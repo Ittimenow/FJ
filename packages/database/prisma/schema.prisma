@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameStatus {
+  WAITING
+  IN_PROGRESS
+  ENDED
+  CANCELLED
+}
+
+enum SystemRole {
+  USER
+  HOST
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+}
+
+enum GameRole {
+  HOST
+  PLAYER
+  BANKER
+  OBSERVER
+}
+
+enum GamePlayerStatus {
+  INVITED
+  JOINED
+  LEFT
+  KICKED
+}
+
+enum BoardTrack {
+  RAT_RACE
+  FAST_TRACK
+}
+
+enum AssetStatus {
+  ACTIVE
+  SOLD
+}
+
+enum CardType {
+  SMALL_DEAL @map("small_deal")
+  BIG_DEAL   @map("big_deal")
+  MARKET     @map("market")
+  DOODAD     @map("doodad")
+  FAST_TRACK @map("fast_track")
+  DREAM      @map("dream")
+}
+
+enum ProfessionLineSection {
+  INCOME    @map("income")
+  EXPENSE   @map("expense")
+  ASSET     @map("asset")
+  LIABILITY @map("liability")
+  TOTAL     @map("total")
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  displayName  String        @map("display_name")
+  avatarUrl    String?       @map("avatar_url")
+  role         SystemRole    @default(USER)
+  status       AccountStatus @default(ACTIVE)
+  blockedAt    DateTime?     @map("blocked_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  createdGames Game[]            @relation("CreatedGames")
+  gamePlayers  GamePlayer[]      @relation("UserGamePlayers")
+  events       GameEvent[]       @relation("UserEvents")
+  chatMessages GameChatMessage[] @relation("UserChatMessages")
+
+  @@map("users")
+}
+
+model Game {
+  id               String     @id @default(uuid()) @db.Uuid
+  code             String     @unique
+  title            String
+  status           GameStatus @default(WAITING)
+  maxPlayers       Int        @default(6) @map("max_players")
+  currentTurnIndex Int        @default(0) @map("current_turn_index")
+  currentRound     Int        @default(1) @map("current_round")
+  settings         Json       @default("{}")
+  createdById      String?    @map("created_by_id") @db.Uuid
+  startedAt        DateTime?  @map("started_at")
+  endedAt          DateTime?  @map("ended_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  createdBy    User?             @relation("CreatedGames", fields: [createdById], references: [id], onDelete: SetNull)
+  players      GamePlayer[]
+  events       GameEvent[]
+  chatMessages GameChatMessage[]
+
+  @@index([status])
+  @@index([createdById])
+  @@map("games")
+}
+
+model GamePlayer {
+  id                String           @id @default(uuid()) @db.Uuid
+  gameId            String           @map("game_id") @db.Uuid
+  userId            String?          @map("user_id") @db.Uuid
+  guestName         String?          @map("guest_name")
+  role              GameRole         @default(PLAYER)
+  status            GamePlayerStatus @default(JOINED)
+  seat              Int?
+  color             String?
+  isReady           Boolean          @default(false) @map("is_ready")
+  professionId      Int?             @map("profession_id")
+  track             BoardTrack       @default(RAT_RACE)
+  position          Int              @default(-1)
+  fastTrackPosition Int              @default(0) @map("fast_track_position")
+  joinedAt          DateTime         @default(now()) @map("joined_at")
+  leftAt            DateTime?        @map("left_at")
+  lastTurnAt        DateTime?        @map("last_turn_at")
+
+  game           Game                    @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user           User?                   @relation("UserGamePlayers", fields: [userId], references: [id], onDelete: SetNull)
+  profession     Profession?             @relation(fields: [professionId], references: [id], onDelete: SetNull)
+  financialState PlayerFinancialState?
+  assets         PlayerAsset[]
+  liabilities    PlayerLiability[]
+  events         GameEvent[]
+
+  @@unique([gameId, userId])
+  @@unique([gameId, seat])
+  @@index([gameId, role, status])
+  @@index([professionId])
+  @@map("game_players")
+}
+
+model Profession {
+  id                          Int      @id @default(autoincrement())
+  slug                        String   @unique
+  name                        String
+  salaryCents                 BigInt?  @map("salary_cents")
+  interestCents               BigInt?  @map("interest_cents")
+  dividendsCents              BigInt?  @map("dividends_cents")
+  realestateBusinessCents     BigInt?  @map("realestate_business_cents")
+  passiveIncomeCents          BigInt?  @map("passive_income_cents")
+  totalIncomeCents            BigInt?  @map("total_income_cents")
+  taxesCents                  BigInt?  @map("taxes_cents")
+  mortgagePaymentCents        BigInt?  @map("mortgage_payment_cents")
+  schoolLoanPaymentCents      BigInt?  @map("school_loan_payment_cents")
+  carLoanPaymentCents         BigInt?  @map("car_loan_payment_cents")
+  creditCardPaymentCents      BigInt?  @map("credit_card_payment_cents")
+  retailPaymentCents          BigInt?  @map("retail_payment_cents")
+  otherExpensesCents          BigInt?  @map("other_expenses_cents")
+  childrenExpenseCents        BigInt?  @map("children_expense_cents")
+  perChildCostCents           BigInt?  @map("per_child_cost_cents")
+  totalExpensesCents          BigInt?  @map("total_expenses_cents")
+  monthlyCashflowCents        BigInt?  @map("monthly_cashflow_cents")
+  savingsCents                BigInt?  @map("savings_cents")
+  homeMortgageCents           BigInt?  @map("home_mortgage_cents")
+  schoolDebtCents             BigInt?  @map("school_debt_cents")
+  carDebtCents                BigInt?  @map("car_debt_cents")
+  creditCardsDebtCents        BigInt?  @map("credit_cards_debt_cents")
+  retailDebtCents             BigInt?  @map("retail_debt_cents")
+  isActive                    Boolean  @default(true) @map("is_active")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  lines       ProfessionLine[]
+  gamePlayers GamePlayer[]
+
+  @@map("professions")
+}
+
+model ProfessionLine {
+  id           Int                   @id @default(autoincrement())
+  professionId Int                   @map("profession_id")
+  section      ProfessionLineSection
+  label        String
+  amountCents  BigInt?               @map("amount_cents")
+  sortOrder    Int                   @default(100) @map("sort_order")
+
+  profession Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+
+  @@index([professionId, section])
+  @@map("profession_lines")
+}
+
+model Card {
+  id          Int      @id @default(autoincrement())
+  cardType    CardType @map("card_type")
+  slug        String   @unique
+  title       String
+  bodyText    String   @map("body_text")
+  category    String?
+  subcategory String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  meta       CardMeta[]
+  effects    CardEffect[]
+  conditions CardCondition[]
+  assets     PlayerAsset[]
+
+  @@index([cardType])
+  @@index([category])
+  @@map("cards")
+}
+
+model CardMeta {
+  id        Int    @id @default(autoincrement())
+  cardId    Int    @map("card_id")
+  metaKey   String @map("meta_key")
+  metaValue String @map("meta_value")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, metaKey])
+  @@map("card_meta")
+}
+
+model CardEffect {
+  id          Int     @id @default(autoincrement())
+  cardId      Int     @map("card_id")
+  effectType  String  @map("effect_type")
+  amountCents BigInt? @map("amount_cents")
+  payload     Json    @default("{}")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, effectType])
+  @@map("card_effects")
+}
+
+model CardCondition {
+  id       Int    @id @default(autoincrement())
+  cardId   Int    @map("card_id")
+  condType String @map("cond_type")
+  payload  Json   @default("{}")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, condType])
+  @@map("card_conditions")
+}
+
+model PlayerFinancialState {
+  id                       String    @id @default(uuid()) @db.Uuid
+  gamePlayerId             String    @unique @map("game_player_id") @db.Uuid
+  cashCents                BigInt    @default(0) @map("cash_cents")
+  salaryCents              BigInt    @default(0) @map("salary_cents")
+  passiveIncomeCents       BigInt    @default(0) @map("passive_income_cents")
+  totalIncomeCents         BigInt    @default(0) @map("total_income_cents")
+  totalExpensesCents       BigInt    @default(0) @map("total_expenses_cents")
+  monthlyCashflowCents     BigInt    @default(0) @map("monthly_cashflow_cents")
+  baseExpensesCents        BigInt    @default(0) @map("base_expenses_cents")
+  basePassiveIncomeCents   BigInt    @default(0) @map("base_passive_income_cents")
+  perChildCostCents        BigInt    @default(0) @map("per_child_cost_cents")
+  childrenCount            Int       @default(0) @map("children_count")
+  charityTurns             Int       @default(0) @map("charity_turns")
+  downsizedTurns           Int       @default(0) @map("downsized_turns")
+  paycheckCount            Int       @default(0) @map("paycheck_count")
+  escapedRatRaceAt         DateTime? @map("escaped_rat_race_at")
+  wonAt                    DateTime? @map("won_at")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  gamePlayer GamePlayer @relation(fields: [gamePlayerId], references: [id], onDelete: Cascade)
+
+  @@map("player_financial_state")
+}
+
+model PlayerAsset {
+  id                String      @id @default(uuid()) @db.Uuid
+  gamePlayerId      String      @map("game_player_id") @db.Uuid
+  sourceCardId      Int?        @map("source_card_id")
+  type              String
+  name              String
+  symbol            String?
+  quantity          Int         @default(1)
+  units             Int         @default(1)
+  costBasisCents    BigInt      @default(0) @map("cost_basis_cents")
+  marketValueCents  BigInt      @default(0) @map("market_value_cents")
+  downPaymentCents  BigInt      @default(0) @map("down_payment_cents")
+  cashflowCents     BigInt      @default(0) @map("cashflow_cents")
+  status            AssetStatus @default(ACTIVE)
+  createdAt         DateTime    @default(now()) @map("created_at")
+  soldAt            DateTime?   @map("sold_at")
+
+  gamePlayer GamePlayer @relation(fields: [gamePlayerId], references: [id], onDelete: Cascade)
+  sourceCard Card?      @relation(fields: [sourceCardId], references: [id], onDelete: SetNull)
+
+  @@index([gamePlayerId, status])
+  @@index([sourceCardId])
+  @@map("player_assets")
+}
+
+model PlayerLiability {
+  id             String   @id @default(uuid()) @db.Uuid
+  gamePlayerId   String   @map("game_player_id") @db.Uuid
+  type           String
+  name           String
+  balanceCents   BigInt   @default(0) @map("balance_cents")
+  paymentCents   BigInt   @default(0) @map("payment_cents")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  gamePlayer GamePlayer @relation(fields: [gamePlayerId], references: [id], onDelete: Cascade)
+
+  @@index([gamePlayerId])
+  @@map("player_liabilities")
+}
+
+model GameEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  gameId        String   @map("game_id") @db.Uuid
+  gamePlayerId  String?  @map("game_player_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  type          String
+  sequence      Int
+  version       Int      @default(1)
+  payload       Json
+  stateSnapshot Json?    @map("state_snapshot")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  game       Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  gamePlayer GamePlayer? @relation(fields: [gamePlayerId], references: [id], onDelete: SetNull)
+  actor      User?       @relation("UserEvents", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([gameId, sequence])
+  @@index([gameId, type])
+  @@index([actorUserId])
+  @@map("game_events")
+}
+
+model GameChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation("UserChatMessages", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([gameId, createdAt])
+  @@map("game_chat_messages")
+}

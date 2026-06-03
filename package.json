@@ -1,0 +1,31 @@
+{
+  "name": "cashflow-online",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:local": "node scripts/dev-local.mjs",
+    "dev:api": "npm run start:dev --workspace=@cashflow/api",
+    "dev:web": "npm run dev --workspace=@cashflow/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run prisma:generate --workspace=@cashflow/database",
+    "db:migrate": "npm run prisma:migrate --workspace=@cashflow/database",
+    "db:push": "npm run prisma:push --workspace=@cashflow/database",
+    "db:seed": "npm run prisma:seed --workspace=@cashflow/database"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.0.0"
+  }
+}
