@@ -3,7 +3,7 @@ import { Providers } from "@/components/layout/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cashflow Online",
+  title: "Financial Journey",
   description: "Realtime MVP финансовой игры с историей партий"
 };
 

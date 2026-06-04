@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards
+} from "@nestjs/common";
 import { CardType, SystemRole } from "@prisma/client";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -11,6 +21,11 @@ import { AdminCardDto } from "./dto/card.dto";
 @Controller("admin/cards")
 export class AdminCardsController {
   constructor(private readonly admin: AdminService) {}
+
+  @Get("unclear")
+  listUnclearCards() {
+    return this.admin.listUnclearCards();
+  }
 
   @Get()
   listCards(@Query("cardType") cardType?: CardType) {
@@ -25,5 +40,10 @@ export class AdminCardsController {
   @Patch(":id")
   updateCard(@Param("id") id: string, @Body() dto: AdminCardDto) {
     return this.admin.updateCard(Number(id), dto);
+  }
+
+  @Delete(":id")
+  deleteCard(@Param("id") id: string) {
+    return this.admin.deleteCard(Number(id));
   }
 }

@@ -116,6 +116,34 @@ export class GamesController {
     return result;
   }
 
+  @Post(":id/market/sell")
+  async sellMarketAsset(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.sellMarketAsset(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/market/decline")
+  async declineMarketSale(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.declineMarketSale(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/charity/accept")
+  async acceptCharity(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.acceptCharity(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/charity/decline")
+  async declineCharity(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.declineCharity(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
   @Post(":id/loans")
   async takeLoan(
     @CurrentUser() user: AuthenticatedUser,

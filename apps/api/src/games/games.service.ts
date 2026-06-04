@@ -70,6 +70,24 @@ type GamePendingAction =
       gamePlayerId: string;
       cardId: number;
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+    }
+  | {
+      type: "charity_choice";
+      gamePlayerId: string;
+      donationCents: number;
+      turns: number;
+    }
+  | {
+      type: "market_sale";
+      gamePlayerId: string;
+      cardId: number;
+      title: string;
+      assetId: string;
+      assetName: string;
+      salePriceCents: number;
+      mortgageCents: number;
+      proceedsCents: number;
+      cashflowCents: number;
     };
 
 interface GameSettings {
@@ -515,9 +533,18 @@ export class GamesService {
         return;
       }
 
-      const dice = rollDie();
+      const charityDiceActive = currentPlayer.financialState.charityTurns > 0;
+      const diceValues = charityDiceActive ? [rollDie(), rollDie()] : [rollDie()];
+      const dice = diceValues.reduce((sum, value) => sum + value, 0);
       const move = moveOnCircularTrack(currentPlayer.position, dice);
       const cell = ratRaceBoard[move.to];
+
+      if (charityDiceActive) {
+        await tx.playerFinancialState.update({
+          where: { gamePlayerId: currentPlayer.id },
+          data: { charityTurns: { decrement: 1 } }
+        });
+      }
 
       await tx.gamePlayer.update({
         where: { id: currentPlayer.id },
@@ -530,7 +557,14 @@ export class GamesService {
       emittedEvents.push({
         type: realtimeEvents.playerRollDice,
         gamePlayerId: currentPlayer.id,
-        payload: { dice }
+        payload: {
+          dice,
+          diceValues,
+          diceCount: diceValues.length,
+          ...(charityDiceActive
+            ? { charityTurnsRemaining: currentPlayer.financialState.charityTurns - 1 }
+            : {})
+        }
       });
       emittedEvents.push({
         type: realtimeEvents.playerMove,
@@ -576,12 +610,24 @@ export class GamesService {
         });
       }
 
+      let pendingCellAction = false;
       if (cell) {
-        await this.resolveCell(tx, game.id, currentPlayer.id, cell.type, emittedEvents);
+        pendingCellAction = await this.resolveCell(
+          tx,
+          game.id,
+          game.settings,
+          currentPlayer.id,
+          cell.type,
+          emittedEvents
+        );
       }
 
       await this.recalculatePlayer(tx, currentPlayer.id);
       await this.checkRatRaceExit(tx, currentPlayer.id, emittedEvents);
+      if (pendingCellAction) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
       if (cell?.type === "deal") {
         await tx.game.update({
           where: { id: gameId },
@@ -681,12 +727,10 @@ export class GamesService {
       const pending = this.pendingAction(game.settings);
       const isDealChoice =
         dto.cardType === CardType.SMALL_DEAL || dto.cardType === CardType.BIG_DEAL;
-      let dealActiveIndex: number | null = null;
+      const activeIndex = game.players.length > 0 ? game.currentTurnIndex % game.players.length : null;
+      const currentPlayer = activeIndex === null ? null : game.players[activeIndex];
 
       if (isDealChoice) {
-        const activeIndex = game.currentTurnIndex % game.players.length;
-        dealActiveIndex = activeIndex;
-        const currentPlayer = game.players[activeIndex];
         if (
           !currentPlayer ||
           currentPlayer.id !== player.id ||
@@ -695,6 +739,8 @@ export class GamesService {
         ) {
           throw new ForbiddenException("Choose a deal only during your deal turn");
         }
+      } else if (!currentPlayer || currentPlayer.id !== player.id) {
+        throw new ForbiddenException("Draw a card only during your turn");
       } else if (pending) {
         throw new BadRequestException("Current player must finish pending action");
       }
@@ -705,7 +751,31 @@ export class GamesService {
         gamePlayerId: player.id,
         payload: this.cardPayload(card)
       });
-      if (isDealChoice && this.hasAutomaticCardEffects(card)) {
+      const networkMarketingCard = this.networkMarketingCard(card);
+      if (isDealChoice && networkMarketingCard) {
+        const applied = await this.applyNetworkMarketingCard(
+          tx,
+          player.id,
+          card,
+          networkMarketingCard,
+          emittedEvents
+        );
+        if (applied) {
+          await this.recalculatePlayer(tx, player.id);
+          await this.checkRatRaceExit(tx, player.id, emittedEvents);
+        }
+        await tx.game.update({
+          where: { id: gameId },
+          data: { settings: this.settingsWithPending(game.settings, null) }
+        });
+        if (activeIndex !== null) {
+          await this.advanceTurn(tx, game, activeIndex);
+        }
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "network_marketing_resolved_turn_ended" }
+        });
+      } else if (isDealChoice && this.hasAutomaticCardEffects(card)) {
         const affectedPlayerIds = await this.applyAutomaticCardEffects(
           tx,
           gameId,
@@ -720,8 +790,8 @@ export class GamesService {
           where: { id: gameId },
           data: { settings: this.settingsWithPending(game.settings, null) }
         });
-        if (dealActiveIndex !== null) {
-          await this.advanceTurn(tx, game, dealActiveIndex);
+        if (activeIndex !== null) {
+          await this.advanceTurn(tx, game, activeIndex);
         }
         emittedEvents.push({
           type: realtimeEvents.stateUpdate,
@@ -743,6 +813,40 @@ export class GamesService {
           type: realtimeEvents.stateUpdate,
           payload: { reason: "deal_card_drawn" }
         });
+      } else if (card.cardType === CardType.MARKET) {
+        const offer = await this.findMarketSaleOffer(tx, player.id, card);
+        if (offer) {
+          await tx.game.update({
+            where: { id: gameId },
+            data: {
+              settings: this.settingsWithPending(game.settings, {
+                type: "market_sale",
+                gamePlayerId: player.id,
+                cardId: card.id,
+                title: card.title,
+                assetId: offer.assetId,
+                assetName: offer.assetName,
+                salePriceCents: offer.salePriceCents,
+                mortgageCents: offer.mortgageCents,
+                proceedsCents: offer.proceedsCents,
+                cashflowCents: offer.cashflowCents
+              })
+            }
+          });
+          emittedEvents.push({
+            type: "market:sale_offer",
+            gamePlayerId: player.id,
+            payload: {
+              cardId: card.id,
+              title: card.title,
+              ...offer
+            }
+          });
+          emittedEvents.push({
+            type: realtimeEvents.stateUpdate,
+            payload: { reason: "market_sale_offer" }
+          });
+        }
       }
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
@@ -817,6 +921,8 @@ export class GamesService {
       const cashflowCents =
         cashflowEffectAmount ?? BigInt(Math.round(Number(meta.cashflow_monthly ?? "0")));
       const totalDownPayment = downPaymentCents * BigInt(quantity);
+      const beforeCashCents = state.cashCents;
+      const afterCashCents = beforeCashCents - totalDownPayment;
 
       if (state.cashCents < totalDownPayment) {
         throw new BadRequestException("Not enough cash for down payment");
@@ -861,6 +967,8 @@ export class GamesService {
           title: card.title,
           quantity,
           downPaymentCents: Number(totalDownPayment),
+          beforeCashCents: cents(beforeCashCents),
+          afterCashCents: cents(afterCashCents),
           cashflowCents: Number(cashflowCents * BigInt(quantity))
         }
       });
@@ -923,7 +1031,7 @@ export class GamesService {
     return this.actionResult(gameId, emittedEvents);
   }
 
-  async takeLoan(gameId: string, userId: string, dto: TakeLoanDto) {
+  async sellMarketAsset(gameId: string, userId: string) {
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -937,13 +1045,270 @@ export class GamesService {
           }
         }
       });
-      if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new ForbiddenException("Loans are available only during an active game");
-      }
+      const pending = this.pendingAction(game.settings);
       const activeIndex = game.currentTurnIndex % game.players.length;
       const currentPlayer = game.players[activeIndex];
-      if (!currentPlayer || currentPlayer.id !== player.id) {
-        throw new ForbiddenException("You can take a loan only during your turn");
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== player.id ||
+        pending?.type !== "market_sale" ||
+        pending.gamePlayerId !== player.id
+      ) {
+        throw new ForbiddenException("No market sale is waiting for your decision");
+      }
+
+      const [state, asset] = await Promise.all([
+        tx.playerFinancialState.findUniqueOrThrow({
+          where: { gamePlayerId: player.id }
+        }),
+        tx.playerAsset.findFirst({
+          where: {
+            id: pending.assetId,
+            gamePlayerId: player.id,
+            status: AssetStatus.ACTIVE
+          }
+        })
+      ]);
+      if (!asset) throw new NotFoundException("Asset not found");
+
+      const proceeds = BigInt(pending.proceedsCents);
+      if (proceeds < 0n && state.cashCents < proceeds * -1n) {
+        throw new BadRequestException("Not enough cash to close this sale");
+      }
+
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: player.id },
+        data: {
+          cashCents:
+            proceeds >= 0n
+              ? { increment: proceeds }
+              : { decrement: proceeds * -1n }
+        }
+      });
+      await tx.playerAsset.update({
+        where: { id: asset.id },
+        data: {
+          marketValueCents: 0n,
+          cashflowCents: 0n,
+          status: AssetStatus.SOLD,
+          soldAt: new Date()
+        }
+      });
+      const updatedState = await this.recalculatePlayer(tx, player.id);
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: realtimeEvents.dealSell,
+        gamePlayerId: player.id,
+        payload: {
+          cardId: pending.cardId,
+          title: pending.title,
+          assetId: asset.id,
+          assetName: asset.name,
+          salePriceCents: pending.salePriceCents,
+          mortgageCents: pending.mortgageCents,
+          proceedsCents: pending.proceedsCents,
+          removedCashflowCents: Number(asset.cashflowCents),
+          beforeCashCents: cents(state.cashCents),
+          afterCashCents: cents(updatedState.cashCents)
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "market_sale_completed_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async declineMarketSale(gameId: string, userId: string) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: "JOINED" },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== player.id ||
+        pending?.type !== "market_sale" ||
+        pending.gamePlayerId !== player.id
+      ) {
+        throw new ForbiddenException("No market sale is waiting for your decision");
+      }
+
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: "market:sale_declined",
+        gamePlayerId: player.id,
+        payload: {
+          cardId: pending.cardId,
+          title: pending.title,
+          assetId: pending.assetId,
+          assetName: pending.assetName,
+          salePriceCents: pending.salePriceCents,
+          mortgageCents: pending.mortgageCents,
+          proceedsCents: pending.proceedsCents
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "market_sale_declined_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async acceptCharity(gameId: string, userId: string) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: "JOINED" },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== player.id ||
+        pending?.type !== "charity_choice" ||
+        pending.gamePlayerId !== player.id
+      ) {
+        throw new ForbiddenException("No charity choice is waiting for your decision");
+      }
+
+      const state = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: player.id }
+      });
+      const donation = BigInt(pending.donationCents);
+      if (state.cashCents < donation) {
+        throw new BadRequestException("Not enough cash for charity");
+      }
+
+      const updatedState = await tx.playerFinancialState.update({
+        where: { gamePlayerId: player.id },
+        data: {
+          cashCents: { decrement: donation },
+          charityTurns: pending.turns
+        },
+        select: { cashCents: true }
+      });
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: "player:charity",
+        gamePlayerId: player.id,
+        payload: {
+          donationCents: Number(donation),
+          beforeCashCents: cents(state.cashCents),
+          afterCashCents: cents(updatedState.cashCents),
+          diceCount: 2,
+          turns: pending.turns,
+          charityTurnsRemaining: pending.turns
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "charity_accepted_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async declineCharity(gameId: string, userId: string) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: "JOINED" },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== player.id ||
+        pending?.type !== "charity_choice" ||
+        pending.gamePlayerId !== player.id
+      ) {
+        throw new ForbiddenException("No charity choice is waiting for your decision");
+      }
+
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: "player:charity_declined",
+        gamePlayerId: player.id,
+        payload: {
+          donationCents: pending.donationCents,
+          diceCount: 2,
+          turns: pending.turns
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "charity_declined_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async takeLoan(gameId: string, userId: string, dto: TakeLoanDto) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId }
+      });
+      if (game.status !== GameStatus.IN_PROGRESS) {
+        throw new ForbiddenException("Loans are available only during an active game");
       }
       const amount = BigInt(dto.amountCents);
       if (dto.amountCents < 1000 || dto.amountCents % 1000 !== 0) {
@@ -1016,11 +1381,12 @@ export class GamesService {
           ? 0n
           : (liability.paymentCents * newBalance) / liability.balanceCents;
 
-      await tx.playerFinancialState.update({
+      const updatedState = await tx.playerFinancialState.update({
         where: { gamePlayerId: player.id },
         data: {
           cashCents: { decrement: repayAmount }
-        }
+        },
+        select: { cashCents: true }
       });
 
       if (newBalance === 0n) {
@@ -1042,7 +1408,14 @@ export class GamesService {
         gamePlayerId: player.id,
         payload: {
           liabilityId: liability.id,
-          amountCents: Number(repayAmount)
+          liabilityType: liability.type,
+          liabilityName: liability.name,
+          amountCents: Number(repayAmount),
+          balanceCents: Number(liability.balanceCents),
+          paymentCents: Number(liability.paymentCents),
+          beforeCashCents: cents(state.cashCents),
+          afterCashCents: cents(updatedState.cashCents),
+          closed: newBalance === 0n
         }
       });
       emittedEvents.push({
@@ -1212,6 +1585,7 @@ export class GamesService {
   private async resolveCell(
     tx: Tx,
     gameId: string,
+    gameSettings: Prisma.JsonValue,
     gamePlayerId: string,
     cellType: string,
     emittedEvents: PendingEvent[]
@@ -1224,6 +1598,43 @@ export class GamesService {
         gamePlayerId,
         payload: this.cardPayload(card)
       });
+
+      if (cardType === CardType.MARKET) {
+        const offer = await this.findMarketSaleOffer(tx, gamePlayerId, card);
+        if (offer) {
+          await tx.game.update({
+            where: { id: gameId },
+            data: {
+              settings: this.settingsWithPending(gameSettings, {
+                type: "market_sale",
+                gamePlayerId,
+                cardId: card.id,
+                title: card.title,
+                assetId: offer.assetId,
+                assetName: offer.assetName,
+                salePriceCents: offer.salePriceCents,
+                mortgageCents: offer.mortgageCents,
+                proceedsCents: offer.proceedsCents,
+                cashflowCents: offer.cashflowCents
+              })
+            }
+          });
+          emittedEvents.push({
+            type: "market:sale_offer",
+            gamePlayerId,
+            payload: {
+              cardId: card.id,
+              title: card.title,
+              ...offer
+            }
+          });
+          emittedEvents.push({
+            type: realtimeEvents.stateUpdate,
+            payload: { reason: "market_sale_offer" }
+          });
+          return true;
+        }
+      }
 
       if (cardType === CardType.DOODAD) {
         await this.applyDoodad(tx, gamePlayerId, card, emittedEvents);
@@ -1239,7 +1650,7 @@ export class GamesService {
           await this.recalculatePlayer(tx, affectedPlayerId);
         }
       }
-      return;
+      return false;
     }
 
     if (cellType === "baby") {
@@ -1257,7 +1668,7 @@ export class GamesService {
           payload: { childrenCount: state.childrenCount + 1 }
         });
       }
-      return;
+      return false;
     }
 
     if (cellType === "downsized") {
@@ -1279,7 +1690,7 @@ export class GamesService {
           turns: 2
         }
       });
-      return;
+      return false;
     }
 
     if (cellType === "charity") {
@@ -1287,24 +1698,189 @@ export class GamesService {
         where: { gamePlayerId }
       });
       const donation = state.totalIncomeCents / 10n;
-      if (state.cashCents >= donation && donation > 0n) {
-        await tx.playerFinancialState.update({
-          where: { gamePlayerId },
+      if (donation > 0n) {
+        await tx.game.update({
+          where: { id: gameId },
           data: {
-            cashCents: { decrement: donation },
-            charityTurns: 3
+            settings: this.settingsWithPending(gameSettings, {
+              type: "charity_choice",
+              gamePlayerId,
+              donationCents: Number(donation),
+              turns: 3
+            })
           }
         });
         emittedEvents.push({
-          type: "player:charity",
+          type: "player:charity_choice_required",
           gamePlayerId,
           payload: {
             donationCents: Number(donation),
+            diceCount: 2,
             turns: 3
           }
         });
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "charity_choice_required" }
+        });
+        return true;
       }
     }
+    return false;
+  }
+
+  private async findMarketSaleOffer(tx: Tx, gamePlayerId: string, card: CardWithRules) {
+    const marketText = this.normalizedSearchText(card.title, card.bodyText);
+    if (this.marketSaleIsUnsupported(marketText)) return null;
+
+    const targetKeys = this.marketTargetKeys(marketText);
+    if (targetKeys.length === 0) return null;
+
+    const assets = await tx.playerAsset.findMany({
+      where: { gamePlayerId, status: AssetStatus.ACTIVE },
+      include: {
+        sourceCard: {
+          include: { meta: true }
+        }
+      }
+    });
+
+    const offers = assets.flatMap((asset) => {
+      const sourceCard = asset.sourceCard;
+      const assetText = this.normalizedSearchText(
+        asset.type,
+        asset.name,
+        sourceCard?.title,
+        sourceCard?.bodyText,
+        sourceCard?.category,
+        sourceCard?.subcategory
+      );
+      if (!targetKeys.some((key) => this.assetMatchesMarketTarget(key, assetText))) {
+        return [];
+      }
+
+      const salePrice = this.marketSalePriceCents(card, marketText, asset, assetText);
+      if (salePrice <= 0n) return [];
+
+      const sourceMeta = sourceCard ? this.metaMap(sourceCard.meta) : {};
+      const mortgage =
+        this.metaMoneyCents(sourceMeta, "mortgage") ||
+        bigintMax(0n, asset.costBasisCents - asset.downPaymentCents);
+      const proceeds = salePrice - mortgage;
+
+      return [
+        {
+          assetId: asset.id,
+          assetName: asset.name,
+          salePriceCents: Number(salePrice),
+          mortgageCents: Number(mortgage),
+          proceedsCents: Number(proceeds),
+          cashflowCents: Number(asset.cashflowCents)
+        }
+      ];
+    });
+
+    return offers.sort((left, right) => right.proceedsCents - left.proceedsCents)[0] ?? null;
+  }
+
+  private marketSaleIsUnsupported(marketText: string) {
+    return (
+      marketText.includes("племянник") ||
+      marketText.includes("сдайте обратно в банк") ||
+      marketText.includes("расширение малого бизнеса")
+    );
+  }
+
+  private marketTargetKeys(marketText: string) {
+    const keys: string[] = [];
+    if (marketText.includes("10 гектар")) keys.push("land10");
+    if (marketText.includes("20 гектар")) keys.push("land20");
+    if (marketText.includes("золот") && marketText.includes("монет")) keys.push("gold_coin");
+    if (marketText.includes("2у")) keys.push("house2u");
+    if (/\b3m\b|\b3м\b|3br|3\/2/.test(marketText)) keys.push("house3m");
+    if (marketText.includes("plex") || marketText.includes("квартирн")) keys.push("plex");
+    if (marketText.includes("апартамент")) keys.push("apartment");
+    if (marketText.includes("автомой")) keys.push("carwash");
+    if (marketText.includes("шашлык")) keys.push("kebab");
+    if (marketText.includes("циркони")) keys.push("zirconium");
+    if (marketText.includes("программн")) keys.push("software");
+    if (marketText.includes("салон") && marketText.includes("крас")) keys.push("beauty_salon");
+    if (marketText.includes("партнерств")) keys.push("partnership");
+    return [...new Set(keys)];
+  }
+
+  private assetMatchesMarketTarget(targetKey: string, assetText: string) {
+    if (targetKey === "land10") return assetText.includes("10 гектар");
+    if (targetKey === "land20") return assetText.includes("20 гектар");
+    if (targetKey === "gold_coin") {
+      return assetText.includes("золот") && assetText.includes("монет");
+    }
+    if (targetKey === "house2u") return assetText.includes("2у");
+    if (targetKey === "house3m") return /\b3m\b|\b3м\b|3\/2|3br/.test(assetText);
+    if (targetKey === "plex") {
+      return /duplex|plex|[248][\s-]*(кв|квартир)/.test(assetText);
+    }
+    if (targetKey === "apartment") return assetText.includes("апартамент");
+    if (targetKey === "carwash") return assetText.includes("автомой");
+    if (targetKey === "kebab") return assetText.includes("шашлык");
+    if (targetKey === "zirconium") return assetText.includes("циркони");
+    if (targetKey === "software") return assetText.includes("программ");
+    if (targetKey === "beauty_salon") {
+      return assetText.includes("салон") && assetText.includes("крас");
+    }
+    if (targetKey === "partnership") return assetText.includes("партнерств");
+    return false;
+  }
+
+  private marketSalePriceCents(
+    card: CardWithRules,
+    marketText: string,
+    asset: { downPaymentCents: bigint; costBasisCents: bigint; quantity: number },
+    assetText: string
+  ) {
+    const meta = this.metaMap(card.meta);
+
+    if (marketText.includes("втрое")) {
+      return asset.downPaymentCents * 3n;
+    }
+    if (marketText.includes("вдвое")) {
+      return asset.downPaymentCents * 2n;
+    }
+    if (marketText.includes("первоначальную стоимость") && marketText.includes("50 000")) {
+      return asset.costBasisCents + 50000n;
+    }
+
+    const basePrice =
+      this.metaMoneyCents(meta, "price") ||
+      this.parseFirstMoneyCents(`${card.title}\n${card.bodyText}`);
+    if (basePrice <= 0n) return 0n;
+
+    if (marketText.includes("каждый блок") || marketText.includes("каждый номер")) {
+      return basePrice * BigInt(this.marketAssetUnits(assetText));
+    }
+    if (marketText.includes("каждую по") || marketText.includes("каждая по")) {
+      return basePrice * BigInt(Math.max(asset.quantity, 1));
+    }
+
+    return basePrice;
+  }
+
+  private marketAssetUnits(assetText: string) {
+    if (/24[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 24;
+    if (/12[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 12;
+    if (/8[\s-]*(кв|квартир|plex)/.test(assetText)) return 8;
+    if (/4[\s-]*(кв|квартир|plex)|4х-кварт/.test(assetText)) return 4;
+    if (/2[\s-]*(кв|квартир|plex)|duplex|двух-кварт/.test(assetText)) return 2;
+    return 1;
+  }
+
+  private normalizedSearchText(...values: Array<string | null | undefined>) {
+    return values
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/\s+/g, " ");
   }
 
   private ratRaceCellsForMove(from: number, steps: number) {
@@ -1357,6 +1933,122 @@ export class GamesService {
       emittedEvents,
       mode: "automatic"
     });
+  }
+
+  private networkMarketingCard(card: CardWithRules) {
+    if (card.cardType !== CardType.SMALL_DEAL) return null;
+
+    const text = `${card.title}\n${card.bodyText}`;
+    const normalized = text.toLowerCase();
+    if (!normalized.includes("уровень")) return null;
+
+    const company = /\bTNI\b/i.test(text)
+      ? "TNI"
+      : /\bAMWAY\b/i.test(text)
+        ? "AMWAY"
+        : /бриллиант/iu.test(text)
+          ? "AMWAY"
+          : null;
+    if (!company) return null;
+
+    const levelMatch = text.match(/(\d+)\s*[-\s]*уровень/iu);
+    const level = levelMatch?.[1] ? Number(levelMatch[1]) : 0;
+    if (!Number.isInteger(level) || level < 1 || level > 4) return null;
+
+    const cashflowCents = this.parseNetworkMarketingCashflowCents(text);
+    if (cashflowCents === null) return null;
+
+    return {
+      company,
+      level,
+      cashflowCents
+    };
+  }
+
+  private async applyNetworkMarketingCard(
+    tx: Tx,
+    gamePlayerId: string,
+    card: CardWithRules,
+    rule: { company: string; level: number; cashflowCents: bigint },
+    emittedEvents: PendingEvent[]
+  ) {
+    const existing = await tx.playerAsset.findFirst({
+      where: {
+        gamePlayerId,
+        type: "network_marketing",
+        symbol: rule.company,
+        status: AssetStatus.ACTIVE
+      },
+      orderBy: [{ quantity: "desc" }, { createdAt: "desc" }]
+    });
+    const currentLevel = existing?.quantity ?? 0;
+    const requiredLevel = rule.level - 1;
+
+    if (currentLevel !== requiredLevel) {
+      emittedEvents.push({
+        type: "network_marketing:discarded",
+        gamePlayerId,
+        payload: {
+          cardId: card.id,
+          title: card.title,
+          company: rule.company,
+          level: rule.level,
+          currentLevel,
+          requiredLevel,
+          reason:
+            rule.level === 1 && currentLevel > 0
+              ? "already_has_level"
+              : "missing_previous_level"
+        }
+      });
+      return false;
+    }
+
+    const previousCashflowCents = existing?.cashflowCents ?? 0n;
+    const assetName =
+      card.title.trim() && card.title.trim() !== "-"
+        ? card.title
+        : `${rule.company}: ${rule.level} уровень`;
+    if (existing) {
+      await tx.playerAsset.update({
+        where: { id: existing.id },
+        data: {
+          sourceCardId: card.id,
+          name: assetName,
+          quantity: rule.level,
+          units: rule.level,
+          cashflowCents: rule.cashflowCents
+        }
+      });
+    } else {
+      await tx.playerAsset.create({
+        data: {
+          gamePlayerId,
+          sourceCardId: card.id,
+          type: "network_marketing",
+          name: assetName,
+          symbol: rule.company,
+          quantity: rule.level,
+          units: rule.level,
+          cashflowCents: rule.cashflowCents
+        }
+      });
+    }
+
+    emittedEvents.push({
+      type: "network_marketing:level_applied",
+      gamePlayerId,
+      payload: {
+        cardId: card.id,
+        title: card.title,
+        company: rule.company,
+        level: rule.level,
+        previousLevel: currentLevel,
+        cashflowCents: Number(rule.cashflowCents),
+        previousCashflowCents: Number(previousCashflowCents)
+      }
+    });
+    return true;
   }
 
   private async executeCardActions(
@@ -2010,6 +2702,25 @@ export class GamesService {
     return BigInt(Math.round(amount));
   }
 
+  private parseFirstMoneyCents(text: string) {
+    const match = text.match(/\$\s*([0-9][0-9\s,.]*)/u);
+    if (!match?.[1]) return 0n;
+    const normalized = match[1].replace(/\s/g, "").replace(/,/g, "");
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? BigInt(Math.round(amount)) : 0n;
+  }
+
+  private parseNetworkMarketingCashflowCents(text: string) {
+    const match =
+      text.match(/денежный\s+поток\s*\$?\s*([+-]?\s*[0-9][0-9\s,.]*)/iu) ??
+      text.match(/добавьте\s*\+?\s*\$?\s*([+-]?\s*[0-9][0-9\s,.]*)/iu);
+    if (!match?.[1]) return null;
+
+    const normalized = match[1].replace(/\s/g, "").replace(/,/g, "");
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? BigInt(Math.round(amount)) : null;
+  }
+
   private metaMap(meta: Array<{ metaKey: string; metaValue: string }>) {
     return meta.reduce<Record<string, string>>((acc, item) => {
       acc[item.metaKey] = item.metaValue;
@@ -2045,6 +2756,44 @@ export class GamesService {
         gamePlayerId: value.gamePlayerId,
         cardId: value.cardId,
         cardType: value.cardType
+      };
+    }
+    if (
+      value.type === "charity_choice" &&
+      typeof value.gamePlayerId === "string" &&
+      typeof value.donationCents === "number" &&
+      typeof value.turns === "number"
+    ) {
+      return {
+        type: "charity_choice",
+        gamePlayerId: value.gamePlayerId,
+        donationCents: value.donationCents,
+        turns: value.turns
+      };
+    }
+    if (
+      value.type === "market_sale" &&
+      typeof value.gamePlayerId === "string" &&
+      typeof value.cardId === "number" &&
+      typeof value.title === "string" &&
+      typeof value.assetId === "string" &&
+      typeof value.assetName === "string" &&
+      typeof value.salePriceCents === "number" &&
+      typeof value.mortgageCents === "number" &&
+      typeof value.proceedsCents === "number" &&
+      typeof value.cashflowCents === "number"
+    ) {
+      return {
+        type: "market_sale",
+        gamePlayerId: value.gamePlayerId,
+        cardId: value.cardId,
+        title: value.title,
+        assetId: value.assetId,
+        assetName: value.assetName,
+        salePriceCents: value.salePriceCents,
+        mortgageCents: value.mortgageCents,
+        proceedsCents: value.proceedsCents,
+        cashflowCents: value.cashflowCents
       };
     }
     return null;
@@ -2314,4 +3063,8 @@ function isUuid(value: string) {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function bigintMax(left: bigint, right: bigint) {
+  return left > right ? left : right;
 }

@@ -32,6 +32,87 @@ export class AdminService {
     return toSerializable(cards);
   }
 
+  async listUnclearCards() {
+    const cards = await this.prisma.card.findMany({
+      where: {
+        isActive: true,
+        effects: { none: {} },
+        NOT: [
+          {
+            AND: [
+              {
+                cardType: {
+                  in: [CardType.SMALL_DEAL, CardType.BIG_DEAL, CardType.FAST_TRACK]
+                }
+              },
+              {
+                OR: [
+                  { category: "stock" },
+                  { category: { contains: "share" } },
+                  { subcategory: "stock" },
+                  { subcategory: { contains: "share" } },
+                  { meta: { some: { metaKey: "symbol" } } },
+                  { title: { contains: "Акци" } },
+                  { title: { contains: "акци" } },
+                  { title: { contains: "Stock" } },
+                  { title: { contains: "stock" } },
+                  { title: { contains: "Share" } },
+                  { title: { contains: "share" } },
+                  { bodyText: { contains: "Акци" } },
+                  { bodyText: { contains: "акци" } },
+                  { bodyText: { contains: "Stock" } },
+                  { bodyText: { contains: "stock" } },
+                  { bodyText: { contains: "Share" } },
+                  { bodyText: { contains: "share" } }
+                ]
+              },
+              {
+                OR: [
+                  { meta: { some: { metaKey: { in: ["price", "today_price"] } } } },
+                  { bodyText: { contains: "сегодняшняя цена" } },
+                  { bodyText: { contains: "Сегодняшняя цена" } }
+                ]
+              }
+            ]
+          },
+          {
+            AND: [
+              { cardType: CardType.SMALL_DEAL },
+              {
+                OR: [
+                  { title: { contains: "TNI" } },
+                  { title: { contains: "AMWAY" } },
+                  { title: { contains: "сетевого маркетинга" } },
+                  { title: { contains: "Бриллиант" } },
+                  { title: { contains: "бриллиант" } },
+                  { bodyText: { contains: "TNI" } },
+                  { bodyText: { contains: "AMWAY" } },
+                  { bodyText: { contains: "сетевого маркетинга" } },
+                  { bodyText: { contains: "Бриллиант" } },
+                  { bodyText: { contains: "бриллиант" } }
+                ]
+              },
+              {
+                OR: [
+                  { title: { contains: "уровень" } },
+                  { bodyText: { contains: "уровень" } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      include: {
+        meta: { orderBy: { id: "asc" } },
+        effects: { orderBy: { id: "asc" } },
+        conditions: { orderBy: { id: "asc" } }
+      },
+      orderBy: { id: "asc" }
+    });
+
+    return toSerializable(cards);
+  }
+
   async createCard(dto: AdminCardDto) {
     this.validateCardRelations(dto);
 
@@ -91,6 +172,33 @@ export class AdminService {
       return toSerializable(card);
     } catch (error) {
       this.handleCardWriteError(error);
+    }
+  }
+
+  async deleteCard(cardId: number) {
+    if (!Number.isInteger(cardId) || cardId <= 0) {
+      throw new BadRequestException("Invalid card id");
+    }
+
+    try {
+      const card = await this.prisma.card.delete({
+        where: { id: cardId },
+        include: {
+          meta: { orderBy: { id: "asc" } },
+          effects: { orderBy: { id: "asc" } },
+          conditions: { orderBy: { id: "asc" } }
+        }
+      });
+
+      return toSerializable(card);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException("Card not found");
+      }
+      throw error;
     }
   }
 

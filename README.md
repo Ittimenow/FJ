@@ -1,4 +1,4 @@
-# Cashflow Online
+# Financial Journey
 
 MVP онлайн-версии финансовой настольной игры: Next.js frontend, NestJS API, PostgreSQL, Prisma, Redis и Socket.IO.
 

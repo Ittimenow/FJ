@@ -6,8 +6,8 @@ import { extractMarkdownHeadings, renderMarkdown } from "@/lib/markdown";
 import { GuideToc } from "./guide-toc";
 
 export const metadata: Metadata = {
-  title: "Руководство пользователя | Cashflow Online",
-  description: "Типы аккаунтов, роли в комнате и правила MVP-партии Cashflow Online"
+  title: "Руководство пользователя | Financial Journey",
+  description: "Типы аккаунтов, роли в комнате и правила MVP-партии Financial Journey"
 };
 
 export default async function GuidePage() {

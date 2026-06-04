@@ -161,6 +161,24 @@ export type GamePendingAction =
       gamePlayerId: string;
       cardId: number;
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+    }
+  | {
+      type: "charity_choice";
+      gamePlayerId: string;
+      donationCents: number;
+      turns: number;
+    }
+  | {
+      type: "market_sale";
+      gamePlayerId: string;
+      cardId: number;
+      title: string;
+      assetId: string;
+      assetName: string;
+      salePriceCents: number;
+      mortgageCents: number;
+      proceedsCents: number;
+      cashflowCents: number;
     };
 
 export interface GameEvent {

@@ -148,6 +148,46 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     return result;
   }
 
+  @SubscribeMessage("market:sell")
+  async sellMarketAsset(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.sellMarketAsset(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("market:decline")
+  async declineMarketSale(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.declineMarketSale(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("charity:accept")
+  async acceptCharity(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.acceptCharity(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("charity:decline")
+  async declineCharity(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.declineCharity(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
   @SubscribeMessage("loan:take")
   async takeLoan(
     @ConnectedSocket() client: Socket,

@@ -11,7 +11,7 @@ class AppController {
   @Get()
   root() {
     return {
-      service: "Cashflow Online API",
+      service: "Financial Journey API",
       status: "ok",
       web: "http://localhost:3000",
       api: "http://localhost:4000/api"
