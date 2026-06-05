@@ -92,12 +92,11 @@ function start(command, args, options = {}) {
   child.on("exit", (code, signal) => {
     children.delete(child);
     if (!shuttingDown) {
-      console.error(
-        `[cashflow-prod] child exited: ${command} ${args.join(" ")} ${
-          signal ? `signal ${signal}` : `code ${code}`
-        }`
-      );
-      shutdown(1);
+      startupErrorMessage = `child exited: ${command} ${args.join(" ")} ${
+        signal ? `signal ${signal}` : `code ${code}`
+      }`;
+      appReady = false;
+      console.error(`[cashflow-prod] ${startupErrorMessage}`);
     }
   });
   return child;
@@ -202,8 +201,13 @@ function proxyHttp(req, res) {
   }
 
   if (!appReady) {
-    res.writeHead(503, { "content-type": "application/json" });
-    res.end(JSON.stringify({ statusCode: 503, message: "Application is starting" }));
+    res.writeHead(startupErrorMessage ? 500 : 503, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        statusCode: startupErrorMessage ? 500 : 503,
+        message: startupErrorMessage ?? "Application is starting"
+      })
+    );
     return;
   }
 
@@ -342,6 +346,6 @@ for (const port of publicPorts) {
 
 void startApplication().catch((error) => {
   startupErrorMessage = (error instanceof Error && error.message) || String(error);
+  appReady = false;
   console.error(`[cashflow-prod] ${startupErrorMessage}`);
-  shutdown(1);
 });
