@@ -1,8 +1,10 @@
-FROM node:22-alpine AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV NEXT_PUBLIC_API_PROXY_PATH=/backend
 ENV NEXT_PUBLIC_SOCKET_PATH=/backend/socket.io
@@ -23,11 +25,13 @@ RUN npm run build --workspace=@cashflow/database
 RUN npm run build --workspace=@cashflow/api
 RUN npm run build --workspace=@cashflow/web
 
-FROM node:22-alpine AS runner
+FROM node:22-bookworm-slim AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl wget \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV AUTH_TRUST_HOST=true
