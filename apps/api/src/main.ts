@@ -8,10 +8,20 @@ import { RedisIoAdapter } from "./config/redis-io.adapter";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
-  const webOrigin = config.get<string>("WEB_ORIGIN") ?? "http://localhost:3000";
+  const webOrigin =
+    config.get<string>("WEB_ORIGIN") ??
+    config.get<string>("APP_PUBLIC_URL") ??
+    "http://localhost:3000";
+  const corsOrigins = webOrigin
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const corsOrigin = corsOrigins.length > 1
+    ? corsOrigins
+    : corsOrigins[0] ?? "http://localhost:3000";
 
   app.enableCors({
-    origin: webOrigin,
+    origin: corsOrigin,
     credentials: true
   });
   app.setGlobalPrefix("api", {
@@ -33,8 +43,13 @@ async function bootstrap() {
   }
 
   const port = Number(config.get<string>("API_PORT") ?? 4000);
-  await app.listen(port);
-  console.log(`API listening on http://localhost:${port}`);
+  const host = config.get<string>("API_HOST");
+  if (host) {
+    await app.listen(port, host);
+  } else {
+    await app.listen(port);
+  }
+  console.log(`API listening on http://${host ?? "localhost"}:${port}`);
 }
 
 bootstrap();

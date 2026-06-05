@@ -10,6 +10,7 @@
     "dev:local": "node scripts/dev-local.mjs",
     "dev:api": "npm run start:dev --workspace=@cashflow/api",
     "dev:web": "npm run dev --workspace=@cashflow/web",
+    "start:production": "node scripts/start-production.mjs",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

@@ -24,10 +24,22 @@ interface SocketUser {
   displayName: string;
 }
 
+function corsOriginFromEnv() {
+  const origins = (
+    process.env.WEB_ORIGIN ??
+    process.env.APP_PUBLIC_URL ??
+    "http://localhost:3000"
+  )
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return origins.length > 1 ? origins : origins[0] ?? "http://localhost:3000";
+}
+
 @WebSocketGateway({
   namespace: "games",
   cors: {
-    origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
+    origin: corsOriginFromEnv(),
     credentials: true
   }
 })

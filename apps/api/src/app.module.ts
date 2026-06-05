@@ -10,11 +10,14 @@ import { UsersModule } from "./users/users.module";
 class AppController {
   @Get()
   root() {
+    const web = process.env.APP_PUBLIC_URL ?? process.env.WEB_ORIGIN ?? "http://localhost:3000";
+    const api = process.env.API_PUBLIC_URL ?? `${web.replace(/\/+$/, "")}/backend/api`;
+
     return {
       service: "Financial Journey API",
       status: "ok",
-      web: "http://localhost:3000",
-      api: "http://localhost:4000/api"
+      web,
+      api
     };
   }
 }

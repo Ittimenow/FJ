@@ -21,6 +21,10 @@ API: `http://localhost:4000`
 
 Web: `http://localhost:3000`
 
+## Деплой
+
+Проект подготовлен для Dockerfile-деплоя в Timeweb Cloud App Platform из GitHub. Инструкция и список production-переменных: [docs/deploy-timeweb.md](docs/deploy-timeweb.md).
+
 ## Руководство пользователя
 
 Подробная инструкция по типам аккаунтов, ролям в комнате и правилам MVP-партии находится в [docs/user-guide.md](docs/user-guide.md).

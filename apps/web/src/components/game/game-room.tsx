@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
-import { publicApiBaseUrl } from "@/lib/api";
+import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
 import type { GameEvent, GamePlayer, GameSnapshot, PlayerLiability } from "@/lib/types";
 
@@ -47,8 +47,9 @@ export function GameRoom({
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
-    const socket = io(`${publicApiBaseUrl()}/games`, {
+    const socket = io(`${publicSocketBaseUrl()}/games`, {
       auth: { token },
+      path: publicSocketPath(),
       transports: ["websocket"]
     });
     socketRef.current = socket;
