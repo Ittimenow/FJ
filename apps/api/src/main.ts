@@ -1,11 +1,12 @@
 import "reflect-metadata";
-import { RequestMethod, ValidationPipe } from "@nestjs/common";
+import { Logger, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { RedisIoAdapter } from "./config/redis-io.adapter";
 
 async function bootstrap() {
+  const logger = new Logger("Bootstrap");
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   const webOrigin =
@@ -38,8 +39,16 @@ async function bootstrap() {
   const redisUrl = config.get<string>("REDIS_URL");
   if (redisUrl) {
     const redisAdapter = new RedisIoAdapter(app);
-    await redisAdapter.connectToRedis(redisUrl);
-    app.useWebSocketAdapter(redisAdapter);
+    try {
+      await redisAdapter.connectToRedis(redisUrl);
+      app.useWebSocketAdapter(redisAdapter);
+    } catch (error) {
+      logger.warn(
+        `Redis adapter disabled: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 
   const port = Number(config.get<string>("API_PORT") ?? 4000);
