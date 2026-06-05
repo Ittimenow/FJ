@@ -102,6 +102,19 @@ function start(command, args, options = {}) {
   return child;
 }
 
+function waitForChildExit(child) {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve({
+        code: child.exitCode,
+        signal: child.signalCode
+      });
+      return;
+    }
+    child.once("exit", (code, signal) => resolve({ code, signal }));
+  });
+}
+
 async function waitForPort(host, port, timeoutMs = 30000) {
   const startedAt = Date.now();
 
@@ -124,6 +137,28 @@ async function waitForPort(host, port, timeoutMs = 30000) {
   }
 
   return false;
+}
+
+async function waitForPortOrExit(child, host, port, label, timeoutMs = 30000) {
+  const result = await Promise.race([
+    waitForPort(host, port, timeoutMs).then((ready) => ({ type: "port", ready })),
+    waitForChildExit(child).then(({ code, signal }) => ({
+      type: "exit",
+      code,
+      signal
+    }))
+  ]);
+
+  if (result.type === "port" && result.ready) return;
+  if (result.type === "exit") {
+    throw new Error(
+      `${label} exited before opening ${host}:${port}: ${
+        result.signal ? `signal ${result.signal}` : `code ${result.code}`
+      }`
+    );
+  }
+
+  throw new Error(`${label} did not open ${host}:${port} within ${timeoutMs}ms.`);
 }
 
 async function setupDatabaseIfNeeded() {
@@ -303,7 +338,7 @@ async function startApplication() {
   await setupDatabaseIfNeeded();
 
   log(`Starting API on ${apiHost}:${apiPort}.`);
-  start("node", ["apps/api/dist/main.js"], {
+  const apiProcess = start("node", ["apps/api/dist/main.js"], {
     env: {
       API_HOST: apiHost,
       API_PORT: String(apiPort),
@@ -311,19 +346,17 @@ async function startApplication() {
     }
   });
 
-  const apiReady = await waitForPort(apiHost, apiPort);
-  if (!apiReady) throw new Error("API did not become ready.");
+  await waitForPortOrExit(apiProcess, apiHost, apiPort, "API");
 
   log(`Starting Next.js on ${webHost}:${webPort}.`);
-  start(npmCommand, ["run", "start", "--workspace=@cashflow/web", "--", "-H", webHost, "-p", String(webPort)], {
+  const webProcess = start(npmCommand, ["run", "start", "--workspace=@cashflow/web", "--", "-H", webHost, "-p", String(webPort)], {
     env: {
       API_URL: process.env.API_URL ?? `http://${apiHost}:${apiPort}`,
       PORT: String(webPort)
     }
   });
 
-  const webReady = await waitForPort(webHost, webPort);
-  if (!webReady) throw new Error("Next.js did not become ready.");
+  await waitForPortOrExit(webProcess, webHost, webPort, "Next.js");
 
   appReady = true;
   log(`Application is ready.`);
