@@ -3,6 +3,8 @@ import Credentials from "next-auth/providers/credentials";
 import { apiBaseUrl } from "./lib/api";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? "dev-secret",
+  trustHost: true,
   pages: {
     signIn: "/login"
   },
