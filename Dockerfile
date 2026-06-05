@@ -2,6 +2,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache libc6-compat openssl
+
 ENV NEXT_PUBLIC_API_PROXY_PATH=/backend
 ENV NEXT_PUBLIC_SOCKET_PATH=/backend/socket.io
 
@@ -24,6 +26,8 @@ RUN npm run build --workspace=@cashflow/web
 FROM node:22-alpine AS runner
 
 WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
 
 ENV NODE_ENV=production
 ENV PORT=3000

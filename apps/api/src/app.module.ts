@@ -11,7 +11,15 @@ class AppController {
   @Get()
   root() {
     const web = process.env.APP_PUBLIC_URL ?? process.env.WEB_ORIGIN ?? "http://localhost:3000";
-    const api = process.env.API_PUBLIC_URL ?? `${web.replace(/\/+$/, "")}/backend/api`;
+    const publicAppUrl =
+      process.env.API_PUBLIC_URL === undefined && process.env.APP_PUBLIC_URL
+        ? process.env.APP_PUBLIC_URL.replace(/\/+$/, "")
+        : null;
+    const api =
+      process.env.API_PUBLIC_URL ??
+      (publicAppUrl
+        ? `${publicAppUrl}${process.env.API_PROXY_PATH ?? "/backend"}/api`
+        : `http://localhost:${process.env.API_PORT ?? 4000}/api`);
 
     return {
       service: "Financial Journey API",
