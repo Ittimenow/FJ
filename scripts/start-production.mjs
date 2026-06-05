@@ -11,6 +11,8 @@ loadRootEnvFile();
 
 const publicHost = process.env.HOST ?? "0.0.0.0";
 const publicPort = numberEnv("PORT", 3000);
+const exposedPort = numberEnv("EXPOSED_PORT", 3000);
+const publicPorts = [...new Set([publicPort, exposedPort])];
 const apiHost = process.env.API_HOST ?? "127.0.0.1";
 const apiPort = numberEnv("API_PORT", 4000);
 const webHost = process.env.WEB_HOST ?? "127.0.0.1";
@@ -21,6 +23,9 @@ const apiProxyPath = normalizePrefix(
 const socketProxyPath = normalizePrefix(
   process.env.NEXT_PUBLIC_SOCKET_PATH ?? `${apiProxyPath}/socket.io`
 );
+
+let appReady = false;
+let startupErrorMessage = null;
 
 function numberEnv(name, fallback) {
   const value = Number(process.env[name] ?? fallback);
@@ -189,8 +194,16 @@ function selectTarget(url) {
 
 function proxyHttp(req, res) {
   if (req.url === "/healthz") {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
+    const status = startupErrorMessage ? "error" : appReady ? "ok" : "starting";
+    const statusCode = startupErrorMessage ? 500 : 200;
+    res.writeHead(statusCode, { "content-type": "application/json" });
+    res.end(JSON.stringify({ status, error: startupErrorMessage }));
+    return;
+  }
+
+  if (!appReady) {
+    res.writeHead(503, { "content-type": "application/json" });
+    res.end(JSON.stringify({ statusCode: 503, message: "Application is starting" }));
     return;
   }
 
@@ -228,6 +241,11 @@ function proxyHttp(req, res) {
 }
 
 function proxyUpgrade(req, socket, head) {
+  if (!appReady) {
+    socket.destroy();
+    return;
+  }
+
   const target = selectTarget(req.url);
   const upstream = net.connect(target.port, target.host, () => {
     const headers = {
@@ -252,7 +270,7 @@ function proxyUpgrade(req, socket, head) {
 }
 
 let shuttingDown = false;
-let server;
+const servers = new Set();
 
 function shutdown(code = 0) {
   if (shuttingDown) return;
@@ -260,8 +278,14 @@ function shutdown(code = 0) {
   for (const child of children) {
     if (!child.killed) child.kill("SIGTERM");
   }
-  if (server) {
-    server.close(() => process.exit(code));
+  if (servers.size > 0) {
+    let pending = servers.size;
+    for (const server of servers) {
+      server.close(() => {
+        pending -= 1;
+        if (pending === 0) process.exit(code);
+      });
+    }
     setTimeout(() => process.exit(code), 5000).unref();
     return;
   }
@@ -271,7 +295,7 @@ function shutdown(code = 0) {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-try {
+async function startApplication() {
   await setupDatabaseIfNeeded();
 
   log(`Starting API on ${apiHost}:${apiPort}.`);
@@ -297,13 +321,27 @@ try {
   const webReady = await waitForPort(webHost, webPort);
   if (!webReady) throw new Error("Next.js did not become ready.");
 
-  server = http.createServer(proxyHttp);
-  server.on("upgrade", proxyUpgrade);
-  server.listen(publicPort, publicHost, () => {
-    log(`Listening on ${publicHost}:${publicPort}.`);
-    log(`Proxying ${apiProxyPath} to API and all other traffic to Next.js.`);
-  });
-} catch (error) {
-  console.error(`[cashflow-prod] ${(error instanceof Error && error.message) || error}`);
-  shutdown(1);
+  appReady = true;
+  log(`Application is ready.`);
+  log(`Proxying ${apiProxyPath} to API and all other traffic to Next.js.`);
 }
+
+for (const port of publicPorts) {
+  const publicServer = http.createServer(proxyHttp);
+  servers.add(publicServer);
+  publicServer.on("error", (error) => {
+    startupErrorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[cashflow-prod] server error on ${publicHost}:${port}: ${startupErrorMessage}`);
+    shutdown(1);
+  });
+  publicServer.on("upgrade", proxyUpgrade);
+  publicServer.listen(port, publicHost, () => {
+    log(`Listening on ${publicHost}:${port}.`);
+  });
+}
+
+void startApplication().catch((error) => {
+  startupErrorMessage = (error instanceof Error && error.message) || String(error);
+  console.error(`[cashflow-prod] ${startupErrorMessage}`);
+  shutdown(1);
+});

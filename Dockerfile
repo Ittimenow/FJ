@@ -30,6 +30,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 
 ENV NODE_ENV=production
+ENV AUTH_TRUST_HOST=true
 ENV PORT=3000
 ENV API_HOST=127.0.0.1
 ENV API_PORT=4000
