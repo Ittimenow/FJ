@@ -25,6 +25,8 @@ Web: `http://localhost:3000`
 
 Проект подготовлен для Dockerfile-деплоя в Timeweb Cloud App Platform из GitHub. Инструкция и список production-переменных: [docs/deploy-timeweb.md](docs/deploy-timeweb.md).
 
+Для обычного Timeweb Cloud Server/VPS на Ubuntu используйте отдельную инструкцию: [docs/deploy-timeweb-vps.md](docs/deploy-timeweb-vps.md).
+
 ## Руководство пользователя
 
 Подробная инструкция по типам аккаунтов, ролям в комнате и правилам MVP-партии находится в [docs/user-guide.md](docs/user-guide.md).
