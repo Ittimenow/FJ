@@ -40,12 +40,9 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    network_mode: host
     environment:
       APP_PUBLIC_HOST: ${APP_PUBLIC_HOST:?set APP_PUBLIC_HOST}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
