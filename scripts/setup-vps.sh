@@ -1,13 +1,47 @@
 #!/usr/bin/env bash
 # VPS first-time setup for the FJ project.
-# Run as the 'deploy' user on the server:
-#   bash setup-vps.sh
+#
+# Запуск:
+#   1. Зайдите на сервер как root: ssh root@SERVER_IP
+#   2. Запустите скрипт: bash setup-vps.sh
+#
+# Скрипт создаёт пользователя deploy, настраивает Docker и клонирует репо.
 
 set -euo pipefail
 
-SERVER_IP="185.185.142.230"
-REPO_URL="git@github.com:Ittimenow/FJ.git"
+SERVER_IP="201.51.11.138"
+DEPLOY_USER="deploy"
+REPO_URL="https://github.com/Ittimenow/FJ.git"
 APP_DIR="/opt/fj"
+
+echo ""
+echo "=== [0/6] Пользователь deploy ==="
+if id "$DEPLOY_USER" &>/dev/null; then
+  echo "Пользователь $DEPLOY_USER уже существует."
+else
+  useradd -m -s /bin/bash "$DEPLOY_USER"
+  echo "Пользователь $DEPLOY_USER создан."
+fi
+
+# SSH-директория для deploy
+DEPLOY_HOME=$(eval echo "~$DEPLOY_USER")
+mkdir -p "$DEPLOY_HOME/.ssh"
+chmod 700 "$DEPLOY_HOME/.ssh"
+touch "$DEPLOY_HOME/.ssh/authorized_keys"
+chmod 600 "$DEPLOY_HOME/.ssh/authorized_keys"
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$DEPLOY_HOME/.ssh"
+
+# sudo без пароля для docker-команд (нужно для GitHub Actions)
+SUDOERS_FILE="/etc/sudoers.d/deploy-docker"
+if [ ! -f "$SUDOERS_FILE" ]; then
+  echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/bin/docker compose" > "$SUDOERS_FILE"
+  chmod 440 "$SUDOERS_FILE"
+fi
+
+echo ""
+echo ">>> Добавьте публичный SSH-ключ GitHub Actions в файл:"
+echo ">>> $DEPLOY_HOME/.ssh/authorized_keys"
+echo ""
 
 echo ""
 echo "=== [1/6] Swap (2 GB) ==="
@@ -88,9 +122,9 @@ if [ -d "$APP_DIR/.git" ]; then
   echo "Репо уже склонировано в $APP_DIR, обновляю..."
   git -C "$APP_DIR" pull
 else
-  sudo mkdir -p "$APP_DIR"
-  sudo chown "$USER:$USER" "$APP_DIR"
-  git clone "$REPO_URL" "$APP_DIR"
+  mkdir -p "$APP_DIR"
+  chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+  sudo -u "$DEPLOY_USER" git clone "$REPO_URL" "$APP_DIR"
 fi
 
 echo ""

@@ -47,3 +47,21 @@ jobs:
       - run: npm run db:push
       - run: npm run typecheck
       - run: npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/fj
+            git pull
+            docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build
+            docker image prune -f
