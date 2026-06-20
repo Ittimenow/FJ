@@ -209,6 +209,8 @@ export class AdminService {
         id: true,
         email: true,
         displayName: true,
+        avatarUrl: true,
+        avatarColor: true,
         role: true,
         status: true,
         blockedAt: true,

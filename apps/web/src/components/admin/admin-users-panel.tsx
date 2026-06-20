@@ -9,10 +9,39 @@ interface AdminUser {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl: string | null;
+  avatarColor: string | null;
   role: "USER" | "HOST" | "ADMIN";
   status: "ACTIVE" | "BLOCKED" | "DELETED";
   createdAt: string;
   blockedAt?: string | null;
+}
+
+function UserAvatar({ user }: { user: AdminUser }) {
+  const initials = (() => {
+    const parts = user.displayName.trim().split(/\s+/);
+    const a = parts[0]?.[0] ?? "";
+    const b = parts[1]?.[0] ?? "";
+    return b ? (a + b).toUpperCase() : user.displayName.slice(0, 2).toUpperCase();
+  })();
+
+  if (user.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt=""
+        className="h-8 w-8 rounded-full object-cover border border-line shrink-0"
+      />
+    );
+  }
+  return (
+    <div
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white select-none"
+      style={{ backgroundColor: user.avatarColor ?? "#64748b" }}
+    >
+      {initials}
+    </div>
+  );
 }
 
 export function AdminUsersPanel({ token }: { token: string }) {
@@ -119,6 +148,7 @@ export function AdminUsersPanel({ token }: { token: string }) {
         <table className="w-full min-w-[780px] text-left text-sm">
           <thead className="border-b border-line text-neutral-500">
             <tr>
+              <th className="w-10 py-2" />
               <th className="py-2 font-medium">Аккаунт</th>
               <th className="py-2 font-medium">Роль</th>
               <th className="py-2 font-medium">Статус</th>
@@ -128,6 +158,9 @@ export function AdminUsersPanel({ token }: { token: string }) {
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className="border-b border-line">
+                <td className="py-3 pr-2">
+                  <UserAvatar user={user} />
+                </td>
                 <td className="py-3">
                   <div className="font-medium">{user.displayName}</div>
                   <div className="text-xs text-neutral-500">{user.email}</div>
