@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { GameRoom } from "@/components/game/game-room";
 import { AppShell } from "@/components/layout/app-shell";
 import { apiFetch } from "@/lib/api";
+import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
 import type { GameSnapshot } from "@/lib/types";
 
 export default async function GamePage({
@@ -18,7 +19,11 @@ export default async function GamePage({
   if (snapshot.game.status === "CANCELLED") redirect("/dashboard");
 
   return (
-    <AppShell userName={session.user.displayName ?? session.user.name}>
+    <AppShell
+      userName={session.user.displayName ?? session.user.name}
+      userAvatarColor={generateAvatarColor(session.user.id)}
+      userInitials={avatarInitials(session.user.displayName ?? session.user.name ?? "")}
+    >
       <GameRoom
         initialSnapshot={snapshot}
         token={session.accessToken}

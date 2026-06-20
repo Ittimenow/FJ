@@ -73,6 +73,10 @@ model User {
   passwordHash String        @map("password_hash")
   displayName  String        @map("display_name")
   avatarUrl    String?       @map("avatar_url")
+  avatarColor     String?   @map("avatar_color")
+  gender          String?
+  birthDate       DateTime? @map("birth_date")
+  gameExperience  Int?      @map("game_experience")
   role         SystemRole    @default(USER)
   status       AccountStatus @default(ACTIVE)
   blockedAt    DateTime?     @map("blocked_at")

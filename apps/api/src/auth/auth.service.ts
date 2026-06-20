@@ -11,6 +11,15 @@ import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 
+const AVATAR_COLORS = [
+  "#e11d48","#db2777","#9333ea","#7c3aed","#2563eb",
+  "#0891b2","#0d9488","#16a34a","#ca8a04","#ea580c","#dc2626","#4f46e5"
+];
+
+function randomAvatarColor() {
+  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -37,6 +46,7 @@ export class AuthService {
         email,
         passwordHash,
         displayName: dto.displayName,
+        avatarColor: randomAvatarColor() ?? null,
         role:
           userCount === 0 || adminEmails.includes(email)
             ? SystemRole.ADMIN

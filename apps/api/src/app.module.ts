@@ -4,6 +4,7 @@ import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
 import { FeedbackModule } from "./feedback/feedback.module";
 import { GamesModule } from "./games/games.module";
+import { MailModule } from "./mail/mail.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
 import { UsersModule } from "./users/users.module";
@@ -89,6 +90,7 @@ function classifyDatabaseError(error: unknown) {
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MailModule,
     PrismaModule,
     AuthModule,
     AdminModule,

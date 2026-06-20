@@ -4,6 +4,10 @@ export interface ProfileResponse {
     email: string;
     displayName: string;
     avatarUrl: string | null;
+    avatarColor: string | null;
+    gender: string | null;
+    birthDate: string | null;
+    gameExperience: number | null;
     role: "USER" | "HOST" | "ADMIN";
     status: "ACTIVE" | "BLOCKED" | "DELETED";
     createdAt: string;

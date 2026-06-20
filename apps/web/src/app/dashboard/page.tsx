@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { apiFetch } from "@/lib/api";
+import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
 import { money, shortDate } from "@/lib/format";
 import type { GamesListResponse, ProfileResponse } from "@/lib/types";
 
@@ -25,7 +26,12 @@ export default async function DashboardPage() {
   const isAdmin = profile.user.role === "ADMIN";
 
   return (
-    <AppShell userName={profile.user.displayName}>
+    <AppShell
+      userName={profile.user.displayName}
+      userAvatarUrl={profile.user.avatarUrl}
+      userAvatarColor={profile.user.avatarColor ?? generateAvatarColor(profile.user.id)}
+      userInitials={avatarInitials(profile.user.displayName)}
+    >
       {isAdmin ? (
         <AdminPanel profile={profile} games={games} token={session.accessToken} />
       ) : (
