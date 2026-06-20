@@ -7,7 +7,7 @@ export function Card({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <section
-      className={cn("rounded-md border border-line bg-white shadow-panel", className)}
+      className={cn("min-w-0 overflow-hidden rounded-md border border-line bg-white shadow-panel", className)}
       {...props}
     />
   );
