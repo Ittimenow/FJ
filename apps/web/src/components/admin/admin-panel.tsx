@@ -7,6 +7,7 @@ import type { Route } from "next";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
+import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
@@ -15,11 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { money, shortDate } from "@/lib/format";
 import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
-type AdminSection = "dashboard" | "users" | "cards" | "rules" | "board";
+type AdminSection = "dashboard" | "users" | "cards" | "rules" | "board" | "feedback";
 
 const mainMenu: Array<{ id: AdminSection; label: string }> = [
   { id: "dashboard", label: "Дашборд" },
-  { id: "users", label: "Пользователи" }
+  { id: "users", label: "Пользователи" },
+  { id: "feedback", label: "Предложения" }
 ];
 
 const settingsMenu: Array<{ id: AdminSection; label: string }> = [
@@ -33,7 +35,8 @@ const adminSections = new Set<AdminSection>([
   "users",
   "cards",
   "rules",
-  "board"
+  "board",
+  "feedback"
 ]);
 
 export function AdminPanel({
@@ -118,6 +121,16 @@ export function AdminPanel({
         ) : null}
         {section === "rules" ? <GameRulesSettings /> : null}
         {section === "board" ? <GameBoardSettings /> : null}
+        {section === "feedback" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Предложения пользователей</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdminFeedbackPanel token={token} />
+            </CardContent>
+          </Card>
+        ) : null}
       </main>
     </div>
   );

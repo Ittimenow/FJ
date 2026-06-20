@@ -2,6 +2,7 @@ import { Controller, Get, Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
+import { FeedbackModule } from "./feedback/feedback.module";
 import { GamesModule } from "./games/games.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
@@ -92,7 +93,8 @@ function classifyDatabaseError(error: unknown) {
     AuthModule,
     AdminModule,
     UsersModule,
-    GamesModule
+    GamesModule,
+    FeedbackModule
   ],
   controllers: [AppController]
 })

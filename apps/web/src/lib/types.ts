@@ -198,6 +198,14 @@ export interface GameEvent {
   } | null;
 }
 
+export interface FeedbackMessage {
+  id: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  user: { id: string; displayName: string; email: string } | null;
+}
+
 export interface ChatMessage {
   id: string;
   body: string;

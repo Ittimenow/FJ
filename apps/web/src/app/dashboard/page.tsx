@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { FeedbackForm } from "@/components/feedback/feedback-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,6 +98,18 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </section>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Написать администратору</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-neutral-600">
+              Есть идея по улучшению игры? Напишите нам — мы читаем каждое сообщение.
+            </p>
+            <FeedbackForm token={session.accessToken} />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

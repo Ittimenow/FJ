@@ -80,10 +80,11 @@ model User {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  createdGames Game[]            @relation("CreatedGames")
-  gamePlayers  GamePlayer[]      @relation("UserGamePlayers")
-  events       GameEvent[]       @relation("UserEvents")
-  chatMessages GameChatMessage[] @relation("UserChatMessages")
+  createdGames      Game[]              @relation("CreatedGames")
+  gamePlayers       GamePlayer[]        @relation("UserGamePlayers")
+  events            GameEvent[]         @relation("UserEvents")
+  chatMessages      GameChatMessage[]   @relation("UserChatMessages")
+  feedbackMessages  FeedbackMessage[]   @relation("UserFeedback")
 
   @@map("users")
 }
@@ -357,4 +358,17 @@ model GameChatMessage {
 
   @@index([gameId, createdAt])
   @@map("game_chat_messages")
+}
+
+model FeedbackMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  body      String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation("UserFeedback", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("feedback_messages")
 }
