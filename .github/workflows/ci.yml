@@ -62,6 +62,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            docker run --rm -v /opt/fj:/opt/fj --entrypoint sh caddy:2-alpine -c 'chown -R 1000:1000 /opt/fj'
             cd /opt/fj
             git pull
             docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build
