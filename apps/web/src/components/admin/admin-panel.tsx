@@ -669,7 +669,7 @@ const cardApplicationRules: RuleRow[] = [
   },
   {
     key: "rat race exit",
-    rule: "Игрок выходит на быстрый круг, когда passiveIncome больше totalExpenses.",
+    rule: "Игрок побеждает, и партия завершается, когда passiveIncome больше totalExpenses.",
     example: "passiveIncome > totalExpenses"
   }
 ];

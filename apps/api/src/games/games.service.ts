@@ -92,7 +92,10 @@ type GamePendingAction =
 
 interface GameSettings {
   pendingAction?: GamePendingAction | null;
+  timeLimitMinutes?: number;
 }
+
+const defaultGameTimeLimitMinutes = 90;
 
 const playerColors = [
   "#166534",
@@ -116,6 +119,9 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Новая партия",
         maxPlayers: dto.maxPlayers ?? 6,
+        settings: {
+          timeLimitMinutes: dto.timeLimitMinutes ?? defaultGameTimeLimitMinutes
+        },
         createdById: userId,
         players: {
           create: {
@@ -200,6 +206,7 @@ export class GamesService {
 
   async getGame(gameId: string, userId: string) {
     await this.ensureGameAccess(gameId, userId);
+    await this.expireGameIfNeeded(gameId);
     return this.snapshot(gameId);
   }
 
@@ -456,6 +463,7 @@ export class GamesService {
         data: {
           status: GameStatus.IN_PROGRESS,
           startedAt: new Date(),
+          endedAt: null,
           currentTurnIndex: 0,
           currentRound: 1
         }
@@ -465,7 +473,8 @@ export class GamesService {
         {
           type: "game:started",
           payload: {
-            playerCount: game.players.length
+            playerCount: game.players.length,
+            timeLimitMinutes: this.timeLimitMinutes(game.settings)
           }
         },
         {
@@ -482,6 +491,8 @@ export class GamesService {
   }
 
   async rollDice(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -623,7 +634,11 @@ export class GamesService {
       }
 
       await this.recalculatePlayer(tx, currentPlayer.id);
-      await this.checkRatRaceExit(tx, currentPlayer.id, emittedEvents);
+      const gameWon = await this.checkAnyGameWon(tx, gameId, emittedEvents);
+      if (gameWon) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
       if (pendingCellAction) {
         await this.appendEvents(tx, gameId, userId, emittedEvents);
         return;
@@ -662,6 +677,8 @@ export class GamesService {
   }
 
   async skipTurn(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -711,6 +728,8 @@ export class GamesService {
   }
 
   async drawCard(gameId: string, userId: string, dto: DrawCardDto) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -762,7 +781,11 @@ export class GamesService {
         );
         if (applied) {
           await this.recalculatePlayer(tx, player.id);
-          await this.checkRatRaceExit(tx, player.id, emittedEvents);
+          const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+          if (gameWon) {
+            await this.appendEvents(tx, gameId, userId, emittedEvents);
+            return;
+          }
         }
         await tx.game.update({
           where: { id: gameId },
@@ -785,6 +808,11 @@ export class GamesService {
         );
         for (const affectedPlayerId of affectedPlayerIds) {
           await this.recalculatePlayer(tx, affectedPlayerId);
+        }
+        const gameWon = await this.checkAnyGameWon(tx, gameId, emittedEvents);
+        if (gameWon) {
+          await this.appendEvents(tx, gameId, userId, emittedEvents);
+          return;
         }
         await tx.game.update({
           where: { id: gameId },
@@ -855,6 +883,8 @@ export class GamesService {
   }
 
   async buyDeal(gameId: string, userId: string, dto: BuyDealDto) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -953,12 +983,6 @@ export class GamesService {
       });
 
       await this.recalculatePlayer(tx, player.id);
-      await this.checkRatRaceExit(tx, player.id, emittedEvents);
-      await tx.game.update({
-        where: { id: gameId },
-        data: { settings: this.settingsWithPending(game.settings, null) }
-      });
-      await this.advanceTurn(tx, game, activeIndex);
       emittedEvents.push({
         type: realtimeEvents.dealBuy,
         gamePlayerId: player.id,
@@ -972,6 +996,16 @@ export class GamesService {
           cashflowCents: Number(cashflowCents * BigInt(quantity))
         }
       });
+      const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+      if (gameWon) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
         payload: { reason: "deal_bought_turn_ended" }
@@ -983,6 +1017,8 @@ export class GamesService {
   }
 
   async declineDeal(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1032,6 +1068,8 @@ export class GamesService {
   }
 
   async sellMarketAsset(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1095,11 +1133,6 @@ export class GamesService {
         }
       });
       const updatedState = await this.recalculatePlayer(tx, player.id);
-      await tx.game.update({
-        where: { id: gameId },
-        data: { settings: this.settingsWithPending(game.settings, null) }
-      });
-      await this.advanceTurn(tx, game, activeIndex);
       emittedEvents.push({
         type: realtimeEvents.dealSell,
         gamePlayerId: player.id,
@@ -1116,6 +1149,16 @@ export class GamesService {
           afterCashCents: cents(updatedState.cashCents)
         }
       });
+      const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+      if (gameWon) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
         payload: { reason: "market_sale_completed_turn_ended" }
@@ -1127,6 +1170,8 @@ export class GamesService {
   }
 
   async declineMarketSale(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1181,6 +1226,8 @@ export class GamesService {
   }
 
   async acceptCharity(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1250,6 +1297,8 @@ export class GamesService {
   }
 
   async declineCharity(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1300,6 +1349,8 @@ export class GamesService {
   }
 
   async takeLoan(gameId: string, userId: string, dto: TakeLoanDto) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1352,6 +1403,8 @@ export class GamesService {
   }
 
   async repayLoan(gameId: string, userId: string, dto: RepayLoanDto) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -1402,7 +1455,6 @@ export class GamesService {
       }
 
       await this.recalculatePlayer(tx, player.id);
-      await this.checkRatRaceExit(tx, player.id, emittedEvents);
       emittedEvents.push({
         type: realtimeEvents.loanRepay,
         gamePlayerId: player.id,
@@ -1418,6 +1470,11 @@ export class GamesService {
           closed: newBalance === 0n
         }
       });
+      const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+      if (gameWon) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
         payload: { reason: "loan_repaid" }
@@ -2557,46 +2614,92 @@ export class GamesService {
     });
   }
 
-  private async checkRatRaceExit(
+  private async checkAnyGameWon(
+    tx: Tx,
+    gameId: string,
+    emittedEvents: PendingEvent[]
+  ) {
+    const players = await tx.gamePlayer.findMany({
+      where: {
+        gameId,
+        role: GameRole.PLAYER,
+        status: GamePlayerStatus.JOINED
+      },
+      include: { financialState: true },
+      orderBy: { seat: "asc" }
+    });
+    const winner = players.find((player) => {
+      const state = player.financialState;
+      return (
+        state &&
+        !state.wonAt &&
+        canEscapeRatRace(
+          cents(state.passiveIncomeCents),
+          cents(state.totalExpensesCents)
+        )
+      );
+    });
+    return winner
+      ? this.checkGameWon(tx, winner.id, emittedEvents)
+      : false;
+  }
+
+  private async checkGameWon(
     tx: Tx,
     gamePlayerId: string,
     emittedEvents: PendingEvent[]
   ) {
     const player = await tx.gamePlayer.findUniqueOrThrow({
       where: { id: gamePlayerId },
-      include: { financialState: true }
+      include: { financialState: true, game: true }
     });
     const state = player.financialState;
-    if (!state || player.track !== BoardTrack.RAT_RACE) return;
+    if (
+      !state ||
+      state.wonAt ||
+      player.game.status !== GameStatus.IN_PROGRESS
+    ) {
+      return false;
+    }
     if (
       canEscapeRatRace(
         cents(state.passiveIncomeCents),
         cents(state.totalExpensesCents)
       )
     ) {
-      await tx.gamePlayer.update({
-        where: { id: gamePlayerId },
+      const wonAt = new Date();
+      await tx.game.update({
+        where: { id: player.gameId },
         data: {
-          track: BoardTrack.FAST_TRACK,
-          position: 0,
-          fastTrackPosition: 0
+          status: GameStatus.ENDED,
+          endedAt: wonAt,
+          settings: this.settingsWithPending(player.game.settings, null)
         }
       });
       await tx.playerFinancialState.update({
         where: { gamePlayerId },
         data: {
-          escapedRatRaceAt: new Date()
+          escapedRatRaceAt: wonAt,
+          wonAt
         }
       });
       emittedEvents.push({
-        type: "player:escaped_rat_race",
+        type: realtimeEvents.gameEnded,
         gamePlayerId,
         payload: {
+          reason: "financial_freedom",
+          winnerGamePlayerId: gamePlayerId,
           passiveIncomeCents: Number(state.passiveIncomeCents),
           totalExpensesCents: Number(state.totalExpensesCents)
         }
       });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "financial_freedom_reached" }
+      });
+      return true;
     }
+    return false;
   }
 
   private async advanceTurn(
@@ -2815,6 +2918,61 @@ export class GamesService {
     return base as Prisma.InputJsonValue;
   }
 
+  private timeLimitMinutes(settings: Prisma.JsonValue) {
+    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+      return defaultGameTimeLimitMinutes;
+    }
+    const value = (settings as Record<string, unknown>).timeLimitMinutes;
+    return typeof value === "number" && Number.isInteger(value) && value > 0
+      ? value
+      : defaultGameTimeLimitMinutes;
+  }
+
+  private gameDeadline(startedAt: Date | null, settings: Prisma.JsonValue) {
+    if (!startedAt) return null;
+    return new Date(
+      startedAt.getTime() + this.timeLimitMinutes(settings) * 60_000
+    );
+  }
+
+  private async expireGameIfNeeded(gameId: string) {
+    const emittedEvents: PendingEvent[] = [];
+    const expired = await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      const deadline = this.gameDeadline(game.startedAt, game.settings);
+      if (
+        game.status !== GameStatus.IN_PROGRESS ||
+        !deadline ||
+        deadline.getTime() > Date.now()
+      ) {
+        return false;
+      }
+
+      await tx.game.update({
+        where: { id: gameId },
+        data: {
+          status: GameStatus.ENDED,
+          endedAt: deadline,
+          settings: this.settingsWithPending(game.settings, null)
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.gameEnded,
+        payload: {
+          reason: "time_limit",
+          deadlineAt: deadline.toISOString()
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "time_limit_reached" }
+      });
+      await this.appendEvents(tx, gameId, null, emittedEvents);
+      return true;
+    });
+    return expired ? emittedEvents : null;
+  }
+
   private async requirePlayer(tx: Tx, gameId: string, userId: string) {
     const player = await tx.gamePlayer.findFirst({
       where: {
@@ -3011,6 +3169,8 @@ export class GamesService {
       activePlayers.length > 0
         ? activePlayers[game.currentTurnIndex % activePlayers.length]
         : null;
+    const timeLimitMinutes = this.timeLimitMinutes(game.settings);
+    const deadlineAt = this.gameDeadline(game.startedAt, game.settings);
 
     return toSerializable({
       game: {
@@ -3025,6 +3185,8 @@ export class GamesService {
         createdById: game.createdById,
         startedAt: game.startedAt,
         endedAt: game.endedAt,
+        timeLimitMinutes,
+        deadlineAt,
         pendingAction: this.pendingAction(game.settings)
       },
       board: ratRaceBoard,

@@ -25,7 +25,8 @@ export function CreateGameForm({ token }: { token: string }) {
       },
       body: JSON.stringify({
         title: String(form.get("title") ?? ""),
-        maxPlayers: Number(form.get("maxPlayers") ?? 6)
+        maxPlayers: Number(form.get("maxPlayers") ?? 6),
+        timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90)
       })
     });
 
@@ -40,7 +41,7 @@ export function CreateGameForm({ token }: { token: string }) {
   }
 
   return (
-    <form className="grid gap-3 sm:grid-cols-[1fr_120px_auto]" onSubmit={onSubmit}>
+    <form className="grid gap-3 sm:grid-cols-[1fr_120px_140px_auto]" onSubmit={onSubmit}>
       <Input name="title" placeholder="Название партии" defaultValue="Вечерняя партия" />
       <Input
         name="maxPlayers"
@@ -50,10 +51,20 @@ export function CreateGameForm({ token }: { token: string }) {
         defaultValue={6}
         aria-label="Максимум игроков"
       />
+      <Input
+        name="timeLimitMinutes"
+        type="number"
+        min={15}
+        max={240}
+        step={15}
+        defaultValue={90}
+        aria-label="Лимит времени в минутах"
+        title="Лимит времени в минутах"
+      />
       <Button type="submit" disabled={loading}>
         {loading ? "Создаём..." : "Создать"}
       </Button>
-      {error ? <p className="text-sm text-red-700 sm:col-span-3">{error}</p> : null}
+      {error ? <p className="text-sm text-red-700 sm:col-span-4">{error}</p> : null}
     </form>
   );
 }

@@ -71,6 +71,8 @@ export interface GameSnapshot {
     createdById: string | null;
     startedAt: string | null;
     endedAt: string | null;
+    timeLimitMinutes: number;
+    deadlineAt: string | null;
     pendingAction: GamePendingAction | null;
   };
   board: Array<{

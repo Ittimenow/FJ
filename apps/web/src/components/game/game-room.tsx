@@ -42,8 +42,10 @@ export function GameRoom({
   const [diceFaces, setDiceFaces] = useState([6]);
   const [loanPopupOpen, setLoanPopupOpen] = useState(false);
   const [playersPopupOpen, setPlayersPopupOpen] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const expirationRefreshRef = useRef(false);
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
@@ -88,10 +90,46 @@ export function GameRoom({
     };
   }, []);
 
+  useEffect(() => {
+    const deadlineAt = snapshot.game.deadlineAt;
+    if (snapshot.game.status !== "IN_PROGRESS" || !deadlineAt) {
+      setRemainingSeconds(null);
+      expirationRefreshRef.current = false;
+      return;
+    }
+
+    const updateTimer = async () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((new Date(deadlineAt).getTime() - Date.now()) / 1000)
+      );
+      setRemainingSeconds(remaining);
+      if (remaining > 0 || expirationRefreshRef.current) return;
+
+      expirationRefreshRef.current = true;
+      try {
+        const response = await fetch(
+          `${publicApiBaseUrl()}/api/games/${snapshot.game.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          setSnapshot((await response.json()) as GameSnapshot);
+        }
+      } finally {
+        expirationRefreshRef.current = false;
+      }
+    };
+
+    void updateTimer();
+    const interval = window.setInterval(() => void updateTimer(), 1000);
+    return () => window.clearInterval(interval);
+  }, [snapshot.game.deadlineAt, snapshot.game.id, snapshot.game.status, token]);
+
   const currentPlayer = snapshot.players.find(
     (player) => player.id === snapshot.game.currentPlayerId
   );
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
+  const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
   const selectedPlayer = me ?? gamePlayers[0];
   const canRoll =
@@ -441,6 +479,18 @@ export function GameRoom({
           {error}
         </div>
       ) : null}
+      {snapshot.game.status === "IN_PROGRESS" && remainingSeconds !== null ? (
+        <div className="rounded-md border border-line bg-white px-3 py-2 text-sm">
+          До завершения партии:{" "}
+          <span className="font-semibold">{formatRemainingTime(remainingSeconds)}</span>
+        </div>
+      ) : snapshot.game.status === "ENDED" ? (
+        <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium">
+          {winner
+            ? `Победитель: ${winner.user?.displayName ?? "Игрок"}`
+            : "Партия завершена по времени"}
+        </div>
+      ) : null}
 
       <div className="hidden xl:block">
         <DesktopGameBoard
@@ -726,6 +776,15 @@ function wait(ms: number) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function formatRemainingTime(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 }
 
 function HostPanel({
@@ -1986,7 +2045,21 @@ function eventDetails(event: GameEvent) {
       ]);
     case "game:started":
       return compactDetails([
-        numericDetail("Игроков", payload.playerCount)
+        numericDetail("Игроков", payload.playerCount),
+        numericDetail("Лимит, мин.", payload.timeLimitMinutes)
+      ]);
+    case "game:ended":
+      return compactDetails([
+        textDetail(
+          "Причина",
+          payload.reason === "financial_freedom"
+            ? "Пассивный доход превысил расходы"
+            : payload.reason === "time_limit"
+              ? "Истёк лимит времени"
+              : payload.reason
+        ),
+        moneyDetail("Пассивный доход", payload.passiveIncomeCents, "/мес"),
+        moneyDetail("Расходы", payload.totalExpensesCents, "/мес")
       ]);
     case "game:deleted":
       return compactDetails([textDetail("Предыдущий статус", payload.previousStatus)]);
