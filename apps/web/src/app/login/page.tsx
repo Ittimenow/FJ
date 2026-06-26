@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
+import { gameReleaseVersion } from "@/lib/release";
 
 export default async function LoginPage() {
   const session = await auth();
@@ -18,7 +19,7 @@ export default async function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4">
-      <LoginForm />
+      <LoginForm releaseVersion={gameReleaseVersion} />
     </main>
   );
 }

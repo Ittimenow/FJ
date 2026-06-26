@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-export function LoginForm() {
+export function LoginForm({ releaseVersion }: { releaseVersion?: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +54,11 @@ export function LoginForm() {
             Зарегистрироваться
           </Link>
         </p>
+        {releaseVersion ? (
+          <div className="mt-4 border-t border-line pt-3 text-center text-xs text-neutral-500">
+            Релиз игры v{releaseVersion}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
