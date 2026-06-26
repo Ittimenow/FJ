@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
 import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
 import { money, shortDate } from "@/lib/format";
 import type { GamesListResponse, ProfileResponse } from "@/lib/types";
@@ -20,7 +20,10 @@ export default async function DashboardPage() {
   const [profile, games] = await Promise.all([
     apiFetch<ProfileResponse>("/users/me", session.accessToken),
     apiFetch<GamesListResponse>("/games", session.accessToken)
-  ]);
+  ]).catch((error: unknown) => {
+    if (isUnauthorizedApiError(error)) redirect("/login");
+    throw error;
+  });
   const canCreateGames =
     profile.user.role === "HOST" || profile.user.role === "ADMIN";
   const isAdmin = profile.user.role === "ADMIN";

@@ -32,6 +32,44 @@ export function publicSocketPath() {
   return process.env.NEXT_PUBLIC_SOCKET_PATH ?? "/socket.io";
 }
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly body: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function isUnauthorizedApiError(error: unknown) {
+  return error instanceof ApiError && error.status === 401;
+}
+
+export function isForbiddenApiError(error: unknown) {
+  return error instanceof ApiError && error.status === 403;
+}
+
+export function isNotFoundApiError(error: unknown) {
+  return error instanceof ApiError && error.status === 404;
+}
+
+function apiErrorMessage(body: string, status: number) {
+  if (!body) return `Request failed: ${status}`;
+
+  try {
+    const data = JSON.parse(body) as { message?: unknown; error?: unknown };
+    if (typeof data.message === "string") return data.message;
+    if (Array.isArray(data.message)) return data.message.join(", ");
+    if (typeof data.error === "string") return data.error;
+  } catch {
+    // Fall through to the raw response body.
+  }
+
+  return body;
+}
+
 export async function apiFetch<T>(
   path: string,
   token: string,
@@ -49,7 +87,7 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(error || `Request failed: ${response.status}`);
+    throw new ApiError(apiErrorMessage(error, response.status), response.status, error);
   }
 
   return (await response.json()) as T;
