@@ -160,6 +160,20 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     return result;
   }
 
+  @SubscribeMessage("stock:sell")
+  async sellStockFromDeal(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string; quantity: number }
+  ) {
+    const result = await this.games.sellStockFromDeal(
+      body.gameId,
+      this.userId(client),
+      body.quantity
+    );
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
   @SubscribeMessage("market:sell")
   async sellMarketAsset(
     @ConnectedSocket() client: Socket,

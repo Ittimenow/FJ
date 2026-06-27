@@ -72,6 +72,15 @@ type GamePendingAction =
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
     }
   | {
+      type: "stock_sale_window";
+      gamePlayerId: string;
+      cardId: number;
+      cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      title: string;
+      symbol: string;
+      salePriceCents: number;
+    }
+  | {
       type: "charity_choice";
       gamePlayerId: string;
       donationCents: number;
@@ -826,15 +835,32 @@ export class GamesService {
           payload: { reason: "automatic_card_resolved_turn_ended" }
         });
       } else if (isDealChoice) {
+        const meta = this.metaMap(card.meta);
+        const stockDeal = this.isStockDeal(card, meta);
+        const symbol = this.stockSymbol(card, meta);
+        const salePriceCents = this.dealUnitPriceCents(card, meta, stockDeal);
         await tx.game.update({
           where: { id: gameId },
           data: {
-            settings: this.settingsWithPending(game.settings, {
-              type: "deal_card_drawn",
-              gamePlayerId: player.id,
-              cardId: card.id,
-              cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL"
-            })
+            settings: this.settingsWithPending(
+              game.settings,
+              stockDeal && symbol && salePriceCents > 0n
+                ? {
+                    type: "stock_sale_window",
+                    gamePlayerId: player.id,
+                    cardId: card.id,
+                    cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
+                    title: card.title,
+                    symbol,
+                    salePriceCents: Number(salePriceCents)
+                  }
+                : {
+                    type: "deal_card_drawn",
+                    gamePlayerId: player.id,
+                    cardId: card.id,
+                    cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL"
+                  }
+            )
           }
         });
         emittedEvents.push({
@@ -904,7 +930,7 @@ export class GamesService {
       if (
         !currentPlayer ||
         currentPlayer.id !== player.id ||
-        pending?.type !== "deal_card_drawn" ||
+        (pending?.type !== "deal_card_drawn" && pending?.type !== "stock_sale_window") ||
         pending.gamePlayerId !== player.id ||
         pending.cardId !== dto.cardId
       ) {
@@ -950,6 +976,7 @@ export class GamesService {
             : this.metaMoneyCents(meta, "down_payment") || unitPriceCents;
       const cashflowCents =
         cashflowEffectAmount ?? BigInt(Math.round(Number(meta.cashflow_monthly ?? "0")));
+      const assetSymbol = stockDeal ? this.stockSymbol(card, meta) : meta.symbol;
       const totalDownPayment = downPaymentCents * BigInt(quantity);
       const beforeCashCents = state.cashCents;
       const afterCashCents = beforeCashCents - totalDownPayment;
@@ -972,7 +999,7 @@ export class GamesService {
           sourceCardId: card.id,
           type: card.category ?? card.cardType.toLowerCase(),
           name: card.title,
-          symbol: meta.symbol ?? null,
+          symbol: assetSymbol ?? null,
           quantity,
           units: quantity,
           costBasisCents: unitPriceCents * BigInt(quantity),
@@ -1038,7 +1065,7 @@ export class GamesService {
       if (
         !currentPlayer ||
         currentPlayer.id !== player.id ||
-        pending?.type !== "deal_card_drawn" ||
+        (pending?.type !== "deal_card_drawn" && pending?.type !== "stock_sale_window") ||
         pending.gamePlayerId !== player.id
       ) {
         throw new ForbiddenException("No deal is waiting for your decision");
@@ -1061,6 +1088,137 @@ export class GamesService {
         type: realtimeEvents.stateUpdate,
         payload: { reason: "deal_declined_turn_ended" }
       });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async sellStockFromDeal(gameId: string, userId: string, quantity: number) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId }
+      });
+      if (game.status !== GameStatus.IN_PROGRESS) {
+        throw new ForbiddenException("Stock sales are available only during an active game");
+      }
+      const pending = this.pendingAction(game.settings);
+      if (pending?.type !== "stock_sale_window") {
+        throw new ForbiddenException("No stock sale is available now");
+      }
+      const saleQuantity = Math.floor(quantity);
+      if (!Number.isInteger(saleQuantity) || saleQuantity < 1) {
+        throw new BadRequestException("Quantity must be a positive integer");
+      }
+
+      const symbol = pending.symbol.toLowerCase();
+      const assets = await tx.playerAsset.findMany({
+        where: {
+          gamePlayerId: player.id,
+          status: AssetStatus.ACTIVE,
+          quantity: { gt: 0 }
+        },
+        orderBy: { createdAt: "asc" }
+      });
+      const stockAssets = assets.filter(
+        (asset) => (asset.symbol ?? "").toLowerCase() === symbol
+      );
+      const availableQuantity = stockAssets.reduce((sum, asset) => sum + asset.quantity, 0);
+      if (availableQuantity < saleQuantity) {
+        throw new BadRequestException("Not enough shares to sell");
+      }
+
+      const state = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: player.id }
+      });
+      let remainingToSell = saleQuantity;
+      let removedCashflowCents = 0n;
+      let removedCostBasisCents = 0n;
+      let removedMarketValueCents = 0n;
+      let removedDownPaymentCents = 0n;
+
+      for (const asset of stockAssets) {
+        if (remainingToSell <= 0) break;
+        const soldFromAsset = Math.min(asset.quantity, remainingToSell);
+        const sellAll = soldFromAsset === asset.quantity;
+        const removedCost = proportionalAmount(asset.costBasisCents, soldFromAsset, asset.quantity);
+        const removedMarket = proportionalAmount(asset.marketValueCents, soldFromAsset, asset.quantity);
+        const removedDownPayment = proportionalAmount(asset.downPaymentCents, soldFromAsset, asset.quantity);
+        const removedCashflow = proportionalAmount(asset.cashflowCents, soldFromAsset, asset.quantity);
+
+        removedCostBasisCents += removedCost;
+        removedMarketValueCents += removedMarket;
+        removedDownPaymentCents += removedDownPayment;
+        removedCashflowCents += removedCashflow;
+
+        if (sellAll) {
+          await tx.playerAsset.update({
+            where: { id: asset.id },
+            data: {
+              quantity: 0,
+              units: 0,
+              costBasisCents: 0n,
+              marketValueCents: 0n,
+              downPaymentCents: 0n,
+              cashflowCents: 0n,
+              status: AssetStatus.SOLD,
+              soldAt: new Date()
+            }
+          });
+        } else {
+          await tx.playerAsset.update({
+            where: { id: asset.id },
+            data: {
+              quantity: { decrement: soldFromAsset },
+              units: { decrement: soldFromAsset },
+              costBasisCents: { decrement: removedCost },
+              marketValueCents: { decrement: removedMarket },
+              downPaymentCents: { decrement: removedDownPayment },
+              cashflowCents: { decrement: removedCashflow }
+            }
+          });
+        }
+        remainingToSell -= soldFromAsset;
+      }
+
+      const proceeds = BigInt(pending.salePriceCents) * BigInt(saleQuantity);
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: player.id },
+        data: { cashCents: { increment: proceeds } }
+      });
+      const updatedState = await this.recalculatePlayer(tx, player.id);
+
+      emittedEvents.push({
+        type: realtimeEvents.dealSell,
+        gamePlayerId: player.id,
+        payload: {
+          cardId: pending.cardId,
+          title: pending.title,
+          assetName: pending.symbol,
+          symbol: pending.symbol,
+          quantity: saleQuantity,
+          salePriceCents: pending.salePriceCents,
+          proceedsCents: Number(proceeds),
+          removedCostBasisCents: Number(removedCostBasisCents),
+          removedMarketValueCents: Number(removedMarketValueCents),
+          removedDownPaymentCents: Number(removedDownPaymentCents),
+          removedCashflowCents: Number(removedCashflowCents),
+          beforeCashCents: cents(state.cashCents),
+          afterCashCents: cents(updatedState.cashCents)
+        }
+      });
+      const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+      if (!gameWon) {
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "stock_sale_completed" }
+        });
+      }
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
 
@@ -2773,6 +2931,22 @@ export class GamesService {
     );
   }
 
+  private stockSymbol(
+    card: { title: string; bodyText: string },
+    meta: Record<string, string>
+  ) {
+    const explicitSymbol = meta.symbol?.trim();
+    if (explicitSymbol) return explicitSymbol.toUpperCase();
+
+    const text = `${card.title}\n${card.bodyText}`;
+    const priceIndex = text.search(/сегодняшняя\s+цена|today(?:'s)?\s+price/iu);
+    const beforePrice = priceIndex >= 0 ? text.slice(0, priceIndex) : text;
+    const matches = [...beforePrice.matchAll(/\b[A-ZА-ЯЁ0-9]{2,12}\b/giu)]
+      .map((match) => match[0].toUpperCase())
+      .filter((value) => !["CO", "INC", "FUND"].includes(value));
+    return matches.at(-1) ?? null;
+  }
+
   private dealUnitPriceCents(
     card: { title: string; bodyText: string },
     meta: Record<string, string>,
@@ -2859,6 +3033,27 @@ export class GamesService {
         gamePlayerId: value.gamePlayerId,
         cardId: value.cardId,
         cardType: value.cardType
+      };
+    }
+    if (
+      value.type === "stock_sale_window" &&
+      typeof value.gamePlayerId === "string" &&
+      typeof value.cardId === "number" &&
+      (value.cardType === "SMALL_DEAL" ||
+        value.cardType === "BIG_DEAL" ||
+        value.cardType === "FAST_TRACK") &&
+      typeof value.title === "string" &&
+      typeof value.symbol === "string" &&
+      typeof value.salePriceCents === "number"
+    ) {
+      return {
+        type: "stock_sale_window",
+        gamePlayerId: value.gamePlayerId,
+        cardId: value.cardId,
+        cardType: value.cardType,
+        title: value.title,
+        symbol: value.symbol,
+        salePriceCents: value.salePriceCents
       };
     }
     if (
@@ -3229,4 +3424,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function bigintMax(left: bigint, right: bigint) {
   return left > right ? left : right;
+}
+
+function proportionalAmount(amount: bigint, part: number, total: number) {
+  if (total <= 0) return 0n;
+  return (amount * BigInt(part)) / BigInt(total);
 }

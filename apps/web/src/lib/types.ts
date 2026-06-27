@@ -169,6 +169,15 @@ export type GamePendingAction =
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
     }
   | {
+      type: "stock_sale_window";
+      gamePlayerId: string;
+      cardId: number;
+      cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      title: string;
+      symbol: string;
+      salePriceCents: number;
+    }
+  | {
       type: "charity_choice";
       gamePlayerId: string;
       donationCents: number;

@@ -42,6 +42,8 @@ export function GameRoom({
   const [diceFaces, setDiceFaces] = useState([6]);
   const [loanPopupOpen, setLoanPopupOpen] = useState(false);
   const [playersPopupOpen, setPlayersPopupOpen] = useState(false);
+  const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
+  const [dismissedStockSaleCardId, setDismissedStockSaleCardId] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -164,6 +166,10 @@ export function GameRoom({
     () => latestDealCard(snapshot.events, ownPendingAction),
     [ownPendingAction, snapshot.events]
   );
+  const stockSaleOffer = useMemo(
+    () => stockSaleOfferForPlayer(pendingAction, me),
+    [me, pendingAction]
+  );
   const latestTurnSummary = useMemo(
     () => latestPlayerActionSummary(snapshot.events, me?.id),
     [me?.id, snapshot.events]
@@ -195,6 +201,13 @@ export function GameRoom({
   useEffect(() => {
     setDealQuantity(1);
   }, [latestBuyableCard?.cardId]);
+
+  useEffect(() => {
+    setStockSaleQuantity(1);
+    if (!stockSaleOffer) {
+      setDismissedStockSaleCardId(null);
+    }
+  }, [stockSaleOffer?.cardId, stockSaleOffer]);
 
   useEffect(() => {
     if (canRoll && !pendingAction && !rollingDice) {
@@ -378,6 +391,13 @@ export function GameRoom({
     emit("market:sell", {});
   }
 
+  function sellStockFromDeal() {
+    if (!stockSaleOffer) return;
+    emit("stock:sell", {
+      quantity: Math.min(stockSaleQuantity, stockSaleOffer.quantity)
+    });
+  }
+
   function declineMarketSale() {
     emit("market:decline", {});
   }
@@ -430,6 +450,12 @@ export function GameRoom({
     setDealQuantity(Math.max(Math.floor(Number(value) || 1), 1));
   }
 
+  function updateStockSaleQuantity(value: number) {
+    const maxQuantity = stockSaleOffer?.quantity ?? 1;
+    const normalized = Math.max(Math.floor(Number(value) || 1), 1);
+    setStockSaleQuantity(Math.min(normalized, maxQuantity));
+  }
+
   function startDiceAnimation(diceCount: number) {
     stopDiceAnimation();
     diceIntervalRef.current = setInterval(() => {
@@ -473,6 +499,18 @@ export function GameRoom({
         players={gamePlayers}
         currentPlayerId={snapshot.game.currentPlayerId}
         onClose={() => setPlayersPopupOpen(false)}
+      />
+      <StockSaleModal
+        open={Boolean(
+          stockSaleOffer && dismissedStockSaleCardId !== stockSaleOffer.cardId
+        )}
+        offer={stockSaleOffer}
+        quantity={stockSaleQuantity}
+        onQuantityChange={updateStockSaleQuantity}
+        onDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
+        onIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+        onSell={sellStockFromDeal}
+        onClose={() => setDismissedStockSaleCardId(stockSaleOffer?.cardId ?? null)}
       />
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -707,6 +745,113 @@ function LoanModal({
           currentCashCents={currentCashCents}
           onCloseLiability={onCloseLiability}
         />
+      </div>
+    </div>
+  );
+}
+
+function StockSaleModal({
+  open,
+  offer,
+  quantity,
+  onQuantityChange,
+  onDecrease,
+  onIncrease,
+  onSell,
+  onClose
+}: {
+  open: boolean;
+  offer: ReturnType<typeof stockSaleOfferForPlayer>;
+  quantity: number;
+  onQuantityChange: (value: number) => void;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  onSell: () => void;
+  onClose: () => void;
+}) {
+  if (!open || !offer) return null;
+
+  const saleTotalCents = offer.salePriceCents * quantity;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stock-sale-title"
+        className="w-full max-w-md rounded-md border border-line bg-white p-4 shadow-panel"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="stock-sale-title" className="text-lg font-semibold">
+              Продажа акций
+            </h2>
+            <p className="mt-1 text-sm text-neutral-600">{offer.title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded px-2 py-1 text-sm text-neutral-500 transition hover:bg-surface hover:text-ink"
+            aria-label="Закрыть продажу акций"
+          >
+            Закрыть
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2 rounded-md border border-line bg-surface p-3 text-sm">
+          <AssetInfoRow label="Тикер" value={offer.symbol} />
+          <AssetInfoRow label="Доступно акций" value={String(offer.quantity)} />
+          <AssetInfoRow label="Цена за акцию" value={money(offer.salePriceCents)} />
+        </div>
+
+        <div className="mt-4 rounded-md border border-line bg-white p-3">
+          <div className="text-sm font-medium">Количество на продажу</div>
+          <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+            <Button
+              variant="secondary"
+              className="px-3"
+              onClick={onDecrease}
+              disabled={quantity <= 1}
+            >
+              &lt;
+            </Button>
+            <Input
+              type="number"
+              min={1}
+              max={offer.quantity}
+              step={1}
+              value={quantity}
+              onChange={(event) => onQuantityChange(Number(event.target.value))}
+              className="text-center font-semibold"
+            />
+            <Button
+              variant="secondary"
+              className="px-3"
+              onClick={onIncrease}
+              disabled={quantity >= offer.quantity}
+            >
+              &gt;
+            </Button>
+          </div>
+          <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
+            <div className="text-neutral-600">Сумма продажи</div>
+            <div className="mt-1 font-semibold">
+              {quantity} x {money(offer.salePriceCents)} = {money(saleTotalCents)}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button onClick={onSell}>Продать</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Не продавать
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -2507,7 +2652,12 @@ function latestDealCard(
   events: GameEvent[],
   pendingAction: GameSnapshot["game"]["pendingAction"]
 ) {
-  if (pendingAction?.type !== "deal_card_drawn") return null;
+  if (
+    pendingAction?.type !== "deal_card_drawn" &&
+    pendingAction?.type !== "stock_sale_window"
+  ) {
+    return null;
+  }
 
   const event = [...events].reverse().find((item) => {
     const cardType = item.payload.cardType;
@@ -2554,6 +2704,27 @@ function latestDealCard(
     downPaymentCents,
     cashflowCents: cashflowDelta || metaCents(meta, "cashflow_monthly"),
     isStock
+  };
+}
+
+function stockSaleOfferForPlayer(
+  pendingAction: GameSnapshot["game"]["pendingAction"],
+  player: GamePlayer | undefined
+) {
+  if (pendingAction?.type !== "stock_sale_window" || !player) return null;
+
+  const symbol = pendingAction.symbol.toLowerCase();
+  const quantity = player.assets
+    .filter((asset) => isStockAsset(asset) && (asset.symbol ?? "").toLowerCase() === symbol)
+    .reduce((sum, asset) => sum + asset.quantity, 0);
+  if (quantity <= 0) return null;
+
+  return {
+    cardId: pendingAction.cardId,
+    title: pendingAction.title,
+    symbol: pendingAction.symbol,
+    salePriceCents: pendingAction.salePriceCents,
+    quantity
   };
 }
 
