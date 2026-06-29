@@ -10,4 +10,5 @@ backups
 .env.*.local
 *.log
 *.tsbuildinfo
+.game-release-version
 packages/database/prisma/migrations/dev.db

@@ -9,6 +9,15 @@ RUN apt-get update \
 ENV NEXT_PUBLIC_API_PROXY_PATH=/backend
 ENV NEXT_PUBLIC_SOCKET_PATH=/backend/socket.io
 
+ARG GAME_RELEASE_VERSION
+ARG NEXT_PUBLIC_GAME_RELEASE_VERSION
+ARG GITHUB_RUN_NUMBER
+ARG GITHUB_SHA
+ARG BUILD_NUMBER
+ARG COMMIT_SHA
+ARG SOURCE_COMMIT
+ARG SOURCE_VERSION
+
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
@@ -19,6 +28,7 @@ RUN npm ci
 
 COPY . .
 
+RUN node scripts/write-release-version.mjs
 RUN npm run db:generate
 RUN npm run build --workspace=@cashflow/shared
 RUN npm run build --workspace=@cashflow/database

@@ -152,11 +152,12 @@ curl https://fj.example.com/healthz
 
 ## Обновление проекта
 
-Правило деплоя: перед каждым релизом повышайте `version` в корневом `package.json`, деплойте только после успешной локальной проверки, а после деплоя сверяйте номер релиза на экране входа `https://gamefj.ru/login`.
+Правило деплоя: деплойте только после успешной локальной проверки, а после деплоя сверяйте номер релиза на экране входа `https://gamefj.ru/login`. Номер релиза собирается автоматически из Git: базовая версия берется из корневого `package.json`, а номер деплоя добавляется из счетчика коммитов и короткого SHA.
 
 ```bash
 cd /opt/fj
 git pull
+export GAME_RELEASE_VERSION="$(node scripts/write-release-version.mjs --print)"
 docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build
 docker image prune -f
 docker builder prune -f

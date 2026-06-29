@@ -40,7 +40,6 @@ export function GameRoom({
   const [turnPopupOpen, setTurnPopupOpen] = useState(false);
   const [rollingDice, setRollingDice] = useState(false);
   const [diceFaces, setDiceFaces] = useState([6]);
-  const [loanPopupOpen, setLoanPopupOpen] = useState(false);
   const [playersPopupOpen, setPlayersPopupOpen] = useState(false);
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
   const [dismissedStockSaleCardId, setDismissedStockSaleCardId] = useState<number | null>(null);
@@ -166,6 +165,8 @@ export function GameRoom({
     () => latestDealCard(snapshot.events, ownPendingAction),
     [ownPendingAction, snapshot.events]
   );
+  const latestDealDecisionCard =
+    ownPendingAction?.type === "deal_card_drawn" ? latestBuyableCard : null;
   const stockSaleOffer = useMemo(
     () => stockSaleOfferForPlayer(pendingAction, me),
     [me, pendingAction]
@@ -428,7 +429,6 @@ export function GameRoom({
     try {
       const result = await emitWithAck(realtimeEvents.loanTake, { amountCents: loanAmount });
       applyActionResult(result);
-      setLoanPopupOpen(false);
     } catch (event) {
       setError(event instanceof Error ? event.message : "Не удалось взять кредит");
     }
@@ -481,8 +481,25 @@ export function GameRoom({
         onRoll={rollDice}
         onSkip={skipTurn}
       />
-      <LoanModal
-        open={loanPopupOpen}
+      <DecisionModal
+        open={Boolean(canChooseDeal || latestDealDecisionCard || charityChoice || marketSaleOffer)}
+        canChooseDeal={canChooseDeal}
+        onDrawSmallDeal={() => draw("SMALL_DEAL")}
+        onDrawBigDeal={() => draw("BIG_DEAL")}
+        latestCard={latestDealDecisionCard}
+        charityChoice={charityChoice}
+        canAnswerCharity={canAnswerCharity}
+        marketSaleOffer={marketSaleOffer}
+        canAnswerMarketSale={canAnswerMarketSale}
+        currentCashCents={me?.financialState?.cashCents ?? 0}
+        dealQuantity={dealQuantity}
+        setDealQuantity={updateDealQuantity}
+        onBuyLatest={buyLatestDeal}
+        onDeclineLatest={declineLatestDeal}
+        onSellMarketAsset={sellMarketAsset}
+        onDeclineMarketSale={declineMarketSale}
+        onAcceptCharity={acceptCharity}
+        onDeclineCharity={declineCharity}
         loanAmount={loanAmount}
         onLoanDecrease={() => changeLoanAmount(-1000)}
         onLoanIncrease={() => changeLoanAmount(1000)}
@@ -490,9 +507,7 @@ export function GameRoom({
         onTakeLoan={takeLoan}
         canTakeLoan={canTakeLoan}
         player={me}
-        currentCashCents={me?.financialState?.cashCents ?? 0}
         onCloseLiability={closeLiability}
-        onClose={() => setLoanPopupOpen(false)}
       />
       <PlayersModal
         open={playersPopupOpen}
@@ -544,30 +559,8 @@ export function GameRoom({
           <ActionsPanel
             onStartGame={startGame}
             canStart={canStart}
-            onRoll={rollDice}
-            canRoll={canRoll && !pendingAction}
-            rollingDice={rollingDice}
-            onDrawSmallDeal={() => draw("SMALL_DEAL")}
-            onDrawBigDeal={() => draw("BIG_DEAL")}
-            canChooseDeal={canChooseDeal}
-            isMyTurn={isMyTurn}
             latestCard={latestBuyableCard}
             latestTurnSummary={latestTurnSummary}
-            charityChoice={charityChoice}
-            canAnswerCharity={canAnswerCharity}
-            marketSaleOffer={marketSaleOffer}
-            canAnswerMarketSale={canAnswerMarketSale}
-            currentCashCents={me?.financialState?.cashCents ?? 0}
-            dealQuantity={dealQuantity}
-            setDealQuantity={updateDealQuantity}
-            onBuyLatest={buyLatestDeal}
-            onDeclineLatest={declineLatestDeal}
-            onSellMarketAsset={sellMarketAsset}
-            onDeclineMarketSale={declineMarketSale}
-            onAcceptCharity={acceptCharity}
-            onDeclineCharity={declineCharity}
-            canTakeLoan={canTakeLoan}
-            onOpenLoan={() => setLoanPopupOpen(true)}
             embedded
           />
         </DesktopGameBoard>
@@ -588,30 +581,8 @@ export function GameRoom({
         <ActionsPanel
           onStartGame={startGame}
           canStart={canStart}
-          onRoll={rollDice}
-          canRoll={canRoll && !pendingAction}
-          rollingDice={rollingDice}
-          onDrawSmallDeal={() => draw("SMALL_DEAL")}
-          onDrawBigDeal={() => draw("BIG_DEAL")}
-          canChooseDeal={canChooseDeal}
-          isMyTurn={isMyTurn}
           latestCard={latestBuyableCard}
           latestTurnSummary={latestTurnSummary}
-          charityChoice={charityChoice}
-          canAnswerCharity={canAnswerCharity}
-          marketSaleOffer={marketSaleOffer}
-          canAnswerMarketSale={canAnswerMarketSale}
-          currentCashCents={me?.financialState?.cashCents ?? 0}
-          dealQuantity={dealQuantity}
-          setDealQuantity={updateDealQuantity}
-          onBuyLatest={buyLatestDeal}
-          onDeclineLatest={declineLatestDeal}
-          onSellMarketAsset={sellMarketAsset}
-          onDeclineMarketSale={declineMarketSale}
-          onAcceptCharity={acceptCharity}
-          onDeclineCharity={declineCharity}
-          canTakeLoan={canTakeLoan}
-          onOpenLoan={() => setLoanPopupOpen(true)}
         />
         <FinancialPanel player={selectedPlayer} />
         {canManage && snapshot.game.status === "WAITING" ? (
@@ -681,8 +652,25 @@ function TurnPopup({
   );
 }
 
-function LoanModal({
+function DecisionModal({
   open,
+  canChooseDeal,
+  onDrawSmallDeal,
+  onDrawBigDeal,
+  latestCard,
+  charityChoice,
+  canAnswerCharity,
+  marketSaleOffer,
+  canAnswerMarketSale,
+  currentCashCents,
+  dealQuantity,
+  setDealQuantity,
+  onBuyLatest,
+  onDeclineLatest,
+  onSellMarketAsset,
+  onDeclineMarketSale,
+  onAcceptCharity,
+  onDeclineCharity,
   loanAmount,
   onLoanDecrease,
   onLoanIncrease,
@@ -690,11 +678,26 @@ function LoanModal({
   onTakeLoan,
   canTakeLoan,
   player,
-  currentCashCents,
-  onCloseLiability,
-  onClose
+  onCloseLiability
 }: {
   open: boolean;
+  canChooseDeal: boolean;
+  onDrawSmallDeal: () => void;
+  onDrawBigDeal: () => void;
+  latestCard: ReturnType<typeof latestDealCard>;
+  charityChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "charity_choice" }> | null;
+  canAnswerCharity: boolean;
+  marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
+  canAnswerMarketSale: boolean;
+  currentCashCents: number;
+  dealQuantity: number;
+  setDealQuantity: (value: number) => void;
+  onBuyLatest: () => void;
+  onDeclineLatest: () => void;
+  onSellMarketAsset: () => void;
+  onDeclineMarketSale: () => void;
+  onAcceptCharity: () => void;
+  onDeclineCharity: () => void;
   loanAmount: number;
   onLoanDecrease: () => void;
   onLoanIncrease: () => void;
@@ -702,49 +705,212 @@ function LoanModal({
   onTakeLoan: () => void;
   canTakeLoan: boolean;
   player: GamePlayer | undefined;
-  currentCashCents: number;
   onCloseLiability: (liability: PlayerLiability) => void;
-  onClose: () => void;
 }) {
+  const [bankOpen, setBankOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setBankOpen(false);
+  }, [open]);
+
   if (!open) return null;
 
+  const maxStockQuantity =
+    latestCard?.isStock && latestCard.priceCents > 0
+      ? Math.max(1, Math.floor(currentCashCents / latestCard.priceCents))
+      : 1;
+  const totalStockCostCents =
+    latestCard?.isStock ? latestCard.priceCents * dealQuantity : 0;
+  const canPayCharity =
+    charityChoice ? currentCashCents >= charityChoice.donationCents : false;
+  const canCloseMarketSale =
+    marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const repayableLiabilities = player ? repayableLiabilityRows(player) : [];
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4 py-6">
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Банк"
-        className="w-full max-w-md rounded-md border border-line bg-white p-4 shadow-panel"
+        aria-labelledby="decision-modal-title"
+        className="max-h-[calc(100vh-3rem)] w-full max-w-xl overflow-y-auto rounded-md border border-line bg-white p-4 shadow-panel"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Банк</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-neutral-500 transition hover:bg-surface hover:text-ink"
-            aria-label="Закрыть банк"
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="decision-modal-title" className="text-lg font-semibold">
+              Решение игрока
+            </h2>
+          </div>
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-xs"
+            onClick={() => setBankOpen((value) => !value)}
+            disabled={!canTakeLoan}
           >
-            Закрыть
-          </button>
+            {bankOpen ? "Скрыть банк" : "Банк"}
+          </Button>
         </div>
-        <LoanPanel
-          loanAmount={loanAmount}
-          onLoanDecrease={onLoanDecrease}
-          onLoanIncrease={onLoanIncrease}
-          onLoanAmountChange={onLoanAmountChange}
-          onTakeLoan={onTakeLoan}
-          canTakeLoan={canTakeLoan}
-          liabilities={repayableLiabilities}
-          currentCashCents={currentCashCents}
-          onCloseLiability={onCloseLiability}
-        />
+
+        <div className="mt-4 space-y-4">
+          {canChooseDeal ? (
+            <div className="rounded-md border border-line bg-surface p-3">
+              <div className="text-sm font-medium">Возможность</div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button variant="secondary" onClick={onDrawSmallDeal}>
+                  Мелкая сделка
+                </Button>
+                <Button variant="secondary" onClick={onDrawBigDeal}>
+                  Крупная сделка
+                </Button>
+              </div>
+            </div>
+          ) : marketSaleOffer ? (
+            <div className="rounded-md border border-line bg-surface p-3">
+              <div className="text-sm font-medium">Предложение рынка</div>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">
+                {marketSaleOffer.title}
+              </p>
+              <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
+                <div>Актив: {marketSaleOffer.assetName}</div>
+                <div>Цена продажи: {money(marketSaleOffer.salePriceCents)}</div>
+                {marketSaleOffer.mortgageCents > 0 ? (
+                  <div>Закладная: {money(marketSaleOffer.mortgageCents)}</div>
+                ) : null}
+                <div>
+                  {marketSaleOffer.proceedsCents >= 0 ? "К получению" : "К доплате"}:{" "}
+                  {money(Math.abs(marketSaleOffer.proceedsCents))}
+                </div>
+                {marketSaleOffer.cashflowCents !== 0 ? (
+                  <div>
+                    {marketSaleOffer.cashflowCents > 0
+                      ? "Денежный поток уменьшится на"
+                      : "Денежный поток увеличится на"}{" "}
+                    {money(Math.abs(marketSaleOffer.cashflowCents))}/мес
+                  </div>
+                ) : null}
+              </div>
+              {!canCloseMarketSale ? (
+                <p className="mt-2 text-xs text-red-700">
+                  Недостаточно наличных, чтобы закрыть продажу.
+                </p>
+              ) : null}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button onClick={onSellMarketAsset} disabled={!canAnswerMarketSale || !canCloseMarketSale}>
+                  Продать
+                </Button>
+                <Button variant="secondary" onClick={onDeclineMarketSale} disabled={!canAnswerMarketSale}>
+                  Отказаться
+                </Button>
+              </div>
+            </div>
+          ) : charityChoice ? (
+            <div className="rounded-md border border-line bg-surface p-3">
+              <div className="text-sm font-medium">Благотворительность</div>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">
+                Заплатите 10% от своих общих доходов и кидайте 2 кубика 3 своих хода.
+              </p>
+              <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
+                <div>Пожертвование: {money(charityChoice.donationCents)}</div>
+                <div>Бонус: 2 кубика на {charityChoice.turns} хода</div>
+              </div>
+              {!canPayCharity ? (
+                <p className="mt-2 text-xs text-red-700">
+                  Недостаточно наличных для оплаты.
+                </p>
+              ) : null}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button onClick={onAcceptCharity} disabled={!canAnswerCharity || !canPayCharity}>
+                  Да
+                </Button>
+                <Button variant="secondary" onClick={onDeclineCharity} disabled={!canAnswerCharity}>
+                  Нет
+                </Button>
+              </div>
+            </div>
+          ) : latestCard ? (
+            <div className="rounded-md border border-line bg-surface p-3">
+              <div className="text-sm font-medium">{latestCard.title}</div>
+              {latestCard.bodyText ? (
+                <p className="mt-2 text-sm leading-6 text-neutral-700">{latestCard.bodyText}</p>
+              ) : null}
+              <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
+                {latestCard.priceCents > 0 ? <div>Цена: {money(latestCard.priceCents)}</div> : null}
+                {latestCard.downPaymentCents > 0 ? (
+                  <div>Первоначальный взнос: {money(latestCard.downPaymentCents)}</div>
+                ) : null}
+                {latestCard.cashflowCents !== 0 ? (
+                  <div>Денежный поток: {money(latestCard.cashflowCents)}/мес</div>
+                ) : null}
+              </div>
+              {latestCard.isStock ? (
+                <div className="mt-3 rounded-md border border-line bg-white p-3">
+                  <div className="text-sm font-medium">Количество акций</div>
+                  <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      className="px-3"
+                      onClick={() => setDealQuantity(Math.max(1, dealQuantity - 1))}
+                    >
+                      &lt;
+                    </Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={dealQuantity}
+                      onChange={(event) => setDealQuantity(Number(event.target.value))}
+                      className="text-center font-semibold"
+                    />
+                    <Button
+                      variant="secondary"
+                      className="px-3"
+                      onClick={() => setDealQuantity(dealQuantity + 1)}
+                    >
+                      &gt;
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-xs text-neutral-500">
+                    На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит в этом окне.
+                  </p>
+                  <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
+                    <div className="text-neutral-600">Полная стоимость</div>
+                    <div className="mt-1 font-semibold">
+                      {dealQuantity} x {money(latestCard.priceCents)} = {money(totalStockCostCents)}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <Button onClick={onBuyLatest}>
+                  Купить
+                </Button>
+                <Button variant="secondary" onClick={() => setBankOpen(true)} disabled={!canTakeLoan}>
+                  Взять кредит
+                </Button>
+                <Button variant="secondary" onClick={onDeclineLatest}>
+                  Отказаться
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {bankOpen ? (
+            <div className="rounded-md border border-line bg-white p-3">
+              <div className="mb-3 text-sm font-medium">Банк</div>
+              <LoanPanel
+                loanAmount={loanAmount}
+                onLoanDecrease={onLoanDecrease}
+                onLoanIncrease={onLoanIncrease}
+                onLoanAmountChange={onLoanAmountChange}
+                onTakeLoan={onTakeLoan}
+                canTakeLoan={canTakeLoan}
+                liabilities={repayableLiabilities}
+                currentCashCents={currentCashCents}
+                onCloseLiability={onCloseLiability}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -1738,176 +1904,30 @@ function liabilitySortOrder(type: string) {
 function ActionsPanel({
   onStartGame,
   canStart,
-  onRoll,
-  canRoll,
-  rollingDice,
-  onDrawSmallDeal,
-  onDrawBigDeal,
-  canChooseDeal,
-  isMyTurn,
   latestCard,
   latestTurnSummary,
-  charityChoice,
-  canAnswerCharity,
-  marketSaleOffer,
-  canAnswerMarketSale,
-  currentCashCents,
-  dealQuantity,
-  setDealQuantity,
-  onBuyLatest,
-  onDeclineLatest,
-  onSellMarketAsset,
-  onDeclineMarketSale,
-  onAcceptCharity,
-  onDeclineCharity,
-  canTakeLoan,
-  onOpenLoan,
   embedded = false
 }: {
   onStartGame: () => void;
   canStart: boolean;
-  onRoll: () => void;
-  canRoll: boolean;
-  rollingDice: boolean;
-  onDrawSmallDeal: () => void;
-  onDrawBigDeal: () => void;
-  canChooseDeal: boolean;
-  isMyTurn: boolean;
   latestCard: ReturnType<typeof latestDealCard>;
   latestTurnSummary: ReturnType<typeof latestPlayerActionSummary>;
-  charityChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "charity_choice" }> | null;
-  canAnswerCharity: boolean;
-  marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
-  canAnswerMarketSale: boolean;
-  currentCashCents: number;
-  dealQuantity: number;
-  setDealQuantity: (value: number) => void;
-  onBuyLatest: () => void;
-  onDeclineLatest: () => void;
-  onSellMarketAsset: () => void;
-  onDeclineMarketSale: () => void;
-  onAcceptCharity: () => void;
-  onDeclineCharity: () => void;
-  canTakeLoan: boolean;
-  onOpenLoan: () => void;
   embedded?: boolean;
 }) {
-  const maxStockQuantity =
-    latestCard?.isStock && latestCard.priceCents > 0
-      ? Math.max(1, Math.floor(currentCashCents / latestCard.priceCents))
-      : 1;
-  const totalStockCostCents =
-    latestCard?.isStock ? latestCard.priceCents * dealQuantity : 0;
-  const canPayCharity =
-    charityChoice ? currentCashCents >= charityChoice.donationCents : false;
-  const canCloseMarketSale =
-    marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
-  const showCurrentTurn = canStart || isMyTurn;
-  const loanButton = (
-    <button
-      type="button"
-      onClick={onOpenLoan}
-      disabled={!canTakeLoan}
-      className="inline-flex shrink-0 items-center rounded bg-surface px-2 py-1 text-xs font-medium text-ink transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      Банк
-    </button>
-  );
-
   const content = (
     <>
-      {showCurrentTurn ? (
+      {canStart ? (
         <div className="rounded-md border border-line bg-surface p-3">
           <div className="text-sm font-medium">Текущий ход</div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {canStart ? (
-              <Button className="col-span-2" onClick={onStartGame}>
-                Начать партию
-              </Button>
-            ) : canChooseDeal ? (
-              <>
-                <Button variant="secondary" onClick={onDrawSmallDeal}>
-                  Мелкая
-                </Button>
-                <Button variant="secondary" onClick={onDrawBigDeal}>
-                  Крупная
-                </Button>
-              </>
-            ) : (
-              <Button className="col-span-2" onClick={onRoll} disabled={!canRoll || rollingDice}>
-                {rollingDice ? "Бросаем..." : "Бросить кубик"}
-              </Button>
-            )}
-          </div>
+          <Button className="mt-3 w-full" onClick={onStartGame}>
+            Начать партию
+          </Button>
         </div>
       ) : null}
 
       <div className="rounded-md border border-line bg-surface p-3">
         <div className="text-sm font-medium">Последняя сделка</div>
-        {marketSaleOffer ? (
-          <>
-            <p className="mt-1 text-sm font-medium text-neutral-800">Предложение рынка</p>
-            <p className="mt-2 text-sm leading-6 text-neutral-700">
-              {marketSaleOffer.title}
-            </p>
-            <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-              <div>Актив: {marketSaleOffer.assetName}</div>
-              <div>Цена продажи: {money(marketSaleOffer.salePriceCents)}</div>
-              {marketSaleOffer.mortgageCents > 0 ? (
-                <div>Закладная: {money(marketSaleOffer.mortgageCents)}</div>
-              ) : null}
-              <div>
-                {marketSaleOffer.proceedsCents >= 0 ? "К получению" : "К доплате"}:{" "}
-                {money(Math.abs(marketSaleOffer.proceedsCents))}
-              </div>
-              {marketSaleOffer.cashflowCents !== 0 ? (
-                <div>
-                  {marketSaleOffer.cashflowCents > 0
-                    ? "Денежный поток уменьшится на"
-                    : "Денежный поток увеличится на"}{" "}
-                  {money(Math.abs(marketSaleOffer.cashflowCents))}/мес
-                </div>
-              ) : null}
-            </div>
-            {!canCloseMarketSale ? (
-              <p className="mt-2 text-xs text-red-700">
-                Недостаточно наличных, чтобы закрыть продажу.
-              </p>
-            ) : null}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button onClick={onSellMarketAsset} disabled={!canAnswerMarketSale || !canCloseMarketSale}>
-                Продать
-              </Button>
-              <Button variant="secondary" onClick={onDeclineMarketSale} disabled={!canAnswerMarketSale}>
-                Отказаться
-              </Button>
-            </div>
-          </>
-        ) : charityChoice ? (
-          <>
-            <p className="mt-1 text-sm font-medium text-neutral-800">Благотворительность</p>
-            <p className="mt-2 text-sm leading-6 text-neutral-700">
-              Заплатите 10% от своих общих доходов и кидайте 2 кубика 3 своих хода.
-            </p>
-            <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-              <div>Пожертвование: {money(charityChoice.donationCents)}</div>
-              <div>Бонус: 2 кубика на {charityChoice.turns} хода</div>
-            </div>
-            {!canPayCharity ? (
-              <p className="mt-2 text-xs text-red-700">
-                Недостаточно наличных для оплаты.
-              </p>
-            ) : null}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button onClick={onAcceptCharity} disabled={!canAnswerCharity || !canPayCharity}>
-                Да
-              </Button>
-              <Button variant="secondary" onClick={onDeclineCharity} disabled={!canAnswerCharity}>
-                Нет
-              </Button>
-            </div>
-          </>
-        ) : latestCard ? (
+        {latestCard ? (
           <>
             <p className="mt-1 text-sm text-neutral-700">{latestCard.title}</p>
             {latestCard.bodyText ? (
@@ -1923,51 +1943,8 @@ function ActionsPanel({
               ) : null}
             </div>
             {latestCard.isStock ? (
-              <div className="mt-3 rounded-md border border-line bg-white p-3">
-                <div className="text-sm font-medium">Количество акций</div>
-                <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    className="px-3"
-                    onClick={() => setDealQuantity(Math.max(1, dealQuantity - 1))}
-                  >
-                    &lt;
-                  </Button>
-                  <Input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={dealQuantity}
-                    onChange={(event) => setDealQuantity(Number(event.target.value))}
-                    className="text-center font-semibold"
-                  />
-                  <Button
-                    variant="secondary"
-                    className="px-3"
-                    onClick={() => setDealQuantity(dealQuantity + 1)}
-                  >
-                    &gt;
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-neutral-500">
-                  На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит в любой момент.
-                </p>
-                <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
-                  <div className="text-neutral-600">Полная стоимость</div>
-                  <div className="mt-1 font-semibold">
-                    {dealQuantity} × {money(latestCard.priceCents)} = {money(totalStockCostCents)}
-                  </div>
-                </div>
-              </div>
+              <p className="mt-2 text-xs text-neutral-500">Акции</p>
             ) : null}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button onClick={onBuyLatest}>
-                Купить
-              </Button>
-              <Button variant="secondary" onClick={onDeclineLatest}>
-                Отказаться
-              </Button>
-            </div>
           </>
         ) : latestTurnSummary ? (
           <>
@@ -1992,10 +1969,7 @@ function ActionsPanel({
   if (embedded) {
     return (
       <section className="grid gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Действия</h2>
-          {loanButton}
-        </div>
+        <h2 className="text-lg font-semibold">Действия</h2>
         {content}
       </section>
     );
@@ -2003,9 +1977,8 @@ function ActionsPanel({
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between gap-3">
+      <CardHeader>
         <CardTitle>Действия</CardTitle>
-        {loanButton}
       </CardHeader>
       <CardContent className="space-y-4">{content}</CardContent>
     </Card>

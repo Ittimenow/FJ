@@ -5,6 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GAME_RELEASE_VERSION: ${GAME_RELEASE_VERSION:-}
+        GITHUB_RUN_NUMBER: ${GITHUB_RUN_NUMBER:-}
+        GITHUB_SHA: ${GITHUB_SHA:-}
+        BUILD_NUMBER: ${BUILD_NUMBER:-}
+        COMMIT_SHA: ${COMMIT_SHA:-}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
+        SOURCE_VERSION: ${SOURCE_VERSION:-}
     restart: unless-stopped
     env_file:
       - .env.vps
