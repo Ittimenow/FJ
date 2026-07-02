@@ -104,6 +104,26 @@ type GamePendingAction =
 interface GameSettings {
   pendingAction?: GamePendingAction | null;
   timeLimitMinutes?: number;
+  cardDecks?: Partial<Record<CardType, CardDeckState>>;
+}
+
+interface CardDeckState {
+  drawPile: number[];
+  discardPile: number[];
+  deckSize: number;
+}
+
+interface CardDrawState {
+  cardId: number;
+  deckPosition: number;
+  reshuffled: boolean;
+  remainingInDeck: number;
+}
+
+interface CardDeckDrawResult {
+  card: CardWithRules & { isActive: boolean };
+  settings: Prisma.JsonValue;
+  drawState: CardDrawState;
 }
 
 const defaultGameTimeLimitMinutes = 90;
@@ -775,11 +795,18 @@ export class GamesService {
         throw new BadRequestException("Current player must finish pending action");
       }
 
-      const card = await this.drawRandomCard(tx, dto.cardType);
+      const draw = await this.drawCardFromDeck(
+        tx,
+        gameId,
+        game.settings,
+        dto.cardType
+      );
+      const { card } = draw;
+      const gameSettings = draw.settings;
       emittedEvents.push({
         type: realtimeEvents.cardDraw,
         gamePlayerId: player.id,
-        payload: this.cardPayload(card)
+        payload: this.cardPayload(card, draw.drawState)
       });
       const networkMarketingCard = this.networkMarketingCard(card);
       if (isDealChoice && networkMarketingCard) {
@@ -800,7 +827,7 @@ export class GamesService {
         }
         await tx.game.update({
           where: { id: gameId },
-          data: { settings: this.settingsWithPending(game.settings, null) }
+          data: { settings: this.settingsWithPending(gameSettings, null) }
         });
         if (activeIndex !== null) {
           await this.advanceTurn(tx, game, activeIndex);
@@ -827,7 +854,7 @@ export class GamesService {
         }
         await tx.game.update({
           where: { id: gameId },
-          data: { settings: this.settingsWithPending(game.settings, null) }
+          data: { settings: this.settingsWithPending(gameSettings, null) }
         });
         if (activeIndex !== null) {
           await this.advanceTurn(tx, game, activeIndex);
@@ -849,7 +876,7 @@ export class GamesService {
           where: { id: gameId },
           data: {
             settings: this.settingsWithPending(
-              game.settings,
+              gameSettings,
               stockDeal && symbol && salePriceCents > 0n && sellerGamePlayerIds.length > 0
                 ? {
                     type: "stock_sale_window",
@@ -881,7 +908,7 @@ export class GamesService {
           await tx.game.update({
             where: { id: gameId },
             data: {
-              settings: this.settingsWithPending(game.settings, {
+              settings: this.settingsWithPending(gameSettings, {
                 type: "market_sale",
                 gamePlayerId: player.id,
                 cardId: card.id,
@@ -1917,12 +1944,20 @@ export class GamesService {
     emittedEvents: PendingEvent[]
   ) {
     const cardType = normalizeCardTypeForCell(cellType) as CardType | null;
+    let currentSettings = gameSettings;
     if (cardType) {
-      const card = await this.drawRandomCard(tx, cardType);
+      const draw = await this.drawCardFromDeck(
+        tx,
+        gameId,
+        currentSettings,
+        cardType
+      );
+      const { card } = draw;
+      currentSettings = draw.settings;
       emittedEvents.push({
         type: realtimeEvents.cardDraw,
         gamePlayerId,
-        payload: this.cardPayload(card)
+        payload: this.cardPayload(card, draw.drawState)
       });
 
       if (cardType === CardType.MARKET) {
@@ -1931,7 +1966,7 @@ export class GamesService {
           await tx.game.update({
             where: { id: gameId },
             data: {
-              settings: this.settingsWithPending(gameSettings, {
+              settings: this.settingsWithPending(currentSettings, {
                 type: "market_sale",
                 gamePlayerId,
                 cardId: card.id,
@@ -2995,25 +3030,147 @@ export class GamesService {
     });
   }
 
-  private async drawRandomCard(tx: Tx, cardType: CardType) {
-    const count = await tx.card.count({
-      where: { cardType, isActive: true }
-    });
-    if (count === 0) {
+  private async drawCardFromDeck(
+    tx: Tx,
+    gameId: string,
+    settings: Prisma.JsonValue,
+    cardType: CardType
+  ): Promise<CardDeckDrawResult> {
+    const baseSettings = this.normalizedSettings(settings);
+    const cardDecks = baseSettings.cardDecks
+      ? { ...baseSettings.cardDecks }
+      : await this.initialCardDecks(tx);
+    if (!cardDecks[cardType]) {
+      const initialized = await this.initialCardDecks(tx);
+      for (const deckCardType of Object.values(CardType)) {
+        cardDecks[deckCardType] ??= initialized[deckCardType] ?? {
+          drawPile: [],
+          discardPile: [],
+          deckSize: 0
+        };
+      }
+    }
+    let deck = this.normalizedDeck(cardDecks[cardType]);
+    if (deck.drawPile.length === 0 && deck.discardPile.length > 0) {
+      deck = {
+        drawPile: this.shuffled(deck.discardPile),
+        discardPile: [],
+        deckSize: deck.discardPile.length
+      };
+    }
+    if (deck.drawPile.length === 0) {
       throw new BadRequestException(`No cards found for ${cardType}`);
     }
-    const card = await tx.card.findFirst({
-      where: { cardType, isActive: true },
-      include: { meta: true, effects: true, conditions: true },
-      skip: randomInt(count)
+
+    const reshuffled = this.normalizedDeck(cardDecks[cardType]).drawPile.length === 0;
+    const deckPosition = deck.deckSize - deck.drawPile.length + 1;
+    const cardId = deck.drawPile[0];
+    if (!cardId) {
+      throw new BadRequestException(`No cards found for ${cardType}`);
+    }
+    const drawPile = deck.drawPile.slice(1);
+    const nextDeck: CardDeckState = {
+      drawPile,
+      discardPile: [...deck.discardPile, cardId],
+      deckSize: deck.deckSize
+    };
+    const nextSettings: GameSettings = {
+      ...baseSettings,
+      cardDecks: {
+        ...cardDecks,
+        [cardType]: nextDeck
+      }
+    };
+
+    await tx.game.update({
+      where: { id: gameId },
+      data: { settings: nextSettings as Prisma.InputJsonValue }
     });
-    if (!card) throw new BadRequestException(`No cards found for ${cardType}`);
-    return card;
+
+    const card = await tx.card.findUnique({
+      where: { id: cardId },
+      include: { meta: true, effects: true, conditions: true }
+    });
+    if (!card || card.cardType !== cardType || !card.isActive) {
+      throw new BadRequestException(`No cards found for ${cardType}`);
+    }
+
+    return {
+      card,
+      settings: nextSettings as Prisma.JsonValue,
+      drawState: {
+        cardId,
+        deckPosition,
+        reshuffled,
+        remainingInDeck: nextDeck.drawPile.length
+      }
+    };
   }
 
-  private cardPayload(card: Awaited<ReturnType<GamesService["drawRandomCard"]>>) {
+  private normalizedSettings(settings: Prisma.JsonValue): GameSettings {
+    return settings && typeof settings === "object" && !Array.isArray(settings)
+      ? ({ ...(settings as Record<string, unknown>) } as GameSettings)
+      : {};
+  }
+
+  private async initialCardDecks(tx: Tx): Promise<Partial<Record<CardType, CardDeckState>>> {
+    const cards = await tx.card.findMany({
+      where: { isActive: true },
+      select: { id: true, cardType: true },
+      orderBy: { id: "asc" }
+    });
+    const decks: Partial<Record<CardType, CardDeckState>> = {};
+    for (const cardType of Object.values(CardType)) {
+      const ids = cards
+        .filter((card) => card.cardType === cardType)
+        .map((card) => card.id);
+      decks[cardType] = {
+        drawPile: this.shuffled(ids),
+        discardPile: [],
+        deckSize: ids.length
+      };
+    }
+    return decks;
+  }
+
+  private normalizedDeck(value: unknown): CardDeckState {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return { drawPile: [], discardPile: [], deckSize: 0 };
+    }
+    const record = value as Record<string, unknown>;
+    const drawPile = this.cardIdList(record.drawPile);
+    const discardPile = this.cardIdList(record.discardPile);
+    const deckSize =
+      typeof record.deckSize === "number" && Number.isInteger(record.deckSize)
+        ? Math.max(record.deckSize, drawPile.length + discardPile.length)
+        : drawPile.length + discardPile.length;
+    return { drawPile, discardPile, deckSize };
+  }
+
+  private cardIdList(value: unknown) {
+    return Array.isArray(value)
+      ? value.filter((cardId): cardId is number => Number.isInteger(cardId) && cardId > 0)
+      : [];
+  }
+
+  private shuffled<T>(items: T[]) {
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = randomInt(index + 1);
+      const current = shuffled[index]!;
+      shuffled[index] = shuffled[swapIndex]!;
+      shuffled[swapIndex] = current;
+    }
+    return shuffled;
+  }
+
+  private cardPayload(
+    card: CardWithRules,
+    drawState?: CardDrawState
+  ) {
     return toSerializable({
       id: card.id,
+      cardId: card.id,
       cardType: card.cardType,
       title: card.title,
       bodyText: card.bodyText,
@@ -3021,7 +3178,14 @@ export class GamesService {
       subcategory: card.subcategory,
       meta: this.metaMap(card.meta),
       effects: card.effects,
-      conditions: card.conditions
+      conditions: card.conditions,
+      ...(drawState
+        ? {
+            deckPosition: drawState.deckPosition,
+            reshuffled: drawState.reshuffled,
+            remainingInDeck: drawState.remainingInDeck
+          }
+        : {})
     });
   }
 
@@ -3264,7 +3428,7 @@ export class GamesService {
   private settingsWithPending(
     settings: Prisma.JsonValue,
     pendingAction: GamePendingAction | null
-  ) {
+  ): Prisma.JsonObject {
     const base =
       settings && typeof settings === "object" && !Array.isArray(settings)
         ? { ...(settings as Record<string, unknown>) }
@@ -3274,7 +3438,7 @@ export class GamesService {
     } else {
       delete base.pendingAction;
     }
-    return base as Prisma.InputJsonValue;
+    return base as Prisma.JsonObject;
   }
 
   private timeLimitMinutes(settings: Prisma.JsonValue) {
