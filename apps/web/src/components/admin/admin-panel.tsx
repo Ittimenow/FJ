@@ -5,14 +5,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { publicApiBaseUrl } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
 import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
@@ -228,13 +230,66 @@ function AdminDashboard({
       </section>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>История игр</CardTitle>
+          <AnalyticsExportButton token={token} />
         </CardHeader>
         <CardContent>
           <HistoryTable history={profile.history} />
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function AnalyticsExportButton({ token }: { token: string }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function downloadExport() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `${publicApiBaseUrl()}/api/admin/analytics/export.ndjson?status=ENDED`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `Ошибка экспорта: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `game-history-${date}.ndjson`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(
+        downloadError instanceof Error
+          ? downloadError.message
+          : "Не удалось скачать историю игр"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1 sm:items-end">
+      <Button variant="secondary" onClick={downloadExport} disabled={loading}>
+        {loading ? "Готовлю файл..." : "Скачать историю игр"}
+      </Button>
+      {error ? <p className="max-w-sm text-xs text-red-700">{error}</p> : null}
     </div>
   );
 }
