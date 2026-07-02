@@ -79,6 +79,8 @@ type GamePendingAction =
       title: string;
       symbol: string;
       salePriceCents: number;
+      sellerGamePlayerIds: string[];
+      resolvedGamePlayerIds: string[];
     }
   | {
       type: "charity_choice";
@@ -839,12 +841,16 @@ export class GamesService {
         const stockDeal = this.isStockDeal(card, meta);
         const symbol = this.stockSymbol(card, meta);
         const salePriceCents = this.dealUnitPriceCents(card, meta, stockDeal);
+        const sellerGamePlayerIds =
+          stockDeal && symbol
+            ? await this.stockSellerGamePlayerIds(tx, gameId, symbol)
+            : [];
         await tx.game.update({
           where: { id: gameId },
           data: {
             settings: this.settingsWithPending(
               game.settings,
-              stockDeal && symbol && salePriceCents > 0n
+              stockDeal && symbol && salePriceCents > 0n && sellerGamePlayerIds.length > 0
                 ? {
                     type: "stock_sale_window",
                     gamePlayerId: player.id,
@@ -852,7 +858,9 @@ export class GamesService {
                     cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
                     title: card.title,
                     symbol,
-                    salePriceCents: Number(salePriceCents)
+                    salePriceCents: Number(salePriceCents),
+                    sellerGamePlayerIds,
+                    resolvedGamePlayerIds: []
                   }
                 : {
                     type: "deal_card_drawn",
@@ -936,6 +944,9 @@ export class GamesService {
       ) {
         throw new ForbiddenException("This deal is not available now");
       }
+      if (pending.type === "stock_sale_window" && !this.stockSaleWindowResolved(pending)) {
+        throw new BadRequestException("Other players must resolve stock sale first");
+      }
       const card = await tx.card.findUnique({
         where: { id: dto.cardId },
         include: { meta: true, effects: true, conditions: true }
@@ -948,6 +959,35 @@ export class GamesService {
       ];
       if (!buyableCardTypes.includes(card.cardType)) {
         throw new BadRequestException("This card is not buyable");
+      }
+      const networkMarketingCard = this.networkMarketingCard(card);
+      if (networkMarketingCard) {
+        const applied = await this.applyNetworkMarketingCard(
+          tx,
+          player.id,
+          card,
+          networkMarketingCard,
+          emittedEvents
+        );
+        if (applied) {
+          await this.recalculatePlayer(tx, player.id);
+          const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
+          if (gameWon) {
+            await this.appendEvents(tx, gameId, userId, emittedEvents);
+            return;
+          }
+        }
+        await tx.game.update({
+          where: { id: gameId },
+          data: { settings: this.settingsWithPending(game.settings, null) }
+        });
+        await this.advanceTurn(tx, game, activeIndex);
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "network_marketing_resolved_turn_ended" }
+        });
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
       }
       if (this.hasAutomaticCardEffects(card)) {
         throw new BadRequestException("This card resolves automatically");
@@ -1070,6 +1110,9 @@ export class GamesService {
       ) {
         throw new ForbiddenException("No deal is waiting for your decision");
       }
+      if (pending.type === "stock_sale_window" && !this.stockSaleWindowResolved(pending)) {
+        throw new BadRequestException("Other players must resolve stock sale first");
+      }
 
       await tx.game.update({
         where: { id: gameId },
@@ -1110,6 +1153,12 @@ export class GamesService {
       const pending = this.pendingAction(game.settings);
       if (pending?.type !== "stock_sale_window") {
         throw new ForbiddenException("No stock sale is available now");
+      }
+      if (!pending.sellerGamePlayerIds.includes(player.id)) {
+        throw new ForbiddenException("You do not have a stock sale offer for this card");
+      }
+      if (pending.resolvedGamePlayerIds.includes(player.id)) {
+        throw new BadRequestException("You have already resolved this stock sale");
       }
       const saleQuantity = Math.floor(quantity);
       if (!Number.isInteger(saleQuantity) || saleQuantity < 1) {
@@ -1214,11 +1263,73 @@ export class GamesService {
       });
       const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
       if (!gameWon) {
+        await tx.game.update({
+          where: { id: gameId },
+          data: {
+            settings: this.settingsWithPending(
+              game.settings,
+              this.resolveStockSalePlayer(pending, player.id)
+            )
+          }
+        });
         emittedEvents.push({
           type: realtimeEvents.stateUpdate,
           payload: { reason: "stock_sale_completed" }
         });
       }
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async declineStockSale(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId }
+      });
+      if (game.status !== GameStatus.IN_PROGRESS) {
+        throw new ForbiddenException("Stock sales are available only during an active game");
+      }
+      const pending = this.pendingAction(game.settings);
+      if (pending?.type !== "stock_sale_window") {
+        throw new ForbiddenException("No stock sale is available now");
+      }
+      if (!pending.sellerGamePlayerIds.includes(player.id)) {
+        throw new ForbiddenException("You do not have a stock sale offer for this card");
+      }
+      if (pending.resolvedGamePlayerIds.includes(player.id)) {
+        throw new BadRequestException("You have already resolved this stock sale");
+      }
+
+      await tx.game.update({
+        where: { id: gameId },
+        data: {
+          settings: this.settingsWithPending(
+            game.settings,
+            this.resolveStockSalePlayer(pending, player.id)
+          )
+        }
+      });
+      emittedEvents.push({
+        type: "stock:sale_declined",
+        gamePlayerId: player.id,
+        payload: {
+          cardId: pending.cardId,
+          title: pending.title,
+          symbol: pending.symbol,
+          salePriceCents: pending.salePriceCents
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "stock_sale_declined" }
+      });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
 
@@ -2947,6 +3058,51 @@ export class GamesService {
     return matches.at(-1) ?? null;
   }
 
+  private async stockSellerGamePlayerIds(tx: Tx, gameId: string, symbol: string) {
+    const normalizedSymbol = symbol.toLowerCase();
+    const assets = await tx.playerAsset.findMany({
+      where: {
+        status: AssetStatus.ACTIVE,
+        quantity: { gt: 0 },
+        gamePlayer: {
+          gameId,
+          role: GameRole.PLAYER,
+          status: GamePlayerStatus.JOINED
+        }
+      },
+      select: {
+        gamePlayerId: true,
+        symbol: true
+      }
+    });
+    return [
+      ...new Set(
+        assets
+          .filter((asset) => (asset.symbol ?? "").toLowerCase() === normalizedSymbol)
+          .map((asset) => asset.gamePlayerId)
+      )
+    ];
+  }
+
+  private stockSaleWindowResolved(
+    pending: Extract<GamePendingAction, { type: "stock_sale_window" }>
+  ) {
+    const resolved = new Set(pending.resolvedGamePlayerIds);
+    return pending.sellerGamePlayerIds.every((gamePlayerId) => resolved.has(gamePlayerId));
+  }
+
+  private resolveStockSalePlayer(
+    pending: Extract<GamePendingAction, { type: "stock_sale_window" }>,
+    gamePlayerId: string
+  ) {
+    return {
+      ...pending,
+      resolvedGamePlayerIds: [
+        ...new Set([...pending.resolvedGamePlayerIds, gamePlayerId])
+      ]
+    };
+  }
+
   private dealUnitPriceCents(
     card: { title: string; bodyText: string },
     meta: Record<string, string>,
@@ -3044,7 +3200,9 @@ export class GamesService {
         value.cardType === "FAST_TRACK") &&
       typeof value.title === "string" &&
       typeof value.symbol === "string" &&
-      typeof value.salePriceCents === "number"
+      typeof value.salePriceCents === "number" &&
+      Array.isArray(value.sellerGamePlayerIds) &&
+      Array.isArray(value.resolvedGamePlayerIds)
     ) {
       return {
         type: "stock_sale_window",
@@ -3053,7 +3211,13 @@ export class GamesService {
         cardType: value.cardType,
         title: value.title,
         symbol: value.symbol,
-        salePriceCents: value.salePriceCents
+        salePriceCents: value.salePriceCents,
+        sellerGamePlayerIds: value.sellerGamePlayerIds.filter(
+          (item): item is string => typeof item === "string"
+        ),
+        resolvedGamePlayerIds: value.resolvedGamePlayerIds.filter(
+          (item): item is string => typeof item === "string"
+        )
       };
     }
     if (

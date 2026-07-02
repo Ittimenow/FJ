@@ -42,7 +42,6 @@ export function GameRoom({
   const [diceFaces, setDiceFaces] = useState([6]);
   const [playersPopupOpen, setPlayersPopupOpen] = useState(false);
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
-  const [dismissedStockSaleCardId, setDismissedStockSaleCardId] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -166,7 +165,16 @@ export function GameRoom({
     [ownPendingAction, snapshot.events]
   );
   const latestDealDecisionCard =
-    ownPendingAction?.type === "deal_card_drawn" ? latestBuyableCard : null;
+    ownPendingAction?.type === "deal_card_drawn" ||
+    ownPendingAction?.type === "stock_sale_window"
+      ? latestBuyableCard
+      : null;
+  const waitingStockSellerCount =
+    ownPendingAction?.type === "stock_sale_window"
+      ? ownPendingAction.sellerGamePlayerIds.filter(
+          (gamePlayerId) => !ownPendingAction.resolvedGamePlayerIds.includes(gamePlayerId)
+        ).length
+      : 0;
   const stockSaleOffer = useMemo(
     () => stockSaleOfferForPlayer(pendingAction, me),
     [me, pendingAction]
@@ -205,9 +213,6 @@ export function GameRoom({
 
   useEffect(() => {
     setStockSaleQuantity(1);
-    if (!stockSaleOffer) {
-      setDismissedStockSaleCardId(null);
-    }
   }, [stockSaleOffer?.cardId, stockSaleOffer]);
 
   useEffect(() => {
@@ -399,6 +404,10 @@ export function GameRoom({
     });
   }
 
+  function declineStockSale() {
+    emit("stock:decline", {});
+  }
+
   function declineMarketSale() {
     emit("market:decline", {});
   }
@@ -492,6 +501,7 @@ export function GameRoom({
         marketSaleOffer={marketSaleOffer}
         canAnswerMarketSale={canAnswerMarketSale}
         currentCashCents={me?.financialState?.cashCents ?? 0}
+        waitingStockSellerCount={waitingStockSellerCount}
         dealQuantity={dealQuantity}
         setDealQuantity={updateDealQuantity}
         onBuyLatest={buyLatestDeal}
@@ -516,16 +526,14 @@ export function GameRoom({
         onClose={() => setPlayersPopupOpen(false)}
       />
       <StockSaleModal
-        open={Boolean(
-          stockSaleOffer && dismissedStockSaleCardId !== stockSaleOffer.cardId
-        )}
+        open={Boolean(stockSaleOffer)}
         offer={stockSaleOffer}
         quantity={stockSaleQuantity}
         onQuantityChange={updateStockSaleQuantity}
         onDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
         onIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
         onSell={sellStockFromDeal}
-        onClose={() => setDismissedStockSaleCardId(stockSaleOffer?.cardId ?? null)}
+        onDecline={declineStockSale}
       />
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -663,6 +671,7 @@ function DecisionModal({
   marketSaleOffer,
   canAnswerMarketSale,
   currentCashCents,
+  waitingStockSellerCount,
   dealQuantity,
   setDealQuantity,
   onBuyLatest,
@@ -690,6 +699,7 @@ function DecisionModal({
   marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
   canAnswerMarketSale: boolean;
   currentCashCents: number;
+  waitingStockSellerCount: number;
   dealQuantity: number;
   setDealQuantity: (value: number) => void;
   onBuyLatest: () => void;
@@ -726,6 +736,7 @@ function DecisionModal({
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const repayableLiabilities = player ? repayableLiabilityRows(player) : [];
+  const canResolveLatestDeal = waitingStockSellerCount === 0;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4 py-6">
@@ -880,14 +891,19 @@ function DecisionModal({
                   </div>
                 </div>
               ) : null}
+              {!canResolveLatestDeal ? (
+                <p className="mt-3 text-xs text-amber-700">
+                  Ожидаем решение по продаже от игроков: {waitingStockSellerCount}.
+                </p>
+              ) : null}
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <Button onClick={onBuyLatest}>
+                <Button onClick={onBuyLatest} disabled={!canResolveLatestDeal}>
                   Купить
                 </Button>
                 <Button variant="secondary" onClick={() => setBankOpen(true)} disabled={!canTakeLoan}>
                   Взять кредит
                 </Button>
-                <Button variant="secondary" onClick={onDeclineLatest}>
+                <Button variant="secondary" onClick={onDeclineLatest} disabled={!canResolveLatestDeal}>
                   Отказаться
                 </Button>
               </div>
@@ -924,7 +940,7 @@ function StockSaleModal({
   onDecrease,
   onIncrease,
   onSell,
-  onClose
+  onDecline
 }: {
   open: boolean;
   offer: ReturnType<typeof stockSaleOfferForPlayer>;
@@ -933,7 +949,7 @@ function StockSaleModal({
   onDecrease: () => void;
   onIncrease: () => void;
   onSell: () => void;
-  onClose: () => void;
+  onDecline: () => void;
 }) {
   if (!open || !offer) return null;
 
@@ -943,7 +959,7 @@ function StockSaleModal({
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) onDecline();
       }}
     >
       <div
@@ -961,7 +977,7 @@ function StockSaleModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onDecline}
             className="rounded px-2 py-1 text-sm text-neutral-500 transition hover:bg-surface hover:text-ink"
             aria-label="Закрыть продажу акций"
           >
@@ -1014,7 +1030,7 @@ function StockSaleModal({
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button onClick={onSell}>Продать</Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onDecline}>
             Не продавать
           </Button>
         </div>
@@ -2685,6 +2701,8 @@ function stockSaleOfferForPlayer(
   player: GamePlayer | undefined
 ) {
   if (pendingAction?.type !== "stock_sale_window" || !player) return null;
+  if (!pendingAction.sellerGamePlayerIds.includes(player.id)) return null;
+  if (pendingAction.resolvedGamePlayerIds.includes(player.id)) return null;
 
   const symbol = pendingAction.symbol.toLowerCase();
   const quantity = player.assets

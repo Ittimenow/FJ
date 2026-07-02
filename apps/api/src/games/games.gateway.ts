@@ -174,6 +174,16 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     return result;
   }
 
+  @SubscribeMessage("stock:decline")
+  async declineStockSale(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.declineStockSale(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
   @SubscribeMessage("market:sell")
   async sellMarketAsset(
     @ConnectedSocket() client: Socket,

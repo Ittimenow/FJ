@@ -176,6 +176,8 @@ export type GamePendingAction =
       title: string;
       symbol: string;
       salePriceCents: number;
+      sellerGamePlayerIds: string[];
+      resolvedGamePlayerIds: string[];
     }
   | {
       type: "charity_choice";
