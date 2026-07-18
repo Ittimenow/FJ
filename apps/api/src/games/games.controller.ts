@@ -12,6 +12,7 @@ import { CreateGameDto } from "./dto/create-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { UpdateHostParticipationDto } from "./dto/update-host-participation.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
 
@@ -51,6 +52,21 @@ export class GamesController {
   @Post(":id/start")
   async start(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     const result = await this.games.startGame(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/host-participation")
+  async updateHostParticipation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: UpdateHostParticipationDto
+  ) {
+    const result = await this.games.updateHostParticipation(
+      id,
+      user.userId,
+      dto.participates
+    );
     this.realtime.broadcastAction(id, result);
     return result;
   }

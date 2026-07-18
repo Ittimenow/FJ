@@ -41,9 +41,15 @@ export function CreateGameForm({ token }: { token: string }) {
   }
 
   return (
-    <form className="grid gap-3 sm:grid-cols-[1fr_120px_140px_auto]" onSubmit={onSubmit}>
-      <Input name="title" placeholder="Название партии" defaultValue="Вечерняя партия" />
+    <form className="grid min-w-0 gap-3 sm:grid-cols-2" onSubmit={onSubmit}>
       <Input
+        className="min-w-0 sm:col-span-2"
+        name="title"
+        placeholder="Название партии"
+        defaultValue="Вечерняя партия"
+      />
+      <Input
+        className="min-w-0"
         name="maxPlayers"
         type="number"
         min={2}
@@ -52,6 +58,7 @@ export function CreateGameForm({ token }: { token: string }) {
         aria-label="Максимум игроков"
       />
       <Input
+        className="min-w-0"
         name="timeLimitMinutes"
         type="number"
         min={15}
@@ -61,10 +68,10 @@ export function CreateGameForm({ token }: { token: string }) {
         aria-label="Лимит времени в минутах"
         title="Лимит времени в минутах"
       />
-      <Button type="submit" disabled={loading}>
+      <Button type="submit" className="w-full sm:col-span-2" disabled={loading}>
         {loading ? "Создаём..." : "Создать"}
       </Button>
-      {error ? <p className="text-sm text-red-700 sm:col-span-4">{error}</p> : null}
+      {error ? <p className="text-sm text-red-700 sm:col-span-2">{error}</p> : null}
     </form>
   );
 }

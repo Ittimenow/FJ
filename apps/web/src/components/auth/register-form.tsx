@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { publicApiBaseUrl } from "@/lib/api";
 
-export function RegisterForm() {
+export function RegisterForm({ callbackUrl = "/dashboard" }: { callbackUrl?: Route }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +48,7 @@ export function RegisterForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(callbackUrl);
     router.refresh();
   }
 
@@ -74,7 +75,10 @@ export function RegisterForm() {
         </form>
         <p className="mt-4 text-sm text-neutral-600">
           Уже есть аккаунт?{" "}
-          <Link className="font-medium text-success" href="/login">
+          <Link
+            className="font-medium text-success"
+            href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+          >
             Войти
           </Link>
         </p>

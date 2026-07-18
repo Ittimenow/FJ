@@ -521,6 +521,79 @@ export class GamesService {
     ]);
   }
 
+  async updateHostParticipation(
+    gameId: string,
+    userId: string,
+    participates: boolean
+  ) {
+    await this.ensureCanManageGame(gameId, userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: { players: true }
+      });
+      if (game.createdById !== userId) {
+        throw new ForbiddenException("Only game creator can change host participation");
+      }
+      if (game.status !== GameStatus.WAITING) {
+        throw new BadRequestException("Participation can be changed only before game start");
+      }
+
+      const host = game.players.find((player) => player.userId === userId);
+      if (!host) throw new ForbiddenException("Game creator is not in this game");
+      const nextRole = participates ? GameRole.PLAYER : GameRole.HOST;
+      if (host.role === nextRole) return;
+      if (host.role !== GameRole.HOST && host.role !== GameRole.PLAYER) {
+        throw new BadRequestException("Game creator has an unsupported room role");
+      }
+
+      let seat: number | null = null;
+      let color: string | null = null;
+      if (participates) {
+        const currentPlayers = game.players.filter(
+          (player) => player.role === GameRole.PLAYER && player.status === "JOINED"
+        );
+        if (currentPlayers.length >= game.maxPlayers) {
+          throw new BadRequestException("Game is full");
+        }
+        const occupiedSeats = new Set(
+          currentPlayers
+            .map((player) => player.seat)
+            .filter((value): value is number => typeof value === "number")
+        );
+        seat =
+          Array.from({ length: game.maxPlayers }, (_value, index) => index + 1).find(
+            (candidate) => !occupiedSeats.has(candidate)
+          ) ?? null;
+        color = seat ? playerColors[(seat - 1) % playerColors.length] ?? null : null;
+      }
+
+      await tx.gamePlayer.update({
+        where: { id: host.id },
+        data: {
+          role: nextRole,
+          seat,
+          color,
+          isReady: !participates,
+          position: -1
+        }
+      });
+      await this.appendEvents(tx, gameId, userId, [
+        {
+          type: "host:participation_changed",
+          gamePlayerId: host.id,
+          payload: { participates, role: nextRole, seat }
+        }
+      ]);
+    });
+
+    return this.actionResult(gameId, [
+      { type: "host:participation_changed", payload: { participates } },
+      { type: realtimeEvents.stateUpdate, payload: {} }
+    ]);
+  }
+
   async rollDice(gameId: string, userId: string) {
     const expirationEvents = await this.expireGameIfNeeded(gameId);
     if (expirationEvents) return this.actionResult(gameId, expirationEvents);
@@ -2333,19 +2406,46 @@ export class GamesService {
     rule: { company: string; level: number; cashflowCents: bigint },
     emittedEvents: PendingEvent[]
   ) {
-    const existing = await tx.playerAsset.findFirst({
+    const existing = await tx.playerAsset.findMany({
       where: {
         gamePlayerId,
         type: "network_marketing",
         symbol: rule.company,
         status: AssetStatus.ACTIVE
       },
-      orderBy: [{ quantity: "desc" }, { createdAt: "desc" }]
+      include: {
+        sourceCard: {
+          select: { title: true, bodyText: true }
+        }
+      },
+      orderBy: [{ quantity: "asc" }, { createdAt: "asc" }]
     });
-    const currentLevel = existing?.quantity ?? 0;
-    const requiredLevel = rule.level - 1;
 
-    if (currentLevel !== requiredLevel) {
+    const ownedLevels = new Set<number>();
+    for (const asset of existing) {
+      // Before levels were stored separately, one asset represented the whole
+      // already completed chain and both fields contained the current level.
+      if (asset.quantity > 1 && asset.units === asset.quantity) {
+        for (let level = 1; level <= asset.quantity; level += 1) {
+          ownedLevels.add(level);
+        }
+      } else if (asset.quantity >= 1 && asset.quantity <= 4) {
+        ownedLevels.add(asset.quantity);
+      }
+    }
+
+    const contiguousLevel = (levels: Set<number>) => {
+      let level = 0;
+      while (levels.has(level + 1)) level += 1;
+      return level;
+    };
+    const previousLevel = contiguousLevel(ownedLevels);
+    const previousCashflowCents = existing.reduce(
+      (sum, asset) => sum + asset.cashflowCents,
+      0n
+    );
+
+    if (ownedLevels.has(rule.level)) {
       emittedEvents.push({
         type: "network_marketing:discarded",
         gamePlayerId,
@@ -2354,46 +2454,77 @@ export class GamesService {
           title: card.title,
           company: rule.company,
           level: rule.level,
-          currentLevel,
-          requiredLevel,
-          reason:
-            rule.level === 1 && currentLevel > 0
-              ? "already_has_level"
-              : "missing_previous_level"
+          currentLevel: previousLevel,
+          requiredLevel: rule.level,
+          reason: "already_has_level"
         }
       });
       return false;
     }
 
-    const previousCashflowCents = existing?.cashflowCents ?? 0n;
     const assetName =
       card.title.trim() && card.title.trim() !== "-"
         ? card.title
         : `${rule.company}: ${rule.level} уровень`;
-    if (existing) {
-      await tx.playerAsset.update({
-        where: { id: existing.id },
-        data: {
-          sourceCardId: card.id,
-          name: assetName,
-          quantity: rule.level,
-          units: rule.level,
-          cashflowCents: rule.cashflowCents
+    await tx.playerAsset.create({
+      data: {
+        gamePlayerId,
+        sourceCardId: card.id,
+        type: "network_marketing",
+        name: assetName,
+        symbol: rule.company,
+        quantity: rule.level,
+        units: 1,
+        cashflowCents: 0n
+      }
+    });
+
+    ownedLevels.add(rule.level);
+    const activeLevel = contiguousLevel(ownedLevels);
+    const companyAssets = await tx.playerAsset.findMany({
+      where: {
+        gamePlayerId,
+        type: "network_marketing",
+        symbol: rule.company,
+        status: AssetStatus.ACTIVE
+      },
+      include: {
+        sourceCard: {
+          select: { title: true, bodyText: true }
+        }
+      },
+      orderBy: [{ createdAt: "desc" }]
+    });
+    const activeAsset = companyAssets.find((asset) => asset.quantity === activeLevel);
+    const activeCashflowCents = activeAsset?.sourceCard
+      ? this.parseNetworkMarketingCashflowCents(
+          `${activeAsset.sourceCard.title}\n${activeAsset.sourceCard.bodyText}`
+        ) ?? 0n
+      : 0n;
+
+    for (const asset of companyAssets) {
+      const cashflowCents = asset.id === activeAsset?.id ? activeCashflowCents : 0n;
+      if (asset.cashflowCents !== cashflowCents) {
+        await tx.playerAsset.update({
+          where: { id: asset.id },
+          data: { cashflowCents }
+        });
+      }
+    }
+
+    if (activeLevel === previousLevel) {
+      emittedEvents.push({
+        type: "network_marketing:level_stored",
+        gamePlayerId,
+        payload: {
+          cardId: card.id,
+          title: card.title,
+          company: rule.company,
+          level: rule.level,
+          currentLevel: activeLevel
         }
       });
-    } else {
-      await tx.playerAsset.create({
-        data: {
-          gamePlayerId,
-          sourceCardId: card.id,
-          type: "network_marketing",
-          name: assetName,
-          symbol: rule.company,
-          quantity: rule.level,
-          units: rule.level,
-          cashflowCents: rule.cashflowCents
-        }
-      });
+      return true;
     }
 
     emittedEvents.push({
@@ -2403,9 +2534,10 @@ export class GamesService {
         cardId: card.id,
         title: card.title,
         company: rule.company,
-        level: rule.level,
-        previousLevel: currentLevel,
-        cashflowCents: Number(rule.cashflowCents),
+        acquiredLevel: rule.level,
+        level: activeLevel,
+        previousLevel,
+        cashflowCents: Number(activeCashflowCents),
         previousCashflowCents: Number(previousCashflowCents)
       }
     });
