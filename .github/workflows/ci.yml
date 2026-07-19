@@ -62,8 +62,18 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eu
+
             docker run --rm -v /opt/fj:/opt/fj --entrypoint sh caddy:2-alpine -c 'chown -R 1000:1000 /opt/fj'
             cd /opt/fj
-            git pull
-            docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build
+            git pull --ff-only
+            test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+
+            export GAME_RELEASE_VERSION="$(node scripts/write-release-version.mjs --print)"
+            docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build --wait --wait-timeout 180
+            docker compose --env-file .env.vps -f docker-compose.vps.yml exec -T app \
+              wget -qO- http://127.0.0.1:3000/healthz | grep -q '"status":"ok"'
+
+            docker compose --env-file .env.vps -f docker-compose.vps.yml exec -T app \
+              head -n 2 /app/.game-release-version
             docker image prune -f
