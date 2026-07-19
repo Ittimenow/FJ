@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input";
 
 export function LoginForm({
   releaseVersion,
+  releasedAt,
   callbackUrl = "/dashboard"
 }: {
   releaseVersion?: string;
+  releasedAt?: string;
   callbackUrl?: Route;
 }) {
   const router = useRouter();
@@ -67,9 +69,18 @@ export function LoginForm({
         {releaseVersion ? (
           <div className="mt-4 border-t border-line pt-3 text-center text-xs text-neutral-500">
             Релиз игры v{releaseVersion}
+            {releasedAt ? ` · ${formatReleaseDate(releasedAt)}` : ""}
           </div>
         ) : null}
       </CardContent>
     </Card>
   );
+}
+
+function formatReleaseDate(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "medium",
+    timeZone: "Europe/Moscow"
+  }).format(new Date(value));
 }

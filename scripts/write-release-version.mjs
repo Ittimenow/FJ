@@ -7,12 +7,13 @@ const packageVersion = String(packageJson.version || "0.1.0");
 const shouldPrintOnly = process.argv.includes("--print");
 
 const releaseVersion = resolveReleaseVersion();
+const releasedAt = new Date().toISOString();
 
 if (shouldPrintOnly) {
   console.log(releaseVersion);
 } else {
-  writeFileSync(releaseFile, `${releaseVersion}\n`);
-  console.log(`Game release version: v${releaseVersion}`);
+  writeFileSync(releaseFile, `${releaseVersion}\n${releasedAt}\n`);
+  console.log(`Game release version: v${releaseVersion} (${releasedAt})`);
 }
 
 function resolveReleaseVersion() {
