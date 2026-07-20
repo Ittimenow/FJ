@@ -6,6 +6,7 @@ import {
 } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
+import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
@@ -178,6 +179,28 @@ export class GamesController {
     @Body() dto: RepayLoanDto
   ) {
     const result = await this.games.repayLoan(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/bankruptcy/assets/sell")
+  async sellBankruptcyAsset(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: SellBankruptcyAssetDto
+  ) {
+    const result = await this.games.sellBankruptcyAsset(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/bankruptcy/debts/repay")
+  async repayBankruptcyDebt(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: RepayBankruptcyDebtDto
+  ) {
+    const result = await this.games.repayBankruptcyDebt(id, user.userId, dto);
     this.realtime.broadcastAction(id, result);
     return result;
   }

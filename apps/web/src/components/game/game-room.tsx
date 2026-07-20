@@ -134,7 +134,8 @@ export function GameRoom({
   const selectedPlayer = me ?? gamePlayers[0];
   const canRoll =
     snapshot.game.status === "IN_PROGRESS" &&
-    currentPlayer?.userId === currentUserId;
+    currentPlayer?.userId === currentUserId &&
+    me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
   const isAdmin = currentUserRole === "ADMIN";
   const canManage =
     isAdmin ||
@@ -161,7 +162,10 @@ export function GameRoom({
     isMyTurn && Boolean(charityChoice);
   const canAnswerMarketSale =
     isMyTurn && Boolean(marketSaleOffer);
-  const canTakeLoan = snapshot.game.status === "IN_PROGRESS" && Boolean(me);
+  const canTakeLoan =
+    snapshot.game.status === "IN_PROGRESS" &&
+    Boolean(me) &&
+    me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
   const activeDiceCount = (me?.financialState?.charityTurns ?? 0) > 0
     ? 2
     : 1;
@@ -475,6 +479,32 @@ export function GameRoom({
     }
   }
 
+  async function sellBankruptcyAsset(assetId: string, quantity: number) {
+    setError(null);
+    try {
+      const result = await emitWithAck("bankruptcy:asset_sell", { assetId, quantity });
+      applyActionResult(result);
+    } catch (event) {
+      setError(event instanceof Error ? event.message : "Не удалось продать актив банку");
+    }
+  }
+
+  async function repayBankruptcyDebt(liability: PlayerLiability) {
+    const cash = me?.financialState?.cashCents ?? 0;
+    const amountCents = Math.min(cash, liability.balanceCents);
+    if (amountCents <= 0) return;
+    setError(null);
+    try {
+      const result = await emitWithAck("bankruptcy:debt_repay", {
+        liabilityId: liability.id,
+        amountCents
+      });
+      applyActionResult(result);
+    } catch (event) {
+      setError(event instanceof Error ? event.message : "Не удалось погасить долг");
+    }
+  }
+
   function changeLoanAmount(delta: number) {
     setLoanAmount((current) => {
       const next = current + delta;
@@ -522,9 +552,25 @@ export function GameRoom({
         onRoll={rollDice}
         onSkip={skipTurn}
       />
+      {me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
+        <BankruptcyPanel
+          player={me}
+          onSellAsset={sellBankruptcyAsset}
+          onRepayDebt={repayBankruptcyDebt}
+        />
+      ) : null}
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {error}
+        </div>
+      ) : null}
+      {me?.financialState?.bankruptcyStatus === "RECOVERED" ? (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Банкротство преодолено. Осталось пропустить ходов: {me.financialState.bankruptcyTurns}.
+        </div>
+      ) : me?.financialState?.bankruptcyStatus === "ELIMINATED" ? (
+        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+          Денежный поток не удалось восстановить — вы выбыли из игры.
         </div>
       ) : null}
       {snapshot.game.status === "IN_PROGRESS" && remainingSeconds !== null ? (
@@ -669,6 +715,100 @@ export function GameRoom({
           messages={snapshot.chatMessages}
           onSend={(body) => emit("chat:send", { body })}
         />
+      </div>
+    </div>
+  );
+}
+
+function BankruptcyPanel({
+  player,
+  onSellAsset,
+  onRepayDebt
+}: {
+  player: GamePlayer;
+  onSellAsset: (assetId: string, quantity: number) => void;
+  onRepayDebt: (liability: PlayerLiability) => void;
+}) {
+  const state = player.financialState;
+  if (!state) return null;
+  const deficit = Math.abs(Math.min(state.monthlyCashflowCents, 0));
+
+  return (
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/50 px-4 py-8">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bankruptcy-title"
+        className="mx-auto w-full max-w-3xl rounded-md border border-red-300 bg-white p-5 shadow-panel"
+      >
+        <h2 id="bankruptcy-title" className="text-xl font-semibold text-red-800">
+          Объявлено банкротство
+        </h2>
+        <p className="mt-2 text-sm text-neutral-700">
+          Денежный поток: {money(state.monthlyCashflowCents)} · наличные: {money(state.cashCents)} ·
+          месячный дефицит: {money(deficit)}. Продайте активы банку и направьте деньги на долги,
+          пока денежный поток не станет положительным.
+        </p>
+
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <section>
+            <h3 className="font-semibold">Активы</h3>
+            <p className="mt-1 text-xs text-neutral-500">
+              Банк выплачивает половину первоначального взноса.
+            </p>
+            <div className="mt-3 space-y-2">
+              {player.assets.length === 0 ? (
+                <p className="rounded-md bg-surface p-3 text-sm text-neutral-600">
+                  Все активы проданы. Сначала направьте оставшиеся наличные на долги.
+                </p>
+              ) : player.assets.map((asset) => (
+                <div key={asset.id} className="rounded-md border border-line p-3">
+                  <div className="text-sm font-medium">{asset.name}</div>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Количество: {asset.quantity} · выплата: {money(Math.floor(asset.downPaymentCents / 2))}
+                    {asset.cashflowCents !== 0 ? ` · cashflow: ${money(asset.cashflowCents)}` : ""}
+                  </div>
+                  <Button
+                    className="mt-2 h-8 px-3 text-xs"
+                    variant="secondary"
+                    onClick={() => onSellAsset(asset.id, asset.quantity)}
+                  >
+                    Продать банку
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="font-semibold">Долги</h3>
+            <p className="mt-1 text-xs text-neutral-500">
+              Доступно для погашения: {money(state.cashCents)}.
+            </p>
+            <div className="mt-3 space-y-2">
+              {player.liabilities.length === 0 ? (
+                <p className="rounded-md bg-surface p-3 text-sm text-neutral-600">Долгов нет.</p>
+              ) : player.liabilities.map((liability) => (
+                <div key={liability.id} className="rounded-md border border-line p-3">
+                  <div className="text-sm font-medium">
+                    {liabilityLabels[liability.type] ?? liability.name}
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Остаток: {money(liability.balanceCents)} · платёж: {money(liability.paymentCents)}/мес
+                  </div>
+                  <Button
+                    className="mt-2 h-8 px-3 text-xs"
+                    variant="secondary"
+                    disabled={state.cashCents <= 0}
+                    onClick={() => onRepayDebt(liability)}
+                  >
+                    Направить {money(Math.min(state.cashCents, liability.balanceCents))}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -2133,6 +2273,13 @@ const eventTitles: Record<string, string> = {
   "market:sale_declined": "Отказ от продажи",
   "loan:take": "Получен кредит",
   "loan:repay": "Погашен кредит",
+  "bankruptcy:declared": "Объявлено банкротство",
+  "bankruptcy:asset_sold": "Актив продан при банкротстве",
+  "bankruptcy:debt_repaid": "Долг погашен при банкротстве",
+  "bankruptcy:debts_halved": "Долги сокращены вдвое",
+  "bankruptcy:recovered": "Выход из банкротства",
+  "bankruptcy:turn_skipped": "Ход пропущен после банкротства",
+  "bankruptcy:eliminated": "Игрок выбыл из-за банкротства",
   "paycheck:receive": "Получен cashflow",
   "doodad:paid": "Оплачена безделушка",
   "state:update": "Обновление состояния"
@@ -2371,6 +2518,48 @@ function eventDetails(event: GameEvent) {
         moneyDetail("Погашено", -Math.abs(toNumber(payload.amountCents))),
         moneyDetail("Наличные после", payload.afterCashCents),
         moneyDetail("Снятый платеж", payload.paymentCents, "/мес")
+      ]);
+    case "bankruptcy:declared":
+      return compactDetails([
+        moneyDetail("Наличные", payload.cashCents),
+        moneyDetail("Денежный поток", payload.monthlyCashflowCents, "/мес"),
+        moneyDetail("Дефицит", payload.deficitCents, "/мес")
+      ]);
+    case "bankruptcy:asset_sold":
+      return compactDetails([
+        textDetail("Актив", payload.assetName),
+        numericDetail("Количество", payload.quantity),
+        moneyDetail("Выплата банка", payload.proceedsCents),
+        moneyDetail("Убран денежный поток", payload.removedCashflowCents, "/мес")
+      ]);
+    case "bankruptcy:debt_repaid":
+      return compactDetails([
+        textDetail("Тип долга", humanizeToken(String(payload.liabilityType ?? ""))),
+        moneyDetail("Погашено", payload.amountCents),
+        moneyDetail("Остаток", payload.balanceCents),
+        moneyDetail("Новый платёж", payload.paymentCents, "/мес")
+      ]);
+    case "bankruptcy:debts_halved":
+      return compactDetails([
+        textDetail(
+          "Сокращённые долги",
+          Array.isArray(payload.liabilityTypes)
+            ? payload.liabilityTypes.map((type) => humanizeToken(String(type))).join(", ")
+            : null
+        )
+      ]);
+    case "bankruptcy:recovered":
+      return compactDetails([
+        moneyDetail("Денежный поток", payload.monthlyCashflowCents, "/мес"),
+        numericDetail("Ходов пропустить", payload.turnsToSkip)
+      ]);
+    case "bankruptcy:turn_skipped":
+      return compactDetails([
+        numericDetail("Ходов осталось", payload.turnsRemaining)
+      ]);
+    case "bankruptcy:eliminated":
+      return compactDetails([
+        moneyDetail("Денежный поток", payload.monthlyCashflowCents, "/мес")
       ]);
     case "player:baby":
       return compactDetails([numericDetail("Детей теперь", payload.childrenCount)]);

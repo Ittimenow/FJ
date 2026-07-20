@@ -38,6 +38,7 @@ enum GamePlayerStatus {
   JOINED
   LEFT
   KICKED
+  BANKRUPT
 }
 
 enum BoardTrack {
@@ -48,6 +49,13 @@ enum BoardTrack {
 enum AssetStatus {
   ACTIVE
   SOLD
+}
+
+enum BankruptcyStatus {
+  NONE
+  LIQUIDATING
+  RECOVERED
+  ELIMINATED
 }
 
 enum CardType {
@@ -276,6 +284,10 @@ model PlayerFinancialState {
   childrenCount            Int       @default(0) @map("children_count")
   charityTurns             Int       @default(0) @map("charity_turns")
   downsizedTurns           Int       @default(0) @map("downsized_turns")
+  bankruptcyStatus         BankruptcyStatus @default(NONE) @map("bankruptcy_status")
+  bankruptcyTurns          Int       @default(0) @map("bankruptcy_turns")
+  bankruptcyDeclaredAt     DateTime? @map("bankruptcy_declared_at")
+  bankruptcyEliminatedAt   DateTime? @map("bankruptcy_eliminated_at")
   paycheckCount            Int       @default(0) @map("paycheck_count")
   escapedRatRaceAt         DateTime? @map("escaped_rat_race_at")
   wonAt                    DateTime? @map("won_at")

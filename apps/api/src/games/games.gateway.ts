@@ -12,6 +12,7 @@ import {
 import { realtimeEvents } from "@cashflow/shared";
 import { Server, Socket } from "socket.io";
 import { BuyDealDto } from "./dto/buy-deal.dto";
+import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
@@ -244,6 +245,34 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     const dto: RepayLoanDto = { amountCents: body.amountCents };
     if (body.liabilityId !== undefined) dto.liabilityId = body.liabilityId;
     const result = await this.games.repayLoan(body.gameId, this.userId(client), dto);
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("bankruptcy:asset_sell")
+  async sellBankruptcyAsset(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & SellBankruptcyAssetDto
+  ) {
+    const result = await this.games.sellBankruptcyAsset(
+      body.gameId,
+      this.userId(client),
+      { assetId: body.assetId, quantity: body.quantity }
+    );
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("bankruptcy:debt_repay")
+  async repayBankruptcyDebt(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & RepayBankruptcyDebtDto
+  ) {
+    const result = await this.games.repayBankruptcyDebt(
+      body.gameId,
+      this.userId(client),
+      { liabilityId: body.liabilityId, amountCents: body.amountCents }
+    );
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }

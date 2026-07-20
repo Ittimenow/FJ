@@ -132,6 +132,10 @@ export interface FinancialState {
   childrenCount: number;
   charityTurns: number;
   downsizedTurns: number;
+  bankruptcyStatus: "NONE" | "LIQUIDATING" | "RECOVERED" | "ELIMINATED";
+  bankruptcyTurns: number;
+  bankruptcyDeclaredAt: string | null;
+  bankruptcyEliminatedAt: string | null;
   paycheckCount: number;
   escapedRatRaceAt: string | null;
   wonAt: string | null;

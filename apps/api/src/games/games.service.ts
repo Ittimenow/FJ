@@ -7,6 +7,7 @@ import {
 import {
   AccountStatus,
   AssetStatus,
+  BankruptcyStatus,
   BoardTrack,
   CardType,
   GamePlayerStatus,
@@ -29,6 +30,7 @@ import { randomInt } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
+import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
@@ -629,6 +631,35 @@ export class GamesService {
         throw new BadRequestException("Financial state is not initialized");
       }
 
+      if (
+        currentPlayer.financialState.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
+      ) {
+        throw new BadRequestException("Complete the bankruptcy procedure before rolling");
+      }
+
+      if (currentPlayer.financialState.bankruptcyTurns > 0) {
+        const remaining = currentPlayer.financialState.bankruptcyTurns - 1;
+        await tx.playerFinancialState.update({
+          where: { gamePlayerId: currentPlayer.id },
+          data: {
+            bankruptcyTurns: { decrement: 1 },
+            ...(remaining === 0 ? { bankruptcyStatus: BankruptcyStatus.NONE } : {})
+          }
+        });
+        await this.advanceTurn(tx, game, activeIndex);
+        emittedEvents.push({
+          type: "bankruptcy:turn_skipped",
+          gamePlayerId: currentPlayer.id,
+          payload: { turnsRemaining: remaining }
+        });
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "bankruptcy_turn_skipped" }
+        });
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
+
       if (currentPlayer.financialState.downsizedTurns > 0) {
         await tx.playerFinancialState.update({
           where: { gamePlayerId: currentPlayer.id },
@@ -737,7 +768,15 @@ export class GamesService {
         );
       }
 
-      await this.recalculatePlayer(tx, currentPlayer.id);
+      await this.recalculatePlayer(tx, currentPlayer.id, emittedEvents);
+      const currentPlayerStatus = await tx.gamePlayer.findUniqueOrThrow({
+        where: { id: currentPlayer.id },
+        select: { status: true }
+      });
+      if (currentPlayerStatus.status !== GamePlayerStatus.JOINED) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
       const gameWon = await this.checkAnyGameWon(tx, gameId, emittedEvents);
       if (gameWon) {
         await this.appendEvents(tx, gameId, userId, emittedEvents);
@@ -791,6 +830,7 @@ export class GamesService {
         include: {
           players: {
             where: { role: GameRole.PLAYER, status: "JOINED" },
+            include: { financialState: true },
             orderBy: { seat: "asc" }
           }
         }
@@ -809,6 +849,11 @@ export class GamesService {
       const currentPlayer = game.players[activeIndex];
       if (!currentPlayer || currentPlayer.userId !== userId) {
         throw new ForbiddenException("It is not your turn");
+      }
+      if (
+        currentPlayer.financialState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
+      ) {
+        throw new BadRequestException("Complete the bankruptcy procedure before skipping");
       }
 
       await tx.gamePlayer.update({
@@ -891,7 +936,7 @@ export class GamesService {
           emittedEvents
         );
         if (applied) {
-          await this.recalculatePlayer(tx, player.id);
+          await this.recalculatePlayer(tx, player.id, emittedEvents);
           const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
           if (gameWon) {
             await this.appendEvents(tx, gameId, userId, emittedEvents);
@@ -918,7 +963,7 @@ export class GamesService {
           emittedEvents
         );
         for (const affectedPlayerId of affectedPlayerIds) {
-          await this.recalculatePlayer(tx, affectedPlayerId);
+          await this.recalculatePlayer(tx, affectedPlayerId, emittedEvents);
         }
         const gameWon = await this.checkAnyGameWon(tx, gameId, emittedEvents);
         if (gameWon) {
@@ -1070,7 +1115,7 @@ export class GamesService {
           emittedEvents
         );
         if (applied) {
-          await this.recalculatePlayer(tx, player.id);
+          await this.recalculatePlayer(tx, player.id, emittedEvents);
           const gameWon = await this.checkGameWon(tx, player.id, emittedEvents);
           if (gameWon) {
             await this.appendEvents(tx, gameId, userId, emittedEvents);
@@ -1149,7 +1194,7 @@ export class GamesService {
         }
       });
 
-      await this.recalculatePlayer(tx, player.id);
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
       emittedEvents.push({
         type: realtimeEvents.dealBuy,
         gamePlayerId: player.id,
@@ -1340,7 +1385,7 @@ export class GamesService {
         where: { gamePlayerId: player.id },
         data: { cashCents: { increment: proceeds } }
       });
-      const updatedState = await this.recalculatePlayer(tx, player.id);
+      const updatedState = await this.recalculatePlayer(tx, player.id, emittedEvents);
 
       emittedEvents.push({
         type: realtimeEvents.dealSell,
@@ -1501,7 +1546,7 @@ export class GamesService {
           soldAt: new Date()
         }
       });
-      const updatedState = await this.recalculatePlayer(tx, player.id);
+      const updatedState = await this.recalculatePlayer(tx, player.id, emittedEvents);
       emittedEvents.push({
         type: realtimeEvents.dealSell,
         gamePlayerId: player.id,
@@ -1724,6 +1769,13 @@ export class GamesService {
 
     await this.prisma.$transaction(async (tx) => {
       const player = await this.requirePlayer(tx, gameId, userId);
+      const bankruptcyState = await tx.playerFinancialState.findUnique({
+        where: { gamePlayerId: player.id },
+        select: { bankruptcyStatus: true }
+      });
+      if (bankruptcyState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
+        throw new BadRequestException("New loans are not available during bankruptcy");
+      }
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId }
       });
@@ -1751,7 +1803,7 @@ export class GamesService {
           cashCents: { increment: amount }
         }
       });
-      await this.recalculatePlayer(tx, player.id);
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
 
       emittedEvents.push({
         type: realtimeEvents.loanTake,
@@ -1781,6 +1833,9 @@ export class GamesService {
       const state = await tx.playerFinancialState.findUniqueOrThrow({
         where: { gamePlayerId: player.id }
       });
+      if (state.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
+        throw new BadRequestException("Use the bankruptcy debt repayment action");
+      }
       const amount = BigInt(dto.amountCents);
       if (state.cashCents < amount) {
         throw new BadRequestException("Not enough cash to repay loan");
@@ -1823,7 +1878,7 @@ export class GamesService {
         });
       }
 
-      await this.recalculatePlayer(tx, player.id);
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
       emittedEvents.push({
         type: realtimeEvents.loanRepay,
         gamePlayerId: player.id,
@@ -1850,6 +1905,160 @@ export class GamesService {
       });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async sellBankruptcyAsset(
+    gameId: string,
+    userId: string,
+    dto: SellBankruptcyAssetDto
+  ) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId, true);
+      const state = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: player.id }
+      });
+      if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) {
+        throw new BadRequestException("Player is not in bankruptcy liquidation");
+      }
+
+      const asset = await tx.playerAsset.findFirst({
+        where: { id: dto.assetId, gamePlayerId: player.id, status: AssetStatus.ACTIVE }
+      });
+      if (!asset) throw new NotFoundException("Active asset not found");
+      if (dto.quantity > asset.quantity) {
+        throw new BadRequestException("Sale quantity exceeds asset quantity");
+      }
+
+      const proceeds = proportionalAmount(
+        asset.downPaymentCents / 2n,
+        dto.quantity,
+        asset.quantity
+      );
+      const removedCashflow = proportionalAmount(
+        asset.cashflowCents,
+        dto.quantity,
+        asset.quantity
+      );
+      const sellAll = dto.quantity === asset.quantity;
+
+      if (sellAll) {
+        await tx.playerAsset.update({
+          where: { id: asset.id },
+          data: { status: AssetStatus.SOLD, soldAt: new Date() }
+        });
+      } else {
+        await tx.playerAsset.update({
+          where: { id: asset.id },
+          data: {
+            quantity: { decrement: dto.quantity },
+            units: { decrement: Math.min(dto.quantity, asset.units) },
+            costBasisCents: {
+              decrement: proportionalAmount(asset.costBasisCents, dto.quantity, asset.quantity)
+            },
+            marketValueCents: {
+              decrement: proportionalAmount(asset.marketValueCents, dto.quantity, asset.quantity)
+            },
+            downPaymentCents: {
+              decrement: proportionalAmount(asset.downPaymentCents, dto.quantity, asset.quantity)
+            },
+            cashflowCents: { decrement: removedCashflow }
+          }
+        });
+      }
+
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: player.id },
+        data: { cashCents: { increment: proceeds } }
+      });
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
+      emittedEvents.push({
+        type: "bankruptcy:asset_sold",
+        gamePlayerId: player.id,
+        payload: {
+          assetId: asset.id,
+          assetName: asset.name,
+          quantity: dto.quantity,
+          proceedsCents: cents(proceeds),
+          removedCashflowCents: cents(removedCashflow)
+        }
+      });
+      await this.resolveBankruptcy(tx, player.id, emittedEvents);
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "bankruptcy_updated" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async repayBankruptcyDebt(
+    gameId: string,
+    userId: string,
+    dto: RepayBankruptcyDebtDto
+  ) {
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId, true);
+      const state = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: player.id }
+      });
+      if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) {
+        throw new BadRequestException("Player is not in bankruptcy liquidation");
+      }
+      const liability = await tx.playerLiability.findFirst({
+        where: { id: dto.liabilityId, gamePlayerId: player.id }
+      });
+      if (!liability) throw new NotFoundException("Liability not found");
+
+      const requested = BigInt(dto.amountCents);
+      const amount = bigintMin(
+        requested,
+        bigintMin(state.cashCents, liability.balanceCents)
+      );
+      if (amount <= 0n) throw new BadRequestException("No cash available for debt repayment");
+      const newBalance = liability.balanceCents - amount;
+      const newPayment = newBalance === 0n
+        ? 0n
+        : (liability.paymentCents * newBalance) / liability.balanceCents;
+
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: player.id },
+        data: { cashCents: { decrement: amount } }
+      });
+      if (newBalance === 0n) {
+        await tx.playerLiability.delete({ where: { id: liability.id } });
+      } else {
+        await tx.playerLiability.update({
+          where: { id: liability.id },
+          data: { balanceCents: newBalance, paymentCents: newPayment }
+        });
+      }
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
+      emittedEvents.push({
+        type: "bankruptcy:debt_repaid",
+        gamePlayerId: player.id,
+        payload: {
+          liabilityId: liability.id,
+          liabilityType: liability.type,
+          amountCents: cents(amount),
+          balanceCents: cents(newBalance),
+          paymentCents: cents(newPayment)
+        }
+      });
+      await this.resolveBankruptcy(tx, player.id, emittedEvents);
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "bankruptcy_updated" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return this.actionResult(gameId, emittedEvents);
   }
@@ -2081,7 +2290,7 @@ export class GamesService {
           emittedEvents
         );
         for (const affectedPlayerId of affectedPlayerIds) {
-          await this.recalculatePlayer(tx, affectedPlayerId);
+          await this.recalculatePlayer(tx, affectedPlayerId, emittedEvents);
         }
       }
       return false;
@@ -2345,7 +2554,7 @@ export class GamesService {
     });
 
     for (const affectedPlayerId of affectedPlayerIds) {
-      await this.recalculatePlayer(tx, affectedPlayerId);
+      await this.recalculatePlayer(tx, affectedPlayerId, emittedEvents);
     }
   }
 
@@ -3015,7 +3224,11 @@ export class GamesService {
     });
   }
 
-  private async recalculatePlayer(tx: Tx, gamePlayerId: string) {
+  private async recalculatePlayer(
+    tx: Tx,
+    gamePlayerId: string,
+    emittedEvents?: PendingEvent[]
+  ) {
     const [state, assets, liabilities] = await Promise.all([
       tx.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId } }),
       tx.playerAsset.findMany({
@@ -3039,7 +3252,7 @@ export class GamesService {
     const totalExpenses =
       state.baseExpensesCents + liabilityPayments + childrenExpense;
 
-    return tx.playerFinancialState.update({
+    const updated = await tx.playerFinancialState.update({
       where: { gamePlayerId },
       data: {
         passiveIncomeCents: passiveIncome,
@@ -3048,6 +3261,179 @@ export class GamesService {
         monthlyCashflowCents: totalIncome - totalExpenses
       }
     });
+
+    const deficit = updated.monthlyCashflowCents < 0n
+      ? updated.monthlyCashflowCents * -1n
+      : 0n;
+    const canDeclare =
+      updated.bankruptcyStatus === BankruptcyStatus.NONE ||
+      updated.bankruptcyStatus === BankruptcyStatus.RECOVERED;
+    if (canDeclare && deficit > 0n && updated.cashCents < deficit) {
+      const declared = await tx.playerFinancialState.update({
+        where: { gamePlayerId },
+        data: {
+          bankruptcyStatus: BankruptcyStatus.LIQUIDATING,
+          bankruptcyTurns: 0,
+          bankruptcyDeclaredAt: new Date(),
+          bankruptcyEliminatedAt: null
+        }
+      });
+      emittedEvents?.push({
+        type: "bankruptcy:declared",
+        gamePlayerId,
+        payload: {
+          cashCents: cents(declared.cashCents),
+          monthlyCashflowCents: cents(declared.monthlyCashflowCents),
+          deficitCents: cents(deficit)
+        }
+      });
+
+      const activeAssets = await tx.playerAsset.count({
+        where: { gamePlayerId, status: AssetStatus.ACTIVE }
+      });
+      if (activeAssets === 0) {
+        await this.resolveBankruptcy(tx, gamePlayerId, emittedEvents ?? []);
+      }
+      return declared;
+    }
+
+    return updated;
+  }
+
+  private async resolveBankruptcy(
+    tx: Tx,
+    gamePlayerId: string,
+    emittedEvents: PendingEvent[]
+  ) {
+    let state = await tx.playerFinancialState.findUniqueOrThrow({
+      where: { gamePlayerId }
+    });
+    if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) return state;
+
+    if (state.monthlyCashflowCents > 0n) {
+      state = await tx.playerFinancialState.update({
+        where: { gamePlayerId },
+        data: {
+          bankruptcyStatus: BankruptcyStatus.RECOVERED,
+          bankruptcyTurns: 3
+        }
+      });
+      emittedEvents.push({
+        type: "bankruptcy:recovered",
+        gamePlayerId,
+        payload: { turnsToSkip: 3, monthlyCashflowCents: cents(state.monthlyCashflowCents) }
+      });
+      return state;
+    }
+
+    const activeAssets = await tx.playerAsset.count({
+      where: { gamePlayerId, status: AssetStatus.ACTIVE }
+    });
+    if (activeAssets > 0) return state;
+
+    const payableLiabilities = await tx.playerLiability.count({
+      where: { gamePlayerId, balanceCents: { gt: 0n } }
+    });
+    if (state.cashCents > 0n && payableLiabilities > 0) return state;
+
+    const reducibleTypes = ["car_debt", "credit_cards", "retail_debt"];
+    const reducible = await tx.playerLiability.findMany({
+      where: { gamePlayerId, type: { in: reducibleTypes } }
+    });
+    if (reducible.length > 0) {
+      for (const liability of reducible) {
+        await tx.playerLiability.update({
+          where: { id: liability.id },
+          data: {
+            balanceCents: liability.balanceCents / 2n,
+            paymentCents: liability.paymentCents / 2n
+          }
+        });
+      }
+      emittedEvents.push({
+        type: "bankruptcy:debts_halved",
+        gamePlayerId,
+        payload: { liabilityTypes: reducibleTypes }
+      });
+      state = await this.recalculatePlayer(tx, gamePlayerId);
+    }
+
+    if (state.monthlyCashflowCents > 0n) {
+      state = await tx.playerFinancialState.update({
+        where: { gamePlayerId },
+        data: { bankruptcyStatus: BankruptcyStatus.RECOVERED, bankruptcyTurns: 3 }
+      });
+      emittedEvents.push({
+        type: "bankruptcy:recovered",
+        gamePlayerId,
+        payload: { turnsToSkip: 3, monthlyCashflowCents: cents(state.monthlyCashflowCents) }
+      });
+      return state;
+    }
+
+    const playerBeforeElimination = await tx.gamePlayer.findUniqueOrThrow({
+      where: { id: gamePlayerId },
+      select: { gameId: true }
+    });
+    const [game, activePlayers] = await Promise.all([
+      tx.game.findUniqueOrThrow({
+        where: { id: playerBeforeElimination.gameId },
+        select: { currentTurnIndex: true }
+      }),
+      tx.gamePlayer.findMany({
+        where: {
+          gameId: playerBeforeElimination.gameId,
+          role: GameRole.PLAYER,
+          status: GamePlayerStatus.JOINED
+        },
+        select: { id: true },
+        orderBy: { seat: "asc" }
+      })
+    ]);
+    const eliminatedIndex = activePlayers.findIndex((player) => player.id === gamePlayerId);
+    const currentIndex = activePlayers.length > 0
+      ? game.currentTurnIndex % activePlayers.length
+      : 0;
+
+    state = await tx.playerFinancialState.update({
+      where: { gamePlayerId },
+      data: {
+        bankruptcyStatus: BankruptcyStatus.ELIMINATED,
+        bankruptcyTurns: 0,
+        bankruptcyEliminatedAt: new Date()
+      }
+    });
+    const player = await tx.gamePlayer.update({
+      where: { id: gamePlayerId },
+      data: { status: GamePlayerStatus.BANKRUPT, leftAt: new Date() },
+      select: { gameId: true }
+    });
+    if (eliminatedIndex >= 0 && eliminatedIndex < currentIndex) {
+      await tx.game.update({
+        where: { id: player.gameId },
+        data: { currentTurnIndex: currentIndex - 1 }
+      });
+    }
+    emittedEvents.push({
+      type: "bankruptcy:eliminated",
+      gamePlayerId,
+      payload: { monthlyCashflowCents: cents(state.monthlyCashflowCents) }
+    });
+
+    const remainingPlayers = await tx.gamePlayer.count({
+      where: { gameId: player.gameId, role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }
+    });
+    if (remainingPlayers === 0) {
+      await tx.game.update({
+        where: { id: player.gameId },
+        data: { status: GameStatus.ENDED, endedAt: new Date(), currentTurnIndex: 0 }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.gameEnded,
+        payload: { reason: "all_players_bankrupt" }
+      });
+    }
+    return state;
   }
 
   private async checkAnyGameWon(
@@ -3628,24 +4014,40 @@ export class GamesService {
     return expired ? emittedEvents : null;
   }
 
-  private async requirePlayer(tx: Tx, gameId: string, userId: string) {
+  private async requirePlayer(
+    tx: Tx,
+    gameId: string,
+    userId: string,
+    allowLiquidation = false
+  ) {
     const player = await tx.gamePlayer.findFirst({
       where: {
         gameId,
         userId,
         status: "JOINED"
-      }
+      },
+      include: { financialState: true }
     });
     if (!player) throw new ForbiddenException("You are not in this game");
     if (player.role !== GameRole.PLAYER) {
       throw new ForbiddenException("Only players can perform this action");
+    }
+    if (
+      !allowLiquidation &&
+      player.financialState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
+    ) {
+      throw new BadRequestException("Complete the bankruptcy procedure first");
     }
     return player;
   }
 
   private async ensureGameAccess(gameId: string, userId: string) {
     const player = await this.prisma.gamePlayer.findFirst({
-      where: { gameId, userId, status: "JOINED" }
+      where: {
+        gameId,
+        userId,
+        status: { in: [GamePlayerStatus.JOINED, GamePlayerStatus.BANKRUPT] }
+      }
     });
     if (!player && (await this.canManageGame(gameId, userId))) {
       return null;
@@ -3884,6 +4286,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function bigintMax(left: bigint, right: bigint) {
   return left > right ? left : right;
+}
+
+function bigintMin(left: bigint, right: bigint) {
+  return left < right ? left : right;
 }
 
 function proportionalAmount(amount: bigint, part: number, total: number) {
