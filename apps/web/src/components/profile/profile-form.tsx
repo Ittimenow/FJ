@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { signOut } from "next-auth/react";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -353,6 +354,22 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
           {!pwOpen && passwordMsg?.ok && (
             <p className="mt-3 text-sm text-green-700">{passwordMsg.text}</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex items-center justify-between gap-4 pt-4">
+          <div>
+            <p className="text-sm font-medium">Выход из аккаунта</p>
+            <p className="text-xs text-neutral-400">Завершить текущий сеанс</p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => signOut({ redirectTo: "/login" })}
+          >
+            Выйти
+          </Button>
         </CardContent>
       </Card>
     </div>

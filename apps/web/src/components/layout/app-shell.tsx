@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { signOut } from "@/auth";
 import { GameRoomHeaderSlot } from "@/components/layout/game-room-header-context";
-import { Button } from "@/components/ui/button";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -27,29 +25,17 @@ export function AppShell({
           </Link>
           <GameRoomHeaderSlot />
           {userName ? (
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 text-neutral-600 hover:text-ink transition"
-              >
-                <UserAvatar
-                  url={userAvatarUrl}
-                  color={userAvatarColor}
-                  initials={userInitials}
-                />
-                <span className="hidden text-sm sm:inline">{userName}</span>
-              </Link>
-              <form
-                action={async () => {
-                  "use server";
-                  await signOut({ redirectTo: "/login" });
-                }}
-              >
-                <Button type="submit" variant="secondary" className="h-9">
-                  Выйти
-                </Button>
-              </form>
-            </div>
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 text-neutral-600 hover:text-ink transition"
+            >
+              <UserAvatar
+                url={userAvatarUrl}
+                color={userAvatarColor}
+                initials={userInitials}
+              />
+              <span className="hidden text-sm sm:inline">{userName}</span>
+            </Link>
           ) : null}
         </div>
       </header>

@@ -4,6 +4,26 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "game-end-results-popup",
+          "category": "feature",
+          "summary": "После окончания партии все участники видят победителя и итоговые финансовые результаты в отдельном окне."
+        },
+        {
+          "id": "debts-tab-credit-management",
+          "category": "improvement",
+          "summary": "Просмотр и полное погашение кредитов перенесены из банка во вкладку «Долги» финансового отчёта."
+        },
+        {
+          "id": "game-log-players-tab",
+          "category": "improvement",
+          "summary": "Список игроков теперь доступен рядом с журналом действий на всех размерах экрана."
+        },
+        {
+          "id": "logout-in-profile",
+          "category": "improvement",
+          "summary": "Кнопка выхода из аккаунта перенесена из глобального меню на страницу профиля."
+        },
+        {
           "id": "docker-registry-rate-limit",
           "category": "technical",
           "summary": "Автоматическое развёртывание больше не зависит от ограничений загрузки образов Docker Hub."

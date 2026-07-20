@@ -43,9 +43,11 @@ export function GameRoom({
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [changingParticipation, setChangingParticipation] = useState(false);
+  const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const expirationRefreshRef = useRef(false);
+  const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
@@ -131,6 +133,9 @@ export function GameRoom({
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
   const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
+  const gameEndEvent = [...snapshot.events]
+    .reverse()
+    .find((event) => event.type === realtimeEvents.gameEnded);
   const selectedPlayer = me ?? gamePlayers[0];
   const canRoll =
     snapshot.game.status === "IN_PROGRESS" &&
@@ -224,6 +229,16 @@ export function GameRoom({
   useEffect(() => {
     setStockSaleQuantity(1);
   }, [stockSaleOffer?.cardId, stockSaleOffer]);
+
+  useEffect(() => {
+    if (
+      snapshot.game.status === "ENDED" &&
+      previousGameStatusRef.current !== "ENDED"
+    ) {
+      setGameEndOpen(true);
+    }
+    previousGameStatusRef.current = snapshot.game.status;
+  }, [snapshot.game.status]);
 
   useEffect(() => {
     if (canRoll && !pendingAction && !rollingDice) {
@@ -552,6 +567,13 @@ export function GameRoom({
         onRoll={rollDice}
         onSkip={skipTurn}
       />
+      <GameEndPopup
+        open={gameEndOpen && snapshot.game.status === "ENDED"}
+        winner={winner}
+        player={me}
+        reason={typeof gameEndEvent?.payload.reason === "string" ? gameEndEvent.payload.reason : null}
+        onClose={() => setGameEndOpen(false)}
+      />
       {me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
           player={me}
@@ -590,6 +612,8 @@ export function GameRoom({
         <DesktopGameBoard
           snapshot={snapshot}
           selectedPlayer={selectedPlayer}
+          canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
+          onCloseLiability={closeLiability}
           outsidePlayers={snapshot.players.filter(
             (player) =>
               player.role === "PLAYER" &&
@@ -632,8 +656,6 @@ export function GameRoom({
             onLoanAmountChange={updateLoanAmount}
             onTakeLoan={takeLoan}
             canTakeLoan={canTakeLoan}
-            player={me}
-            onCloseLiability={closeLiability}
             embedded
           />
         </DesktopGameBoard>
@@ -657,7 +679,6 @@ export function GameRoom({
           snapshot={snapshot}
           selectedPlayer={selectedPlayer}
         />
-        <PlayersPanel players={gamePlayers} currentPlayerId={snapshot.game.currentPlayerId} />
         <ActionsPanel
           onStartGame={startGame}
           canStart={canStart}
@@ -693,10 +714,12 @@ export function GameRoom({
           onLoanAmountChange={updateLoanAmount}
           onTakeLoan={takeLoan}
           canTakeLoan={canTakeLoan}
-          player={me}
+        />
+        <FinancialPanel
+          player={selectedPlayer}
+          canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
           onCloseLiability={closeLiability}
         />
-        <FinancialPanel player={selectedPlayer} />
         {canManage && snapshot.game.status === "WAITING" ? (
           <HostPanel
             code={snapshot.game.code}
@@ -710,7 +733,12 @@ export function GameRoom({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <EventLog events={snapshot.events} currentUserId={currentUserId} />
+        <EventLog
+          events={snapshot.events}
+          currentUserId={currentUserId}
+          players={gamePlayers}
+          currentPlayerId={snapshot.game.currentPlayerId}
+        />
         <ChatPanel
           messages={snapshot.chatMessages}
           onSend={(body) => emit("chat:send", { body })}
@@ -860,6 +888,78 @@ function TurnPopup({
         >
           Пропустить ход
         </button>
+      </div>
+    </div>
+  );
+}
+
+function GameEndPopup({
+  open,
+  winner,
+  player,
+  reason,
+  onClose
+}: {
+  open: boolean;
+  winner: GamePlayer | undefined;
+  player: GamePlayer | undefined;
+  reason: string | null;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  const winnerState = winner?.financialState;
+  const playerState = player?.financialState;
+  const description = winner
+    ? `${winner.user?.displayName ?? "Игрок"} достиг финансовой свободы`
+    : reason === "all_players_bankrupt"
+      ? "Все игроки выбыли из-за банкротства"
+      : "Время партии истекло — победителя нет";
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/50 px-4 py-8">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="game-end-title"
+        aria-describedby="game-end-description"
+        className="w-full max-w-xl rounded-md border border-line bg-white p-5 shadow-panel sm:p-6"
+      >
+        <div className="text-center">
+          <div className="text-4xl" aria-hidden="true">🏆</div>
+          <h2 id="game-end-title" className="mt-3 text-2xl font-semibold">
+            Игра окончена
+          </h2>
+          <p id="game-end-description" className="mt-2 text-sm text-neutral-600">
+            {description}
+          </p>
+        </div>
+
+        {winnerState ? (
+          <section className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4">
+            <h3 className="font-semibold text-emerald-900">Результат победителя</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <Metric label="Пассивный доход" value={money(winnerState.passiveIncomeCents)} />
+              <Metric label="Расходы" value={money(winnerState.totalExpensesCents)} />
+              <Metric label="Денежный поток" value={money(winnerState.monthlyCashflowCents)} />
+            </div>
+          </section>
+        ) : null}
+
+        {playerState ? (
+          <section className="mt-4 rounded-md border border-line bg-surface p-4">
+            <h3 className="font-semibold">Ваш результат</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <Metric label="Наличные" value={money(playerState.cashCents)} />
+              <Metric label="Пассивный доход" value={money(playerState.passiveIncomeCents)} />
+              <Metric label="Денежный поток" value={money(playerState.monthlyCashflowCents)} />
+            </div>
+          </section>
+        ) : null}
+
+        <Button className="mt-5 w-full" onClick={onClose}>
+          {playerState ? "Посмотреть свои результаты" : "Закрыть"}
+        </Button>
       </div>
     </div>
   );
@@ -1121,11 +1221,15 @@ function HostPanel({
 function DesktopGameBoard({
   snapshot,
   selectedPlayer,
+  canManageLiabilities,
+  onCloseLiability,
   outsidePlayers,
   children
 }: {
   snapshot: GameSnapshot;
   selectedPlayer: GamePlayer | undefined;
+  canManageLiabilities: boolean;
+  onCloseLiability: (liability: PlayerLiability) => void;
   outsidePlayers: GamePlayer[];
   children: ReactNode;
 }) {
@@ -1151,6 +1255,8 @@ function DesktopGameBoard({
         >
           <DesktopFinancialPanel
             player={selectedPlayer}
+            canManageLiabilities={canManageLiabilities}
+            onCloseLiability={onCloseLiability}
             outsidePlayers={outsidePlayers}
           />
           <div className="min-h-0 overflow-y-auto rounded-md border border-line bg-white p-3">
@@ -1164,9 +1270,13 @@ function DesktopGameBoard({
 
 function DesktopFinancialPanel({
   player,
+  canManageLiabilities,
+  onCloseLiability,
   outsidePlayers
 }: {
   player: GamePlayer | undefined;
+  canManageLiabilities: boolean;
+  onCloseLiability: (liability: PlayerLiability) => void;
   outsidePlayers: GamePlayer[];
 }) {
   const state = player?.financialState;
@@ -1209,7 +1319,11 @@ function DesktopFinancialPanel({
 
       <div className="grid min-h-0 grid-rows-[auto_auto] gap-3 overflow-y-auto pr-1">
         <DesktopAssetsSection assets={player.assets} />
-        <FinancialTabs player={player} />
+        <FinancialTabs
+          player={player}
+          canManageLiabilities={canManageLiabilities}
+          onCloseLiability={onCloseLiability}
+        />
       </div>
     </div>
   );
@@ -1411,25 +1525,6 @@ function ringCellStyle(index: number): CSSProperties {
   return {};
 }
 
-function PlayersPanel({
-  players,
-  currentPlayerId
-}: {
-  players: GamePlayer[];
-  currentPlayerId: string | null;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Игроки</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <PlayersGrid players={players} currentPlayerId={currentPlayerId} />
-      </CardContent>
-    </Card>
-  );
-}
-
 function PlayersGrid({
   players,
   currentPlayerId
@@ -1462,7 +1557,15 @@ function PlayersGrid({
   );
 }
 
-function FinancialPanel({ player }: { player: GamePlayer | undefined }) {
+function FinancialPanel({
+  player,
+  canManageLiabilities,
+  onCloseLiability
+}: {
+  player: GamePlayer | undefined;
+  canManageLiabilities: boolean;
+  onCloseLiability: (liability: PlayerLiability) => void;
+}) {
   const state = player?.financialState;
   return (
     <Card>
@@ -1486,7 +1589,11 @@ function FinancialPanel({ player }: { player: GamePlayer | undefined }) {
               <Metric label="Расходы" value={money(state.totalExpensesCents)} />
             </div>
             <AssetsList assets={player.assets} />
-            <FinancialTabs player={player} />
+            <FinancialTabs
+              player={player}
+              canManageLiabilities={canManageLiabilities}
+              onCloseLiability={onCloseLiability}
+            />
           </div>
         )}
       </CardContent>
@@ -1552,9 +1659,16 @@ function assetUnitCostCents(asset: GamePlayer["assets"][number]) {
   return asset.quantity > 0 ? Math.round(asset.costBasisCents / asset.quantity) : 0;
 }
 
-function FinancialTabs({ player }: { player: GamePlayer }) {
+function FinancialTabs({
+  player,
+  canManageLiabilities,
+  onCloseLiability
+}: {
+  player: GamePlayer;
+  canManageLiabilities: boolean;
+  onCloseLiability: (liability: PlayerLiability) => void;
+}) {
   const [activeTab, setActiveTab] = useState<"expenses" | "liabilities">("expenses");
-  const rows = activeTab === "expenses" ? expenseRows(player) : liabilityRows(player);
 
   return (
     <div className="rounded-md border border-line bg-surface p-3">
@@ -1575,7 +1689,16 @@ function FinancialTabs({ player }: { player: GamePlayer }) {
         </button>
       </div>
       <div className="mt-4">
-        <SectionList title={activeTab === "expenses" ? "Расходы" : "Долги"} rows={rows} />
+        {activeTab === "expenses" ? (
+          <SectionList title="Расходы" rows={expenseRows(player)} />
+        ) : (
+          <CreditList
+            liabilities={repayableLiabilityRows(player)}
+            currentCashCents={player.financialState?.cashCents ?? 0}
+            canManageLiabilities={canManageLiabilities}
+            onCloseLiability={onCloseLiability}
+          />
+        )}
       </div>
     </div>
   );
@@ -1587,10 +1710,7 @@ function LoanPanel({
   onLoanIncrease,
   onLoanAmountChange,
   onTakeLoan,
-  canTakeLoan,
-  liabilities,
-  currentCashCents,
-  onCloseLiability
+  canTakeLoan
 }: {
   loanAmount: number;
   onLoanDecrease: () => void;
@@ -1598,92 +1718,102 @@ function LoanPanel({
   onLoanAmountChange: (value: number) => void;
   onTakeLoan: () => void;
   canTakeLoan: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-line bg-surface p-3">
+      <div className="text-sm font-medium">Взять кредит</div>
+      <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+        <Button
+          variant="secondary"
+          className="px-3"
+          onClick={onLoanDecrease}
+          disabled={!canTakeLoan || loanAmount <= 1000}
+        >
+          &lt;
+        </Button>
+        <Input
+          type="number"
+          min={1000}
+          step={1000}
+          value={loanAmount}
+          onChange={(event) => onLoanAmountChange(Number(event.target.value))}
+          disabled={!canTakeLoan}
+          className="text-center font-semibold"
+        />
+        <Button
+          variant="secondary"
+          className="px-3"
+          onClick={onLoanIncrease}
+          disabled={!canTakeLoan}
+        >
+          &gt;
+        </Button>
+      </div>
+      <Button className="mt-3 w-full" variant="secondary" onClick={onTakeLoan} disabled={!canTakeLoan}>
+        Взять кредит
+      </Button>
+      <p className="mt-2 text-xs text-neutral-500">
+        Доступен во время активной партии. Сумма должна быть кратна {money(1000)}.
+      </p>
+    </div>
+  );
+}
+
+function CreditList({
+  liabilities,
+  currentCashCents,
+  canManageLiabilities,
+  onCloseLiability
+}: {
   liabilities: PlayerLiability[];
   currentCashCents: number;
+  canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-md border border-line bg-surface p-3">
-        <div className="text-sm font-medium">Взять кредит</div>
-        <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
-          <Button
-            variant="secondary"
-            className="px-3"
-            onClick={onLoanDecrease}
-            disabled={!canTakeLoan || loanAmount <= 1000}
-          >
-            &lt;
-          </Button>
-          <Input
-            type="number"
-            min={1000}
-            step={1000}
-            value={loanAmount}
-            onChange={(event) => onLoanAmountChange(Number(event.target.value))}
-            disabled={!canTakeLoan}
-            className="text-center font-semibold"
-          />
-          <Button
-            variant="secondary"
-            className="px-3"
-            onClick={onLoanIncrease}
-            disabled={!canTakeLoan}
-          >
-            &gt;
-          </Button>
-        </div>
-        <Button className="mt-3 w-full" variant="secondary" onClick={onTakeLoan} disabled={!canTakeLoan}>
-          Взять кредит
-        </Button>
-        <p className="mt-2 text-xs text-neutral-500">
-          Доступен во время активной партии. Сумма должна быть кратна {money(1000)}.
-        </p>
-      </div>
-
-      <div className="rounded-md border border-line bg-surface p-3">
-        <div className="text-sm font-medium">Кредиты</div>
-        {liabilities.length === 0 ? (
-          <p className="mt-2 text-sm text-neutral-600">Нет кредитов для закрытия.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {liabilities.map((liability) => {
-              const canClose = currentCashCents >= liability.balanceCents;
-              return (
-                <div
-                  key={liability.id}
-                  className="grid gap-2 rounded-md border border-line bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-center"
-                >
-                  <div>
-                    <div className="text-sm font-medium">
-                      {liabilityLabels[liability.type] ?? liability.name}
-                    </div>
-                    <div className="mt-1 text-xs text-neutral-500">
-                      Остаток: {money(liability.balanceCents)}
-                      {liability.paymentCents > 0
-                        ? ` · платеж: ${money(liability.paymentCents)}/мес`
-                        : ""}
-                    </div>
-                    {!canClose ? (
-                      <div className="mt-1 text-xs text-red-700">
-                        Недостаточно наличных для закрытия.
-                      </div>
-                    ) : null}
+    <div>
+      <div className="text-sm font-medium">Кредиты</div>
+      {liabilities.length === 0 ? (
+        <p className="mt-2 text-sm text-neutral-600">Нет кредитов для закрытия.</p>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {liabilities.map((liability) => {
+            const hasEnoughCash = currentCashCents >= liability.balanceCents;
+            const canClose = canManageLiabilities && hasEnoughCash;
+            return (
+              <div
+                key={liability.id}
+                className="grid gap-2 rounded-md border border-line bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+              >
+                <div>
+                  <div className="text-sm font-medium">
+                    {liabilityLabels[liability.type] ?? liability.name}
                   </div>
-                  <Button
-                    variant="secondary"
-                    className="h-8 px-3 text-xs"
-                    onClick={() => onCloseLiability(liability)}
-                    disabled={!canClose}
-                  >
-                    Закрыть кредит
-                  </Button>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Остаток: {money(liability.balanceCents)}
+                    {liability.paymentCents > 0
+                      ? ` · платеж: ${money(liability.paymentCents)}/мес`
+                      : ""}
+                  </div>
+                  {canManageLiabilities && !hasEnoughCash ? (
+                    <div className="mt-1 text-xs text-red-700">
+                      Недостаточно наличных для закрытия.
+                    </div>
+                  ) : null}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <Button
+                  variant="secondary"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => onCloseLiability(liability)}
+                  disabled={!canClose}
+                >
+                  Закрыть кредит
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1779,27 +1909,6 @@ const liabilityLabels: Record<string, string> = {
   bank_loan: "Оплата кредита банка"
 };
 
-function liabilityRows(player: GamePlayer) {
-  const rows = player.liabilities
-    .filter((liability) => liability.type !== "bank_loan")
-    .map((liability) => ({
-      id: liability.id,
-      label: liabilityLabels[liability.type] ?? liability.name,
-      value: money(liability.balanceCents)
-    }));
-  const bankLoanBalance = player.liabilities
-    .filter((liability) => liability.type === "bank_loan")
-    .reduce((sum, liability) => sum + liability.balanceCents, 0);
-  if (bankLoanBalance > 0) {
-    rows.push({
-      id: "bank_loan",
-      label: liabilityLabels.bank_loan ?? "Оплата кредита банка",
-      value: money(bankLoanBalance)
-    });
-  }
-  return rows;
-}
-
 function repayableLiabilityRows(player: GamePlayer) {
   return [...player.liabilities]
     .filter((liability) => liability.balanceCents > 0)
@@ -1857,8 +1966,6 @@ function ActionsPanel({
   onLoanAmountChange,
   onTakeLoan,
   canTakeLoan,
-  player,
-  onCloseLiability,
   embedded = false
 }: {
   onStartGame: () => void;
@@ -1895,8 +2002,6 @@ function ActionsPanel({
   onLoanAmountChange: (value: number) => void;
   onTakeLoan: () => void;
   canTakeLoan: boolean;
-  player: GamePlayer | undefined;
-  onCloseLiability: (liability: PlayerLiability) => void;
   embedded?: boolean;
 }) {
   const [bankOpen, setBankOpen] = useState(false);
@@ -1911,7 +2016,6 @@ function ActionsPanel({
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerCount === 0;
-  const repayableLiabilities = player ? repayableLiabilityRows(player) : [];
   const hasCurrentAction =
     canStart ||
     canChooseDeal ||
@@ -2128,9 +2232,6 @@ function ActionsPanel({
             onLoanAmountChange={onLoanAmountChange}
             onTakeLoan={onTakeLoan}
             canTakeLoan={canTakeLoan}
-            liabilities={repayableLiabilities}
-            currentCashCents={currentCashCents}
-            onCloseLiability={onCloseLiability}
           />
         </div>
       ) : null}
@@ -2172,12 +2273,17 @@ function ActionsPanel({
 
 function EventLog({
   events,
-  currentUserId
+  currentUserId,
+  players,
+  currentPlayerId
 }: {
   events: GameEvent[];
   currentUserId: string;
+  players: GamePlayer[];
+  currentPlayerId: string | null;
 }) {
   const [onlyMine, setOnlyMine] = useState(false);
+  const [activeTab, setActiveTab] = useState<"events" | "players">("events");
   const visibleEvents = useMemo(() => {
     return [...events]
       .sort((left, right) => right.sequence - left.sequence)
@@ -2187,53 +2293,80 @@ function EventLog({
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle>Журнал действий</CardTitle>
-          <p className="mt-1 text-xs text-neutral-500">
-            Сначала показаны последние действия.
-          </p>
+        <div className="flex gap-1 rounded-md bg-surface p-1" role="tablist" aria-label="Информация об игре">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "events"}
+            className={`rounded px-3 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "events" ? "bg-white text-ink shadow-sm" : "text-neutral-500"
+            }`}
+            onClick={() => setActiveTab("events")}
+          >
+            Журнал действий
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "players"}
+            className={`rounded px-3 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "players" ? "bg-white text-ink shadow-sm" : "text-neutral-500"
+            }`}
+            onClick={() => setActiveTab("players")}
+          >
+            Игроки
+          </button>
         </div>
-        <Button
-          variant={onlyMine ? "primary" : "secondary"}
-          className="h-9 self-start px-3"
-          onClick={() => setOnlyMine((value) => !value)}
-        >
-          {onlyMine ? "Показать всех" : "Только мои"}
-        </Button>
+        {activeTab === "events" ? (
+          <Button
+            variant={onlyMine ? "primary" : "secondary"}
+            className="h-9 self-start px-3"
+            onClick={() => setOnlyMine((value) => !value)}
+          >
+            {onlyMine ? "Показать всех" : "Только мои"}
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
-        <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
-          {visibleEvents.length === 0 ? (
-            <p className="text-sm text-neutral-600">
-              {onlyMine ? "Ваших действий пока нет." : "Событий пока нет."}
-            </p>
-          ) : (
-            visibleEvents.map((event) => {
-              const details = eventDetails(event);
+        {activeTab === "events" ? (
+          <div className="max-h-96 space-y-3 overflow-y-auto pr-1" role="tabpanel">
+            <p className="text-xs text-neutral-500">Сначала показаны последние действия.</p>
+            {visibleEvents.length === 0 ? (
+              <p className="text-sm text-neutral-600">
+                {onlyMine ? "Ваших действий пока нет." : "Событий пока нет."}
+              </p>
+            ) : (
+              visibleEvents.map((event) => {
+                const details = eventDetails(event);
 
-              return (
-                <div key={event.id} className="rounded-md border border-line bg-surface p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">{eventTitle(event.type)}</div>
-                      <div className="mt-1 text-xs text-neutral-500">
-                        {event.actor?.displayName ?? "Система"} · {shortDate(event.createdAt)}
+                return (
+                  <div key={event.id} className="rounded-md border border-line bg-surface p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">{eventTitle(event.type)}</div>
+                        <div className="mt-1 text-xs text-neutral-500">
+                          {event.actor?.displayName ?? "Система"} · {shortDate(event.createdAt)}
+                        </div>
                       </div>
+                      <span className="shrink-0 text-xs text-neutral-500">#{event.sequence}</span>
                     </div>
-                    <span className="shrink-0 text-xs text-neutral-500">#{event.sequence}</span>
+                    {details.length > 0 ? (
+                      <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
+                        {details.map((detail, index) => (
+                          <div key={index}>{detail}</div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                  {details.length > 0 ? (
-                    <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-                      {details.map((detail, index) => (
-                        <div key={index}>{detail}</div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          <div role="tabpanel">
+            <PlayersGrid players={players} currentPlayerId={currentPlayerId} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
