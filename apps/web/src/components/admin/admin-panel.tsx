@@ -7,6 +7,7 @@ import type { Route } from "next";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
+import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
@@ -15,15 +16,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { publicApiBaseUrl } from "@/lib/api";
+import type { SystemRelease } from "@/lib/changes";
 import { money, shortDate } from "@/lib/format";
 import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
-type AdminSection = "dashboard" | "users" | "cards" | "rules" | "board" | "feedback";
+type AdminSection =
+  | "dashboard"
+  | "users"
+  | "cards"
+  | "rules"
+  | "board"
+  | "feedback"
+  | "changes";
 
 const mainMenu: Array<{ id: AdminSection; label: string }> = [
   { id: "dashboard", label: "Дашборд" },
   { id: "users", label: "Пользователи" },
-  { id: "feedback", label: "Предложения" }
+  { id: "feedback", label: "Предложения" },
+  { id: "changes", label: "Последние изменения" }
 ];
 
 const settingsMenu: Array<{ id: AdminSection; label: string }> = [
@@ -38,17 +48,22 @@ const adminSections = new Set<AdminSection>([
   "cards",
   "rules",
   "board",
-  "feedback"
+  "feedback",
+  "changes"
 ]);
 
 export function AdminPanel({
   profile,
   games,
-  token
+  token,
+  releases,
+  currentVersion
 }: {
   profile: ProfileResponse;
   games: GamesListResponse;
   token: string;
+  releases: SystemRelease[];
+  currentVersion: string;
 }) {
   const searchParams = useSearchParams();
   const section = parseAdminSection(searchParams.get("section"));
@@ -130,6 +145,16 @@ export function AdminPanel({
             </CardHeader>
             <CardContent>
               <AdminFeedbackPanel token={token} />
+            </CardContent>
+          </Card>
+        ) : null}
+        {section === "changes" ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Последние изменения</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdminChangesPanel releases={releases} currentVersion={currentVersion} />
             </CardContent>
           </Card>
         ) : null}

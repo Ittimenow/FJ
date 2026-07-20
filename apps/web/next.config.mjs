@@ -1,7 +1,10 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  transpilePackages: ["@cashflow/shared"],
-  typedRoutes: true
-};
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
-export default nextConfig;
+/** @type {import('next').NextConfig} */
+export default function nextConfig(phase) {
+  return {
+    distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+    transpilePackages: ["@cashflow/shared"],
+    typedRoutes: true
+  };
+}

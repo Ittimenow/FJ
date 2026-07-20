@@ -272,7 +272,7 @@ async function seedReferenceDataIfNeeded() {
 }
 
 function resetWebDevCache() {
-  const nextCachePath = "apps/web/.next";
+  const nextCachePath = "apps/web/.next-dev";
   if (!existsSync(nextCachePath)) return;
 
   rmSync(nextCachePath, { recursive: true, force: true });

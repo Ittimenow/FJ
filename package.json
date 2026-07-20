@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "changes:check": "node scripts/check-changes.mjs",
     "dev:local": "node scripts/dev-local.mjs",
     "dev:api": "npm run start:dev --workspace=@cashflow/api",
     "dev:web": "npm run dev --workspace=@cashflow/web",

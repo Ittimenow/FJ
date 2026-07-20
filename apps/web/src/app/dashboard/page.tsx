@@ -10,7 +10,9 @@ import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
 import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
+import { systemReleases } from "@/lib/changes";
 import { money, shortDate } from "@/lib/format";
+import { gameReleaseVersion } from "@/lib/release";
 import type { GamesListResponse, ProfileResponse } from "@/lib/types";
 
 export default async function DashboardPage() {
@@ -36,7 +38,13 @@ export default async function DashboardPage() {
       userInitials={avatarInitials(profile.user.displayName)}
     >
       {isAdmin ? (
-        <AdminPanel profile={profile} games={games} token={session.accessToken} />
+        <AdminPanel
+          profile={profile}
+          games={games}
+          token={session.accessToken}
+          releases={systemReleases}
+          currentVersion={gameReleaseVersion}
+        />
       ) : (
       <div className="grid gap-6">
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">

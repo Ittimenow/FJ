@@ -1,0 +1,90 @@
+{
+  "releases": [
+    {
+      "version": "unreleased",
+      "changes": [
+        {
+          "id": "stable-dev-styles-after-build",
+          "category": "fix",
+          "summary": "Локальная версия сайта больше не теряет оформление после проверки или сборки изменений."
+        },
+        {
+          "id": "admin-recent-changes",
+          "category": "feature",
+          "summary": "В панели администратора появился журнал последних изменений системы."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.40.f98f0ff",
+      "releasedAt": "2026-07-20T04:41:34.000Z",
+      "changes": [
+        {
+          "id": "bankruptcy-mechanics",
+          "category": "feature",
+          "summary": "Добавлена механика банкротства игрока с ликвидацией активов и возможностью восстановления."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.39.65ac8f8",
+      "releasedAt": "2026-07-19T00:00:00.000Z",
+      "changes": [
+        {
+          "id": "deployment-stability",
+          "category": "technical",
+          "summary": "Повышена стабильность автоматического развёртывания новых версий."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.37.e47d8bf",
+      "releasedAt": "2026-07-19T00:00:00.000Z",
+      "changes": [
+        {
+          "id": "release-date",
+          "category": "improvement",
+          "summary": "Рядом с версией игры теперь отображаются дата и время выпуска."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.36.747d496",
+      "releasedAt": "2026-07-18T00:00:00.000Z",
+      "changes": [
+        {
+          "id": "network-marketing-cards",
+          "category": "feature",
+          "summary": "Добавлена игровая логика карточек сетевого маркетинга."
+        },
+        {
+          "id": "admin-can-play",
+          "category": "improvement",
+          "summary": "Администратор теперь может участвовать в игре."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.34.f594b6d",
+      "releasedAt": "2026-07-02T00:00:00.000Z",
+      "changes": [
+        {
+          "id": "unique-card-draws",
+          "category": "fix",
+          "summary": "Карточки больше не повторяются до завершения игровой колоды."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+commit.33.a71a55a",
+      "releasedAt": "2026-07-02T00:00:00.000Z",
+      "changes": [
+        {
+          "id": "analytics-export-v2",
+          "category": "improvement",
+          "summary": "Обновлён формат выгрузки истории игр для аналитики."
+        }
+      ]
+    }
+  ]
+}
