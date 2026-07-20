@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS builder
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -35,7 +35,7 @@ RUN npm run build --workspace=@cashflow/database
 RUN npm run build --workspace=@cashflow/api
 RUN npm run build --workspace=@cashflow/web
 
-FROM node:22-bookworm-slim AS runner
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS runner
 
 WORKDIR /app
 

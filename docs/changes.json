@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "docker-registry-rate-limit",
+          "category": "technical",
+          "summary": "Автоматическое развёртывание больше не зависит от ограничений загрузки образов Docker Hub."
+        },
+        {
           "id": "stable-dev-styles-after-build",
           "category": "fix",
           "summary": "Локальная версия сайта больше не теряет оформление после проверки или сборки изменений."
