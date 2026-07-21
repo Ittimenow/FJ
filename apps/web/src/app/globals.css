@@ -25,3 +25,84 @@ input,
 textarea {
   font: inherit;
 }
+
+@media (max-width: 1279px) {
+  .turn-popup-backdrop-opening {
+    animation: turn-popup-backdrop-in 220ms ease-out both;
+  }
+
+  .turn-popup-backdrop-closing {
+    animation: turn-popup-backdrop-out 280ms ease-in both;
+  }
+
+  .turn-popup-panel-opening {
+    animation: turn-popup-expand 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    transform-origin: center;
+  }
+
+  .turn-popup-panel-closing {
+    animation: turn-popup-collapse 280ms cubic-bezier(0.4, 0, 1, 1) both;
+    transform-origin: center;
+  }
+}
+
+@keyframes turn-popup-backdrop-in {
+  from { background-color: rgb(0 0 0 / 0); }
+  to { background-color: rgb(0 0 0 / 0.3); }
+}
+
+@keyframes turn-popup-backdrop-out {
+  from { background-color: rgb(0 0 0 / 0.3); }
+  to { background-color: rgb(0 0 0 / 0); }
+}
+
+@keyframes turn-popup-expand {
+  from {
+    opacity: 0.65;
+    transform: translate(var(--turn-popup-x), var(--turn-popup-y)) scale(0.72, 0.22);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes turn-popup-collapse {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0.65;
+    transform: translate(var(--turn-popup-x), var(--turn-popup-y)) scale(0.72, 0.22);
+  }
+}
+
+.timeline-moving-token {
+  animation: timeline-token-step 180ms ease-out both;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.9);
+}
+
+@keyframes timeline-token-step {
+  from {
+    opacity: 0.35;
+    transform: translateX(-8px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-popup-backdrop-opening,
+  .turn-popup-backdrop-closing,
+  .turn-popup-panel-opening,
+  .turn-popup-panel-closing {
+    animation-duration: 1ms;
+  }
+
+  .timeline-moving-token {
+    animation-duration: 1ms;
+  }
+}

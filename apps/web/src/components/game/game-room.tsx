@@ -3,7 +3,16 @@
 import { realtimeEvents } from "@cashflow/shared";
 import { Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CSSProperties, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  ReactNode,
+  RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { io, Socket } from "socket.io-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +28,8 @@ type GameActionResult = {
   events?: Array<{ type: string; payload: Record<string, unknown> }>;
   message?: string;
 };
+
+type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed" | "closing";
 
 export function GameRoom({
   initialSnapshot,
@@ -38,6 +49,10 @@ export function GameRoom({
   const [loanAmount, setLoanAmount] = useState(1000);
   const [dealQuantity, setDealQuantity] = useState<number | "">(1);
   const [turnPopupOpen, setTurnPopupOpen] = useState(false);
+  const [turnAnimationPhase, setTurnAnimationPhase] = useState<TurnAnimationPhase>("ready");
+  const [animatedPosition, setAnimatedPosition] = useState<number | null>(null);
+  const [turnTabRequest, setTurnTabRequest] = useState(0);
+  const [turnPopupOrigin, setTurnPopupOrigin] = useState({ x: 0, y: 0 });
   const [rollingDice, setRollingDice] = useState(false);
   const [diceFaces, setDiceFaces] = useState([6]);
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
@@ -46,6 +61,8 @@ export function GameRoom({
   const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mobileBoardRef = useRef<HTMLDivElement>(null);
+  const turnPopupClosingRef = useRef(false);
   const expirationRefreshRef = useRef(false);
   const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const setGameRoomHeader = useSetGameRoomHeader();
@@ -247,11 +264,15 @@ export function GameRoom({
   useEffect(() => {
     if (canRoll && !pendingAction && !rollingDice) {
       setDiceFaces(Array.from({ length: activeDiceCount }, () => 6));
+      setAnimatedPosition(me?.position ?? null);
+      setTurnAnimationPhase("ready");
+      setTurnPopupOrigin(popupOriginFrom(mobileBoardRef.current));
+      turnPopupClosingRef.current = false;
       setTurnPopupOpen(true);
     } else if (!rollingDice) {
       setTurnPopupOpen(false);
     }
-  }, [activeDiceCount, canRoll, pendingAction, rollingDice]);
+  }, [activeDiceCount, canRoll, me?.position, pendingAction, rollingDice]);
 
   async function startGame() {
     setError(null);
@@ -397,8 +418,11 @@ export function GameRoom({
   async function rollDice() {
     if (rollingDice) return;
     setError(null);
+    turnPopupClosingRef.current = false;
     setTurnPopupOpen(true);
     setRollingDice(true);
+    setTurnAnimationPhase("rolling");
+    setAnimatedPosition(me?.position ?? null);
     startDiceAnimation(activeDiceCount);
     const startedAt = Date.now();
 
@@ -406,18 +430,47 @@ export function GameRoom({
       const result = await emitWithAck(realtimeEvents.playerRollDice, {});
       applyActionResult(result);
       const dice = diceValuesFromActionResult(result) ?? diceFaces;
+      const move = moveFromActionResult(result);
       const remaining = Math.max(0, 1000 - (Date.now() - startedAt));
       await wait(remaining);
       stopDiceAnimation();
       setDiceFaces(dice);
       await wait(450);
-      setTurnPopupOpen(false);
+
+      if (move) {
+        setTurnAnimationPhase("moving");
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reduceMotion) {
+          setAnimatedPosition(move.to);
+        } else {
+          for (let step = 1; step <= move.steps; step += 1) {
+            setAnimatedPosition(normalizeBoardPosition(move.from + step, snapshot.board.length));
+            await wait(220);
+          }
+        }
+      }
+
+      setTurnAnimationPhase("landed");
+      await wait(2500);
+      await closeTurnPopup();
     } catch (event) {
       stopDiceAnimation();
+      setTurnAnimationPhase("ready");
       setError(event instanceof Error ? event.message : "Не удалось бросить кубик");
     } finally {
       setRollingDice(false);
     }
+  }
+
+  async function closeTurnPopup() {
+    if (turnPopupClosingRef.current || !turnPopupOpen) return;
+    turnPopupClosingRef.current = true;
+    setTurnAnimationPhase("closing");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion) await wait(280);
+    setTurnPopupOpen(false);
+    setAnimatedPosition(null);
+    setTurnTabRequest((current) => current + 1);
   }
 
   async function skipTurn() {
@@ -426,7 +479,7 @@ export function GameRoom({
     try {
       const result = await emitWithAck("turn:skip", {});
       applyActionResult(result);
-      setTurnPopupOpen(false);
+      await closeTurnPopup();
     } catch (event) {
       setError(event instanceof Error ? event.message : "Не удалось пропустить ход");
     }
@@ -577,13 +630,19 @@ export function GameRoom({
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid w-full min-w-0 max-w-full gap-5 overflow-x-clip">
       <TurnPopup
         open={turnPopupOpen}
+        snapshot={snapshot}
+        player={me}
+        animatedPosition={animatedPosition}
+        phase={turnAnimationPhase}
+        origin={turnPopupOrigin}
         diceValues={diceFaces}
-        rolling={rollingDice}
+        rolling={turnAnimationPhase === "rolling"}
         onRoll={rollDice}
         onSkip={skipTurn}
+        onDismiss={closeTurnPopup}
       />
       <GameEndPopup
         open={gameEndOpen && snapshot.game.status === "ENDED"}
@@ -696,56 +755,68 @@ export function GameRoom({
         </div>
       ) : null}
 
-      <div className="grid min-w-0 max-w-full gap-5 overflow-x-hidden xl:hidden">
-        <MobileBoard
-          snapshot={snapshot}
-          selectedPlayer={selectedPlayer}
-        />
-        <ActionsPanel
-          onStartGame={startGame}
-          canStart={canStart}
-          canChooseDeal={canChooseDeal}
-          onDrawSmallDeal={() => draw("SMALL_DEAL")}
-          onDrawBigDeal={() => draw("BIG_DEAL")}
-          latestCard={latestDealDecisionCard}
-          latestTurnSummary={latestTurnSummary}
-          charityChoice={charityChoice}
-          canAnswerCharity={canAnswerCharity}
-          doodadPaymentChoice={doodadPaymentChoice}
-          canAnswerDoodadPayment={canAnswerDoodadPayment}
-          marketSaleOffer={marketSaleOffer}
-          canAnswerMarketSale={canAnswerMarketSale}
-          currentCashCents={me?.financialState?.cashCents ?? 0}
-          waitingStockSellerCount={waitingStockSellerCount}
-          dealQuantity={dealQuantity}
-          setDealQuantity={updateDealQuantity}
-          onBuyLatest={buyLatestDeal}
-          onDeclineLatest={declineLatestDeal}
-          onSellMarketAsset={sellMarketAsset}
-          onDeclineMarketSale={declineMarketSale}
-          onAcceptCharity={acceptCharity}
-          onDeclineCharity={declineCharity}
-          onPayDoodadWithCash={payDoodadWithCash}
-          onPayDoodadWithCredit={payDoodadWithCredit}
-          stockSaleOffer={stockSaleOffer}
-          stockSaleQuantity={stockSaleQuantity}
-          onStockSaleQuantityChange={updateStockSaleQuantity}
-          onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-          onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
-          onSellStock={sellStockFromDeal}
-          onDeclineStockSale={declineStockSale}
-          loanAmount={loanAmount}
-          onLoanDecrease={() => changeLoanAmount(-1000)}
-          onLoanIncrease={() => changeLoanAmount(1000)}
-          onLoanAmountChange={updateLoanAmount}
-          onTakeLoan={takeLoan}
-          canTakeLoan={canTakeLoan}
-        />
-        <FinancialPanel
-          player={selectedPlayer}
-          canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
-          onCloseLiability={closeLiability}
-        />
+      <div className="grid w-full min-w-0 max-w-full gap-5 overflow-x-clip xl:hidden">
+        <div className="grid w-full min-w-0 max-w-full gap-2">
+          <MobileBoard
+            snapshot={snapshot}
+            selectedPlayer={selectedPlayer}
+            containerRef={mobileBoardRef}
+          />
+          <MobileGameTabs
+            player={selectedPlayer}
+            canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
+            onCloseLiability={closeLiability}
+            actionAttentionKey={
+              canStart
+                ? "start_game"
+                : ownPendingAction?.type ?? (stockSaleOffer ? "stock_sale_window" : null)
+            }
+            turnTabRequest={turnTabRequest}
+            actions={
+              <ActionsPanel
+                onStartGame={startGame}
+                canStart={canStart}
+                canChooseDeal={canChooseDeal}
+                onDrawSmallDeal={() => draw("SMALL_DEAL")}
+                onDrawBigDeal={() => draw("BIG_DEAL")}
+                latestCard={latestDealDecisionCard}
+                latestTurnSummary={latestTurnSummary}
+                charityChoice={charityChoice}
+                canAnswerCharity={canAnswerCharity}
+                doodadPaymentChoice={doodadPaymentChoice}
+                canAnswerDoodadPayment={canAnswerDoodadPayment}
+                marketSaleOffer={marketSaleOffer}
+                canAnswerMarketSale={canAnswerMarketSale}
+                currentCashCents={me?.financialState?.cashCents ?? 0}
+                waitingStockSellerCount={waitingStockSellerCount}
+                dealQuantity={dealQuantity}
+                setDealQuantity={updateDealQuantity}
+                onBuyLatest={buyLatestDeal}
+                onDeclineLatest={declineLatestDeal}
+                onSellMarketAsset={sellMarketAsset}
+                onDeclineMarketSale={declineMarketSale}
+                onAcceptCharity={acceptCharity}
+                onDeclineCharity={declineCharity}
+                onPayDoodadWithCash={payDoodadWithCash}
+                onPayDoodadWithCredit={payDoodadWithCredit}
+                stockSaleOffer={stockSaleOffer}
+                stockSaleQuantity={stockSaleQuantity}
+                onStockSaleQuantityChange={updateStockSaleQuantity}
+                onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
+                onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+                onSellStock={sellStockFromDeal}
+                onDeclineStockSale={declineStockSale}
+                loanAmount={loanAmount}
+                onLoanDecrease={() => changeLoanAmount(-1000)}
+                onLoanIncrease={() => changeLoanAmount(1000)}
+                onLoanAmountChange={updateLoanAmount}
+                onTakeLoan={takeLoan}
+                canTakeLoan={canTakeLoan}
+                embedded
+              />
+            }
+          />
+        </div>
         {canManage && snapshot.game.status === "WAITING" ? (
           <HostPanel
             code={snapshot.game.code}
@@ -870,51 +941,141 @@ function BankruptcyPanel({
 
 function TurnPopup({
   open,
+  snapshot,
+  player,
+  animatedPosition,
+  phase,
+  origin,
   diceValues,
   rolling,
   onRoll,
-  onSkip
+  onSkip,
+  onDismiss
 }: {
   open: boolean;
+  snapshot: GameSnapshot;
+  player: GamePlayer | undefined;
+  animatedPosition: number | null;
+  phase: TurnAnimationPhase;
+  origin: { x: number; y: number };
   diceValues: number[];
   rolling: boolean;
   onRoll: () => void;
   onSkip: () => void;
+  onDismiss: () => void;
 }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4">
+    <div
+      className={[
+        "fixed inset-0 z-50 grid place-items-center overflow-y-auto overscroll-contain bg-black/30 px-4 py-5",
+        phase === "closing" ? "turn-popup-backdrop-closing" : "turn-popup-backdrop-opening"
+      ].join(" ")}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="turn-popup-title"
-        className="w-full max-w-xs rounded-md border border-line bg-white p-5 text-center shadow-panel"
+        style={
+          {
+            "--turn-popup-x": `${origin.x}px`,
+            "--turn-popup-y": `${origin.y}px`
+          } as CSSProperties
+        }
+        className={[
+          "max-h-[calc(100dvh-2.5rem)] w-full min-w-0 max-w-xl overflow-x-hidden overflow-y-auto rounded-md border border-line bg-white p-4 text-center shadow-panel sm:p-5 xl:max-w-xs",
+          phase === "closing" ? "turn-popup-panel-closing" : "turn-popup-panel-opening"
+        ].join(" ")}
       >
         <h2 id="turn-popup-title" className="text-xl font-semibold">
-          Ваш ход!
+          {phase === "moving"
+            ? "Двигаемся по полю"
+            : phase === "landed"
+              ? "Новая клетка"
+              : "Ваш ход!"}
         </h2>
+        <div className="mt-4 min-w-0 max-w-full overflow-hidden xl:hidden">
+          <PopupBoard
+            snapshot={snapshot}
+            player={player}
+            animatedPosition={animatedPosition}
+          />
+        </div>
         <div className="mt-4 flex justify-center gap-3">
           {diceValues.map((diceValue, index) => (
             <DiceFace key={index} value={diceValue} rolling={rolling} />
           ))}
         </div>
-        <Button className="mt-5 w-full" onClick={onRoll} disabled={rolling}>
-          {rolling
-            ? "Бросаем..."
-            : diceValues.length > 1
-              ? "Бросить кубики"
-              : "Бросить кубик"}
-        </Button>
-        <button
-          type="button"
-          onClick={onSkip}
-          disabled={rolling}
-          className="mt-3 text-xs text-neutral-500 underline-offset-4 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Пропустить ход
-        </button>
+        {phase === "ready" ? (
+          <>
+            <Button className="mt-5 w-full" onClick={onRoll}>
+              {diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"}
+            </Button>
+            <button
+              type="button"
+              onClick={onSkip}
+              className="mt-3 text-xs text-neutral-500 underline-offset-4 hover:text-ink hover:underline"
+            >
+              Пропустить ход
+            </button>
+          </>
+        ) : phase === "landed" ? (
+          <Button className="mt-5 w-full" variant="secondary" onClick={onDismiss}>
+            Перейти к ходу
+          </Button>
+        ) : (
+          <p className="mt-4 text-sm text-neutral-500" aria-live="polite">
+            {phase === "rolling" ? "Бросаем кубик..." : "Фишка движется..."}
+          </p>
+        )}
       </div>
+    </div>
+  );
+}
+
+function PopupBoard({
+  snapshot,
+  player,
+  animatedPosition
+}: {
+  snapshot: GameSnapshot;
+  player: GamePlayer | undefined;
+  animatedPosition: number | null;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const targetCellIndex = animatedPosition ?? (player && player.position >= 0 ? player.position : 0);
+
+  useEffect(() => {
+    const target = scrollRef.current?.querySelector<HTMLElement>(
+      `[data-popup-board-cell="${targetCellIndex}"]`
+    );
+    target?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [targetCellIndex]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="grid w-full min-w-0 max-w-full snap-x snap-mandatory grid-flow-col auto-cols-[clamp(88px,27vw,136px)] gap-2 overflow-x-auto overscroll-x-contain scroll-smooth px-[40%] pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Малый круг"
+    >
+      {snapshot.board.map((cell) => {
+        const players = animatedCellPlayers(snapshot, cell.index, player, animatedPosition);
+        return (
+          <div
+            key={cell.index}
+            data-popup-board-cell={cell.index}
+            className="min-w-0 snap-center"
+          >
+            <BoardCellTile
+              cell={cell}
+              players={players}
+              active={cell.index === targetCellIndex}
+              mobile
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1126,6 +1287,29 @@ function diceValuesFromActionResult(result: GameActionResult) {
   }
   const dice = Number(diceEvent?.payload.dice);
   return Number.isFinite(dice) && dice >= 1 && dice <= 6 ? [dice] : null;
+}
+
+function moveFromActionResult(result: GameActionResult) {
+  const moveEvent = result.events?.find((event) => event.type === realtimeEvents.playerMove);
+  const from = Number(moveEvent?.payload.from);
+  const to = Number(moveEvent?.payload.to);
+  const steps = Number(moveEvent?.payload.steps);
+  if (![from, to, steps].every(Number.isFinite) || steps < 0) return null;
+  return { from, to, steps };
+}
+
+function normalizeBoardPosition(position: number, boardSize: number) {
+  if (boardSize <= 0) return 0;
+  return ((position % boardSize) + boardSize) % boardSize;
+}
+
+function popupOriginFrom(element: HTMLElement | null) {
+  if (!element || typeof window === "undefined") return { x: 0, y: 0 };
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2 - window.innerWidth / 2,
+    y: rect.top + rect.height / 2 - window.innerHeight / 2
+  };
 }
 
 function randomDiceValues(diceCount: number) {
@@ -1360,7 +1544,9 @@ function DesktopAssetsSection({ assets }: { assets: GamePlayer["assets"] }) {
     return (
       <section className="flex items-center justify-between gap-3 rounded-md border border-line bg-white px-3 py-2">
         <h3 className="text-sm font-semibold">Активы</h3>
-        <span className="text-sm text-neutral-600">Пусто</span>
+        <span className="text-sm text-neutral-600">
+          Активов пока нет, но амбиции уже на балансе!
+        </span>
       </section>
     );
   }
@@ -1377,7 +1563,11 @@ function DesktopAssetsSection({ assets }: { assets: GamePlayer["assets"] }) {
 
 function CompactAssets({ assets }: { assets: GamePlayer["assets"] }) {
   if (assets.length === 0) {
-    return <p className="text-sm text-neutral-600">Пусто</p>;
+    return (
+      <p className="text-sm text-neutral-600">
+        Активов пока нет, но амбиции уже на балансе!
+      </p>
+    );
   }
 
   return (
@@ -1391,12 +1581,21 @@ function CompactAssets({ assets }: { assets: GamePlayer["assets"] }) {
 
 function MobileBoard({
   snapshot,
-  selectedPlayer
+  selectedPlayer,
+  containerRef
 }: {
   snapshot: GameSnapshot;
   selectedPlayer: GamePlayer | undefined;
+  containerRef: RefObject<HTMLDivElement | null>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const latestOtherMove = latestPlayerMoveEvent(snapshot.events, selectedPlayer?.id);
+  const lastAnimatedMoveSequenceRef = useRef(latestOtherMove?.sequence ?? 0);
+  const moveAnimationRunRef = useRef(0);
+  const [animatedOtherPlayer, setAnimatedOtherPlayer] = useState<{
+    playerId: string;
+    position: number;
+  } | null>(null);
   const targetCellIndex =
     selectedPlayer?.track === "RAT_RACE" && selectedPlayer.position >= 0
       ? selectedPlayer.position
@@ -1407,6 +1606,7 @@ function MobileBoard({
       player.track === "RAT_RACE" &&
       player.position < 0
   );
+  const targetCell = snapshot.board[targetCellIndex];
 
   useEffect(() => {
     const target = scrollRef.current?.querySelector<HTMLElement>(
@@ -1419,48 +1619,121 @@ function MobileBoard({
     });
   }, [snapshot.game.id, targetCellIndex]);
 
+  useEffect(() => {
+    if (!latestOtherMove || latestOtherMove.sequence <= lastAnimatedMoveSequenceRef.current) {
+      return;
+    }
+
+    lastAnimatedMoveSequenceRef.current = latestOtherMove.sequence;
+    const animationRun = moveAnimationRunRef.current + 1;
+    moveAnimationRunRef.current = animationRun;
+    const playerId = latestOtherMove.gamePlayer?.id;
+    const from = Number(latestOtherMove.payload.from);
+    const to = Number(latestOtherMove.payload.to);
+    const steps = Number(latestOtherMove.payload.steps);
+    if (
+      !playerId ||
+      ![from, to, steps].every(Number.isFinite) ||
+      steps < 0 ||
+      snapshot.board.length === 0
+    ) {
+      return;
+    }
+
+    const animateMove = async () => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduceMotion) {
+        setAnimatedOtherPlayer({ playerId, position: to });
+        await wait(120);
+      } else {
+        for (let step = 1; step <= steps; step += 1) {
+          if (moveAnimationRunRef.current !== animationRun) return;
+          setAnimatedOtherPlayer({
+            playerId,
+            position: normalizeBoardPosition(from + step, snapshot.board.length)
+          });
+          await wait(180);
+        }
+      }
+
+      if (moveAnimationRunRef.current === animationRun) {
+        setAnimatedOtherPlayer(null);
+      }
+    };
+
+    void animateMove();
+    return () => {
+      if (moveAnimationRunRef.current === animationRun) {
+        moveAnimationRunRef.current += 1;
+      }
+    };
+  }, [latestOtherMove?.sequence, snapshot.board.length]);
+
   return (
-    <Card className="min-w-0 max-w-full overflow-hidden">
-      <CardHeader className="min-w-0 max-w-full">
-        <CardTitle>Малый круг</CardTitle>
+    <div ref={containerRef} className="w-full min-w-0 max-w-full">
+      <Card className="min-w-0 max-w-full overflow-hidden">
+        <div className="px-3 pb-1 pt-2 text-center">
+          <div className="truncate text-sm font-semibold">
+            Клетка {targetCellIndex + 1} · {targetCell?.label ?? "Малый круг"}
+          </div>
+        </div>
         {outsidePlayers.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-1 px-3 pb-1">
             <span className="text-xs text-neutral-500">Вне поля</span>
             {outsidePlayers.map((player) => (
-              <span
-                key={player.id}
-                className="h-5 min-w-5 rounded px-1 text-center text-xs font-semibold text-white"
-                style={{ backgroundColor: player.color ?? "#171717" }}
-                title={player.user?.displayName ?? `Игрок ${player.seat ?? ""}`}
-              >
-                {player.seat}
-              </span>
+              <PlayerToken key={player.id} player={player} small />
             ))}
           </div>
         ) : null}
-      </CardHeader>
-      <CardContent className="min-w-0 max-w-full overflow-hidden">
         <div
           ref={scrollRef}
-          className="grid w-full min-w-0 max-w-full snap-x snap-mandatory grid-flow-col auto-cols-[clamp(78px,23vw,136px)] gap-2 overflow-x-auto scroll-smooth px-1 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid w-full min-w-0 max-w-full snap-x snap-mandatory grid-flow-col auto-cols-[44px] overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_22px)] pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
-            const players = cellPlayers(snapshot, cell.index);
+            const players = timelineCellPlayers(snapshot, cell.index, animatedOtherPlayer);
             return (
-              <div key={cell.index} data-board-cell={cell.index} className="min-w-0 snap-center">
-                <BoardCellTile
-                  cell={cell}
-                  players={players}
-                  active={cell.index === targetCellIndex}
-                  mobile
-                />
+              <div
+                key={cell.index}
+                data-board-cell={cell.index}
+                className="relative min-w-0 snap-center text-center"
+                aria-label={`Клетка ${cell.index + 1}: ${cell.label}`}
+              >
+                <div
+                  className={[
+                    "text-[10px] font-semibold",
+                    cell.index === targetCellIndex ? "text-success" : "text-neutral-500"
+                  ].join(" ")}
+                >
+                  {cell.index + 1}
+                </div>
+                <div className="relative mt-1 h-3">
+                  <span className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
+                  <span
+                    className={[
+                      "absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white",
+                      cell.index === targetCellIndex
+                        ? "scale-125 border-success"
+                        : "border-neutral-400"
+                    ].join(" ")}
+                  />
+                </div>
+                <div className="mt-1 flex min-h-4 flex-wrap justify-center gap-0.5">
+                  {players.map((player) => (
+                    <PlayerToken
+                      key={player.id}
+                      player={player}
+                      small
+                      moving={player.id === animatedOtherPlayer?.playerId}
+                    />
+                  ))}
+                </div>
               </div>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -1515,16 +1788,69 @@ function BoardCellTile({
   );
 }
 
-function PlayerToken({ player }: { player: GamePlayer }) {
+function PlayerToken({
+  player,
+  small = false,
+  moving = false
+}: {
+  player: GamePlayer;
+  small?: boolean;
+  moving?: boolean;
+}) {
   return (
     <span
-      className="h-5 min-w-5 rounded px-1 text-center text-xs font-semibold text-white"
+      className={[
+        "rounded text-center font-semibold text-white",
+        small ? "h-4 min-w-4 px-0.5 text-[9px] leading-4" : "h-5 min-w-5 px-1 text-xs",
+        moving ? "timeline-moving-token" : ""
+      ].join(" ")}
       style={{ backgroundColor: player.color ?? "#171717" }}
       title={player.user?.displayName ?? `Игрок ${player.seat ?? ""}`}
     >
       {player.seat}
     </span>
   );
+}
+
+function timelineCellPlayers(
+  snapshot: GameSnapshot,
+  cellIndex: number,
+  animatedPlayer: { playerId: string; position: number } | null
+) {
+  if (!animatedPlayer) return cellPlayers(snapshot, cellIndex);
+
+  const players = cellPlayers(snapshot, cellIndex).filter(
+    (player) => player.id !== animatedPlayer.playerId
+  );
+  const movingPlayer = snapshot.players.find((player) => player.id === animatedPlayer.playerId);
+  if (movingPlayer && cellIndex === animatedPlayer.position) players.push(movingPlayer);
+  return players;
+}
+
+function latestPlayerMoveEvent(events: GameEvent[], excludedPlayerId: string | undefined) {
+  return [...events]
+    .reverse()
+    .find(
+      (event) =>
+        event.type === realtimeEvents.playerMove &&
+        Boolean(event.gamePlayer?.id) &&
+        event.gamePlayer?.id !== excludedPlayerId
+    );
+}
+
+function animatedCellPlayers(
+  snapshot: GameSnapshot,
+  cellIndex: number,
+  movingPlayer: GamePlayer | undefined,
+  animatedPosition: number | null
+) {
+  if (!movingPlayer || animatedPosition === null) return cellPlayers(snapshot, cellIndex);
+
+  const players = cellPlayers(snapshot, cellIndex).filter(
+    (candidate) => candidate.id !== movingPlayer.id
+  );
+  if (cellIndex === animatedPosition) players.push(movingPlayer);
+  return players;
 }
 
 function cellPlayers(snapshot: GameSnapshot, cellIndex: number) {
@@ -1577,64 +1903,173 @@ function PlayersGrid({
   );
 }
 
-function FinancialPanel({
+type MobileGameTab = "turn" | "player" | "assets" | "expenses" | "liabilities";
+
+function MobileGameTabs({
   player,
   canManageLiabilities,
-  onCloseLiability
+  onCloseLiability,
+  actionAttentionKey,
+  turnTabRequest,
+  actions
 }: {
   player: GamePlayer | undefined;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
+  actionAttentionKey: string | null;
+  turnTabRequest: number;
+  actions: ReactNode;
 }) {
+  const [activeTab, setActiveTab] = useState<MobileGameTab>("turn");
   const state = player?.financialState;
+  const assetCount = player?.assets.length ?? 0;
+  const liabilities = player ? repayableLiabilityRows(player) : [];
+  const actionAttention = Boolean(actionAttentionKey);
+
+  useEffect(() => {
+    if (actionAttentionKey) setActiveTab("turn");
+  }, [actionAttentionKey]);
+
+  useEffect(() => {
+    if (turnTabRequest > 0) setActiveTab("turn");
+  }, [turnTabRequest]);
+
+  const tabs: Array<{
+    id: MobileGameTab;
+    label: string;
+    count?: number;
+    attention?: boolean;
+  }> = [
+    { id: "turn", label: "Ход", attention: actionAttention },
+    { id: "player", label: "Игрок" },
+    { id: "assets", label: "Активы", count: assetCount },
+    { id: "expenses", label: "Расходы" },
+    { id: "liabilities", label: "Долги", count: liabilities.length }
+  ];
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Финансовый отчёт</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!player || !state ? (
-          <p className="text-sm text-neutral-600">Отчёт появится после старта партии.</p>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm font-medium">{player.user?.displayName}</div>
-              <div className="text-xs text-neutral-500">{player.profession?.name}</div>
+    <Card className="w-full min-w-0 max-w-full">
+      <div
+        className="grid min-w-0 grid-cols-5 gap-1 border-b border-line bg-surface p-2"
+        role="tablist"
+        aria-label="Информация об игроке"
+      >
+        {tabs.map((tab, index) => {
+          const active = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              id={`mobile-game-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls="mobile-game-tab-panel"
+              tabIndex={active ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => {
+                let nextIndex = index;
+                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+                if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+                if (event.key === "Home") nextIndex = 0;
+                if (event.key === "End") nextIndex = tabs.length - 1;
+                if (nextIndex === index) return;
+
+                event.preventDefault();
+                const nextTab = tabs[nextIndex];
+                if (!nextTab) return;
+                setActiveTab(nextTab.id);
+                document.getElementById(`mobile-game-tab-${nextTab.id}`)?.focus();
+              }}
+              className={[
+                "relative flex h-10 min-w-0 items-center justify-center overflow-hidden rounded-md px-0.5 text-[9px] font-medium transition min-[340px]:text-[10px] min-[380px]:text-xs",
+                active
+                  ? "bg-ink text-white shadow-sm"
+                  : "bg-white text-ink hover:bg-neutral-100"
+              ].join(" ")}
+            >
+              <span className="truncate">{tab.label}</span>
+              {tab.count !== undefined ? (
+                <span
+                  className={[
+                    "absolute right-0.5 top-0.5 inline-flex min-w-3 justify-center rounded-full px-0.5 text-[8px] leading-3",
+                    active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-600"
+                  ].join(" ")}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+              {tab.attention ? (
+                <span
+                  className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500 ring-2 ring-white"
+                  aria-label="Требуется действие"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="mobile-game-tab-panel"
+        role="tabpanel"
+        aria-labelledby={`mobile-game-tab-${activeTab}`}
+        className="min-w-0 max-w-full overflow-x-hidden p-3"
+      >
+        {activeTab === "turn" ? actions : null}
+
+        {activeTab !== "turn" && (!player || !state) ? (
+          <p className="py-2 text-sm text-neutral-600">
+            Финансовый отчёт появится после старта партии.
+          </p>
+        ) : null}
+
+        {activeTab === "player" && player && state ? (
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold">
+                  {player.user?.displayName ?? "Игрок"}
+                </div>
+                <div className="mt-0.5 truncate text-xs text-neutral-500">
+                  {player.profession?.name}
+                </div>
+              </div>
+              <Badge className="shrink-0 bg-surface text-ink">финансы</Badge>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
-              <Metric label="Зарплата" value={money(state.salaryCents)} />
               <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
+              <Metric label="Зарплата" value={money(state.salaryCents)} />
               <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
-              <Metric label="Расходы" value={money(state.totalExpensesCents)} />
+              <div className="col-span-2">
+                <Metric label="Расходы" value={money(state.totalExpensesCents)} />
+              </div>
             </div>
-            <AssetsList assets={player.assets} />
-            <FinancialTabs
-              player={player}
-              canManageLiabilities={canManageLiabilities}
-              onCloseLiability={onCloseLiability}
-            />
           </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+        ) : null}
 
-function AssetsList({ assets }: { assets: GamePlayer["assets"] }) {
-  return (
-    <div>
-      <div className="mb-2 text-sm font-medium">Активы</div>
-      {assets.length === 0 ? (
-        <p className="text-sm text-neutral-600">Пусто</p>
-      ) : (
-        <div className="space-y-2">
-          {assets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} />
-          ))}
-        </div>
-      )}
-    </div>
+        {activeTab === "assets" && player && state ? (
+          <CompactAssets assets={player.assets} />
+        ) : null}
+
+        {activeTab === "expenses" && player && state ? (
+          <SectionList
+            title={money(state.totalExpensesCents)}
+            titleAlign="right"
+            rows={expenseRows(player)}
+          />
+        ) : null}
+
+        {activeTab === "liabilities" && player && state ? (
+          <CreditList
+            liabilities={liabilities}
+            currentCashCents={state.cashCents}
+            canManageLiabilities={canManageLiabilities}
+            onCloseLiability={onCloseLiability}
+          />
+        ) : null}
+      </div>
+    </Card>
   );
 }
 
@@ -3063,30 +3498,39 @@ function ChatPanel({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid rounded-md border border-line bg-surface p-3">
+    <div className="grid min-w-0 rounded-md border border-line bg-surface p-3">
       <div className="min-h-8 text-xs leading-4 text-neutral-500">{label}</div>
-      <div className="mt-1 text-sm font-semibold leading-5">{value}</div>
+      <div className="mt-1 break-words text-sm font-semibold leading-5">{value}</div>
     </div>
   );
 }
 
 function SectionList({
   title,
+  titleAlign = "left",
   rows
 }: {
   title: string;
+  titleAlign?: "left" | "right";
   rows: Array<{ id: string; label: string; value: string }>;
 }) {
   return (
     <div>
-      <div className="mb-2 text-sm font-medium">{title}</div>
+      <div
+        className={[
+          "mb-2 text-sm font-medium",
+          titleAlign === "right" ? "text-right" : "text-left"
+        ].join(" ")}
+      >
+        {title}
+      </div>
       {rows.length === 0 ? (
         <p className="text-sm text-neutral-600">Пусто</p>
       ) : (
         <div className="space-y-2">
           {rows.map((row) => (
-            <div key={row.id} className="flex justify-between gap-3 text-sm">
-              <span>{row.label}</span>
+            <div key={row.id} className="flex min-w-0 justify-between gap-3 text-sm">
+              <span className="min-w-0 break-words">{row.label}</span>
               <span className="shrink-0 font-medium">{row.value}</span>
             </div>
           ))}
