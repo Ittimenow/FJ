@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "extend-vps-deploy-timeout",
+          "category": "technical",
+          "summary": "Деплой на сервер теперь дольше ожидает завершения сборки и не прерывается через десять минут."
+        },
+        {
           "id": "motivating-empty-assets-message",
           "category": "improvement",
           "summary": "В пустом списке активов теперь отображается мотивирующая фраза вместо слова «Пусто»."
