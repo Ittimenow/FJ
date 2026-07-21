@@ -161,6 +161,20 @@ export class GamesController {
     return result;
   }
 
+  @Post(":id/doodad/payment/cash")
+  async payDoodadWithCash(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.resolveDoodadPayment(id, user.userId, "cash");
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/doodad/payment/credit")
+  async payDoodadWithCredit(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.resolveDoodadPayment(id, user.userId, "credit");
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
   @Post(":id/loans")
   async takeLoan(
     @CurrentUser() user: AuthenticatedUser,

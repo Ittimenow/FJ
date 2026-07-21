@@ -662,7 +662,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -5000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', -100);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0043_банк-продает-дом-по-закладной-близко-к-месту', 'Дом: $40,000, +$220/мес', 'Банк продает дом по закладной. Близко к месту работы и магазинам. Сделайте предложение – банк может частично профинансировать.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0043_банк-продает-дом-по-закладной-близко-к-месту', '2У коттедж: $40,000, +$220/мес', 'Коттедж на продажу – 2У. Банк продает дом по закладной. Близко к месту работы и магазинам. Сделайте предложение – банк может частично профинансировать.
 
 Используйте сами или продайте другому игроку. 53% ROI, может быть продан от $45 000 до $65 000
 
@@ -679,7 +679,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -5000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 220);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0044_в-молодой-семье-родился-3-ребенок-и-они-хотели', 'Дом: $55,000, +$160/мес', 'В молодой семье родился 3 ребенок, и они хотели бы переехать в более просторный дом.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0044_в-молодой-семье-родился-3-ребенок-и-они-хотели', '2У коттедж: $55,000, +$160/мес', 'Коттедж на продажу – 2У. В молодой семье родился 3 ребенок, и они хотели бы переехать в более просторный дом.
 
 Используйте сами или продайте другому игроку. 38% ROI, может быть продан от $45 000 до $65 000
 
@@ -696,7 +696,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -5000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 160);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0045_хороший-2-х-этажный-коттедж-выставлен-на', '2У коттедж: $65,000, +$160/мес', 'Хороший 2-х этажный коттедж выставлен на продажу из-за неожиданного отъезда хозяина за границу.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0045_хороший-2-х-этажный-коттедж-выставлен-на', '3M коттедж: $65,000, +$160/мес', 'Коттедж на продажу – 3M. Хороший 2-х этажный коттедж выставлен на продажу из-за неожиданного отъезда хозяина за границу.
 
 Используйте сами или продайте другому игроку. 38% ROI, может быть продан от $65 000 до $135 000
 
@@ -789,7 +789,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $5 000
 
-Денежный поток $0 Брат просит денег', 'realestate', NULL);
+Денежный поток $0', 'business', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '5000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '5000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -807,7 +807,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $3 000
 
-Денежный поток $0 Другу срочно нужны деньги', 'realestate', NULL);
+Денежный поток $0', 'business', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '3000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '3000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -815,7 +815,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -3000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 0);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0052_ваши-арендаторы-нанесли-урон-вашему-дому', 'Расход по недвижимости: $500', 'Ваши арендаторы нанесли урон вашему дому, заплатили за 2 месяца и исчезли, оставив огромный счет за междугородние переговоры. Ваша страховая компания покрыла часть убытков, но вы еще остались должны $500.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0052_ваши-арендаторы-нанесли-урон-вашему-дому', 'Расход по недвижимости: $500', 'Ваши арендаторы нанесли урон вашему дому, не заплатили за 2 месяца и исчезли, оставив огромный счет за междугородние переговоры. Ваша страховая компания покрыла часть убытков, но вы еще остались должны $500.
 
 Заплатите в банк 500, если вы владеете хоть какой- нибудь недвижимостью, сдаваемой внаем. Только для человека, вытащившего эту карточку.', 'realestate', NULL);
 SET @cid = LAST_INSERT_ID();
@@ -830,7 +830,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $5 000
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'loan', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '5000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '5000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -846,7 +846,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $3 000
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'collectible', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '3000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '3000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -862,7 +862,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $5 000
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'land', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '5000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '0') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -879,7 +879,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $500
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'collectible', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '500') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '500') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -893,8 +893,13 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 AI4U Сегодняшняя цена $3
 
-Дивидендов нет. Доходность = 0%', 'stock', NULL);
+Дивидендов нет. Доходность = 0%
+
+Возможный разброс котировок: от $5 до $30', 'stock', NULL);
 SET @cid = LAST_INSERT_ID();
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'symbol', 'AI4U') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_min', '5') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_max', '30') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '3') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0058_акция-only4u', 'Акции ONLY4U на минимуме: $5', 'Менеджмент в компании обеспечил постоянный рост активов.
@@ -1166,7 +1171,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $6 000
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'land', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '6000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '0') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -1183,7 +1188,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Первоначальный взнос $400
 
-Денежный поток $0', 'realestate', NULL);
+Денежный поток $0', 'collectible', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '400') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '400') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -1516,7 +1521,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -20000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 800);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0115_этот-дом-продается-собственником-переезжающим', 'Дом: $140,000, +$2,000/мес', 'Этот дом продается собственником, переезжающим в другой город. Арендаторы готовы продлить договор аренды.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0115_этот-дом-продается-собственником-переезжающим', '4-Plex: $140,000, +$2,000/мес', 'Этот 4-квартирный дом продается собственником, переезжающим в другой город. Арендаторы готовы продлить договор аренды.
 
 Можете использовать это сами или продать другим 75% РОИ, может стоить от $100 000 до $140 000
 
@@ -1533,7 +1538,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -32000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 2000);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0116_довольно', 'Дом: $90,000, +$500/мес', 'Довольно старый дом рядом с автотрассой. Владелец переезжает в более тихое место. Цена быстрой продажи.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0116_довольно', '4-Plex: $90,000, +$500/мес', 'Довольно старый 4-квартирный дом рядом с автотрассой. Владелец переезжает в более тихое место. Цена быстрой продажи.
 
 Можете использовать это сами или продать другим 40% РОИ, может стоить от $100 000 до $140 000
 
@@ -1630,10 +1635,29 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '220000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '180000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '40000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_monthly', '1700') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 1700);
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122_продажа-8-квартирного-дома-8-plex', '8-Plex: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
+
+Можете использовать это сами или продать другим 29% ROI, может стоить от $200 000 до $280 000
+
+Цена: $240 000 Ипотечный кредит: $200 000
+
+Денежный поток: +$950
+
+Первоначальный взнос: $40 000', 'realestate', NULL);
+SET @cid = LAST_INSERT_ID();
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '240000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '200000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '40000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_monthly', '950') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
+INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 950);
+
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122b_продажа-8-квартирного-дома-8-plex', '8-Plex: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
 
 Можете использовать это сами или продать другим 29% ROI, может стоить от $200 000 до $280 000
 
@@ -1718,7 +1742,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -50000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 2800);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0127_апартаменты-на-продажу', 'Апартаменты: $575,000, +$3,400/мес', '2 здания элитного жилья, в общей сложности квартиры. Недвижимость находится доверительном управлении. Эксклюзивное предложение.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0127_апартаменты-на-продажу', '24-квартирные апартаменты: $575,000, +$3,400/мес', '2 здания элитного жилья, в общей сложности 24 квартиры. Недвижимость находится в доверительном управлении. Эксклюзивное предложение.
 
 Можете использовать это сами или продать другим 54% ROI, может стоить от $600 000 до $960 000
 
@@ -1735,7 +1759,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -75000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 3400);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0128_24', 'Апартаменты: $1,200,000, +$11,000/мес', '24 в Апартаменты на продажу 60 квартирный комплекс элитного жилья распродается пенсионным фондом. Внешнее управление.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0128_60-квартирные-апартаменты', '60-квартирные апартаменты: $1,200,000, +$11,000/мес', '60-квартирный комплекс элитного жилья распродается пенсионным фондом. Внешнее управление.
 
 Можете использовать это сами или продать другим 66% ROI, может стоить от $1 500 000 до $2 700 000
 
@@ -1743,7 +1767,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 
 Денежный поток: +$11 000
 
-Первоначальный взнос: $200 000', 'stock', NULL);
+Первоначальный взнос: $200 000', 'realestate', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '1200000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '1000000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
@@ -2490,9 +2514,10 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('doodad', 'doodad_0224_новый-телевизор-с-большим-экраном', 'Новый телевизор с большим экраном: $4,000', 'Заплатите $4,000 (Вы можете рассчитаться кредитной карточкой. В этом случае добавьте $4,000 в Пассив по кредитным карточкам и $120 в Расходы)', 'expense', NULL);
 SET @cid = LAST_INSERT_ID();
-INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'liability_added', '4000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
-INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -4000);
-INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', -120);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'payment_choice', 'cash_or_credit') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cash_price', '4000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'credit_balance', '4000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'credit_payment', '120') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('doodad', 'doodad_0225_новая-посудомоечная-машина', 'Новая посудомоечная машина: $450', 'Заплатите $450', 'expense', NULL);
 SET @cid = LAST_INSERT_ID();

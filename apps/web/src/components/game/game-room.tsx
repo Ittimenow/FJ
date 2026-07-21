@@ -36,7 +36,7 @@ export function GameRoom({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
-  const [dealQuantity, setDealQuantity] = useState(1);
+  const [dealQuantity, setDealQuantity] = useState<number | "">(1);
   const [turnPopupOpen, setTurnPopupOpen] = useState(false);
   const [rollingDice, setRollingDice] = useState(false);
   const [diceFaces, setDiceFaces] = useState([6]);
@@ -158,6 +158,8 @@ export function GameRoom({
   const ownPendingAction = pendingAction?.gamePlayerId === me?.id ? pendingAction : null;
   const charityChoice =
     ownPendingAction?.type === "charity_choice" ? ownPendingAction : null;
+  const doodadPaymentChoice =
+    ownPendingAction?.type === "doodad_payment_choice" ? ownPendingAction : null;
   const marketSaleOffer =
     ownPendingAction?.type === "market_sale" ? ownPendingAction : null;
   const isMyTurn =
@@ -165,6 +167,8 @@ export function GameRoom({
     currentPlayer?.userId === currentUserId;
   const canAnswerCharity =
     isMyTurn && Boolean(charityChoice);
+  const canAnswerDoodadPayment =
+    isMyTurn && Boolean(doodadPaymentChoice);
   const canAnswerMarketSale =
     isMyTurn && Boolean(marketSaleOffer);
   const canTakeLoan =
@@ -434,6 +438,7 @@ export function GameRoom({
 
   function buyLatestDeal() {
     if (!latestBuyableCard) return;
+    if (latestBuyableCard.isStock && (!dealQuantity || dealQuantity < 1)) return;
     emit(realtimeEvents.dealBuy, {
       cardId: latestBuyableCard.cardId,
       quantity: latestBuyableCard.isStock ? dealQuantity : 1
@@ -469,6 +474,14 @@ export function GameRoom({
 
   function declineCharity() {
     emit("charity:decline", {});
+  }
+
+  function payDoodadWithCash() {
+    emit("doodad:pay_cash", {});
+  }
+
+  function payDoodadWithCredit() {
+    emit("doodad:pay_credit", {});
   }
 
   async function closeLiability(liability: PlayerLiability) {
@@ -532,8 +545,13 @@ export function GameRoom({
     setLoanAmount(normalized);
   }
 
-  function updateDealQuantity(value: number) {
-    setDealQuantity(Math.max(Math.floor(Number(value) || 1), 1));
+  function updateDealQuantity(value: number | "") {
+    if (value === "") {
+      setDealQuantity("");
+      return;
+    }
+    const normalized = Math.floor(Number(value));
+    setDealQuantity(Number.isFinite(normalized) ? normalized : "");
   }
 
   function updateStockSaleQuantity(value: number) {
@@ -631,6 +649,8 @@ export function GameRoom({
             latestTurnSummary={latestTurnSummary}
             charityChoice={charityChoice}
             canAnswerCharity={canAnswerCharity}
+            doodadPaymentChoice={doodadPaymentChoice}
+            canAnswerDoodadPayment={canAnswerDoodadPayment}
             marketSaleOffer={marketSaleOffer}
             canAnswerMarketSale={canAnswerMarketSale}
             currentCashCents={me?.financialState?.cashCents ?? 0}
@@ -643,6 +663,8 @@ export function GameRoom({
             onDeclineMarketSale={declineMarketSale}
             onAcceptCharity={acceptCharity}
             onDeclineCharity={declineCharity}
+            onPayDoodadWithCash={payDoodadWithCash}
+            onPayDoodadWithCredit={payDoodadWithCredit}
             stockSaleOffer={stockSaleOffer}
             stockSaleQuantity={stockSaleQuantity}
             onStockSaleQuantityChange={updateStockSaleQuantity}
@@ -689,6 +711,8 @@ export function GameRoom({
           latestTurnSummary={latestTurnSummary}
           charityChoice={charityChoice}
           canAnswerCharity={canAnswerCharity}
+          doodadPaymentChoice={doodadPaymentChoice}
+          canAnswerDoodadPayment={canAnswerDoodadPayment}
           marketSaleOffer={marketSaleOffer}
           canAnswerMarketSale={canAnswerMarketSale}
           currentCashCents={me?.financialState?.cashCents ?? 0}
@@ -701,6 +725,8 @@ export function GameRoom({
           onDeclineMarketSale={declineMarketSale}
           onAcceptCharity={acceptCharity}
           onDeclineCharity={declineCharity}
+          onPayDoodadWithCash={payDoodadWithCash}
+          onPayDoodadWithCredit={payDoodadWithCredit}
           stockSaleOffer={stockSaleOffer}
           stockSaleQuantity={stockSaleQuantity}
           onStockSaleQuantityChange={updateStockSaleQuantity}
@@ -1357,13 +1383,7 @@ function CompactAssets({ assets }: { assets: GamePlayer["assets"] }) {
   return (
     <div className="space-y-2">
       {assets.map((asset) => (
-        <div key={asset.id} className="rounded-md bg-surface px-3 py-2 text-sm">
-          <div className="font-medium">{asset.name}</div>
-          <div className="mt-1 flex justify-between gap-3 text-xs text-neutral-600">
-            <span>{isStockAsset(asset) ? `${asset.quantity} шт.` : money(asset.cashflowCents)}</span>
-            <span>{money(asset.costBasisCents)}</span>
-          </div>
-        </div>
+        <AssetCard key={asset.id} asset={asset} />
       ))}
     </div>
   );
@@ -1609,33 +1629,41 @@ function AssetsList({ assets }: { assets: GamePlayer["assets"] }) {
         <p className="text-sm text-neutral-600">Пусто</p>
       ) : (
         <div className="space-y-2">
-          {assets.map((asset) =>
-            isStockAsset(asset) ? (
-              <div key={asset.id} className="rounded-md border border-line bg-surface p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium">{asset.name}</div>
-                    {asset.symbol ? (
-                      <div className="mt-1 text-xs text-neutral-500">{asset.symbol}</div>
-                    ) : null}
-                  </div>
-                  <Badge className="bg-white text-ink">Акции</Badge>
-                </div>
-                <div className="mt-3 grid gap-2 text-sm">
-                  <AssetInfoRow label="Кол-во акций" value={String(asset.quantity)} />
-                  <AssetInfoRow label="Стоимость за единицу" value={money(assetUnitCostCents(asset))} />
-                  <AssetInfoRow label="Стоимость акций" value={money(asset.costBasisCents)} />
-                </div>
-              </div>
-            ) : (
-              <div key={asset.id} className="flex justify-between gap-3 text-sm">
-                <span>{asset.name}</span>
-                <span className="shrink-0 font-medium">{money(asset.cashflowCents)}</span>
-              </div>
-            )
-          )}
+          {assets.map((asset) => (
+            <AssetCard key={asset.id} asset={asset} />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function AssetCard({ asset }: { asset: GamePlayer["assets"][number] }) {
+  const stock = isStockAsset(asset);
+
+  return (
+    <div className="rounded-md border border-line bg-surface p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium">{asset.name}</div>
+          {asset.symbol ? (
+            <div className="mt-1 text-xs text-neutral-500">{asset.symbol}</div>
+          ) : null}
+        </div>
+        <Badge className="shrink-0 bg-white text-ink">{assetTypeLabel(asset)}</Badge>
+      </div>
+      <div className="mt-3 grid gap-2 text-sm">
+        {stock ? (
+          <>
+            <AssetInfoRow label="Количество" value={`${asset.quantity} шт.`} />
+            <AssetInfoRow label="Стоимость за единицу" value={money(assetUnitCostCents(asset))} />
+          </>
+        ) : asset.quantity > 1 ? (
+          <AssetInfoRow label="Количество" value={String(asset.quantity)} />
+        ) : null}
+        <AssetInfoRow label="Стоимость" value={money(asset.costBasisCents)} />
+        <AssetInfoRow label="Денежный поток" value={`${money(asset.cashflowCents)}/мес`} />
+      </div>
     </div>
   );
 }
@@ -1653,6 +1681,15 @@ function isStockAsset(asset: GamePlayer["assets"][number]) {
   const type = asset.type.toLowerCase();
   const name = asset.name.toLowerCase();
   return Boolean(asset.symbol) || type.includes("stock") || type.includes("share") || /акци/.test(name);
+}
+
+function assetTypeLabel(asset: GamePlayer["assets"][number]) {
+  if (isStockAsset(asset)) return "Акции";
+
+  const type = asset.type.toLowerCase();
+  if (type.includes("realestate") || type.includes("real_estate")) return "Недвижимость";
+  if (type.includes("network")) return "Бизнес";
+  return "Актив";
 }
 
 function assetUnitCostCents(asset: GamePlayer["assets"][number]) {
@@ -1941,6 +1978,8 @@ function ActionsPanel({
   latestTurnSummary,
   charityChoice,
   canAnswerCharity,
+  doodadPaymentChoice,
+  canAnswerDoodadPayment,
   marketSaleOffer,
   canAnswerMarketSale,
   currentCashCents,
@@ -1953,6 +1992,8 @@ function ActionsPanel({
   onDeclineMarketSale,
   onAcceptCharity,
   onDeclineCharity,
+  onPayDoodadWithCash,
+  onPayDoodadWithCredit,
   stockSaleOffer,
   stockSaleQuantity,
   onStockSaleQuantityChange,
@@ -1977,18 +2018,22 @@ function ActionsPanel({
   latestTurnSummary: ReturnType<typeof latestPlayerActionSummary>;
   charityChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "charity_choice" }> | null;
   canAnswerCharity: boolean;
+  doodadPaymentChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "doodad_payment_choice" }> | null;
+  canAnswerDoodadPayment: boolean;
   marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
   canAnswerMarketSale: boolean;
   currentCashCents: number;
   waitingStockSellerCount: number;
-  dealQuantity: number;
-  setDealQuantity: (value: number) => void;
+  dealQuantity: number | "";
+  setDealQuantity: (value: number | "") => void;
   onBuyLatest: () => void;
   onDeclineLatest: () => void;
   onSellMarketAsset: () => void;
   onDeclineMarketSale: () => void;
   onAcceptCharity: () => void;
   onDeclineCharity: () => void;
+  onPayDoodadWithCash: () => void;
+  onPayDoodadWithCredit: () => void;
   stockSaleOffer: ReturnType<typeof stockSaleOfferForPlayer>;
   stockSaleQuantity: number;
   onStockSaleQuantityChange: (value: number) => void;
@@ -2009,8 +2054,9 @@ function ActionsPanel({
     latestCard?.isStock && latestCard.priceCents > 0
       ? Math.max(1, Math.floor(currentCashCents / latestCard.priceCents))
       : 1;
+  const validDealQuantity = typeof dealQuantity === "number" && dealQuantity >= 1;
   const totalStockCostCents =
-    latestCard?.isStock ? latestCard.priceCents * dealQuantity : 0;
+    latestCard?.isStock && validDealQuantity ? latestCard.priceCents * dealQuantity : 0;
   const canPayCharity =
     charityChoice ? currentCashCents >= charityChoice.donationCents : false;
   const canCloseMarketSale =
@@ -2022,6 +2068,7 @@ function ActionsPanel({
     Boolean(stockSaleOffer) ||
     Boolean(marketSaleOffer) ||
     Boolean(charityChoice) ||
+    Boolean(doodadPaymentChoice) ||
     Boolean(latestCard);
 
   const content = (
@@ -2128,6 +2175,34 @@ function ActionsPanel({
         </div>
       ) : null}
 
+      {doodadPaymentChoice ? (
+        <div className="rounded-md border border-line bg-surface p-3">
+          <div className="text-sm font-medium">Выбор оплаты</div>
+          <p className="mt-2 text-sm leading-6 text-neutral-700">
+            {doodadPaymentChoice.title}
+          </p>
+          <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
+            <div>Наличными: {money(doodadPaymentChoice.cashPriceCents)}</div>
+            <div>
+              Кредитная карта: долг {money(doodadPaymentChoice.creditBalanceCents)}, платёж{" "}
+              {money(doodadPaymentChoice.creditPaymentCents)}/мес
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button onClick={onPayDoodadWithCash} disabled={!canAnswerDoodadPayment}>
+              Наличными
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={onPayDoodadWithCredit}
+              disabled={!canAnswerDoodadPayment}
+            >
+              Кредитная карта
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="rounded-md border border-line bg-surface p-3">
         <div className="text-sm font-medium">
           {latestCard ? "Текущая сделка" : "Последняя сделка"}
@@ -2150,11 +2225,18 @@ function ActionsPanel({
             {latestCard.isStock ? (
               <div className="mt-3 rounded-md border border-line bg-white p-3">
                 <div className="text-sm font-medium">Количество акций</div>
-                <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                <div className="mt-2 grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-2">
                   <Button
                     variant="secondary"
                     className="px-3"
-                    onClick={() => setDealQuantity(Math.max(1, dealQuantity - 1))}
+                    onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 50))}
+                  >
+                    &lt;&lt;
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="px-3"
+                    onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 1))}
                   >
                     &lt;
                   </Button>
@@ -2163,15 +2245,27 @@ function ActionsPanel({
                     min={1}
                     step={1}
                     value={dealQuantity}
-                    onChange={(event) => setDealQuantity(Number(event.target.value))}
+                    onChange={(event) =>
+                      setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
+                    }
+                    onBlur={() => {
+                      if (!validDealQuantity) setDealQuantity(1);
+                    }}
                     className="text-center font-semibold"
                   />
                   <Button
                     variant="secondary"
                     className="px-3"
-                    onClick={() => setDealQuantity(dealQuantity + 1)}
+                    onClick={() => setDealQuantity((dealQuantity || 0) + 1)}
                   >
                     &gt;
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="px-3"
+                    onClick={() => setDealQuantity((dealQuantity || 0) + 50)}
+                  >
+                    &gt;&gt;
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">
@@ -2180,7 +2274,8 @@ function ActionsPanel({
                 <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
                   <div className="text-neutral-600">Полная стоимость</div>
                   <div className="mt-1 font-semibold">
-                    {dealQuantity} x {money(latestCard.priceCents)} = {money(totalStockCostCents)}
+                    {validDealQuantity ? dealQuantity : "—"} x {money(latestCard.priceCents)} ={" "}
+                    {money(totalStockCostCents)}
                   </div>
                 </div>
               </div>
@@ -2191,7 +2286,10 @@ function ActionsPanel({
               </p>
             ) : null}
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <Button onClick={onBuyLatest} disabled={!canResolveLatestDeal}>
+              <Button
+                onClick={onBuyLatest}
+                disabled={!canResolveLatestDeal || (Boolean(latestCard?.isStock) && !validDealQuantity)}
+              >
                 Купить
               </Button>
               <Button variant="secondary" onClick={() => setBankOpen(true)} disabled={!canTakeLoan}>

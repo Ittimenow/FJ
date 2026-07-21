@@ -37,6 +37,7 @@ import { CreateGameDto } from "./dto/create-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { isRentalRealEstateAsset, marketSalePriceForUnits } from "./market-sale";
 
 type Tx = Prisma.TransactionClient;
 
@@ -89,6 +90,15 @@ type GamePendingAction =
       gamePlayerId: string;
       donationCents: number;
       turns: number;
+    }
+  | {
+      type: "doodad_payment_choice";
+      gamePlayerId: string;
+      cardId: number;
+      title: string;
+      cashPriceCents: number;
+      creditBalanceCents: number;
+      creditPaymentCents: number;
     }
   | {
       type: "market_sale";
@@ -1762,6 +1772,83 @@ export class GamesService {
     return this.actionResult(gameId, emittedEvents);
   }
 
+  async resolveDoodadPayment(
+    gameId: string,
+    userId: string,
+    method: "cash" | "credit"
+  ) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const player = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: "JOINED" },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== player.id ||
+        pending?.type !== "doodad_payment_choice" ||
+        pending.gamePlayerId !== player.id
+      ) {
+        throw new ForbiddenException("No doodad payment choice is waiting for your decision");
+      }
+
+      if (method === "cash") {
+        await tx.playerFinancialState.update({
+          where: { gamePlayerId: player.id },
+          data: { cashCents: { decrement: BigInt(pending.cashPriceCents) } }
+        });
+      } else {
+        await tx.playerLiability.create({
+          data: {
+            gamePlayerId: player.id,
+            type: "credit_cards",
+            name: pending.title,
+            balanceCents: BigInt(pending.creditBalanceCents),
+            paymentCents: BigInt(pending.creditPaymentCents)
+          }
+        });
+      }
+
+      await this.recalculatePlayer(tx, player.id, emittedEvents);
+      await tx.game.update({
+        where: { id: gameId },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: "doodad:payment_resolved",
+        gamePlayerId: player.id,
+        payload: {
+          cardId: pending.cardId,
+          title: pending.title,
+          method,
+          cashPriceCents: pending.cashPriceCents,
+          creditBalanceCents: pending.creditBalanceCents,
+          creditPaymentCents: pending.creditPaymentCents
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "doodad_payment_resolved_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
   async takeLoan(gameId: string, userId: string, dto: TakeLoanDto) {
     const expirationEvents = await this.expireGameIfNeeded(gameId);
     if (expirationEvents) return this.actionResult(gameId, expirationEvents);
@@ -2280,6 +2367,31 @@ export class GamesService {
       }
 
       if (cardType === CardType.DOODAD) {
+        const paymentChoice = this.doodadPaymentChoice(card);
+        if (paymentChoice) {
+          await tx.game.update({
+            where: { id: gameId },
+            data: {
+              settings: this.settingsWithPending(currentSettings, {
+                type: "doodad_payment_choice",
+                gamePlayerId,
+                cardId: card.id,
+                title: card.title,
+                ...paymentChoice
+              })
+            }
+          });
+          emittedEvents.push({
+            type: "doodad:payment_choice_required",
+            gamePlayerId,
+            payload: { cardId: card.id, title: card.title, ...paymentChoice }
+          });
+          emittedEvents.push({
+            type: realtimeEvents.stateUpdate,
+            payload: { reason: "doodad_payment_choice_required" }
+          });
+          return true;
+        }
         await this.applyDoodad(tx, gamePlayerId, card, emittedEvents);
       } else if (this.hasAutomaticCardEffects(card)) {
         const affectedPlayerIds = await this.applyAutomaticCardEffects(
@@ -2499,22 +2611,13 @@ export class GamesService {
     if (basePrice <= 0n) return 0n;
 
     if (marketText.includes("каждый блок") || marketText.includes("каждый номер")) {
-      return basePrice * BigInt(this.marketAssetUnits(assetText));
+      return marketSalePriceForUnits(basePrice, assetText);
     }
     if (marketText.includes("каждую по") || marketText.includes("каждая по")) {
       return basePrice * BigInt(Math.max(asset.quantity, 1));
     }
 
     return basePrice;
-  }
-
-  private marketAssetUnits(assetText: string) {
-    if (/24[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 24;
-    if (/12[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 12;
-    if (/8[\s-]*(кв|квартир|plex)/.test(assetText)) return 8;
-    if (/4[\s-]*(кв|квартир|plex)|4х-кварт/.test(assetText)) return 4;
-    if (/2[\s-]*(кв|квартир|plex)|duplex|двух-кварт/.test(assetText)) return 2;
-    return 1;
   }
 
   private normalizedSearchText(...values: Array<string | null | undefined>) {
@@ -2556,6 +2659,25 @@ export class GamesService {
     for (const affectedPlayerId of affectedPlayerIds) {
       await this.recalculatePlayer(tx, affectedPlayerId, emittedEvents);
     }
+  }
+
+  private doodadPaymentChoice(card: CardWithRules) {
+    const meta = this.metaMap(card.meta);
+    if (meta.payment_choice !== "cash_or_credit") return null;
+    const cashPriceCents = Number(meta.cash_price ?? "0");
+    const creditBalanceCents = Number(meta.credit_balance ?? "0");
+    const creditPaymentCents = Number(meta.credit_payment ?? "0");
+    if (
+      !Number.isFinite(cashPriceCents) ||
+      !Number.isFinite(creditBalanceCents) ||
+      !Number.isFinite(creditPaymentCents) ||
+      cashPriceCents <= 0 ||
+      creditBalanceCents <= 0 ||
+      creditPaymentCents <= 0
+    ) {
+      return null;
+    }
+    return { cashPriceCents, creditBalanceCents, creditPaymentCents };
   }
 
   private hasAutomaticCardEffects(card: Pick<CardWithRules, "effects">) {
@@ -3186,11 +3308,35 @@ export class GamesService {
   }
 
   private async hasRentalRealEstate(tx: Tx, gamePlayerId: string) {
-    return this.hasAssetMatching(
-      tx,
-      gamePlayerId,
-      /realestate|недвиж|дом|квартир|plex|duplex|коттедж|таунхаус|3m|2у|2br|3br/i
-    );
+    const assets = await tx.playerAsset.findMany({
+      where: { gamePlayerId, status: AssetStatus.ACTIVE },
+      include: {
+        sourceCard: {
+          select: {
+            title: true,
+            bodyText: true,
+            category: true,
+            subcategory: true
+          }
+        }
+      }
+    });
+
+    return assets.some((asset) => {
+      const sourceCard = asset.sourceCard;
+      return isRentalRealEstateAsset(
+        [
+          asset.type,
+          asset.name,
+          sourceCard?.title,
+          sourceCard?.bodyText,
+          sourceCard?.category,
+          sourceCard?.subcategory
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+    });
   }
 
   private async hasAssetMatching(tx: Tx, gamePlayerId: string, pattern: RegExp) {
@@ -3913,6 +4059,25 @@ export class GamesService {
         gamePlayerId: value.gamePlayerId,
         donationCents: value.donationCents,
         turns: value.turns
+      };
+    }
+    if (
+      value.type === "doodad_payment_choice" &&
+      typeof value.gamePlayerId === "string" &&
+      typeof value.cardId === "number" &&
+      typeof value.title === "string" &&
+      typeof value.cashPriceCents === "number" &&
+      typeof value.creditBalanceCents === "number" &&
+      typeof value.creditPaymentCents === "number"
+    ) {
+      return {
+        type: "doodad_payment_choice",
+        gamePlayerId: value.gamePlayerId,
+        cardId: value.cardId,
+        title: value.title,
+        cashPriceCents: value.cashPriceCents,
+        creditBalanceCents: value.creditBalanceCents,
+        creditPaymentCents: value.creditPaymentCents
       };
     }
     if (

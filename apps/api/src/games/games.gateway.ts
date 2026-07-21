@@ -225,6 +225,34 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     return result;
   }
 
+  @SubscribeMessage("doodad:pay_cash")
+  async payDoodadWithCash(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.resolveDoodadPayment(
+      body.gameId,
+      this.userId(client),
+      "cash"
+    );
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("doodad:pay_credit")
+  async payDoodadWithCredit(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.resolveDoodadPayment(
+      body.gameId,
+      this.userId(client),
+      "credit"
+    );
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
   @SubscribeMessage("loan:take")
   async takeLoan(
     @ConnectedSocket() client: Socket,

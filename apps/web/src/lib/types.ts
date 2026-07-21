@@ -190,6 +190,15 @@ export type GamePendingAction =
       turns: number;
     }
   | {
+      type: "doodad_payment_choice";
+      gamePlayerId: string;
+      cardId: number;
+      title: string;
+      cashPriceCents: number;
+      creditBalanceCents: number;
+      creditPaymentCents: number;
+    }
+  | {
       type: "market_sale";
       gamePlayerId: string;
       cardId: number;
