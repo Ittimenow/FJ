@@ -368,18 +368,26 @@ async function seedProfessions() {
   }
 }
 
-async function seedCards() {
+async function seedCards(
+  options: { replaceAll?: boolean } = {},
+  db: PrismaClient | Prisma.TransactionClient = prisma
+) {
+  const replaceAll = options.replaceAll ?? true;
   const file = resolve(repoRoot, "dist/seed_cards.sql");
   if (!existsSync(file)) {
     console.warn("Skipping cards: dist/seed_cards.sql not found");
     return;
   }
 
-  console.log("Seeding cards from dist/seed_cards.sql");
-  await prisma.cardCondition.deleteMany();
-  await prisma.cardEffect.deleteMany();
-  await prisma.cardMeta.deleteMany();
-  await prisma.card.deleteMany();
+  console.log(
+    `${replaceAll ? "Seeding" : "Synchronizing"} cards from dist/seed_cards.sql`
+  );
+  if (replaceAll) {
+    await db.cardCondition.deleteMany();
+    await db.cardEffect.deleteMany();
+    await db.cardMeta.deleteMany();
+    await db.card.deleteMany();
+  }
 
   const context: SqlContext = {};
   const statements = splitSqlStatements(readFileSync(file, "utf8"));
@@ -399,16 +407,26 @@ async function seedCards() {
       const cardType = cardTypeMap[rawCardType];
       if (!cardType) throw new Error(`Unsupported card type: ${rawCardType}`);
 
-      const card = await prisma.card.create({
-        data: {
-          cardType,
-          slug,
-          title: requireString(row.title, "cards.title"),
-          bodyText: requireString(row.body_text, "cards.body_text"),
-          category: nullableString(row.category),
-          subcategory: nullableString(row.subcategory)
-        }
-      });
+      const data = {
+        cardType,
+        slug,
+        title: requireString(row.title, "cards.title"),
+        bodyText: requireString(row.body_text, "cards.body_text"),
+        category: nullableString(row.category),
+        subcategory: nullableString(row.subcategory)
+      };
+      const card = replaceAll
+        ? await db.card.create({ data })
+        : await db.card.upsert({
+            where: { slug },
+            create: data,
+            update: data
+          });
+      if (!replaceAll) {
+        await db.cardCondition.deleteMany({ where: { cardId: card.id } });
+        await db.cardEffect.deleteMany({ where: { cardId: card.id } });
+        await db.cardMeta.deleteMany({ where: { cardId: card.id } });
+      }
       context.cid = card.id;
       continue;
     }
@@ -418,7 +436,7 @@ async function seedCards() {
         const row = rowFromInsert(insert, values, context);
         const cardId = intOrDefault(row.card_id, 0);
         const metaKey = requireString(row.meta_key, "card_meta.meta_key");
-        await prisma.cardMeta.upsert({
+        await db.cardMeta.upsert({
           where: {
             cardId_metaKey: {
               cardId,
@@ -442,7 +460,7 @@ async function seedCards() {
       const rows = insert.rows.map((values) =>
         rowFromInsert(insert, values, context)
       );
-      await prisma.cardEffect.createMany({
+      await db.cardEffect.createMany({
         data: rows.map((row) => ({
           cardId: intOrDefault(row.card_id, 0),
           effectType: requireString(row.effect_type, "card_effects.effect_type"),
@@ -457,7 +475,7 @@ async function seedCards() {
       const rows = insert.rows.map((values) =>
         rowFromInsert(insert, values, context)
       );
-      await prisma.cardCondition.createMany({
+      await db.cardCondition.createMany({
         data: rows.map((row) => ({
           cardId: intOrDefault(row.card_id, 0),
           condType: requireString(row.cond_type, "card_conditions.cond_type"),
@@ -469,6 +487,48 @@ async function seedCards() {
 }
 
 async function main() {
+  if (process.argv.includes("--sync-cards")) {
+    const migrationId = "2026-07-21-correct-original-card-data";
+    const didApply = await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${migrationId}))`;
+        const applied = await tx.referenceDataMigration.findUnique({
+          where: { id: migrationId }
+        });
+        if (applied) return false;
+
+        const legacyApartmentSlug = "big_deal_0128_24";
+        const apartmentSlug = "big_deal_0128_60-квартирные-апартаменты";
+        const [legacyApartment, correctedApartment] = await Promise.all([
+          tx.card.findUnique({ where: { slug: legacyApartmentSlug } }),
+          tx.card.findUnique({ where: { slug: apartmentSlug } })
+        ]);
+        if (legacyApartment && !correctedApartment) {
+          await tx.card.update({
+            where: { id: legacyApartment.id },
+            data: { slug: apartmentSlug }
+          });
+        } else if (legacyApartment) {
+          await tx.card.update({
+            where: { id: legacyApartment.id },
+            data: { isActive: false }
+          });
+        }
+
+        await seedCards({ replaceAll: false }, tx);
+        await tx.referenceDataMigration.create({ data: { id: migrationId } });
+        return true;
+      },
+      { maxWait: 10_000, timeout: 120_000 }
+    );
+    console.log(
+      didApply
+        ? `Applied reference data migration: ${migrationId}`
+        : `Reference data migration already applied: ${migrationId}`
+    );
+    return;
+  }
+
   await seedProfessions();
   await seedCards();
 }

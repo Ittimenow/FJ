@@ -253,6 +253,7 @@ async function installDependenciesIfNeeded(env) {
 async function seedReferenceDataIfNeeded() {
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient();
+  let hasReferenceData = false;
   try {
     const [professions, cards] = await Promise.all([
       prisma.profession.count(),
@@ -261,10 +262,16 @@ async function seedReferenceDataIfNeeded() {
 
     if (professions > 0 && cards > 0) {
       log(`Reference data already exists: ${professions} professions, ${cards} cards`);
-      return;
+      hasReferenceData = true;
     }
   } finally {
     await prisma.$disconnect();
+  }
+
+  if (hasReferenceData) {
+    log("Applying pending card data updates.");
+    await run(npmCommand, ["run", "db:sync-cards"], { env: localEnv });
+    return;
   }
 
   log("Reference data is empty. Running db:seed.");

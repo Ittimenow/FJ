@@ -269,6 +269,13 @@ model CardCondition {
   @@map("card_conditions")
 }
 
+model ReferenceDataMigration {
+  id        String   @id
+  appliedAt DateTime @default(now()) @map("applied_at")
+
+  @@map("reference_data_migrations")
+}
+
 model PlayerFinancialState {
   id                       String    @id @default(uuid()) @db.Uuid
   gamePlayerId             String    @unique @map("game_player_id") @db.Uuid
