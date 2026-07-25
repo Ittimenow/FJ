@@ -1692,6 +1692,7 @@ function MobileBoard({
         >
           {snapshot.board.map((cell) => {
             const players = timelineCellPlayers(snapshot, cell.index, animatedOtherPlayer);
+            const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
             return (
               <div
                 key={cell.index}
@@ -1711,10 +1712,11 @@ function MobileBoard({
                   <span className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
                   <span
                     className={[
-                      "absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white",
+                      "absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-sm",
+                      appearance.timelineMarker,
                       cell.index === targetCellIndex
-                        ? "scale-125 border-success"
-                        : "border-neutral-400"
+                        ? "scale-125 ring-2 ring-success ring-offset-1"
+                        : ""
                     ].join(" ")}
                   />
                 </div>
@@ -1752,28 +1754,47 @@ function BoardCellTile({
   mobile?: boolean;
   active?: boolean;
 }) {
+  const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
+
   return (
     <div
       className={[
-        "relative rounded-md border border-line bg-white",
+        "relative overflow-hidden rounded-md border",
+        appearance.tile,
         compact
           ? "h-[105px] w-[145px] p-3"
           : mobile
-            ? "h-24 w-full bg-surface p-2"
-            : "min-h-24 aspect-square bg-surface p-3",
+            ? "h-24 w-full p-2"
+            : "min-h-24 aspect-square p-3",
         active ? "ring-2 ring-success ring-offset-2 ring-offset-white" : ""
       ].join(" ")}
       style={style}
     >
-      <div className={mobile ? "grid gap-1" : "flex items-center justify-between gap-2"}>
-        <span className={compact || mobile ? "text-lg font-semibold" : "text-xs text-neutral-500"}>
+      <span
+        aria-hidden="true"
+        className={`absolute inset-x-0 top-0 h-1.5 ${appearance.marker}`}
+      />
+      <div
+        className={
+          mobile ? "grid gap-1 pt-1" : "flex items-start justify-between gap-2 pt-1"
+        }
+      >
+        <span
+          className={
+            compact || mobile
+              ? "text-lg font-bold text-neutral-700"
+              : "text-xs font-semibold text-neutral-600"
+          }
+        >
           {cell.index + 1}
         </span>
         <Badge
           className={[
-            "bg-surface text-ink",
-            compact ? "max-w-[7rem] truncate" : "",
-            mobile ? "w-fit max-w-full truncate px-1.5 text-[10px]" : ""
+            "justify-center bg-transparent text-center font-semibold leading-tight text-ink",
+            compact ? "max-w-[7rem] px-2 text-[11px]" : "",
+            mobile
+              ? "w-full max-w-full px-1 py-1 text-[10px] [overflow-wrap:anywhere]"
+              : ""
           ].join(" ")}
         >
           {cellTypes[cell.type] ?? cell.type}
@@ -3005,6 +3026,56 @@ const cellTypes: Record<string, string> = {
   charity: "Благотворительность",
   baby: "Ребенок",
   downsized: "Увольнение"
+};
+
+type BoardCellAppearance = {
+  tile: string;
+  marker: string;
+  timelineMarker: string;
+};
+
+const defaultBoardCellAppearance: BoardCellAppearance = {
+  tile: "border-line bg-white",
+  marker: "bg-neutral-400",
+  timelineMarker: "bg-neutral-300"
+};
+
+const boardCellAppearances: Record<string, BoardCellAppearance> = {
+  deal: {
+    tile: "border-line bg-[#f5faf2]",
+    marker: "bg-[#a8c99a]",
+    timelineMarker: "bg-[#d1e3ca]"
+  },
+  market: {
+    tile: "border-line bg-[#f5f6fc]",
+    marker: "bg-[#a7add6]",
+    timelineMarker: "bg-[#d4d7ec]"
+  },
+  paycheck: {
+    tile: "border-line bg-[#fff9e8]",
+    marker: "bg-[#e5c568]",
+    timelineMarker: "bg-[#f3e4ad]"
+  },
+  doodad: {
+    tile: "border-line bg-[#fff4f7]",
+    marker: "bg-[#dfa1b3]",
+    timelineMarker: "bg-[#eecbd5]"
+  },
+  baby: {
+    tile: "border-line bg-[#faf5fc]",
+    marker: "bg-[#c5a6d8]",
+    timelineMarker: "bg-[#e1d2ea]"
+  },
+  charity: {
+    tile: "border-line bg-[#fff5ed]",
+    marker: "bg-[#e6a06c]",
+    timelineMarker: "bg-[#f1d1b8]"
+  },
+  downsized: {
+    tile: "border-line bg-[#f7f2f8]",
+    marker: "bg-[#9875a8]",
+    timelineMarker: "bg-[#d6c5de]"
+  }
 };
 
 function eventTitle(type: string) {

@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "rat-race-cell-color-coding",
+          "category": "improvement",
+          "summary": "Типы ячеек малого круга теперь выделены узнаваемыми цветами и единым контрастным оформлением."
+        },
+        {
           "id": "extend-vps-deploy-timeout",
           "category": "technical",
           "summary": "Деплой на сервер теперь дольше ожидает завершения сборки и не прерывается через десять минут."
