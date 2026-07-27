@@ -89,7 +89,7 @@ export function AdminPanel({
               href="/guide"
               className="block rounded-md px-3 py-2 text-sm font-medium text-ink transition hover:bg-surface"
             >
-              Руководство
+              Правила игры
             </Link>
           </div>
 

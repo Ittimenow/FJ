@@ -27,9 +27,9 @@ Web: `http://localhost:3000`
 
 Для обычного Timeweb Cloud Server/VPS на Ubuntu используйте отдельную инструкцию: [docs/deploy-timeweb-vps.md](docs/deploy-timeweb-vps.md).
 
-## Руководство пользователя
+## Правила игры
 
-Подробная инструкция по типам аккаунтов, ролям в комнате и правилам MVP-партии находится в [docs/user-guide.md](docs/user-guide.md).
+Правила финансовой игры «Финансовое путешествие» по мотивам CASHFLOW находятся в [docs/user-guide.md](docs/user-guide.md) и доступны в приложении по адресу `/guide`.
 
 ## Автозапуск в VS Code
 

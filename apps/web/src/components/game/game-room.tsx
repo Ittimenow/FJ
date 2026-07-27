@@ -21,7 +21,13 @@ import { Input } from "@/components/ui/input";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
-import type { GameEvent, GamePlayer, GameSnapshot, PlayerLiability } from "@/lib/types";
+import type {
+  FinancialState,
+  GameEvent,
+  GamePlayer,
+  GameSnapshot,
+  PlayerLiability
+} from "@/lib/types";
 
 type GameActionResult = {
   snapshot?: GameSnapshot;
@@ -440,14 +446,8 @@ export function GameRoom({
       if (move) {
         setTurnAnimationPhase("moving");
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (reduceMotion) {
-          setAnimatedPosition(move.to);
-        } else {
-          for (let step = 1; step <= move.steps; step += 1) {
-            setAnimatedPosition(normalizeBoardPosition(move.from + step, snapshot.board.length));
-            await wait(220);
-          }
-        }
+        setAnimatedPosition(move.to);
+        if (!reduceMotion) await wait(popupMoveDuration(move.steps));
       }
 
       setTurnAnimationPhase("landed");
@@ -673,10 +673,10 @@ export function GameRoom({
         </div>
       ) : null}
       {snapshot.game.status === "IN_PROGRESS" && remainingSeconds !== null ? (
-        <div className="rounded-md border border-line bg-white px-3 py-2 text-sm">
-          До завершения партии:{" "}
-          <span className="font-semibold">{formatRemainingTime(remainingSeconds)}</span>
-        </div>
+        <GameTimer
+          remainingSeconds={remainingSeconds}
+          totalMinutes={snapshot.game.timeLimitMinutes}
+        />
       ) : snapshot.game.status === "ENDED" ? (
         <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium">
           {winner
@@ -713,6 +713,7 @@ export function GameRoom({
             marketSaleOffer={marketSaleOffer}
             canAnswerMarketSale={canAnswerMarketSale}
             currentCashCents={me?.financialState?.cashCents ?? 0}
+            currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
             waitingStockSellerCount={waitingStockSellerCount}
             dealQuantity={dealQuantity}
             setDealQuantity={updateDealQuantity}
@@ -788,6 +789,7 @@ export function GameRoom({
                 marketSaleOffer={marketSaleOffer}
                 canAnswerMarketSale={canAnswerMarketSale}
                 currentCashCents={me?.financialState?.cashCents ?? 0}
+                currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
                 waitingStockSellerCount={waitingStockSellerCount}
                 dealQuantity={dealQuantity}
                 setDealQuantity={updateDealQuantity}
@@ -857,6 +859,10 @@ function BankruptcyPanel({
   const state = player.financialState;
   if (!state) return null;
   const deficit = Math.abs(Math.min(state.monthlyCashflowCents, 0));
+  const totalDebtCents = player.liabilities.reduce(
+    (sum, liability) => sum + liability.balanceCents,
+    0
+  );
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/50 px-4 py-8">
@@ -874,6 +880,20 @@ function BankruptcyPanel({
           месячный дефицит: {money(deficit)}. Продайте активы банку и направьте деньги на долги,
           пока денежный поток не станет положительным.
         </p>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <BankruptcyRecoveryProgress
+            deficitCents={deficit}
+            totalExpensesCents={state.totalExpensesCents}
+          />
+          {totalDebtCents > 0 ? (
+            <FundingProgress
+              availableCents={state.cashCents}
+              requiredCents={totalDebtCents}
+              label="Покрытие долгов наличными"
+            />
+          ) : null}
+        </div>
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <section>
@@ -1000,6 +1020,7 @@ function TurnPopup({
             snapshot={snapshot}
             player={player}
             animatedPosition={animatedPosition}
+            phase={phase}
           />
         </div>
         <div className="mt-4 flex justify-center gap-3">
@@ -1037,21 +1058,58 @@ function TurnPopup({
 function PopupBoard({
   snapshot,
   player,
-  animatedPosition
+  animatedPosition,
+  phase
 }: {
   snapshot: GameSnapshot;
   player: GamePlayer | undefined;
   animatedPosition: number | null;
+  phase: TurnAnimationPhase;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const previousTargetRef = useRef<number | null>(null);
   const targetCellIndex = animatedPosition ?? (player && player.position >= 0 ? player.position : 0);
 
   useEffect(() => {
-    const target = scrollRef.current?.querySelector<HTMLElement>(
+    const scroller = scrollRef.current;
+    const target = scroller?.querySelector<HTMLElement>(
       `[data-popup-board-cell="${targetCellIndex}"]`
     );
-    target?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
-  }, [targetCellIndex]);
+    if (!scroller || !target) return;
+
+    const previousTarget = previousTargetRef.current;
+    previousTargetRef.current = targetCellIndex;
+    const targetScrollLeft = Math.max(
+      0,
+      Math.min(
+        target.offsetLeft - (scroller.clientWidth - target.clientWidth) / 2,
+        scroller.scrollWidth - scroller.clientWidth
+      )
+    );
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (phase !== "moving" || previousTarget === null || reduceMotion) {
+      scroller.scrollTo({ left: targetScrollLeft, behavior: "auto" });
+      return;
+    }
+
+    const steps = normalizeBoardPosition(targetCellIndex - previousTarget, snapshot.board.length);
+    const duration = popupMoveDuration(steps);
+    const startScrollLeft = scroller.scrollLeft;
+    const distance = targetScrollLeft - startScrollLeft;
+    let animationFrame = 0;
+    let startedAt: number | null = null;
+
+    const animate = (timestamp: number) => {
+      startedAt ??= timestamp;
+      const progress = Math.min(1, (timestamp - startedAt) / duration);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      scroller.scrollLeft = startScrollLeft + distance * easedProgress;
+      if (progress < 1) animationFrame = window.requestAnimationFrame(animate);
+    };
+
+    animationFrame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [phase, snapshot.board.length, targetCellIndex]);
 
   return (
     <div
@@ -1125,22 +1183,14 @@ function GameEndPopup({
         {winnerState ? (
           <section className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4">
             <h3 className="font-semibold text-emerald-900">Результат победителя</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Metric label="Пассивный доход" value={money(winnerState.passiveIncomeCents)} />
-              <Metric label="Расходы" value={money(winnerState.totalExpensesCents)} />
-              <Metric label="Денежный поток" value={money(winnerState.monthlyCashflowCents)} />
-            </div>
+            <ResultFinancialComparison state={winnerState} />
           </section>
         ) : null}
 
         {playerState ? (
           <section className="mt-4 rounded-md border border-line bg-surface p-4">
             <h3 className="font-semibold">Ваш результат</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Metric label="Наличные" value={money(playerState.cashCents)} />
-              <Metric label="Пассивный доход" value={money(playerState.passiveIncomeCents)} />
-              <Metric label="Денежный поток" value={money(playerState.monthlyCashflowCents)} />
-            </div>
+            <ResultFinancialComparison state={playerState} showCash />
           </section>
         ) : null}
 
@@ -1303,6 +1353,10 @@ function normalizeBoardPosition(position: number, boardSize: number) {
   return ((position % boardSize) + boardSize) % boardSize;
 }
 
+function popupMoveDuration(steps: number) {
+  return Math.min(1100, Math.max(420, 300 + steps * 110));
+}
+
 function popupOriginFrom(element: HTMLElement | null) {
   if (!element || typeof window === "undefined") return { x: 0, y: 0 };
   const rect = element.getBoundingClientRect();
@@ -1329,6 +1383,37 @@ function formatRemainingTime(totalSeconds: number) {
   return [hours, minutes, seconds]
     .map((value) => String(value).padStart(2, "0"))
     .join(":");
+}
+
+function GameTimer({
+  remainingSeconds,
+  totalMinutes
+}: {
+  remainingSeconds: number;
+  totalMinutes: number;
+}) {
+  const totalSeconds = Math.max(1, totalMinutes * 60);
+  const remainingRatio = Math.min(1, Math.max(0, remainingSeconds / totalSeconds));
+  const tone =
+    remainingRatio <= 0.1 ? "danger" : remainingRatio <= 0.25 ? "warning" : "neutral";
+
+  return (
+    <div className="rounded-md border border-line bg-white px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-neutral-600">⏱ До завершения партии</span>
+        <span className="font-semibold tabular-nums">
+          {formatRemainingTime(remainingSeconds)}
+        </span>
+      </div>
+      <ProgressBar
+        className="mt-2"
+        value={remainingSeconds}
+        max={totalSeconds}
+        label={`До завершения партии осталось ${formatRemainingTime(remainingSeconds)}`}
+        tone={tone}
+      />
+    </div>
+  );
 }
 
 function HostPanel({
@@ -1478,6 +1563,8 @@ function DesktopGameBoard({
   );
 }
 
+type DesktopFinancialTab = "player" | "assets" | "expenses" | "liabilities";
+
 function DesktopFinancialPanel({
   player,
   canManageLiabilities,
@@ -1489,6 +1576,7 @@ function DesktopFinancialPanel({
   onCloseLiability: (liability: PlayerLiability) => void;
   outsidePlayers: GamePlayer[];
 }) {
+  const [activeTab, setActiveTab] = useState<DesktopFinancialTab>("player");
   const state = player?.financialState;
 
   if (!player || !state) {
@@ -1500,64 +1588,145 @@ function DesktopFinancialPanel({
     );
   }
 
+  const liabilities = repayableLiabilityRows(player);
+  const tabs: Array<{
+    id: DesktopFinancialTab;
+    label: string;
+    icon: string;
+    count?: number;
+  }> = [
+    { id: "player", label: "Игрок", icon: "👤" },
+    { id: "assets", label: "Активы", icon: "💼", count: player.assets.length },
+    { id: "expenses", label: "Расходы", icon: "📊" },
+    { id: "liabilities", label: "Долги", icon: "🏦", count: liabilities.length }
+  ];
+
   return (
-    <div className="grid min-h-0 grid-rows-[auto_1fr] gap-3">
-      <div className="rounded-md border border-line bg-white p-4">
-        <div className="flex items-start justify-between gap-4">
+    <div className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-md border border-line bg-white">
+      <div
+        className="grid grid-cols-4 gap-1 border-b border-line bg-surface p-2"
+        role="tablist"
+        aria-label="Информация об игроке"
+      >
+        {tabs.map((tab, index) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              id={`desktop-game-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls="desktop-game-tab-panel"
+              tabIndex={active ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => {
+                let nextIndex = index;
+                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+                if (event.key === "ArrowLeft") {
+                  nextIndex = (index - 1 + tabs.length) % tabs.length;
+                }
+                if (event.key === "Home") nextIndex = 0;
+                if (event.key === "End") nextIndex = tabs.length - 1;
+                if (nextIndex === index) return;
+
+                event.preventDefault();
+                const nextTab = tabs[nextIndex];
+                if (!nextTab) return;
+                setActiveTab(nextTab.id);
+                document.getElementById(`desktop-game-tab-${nextTab.id}`)?.focus();
+              }}
+              className={[
+                "relative flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition",
+                active
+                  ? "bg-ink text-white shadow-sm"
+                  : "bg-white text-ink hover:bg-neutral-100"
+              ].join(" ")}
+            >
+              <span aria-hidden="true">{tab.icon}</span>
+              <span className="truncate">{tab.label}</span>
+              {tab.count !== undefined ? (
+                <span
+                  className={[
+                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[9px] leading-4",
+                    active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-600"
+                  ].join(" ")}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="desktop-game-tab-panel"
+        role="tabpanel"
+        aria-labelledby={`desktop-game-tab-${activeTab}`}
+        className="min-h-0 overflow-y-auto p-3"
+      >
+        {activeTab === "player" ? (
           <div>
-            <h2 className="text-lg font-semibold">{player.user?.displayName ?? "Игрок"}</h2>
-            <div className="mt-1 text-sm text-neutral-500">{player.profession?.name}</div>
-          </div>
-          <Badge className="bg-surface text-ink">финансовый отчёт</Badge>
-        </div>
-        <div className="mt-4 grid grid-cols-5 gap-2">
-          <Metric label="Наличные" value={money(state.cashCents)} />
-          <Metric label="Зарплата" value={money(state.salaryCents)} />
-          <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
-          <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
-          <Metric label="Расходы" value={money(state.totalExpensesCents)} />
-        </div>
-        {outsidePlayers.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-            <span>Вне поля</span>
-            {outsidePlayers.map((outsidePlayer) => (
-              <PlayerToken key={outsidePlayer.id} player={outsidePlayer} />
-            ))}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {player.user?.displayName ?? "Игрок"}
+                </h2>
+                <div className="mt-1 text-sm text-neutral-500">
+                  {player.profession?.name}
+                </div>
+              </div>
+              <Badge className="bg-surface text-ink">финансовый отчёт</Badge>
+            </div>
+            <div className="mt-4 grid grid-cols-5 gap-2">
+              <Metric label="Наличные" value={money(state.cashCents)} />
+              <Metric label="Зарплата" value={money(state.salaryCents)} />
+              <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
+              <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
+              <Metric label="Расходы" value={money(state.totalExpensesCents)} />
+            </div>
+            <FinancialFreedomProgress
+              className="mt-3"
+              passiveIncomeCents={state.passiveIncomeCents}
+              totalExpensesCents={state.totalExpensesCents}
+            />
+            <CashflowEquation className="mt-3" state={state} />
+            {outsidePlayers.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                <span>Вне поля</span>
+                {outsidePlayers.map((outsidePlayer) => (
+                  <PlayerToken key={outsidePlayer.id} player={outsidePlayer} />
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
-      </div>
 
-      <div className="grid min-h-0 grid-rows-[auto_auto] gap-3 overflow-y-auto pr-1">
-        <DesktopAssetsSection assets={player.assets} />
-        <FinancialTabs
-          player={player}
-          canManageLiabilities={canManageLiabilities}
-          onCloseLiability={onCloseLiability}
-        />
+        {activeTab === "assets" ? <CompactAssets assets={player.assets} /> : null}
+
+        {activeTab === "expenses" ? (
+          <div className="space-y-4">
+            <ExpenseComposition player={player} />
+            <SectionList
+              title={money(state.totalExpensesCents)}
+              titleAlign="right"
+              rows={expenseRows(player)}
+            />
+          </div>
+        ) : null}
+
+        {activeTab === "liabilities" ? (
+          <CreditList
+            liabilities={liabilities}
+            currentCashCents={state.cashCents}
+            monthlyIncomeCents={state.totalIncomeCents}
+            canManageLiabilities={canManageLiabilities}
+            onCloseLiability={onCloseLiability}
+          />
+        ) : null}
       </div>
     </div>
-  );
-}
-
-function DesktopAssetsSection({ assets }: { assets: GamePlayer["assets"] }) {
-  if (assets.length === 0) {
-    return (
-      <section className="flex items-center justify-between gap-3 rounded-md border border-line bg-white px-3 py-2">
-        <h3 className="text-sm font-semibold">Активы</h3>
-        <span className="text-sm text-neutral-600">
-          Активов пока нет, но амбиции уже на балансе!
-        </span>
-      </section>
-    );
-  }
-
-  return (
-    <section className="rounded-md border border-line bg-white p-3">
-      <h3 className="text-sm font-semibold">Активы</h3>
-      <div className="mt-3">
-        <CompactAssets assets={assets} />
-      </div>
-    </section>
   );
 }
 
@@ -1570,13 +1739,113 @@ function CompactAssets({ assets }: { assets: GamePlayer["assets"] }) {
     );
   }
 
+  const maxAbsCashflowCents = Math.max(
+    1,
+    ...assets.map((asset) => Math.abs(asset.cashflowCents))
+  );
+
   return (
     <div className="space-y-2">
+      <PortfolioSummary assets={assets} />
       {assets.map((asset) => (
-        <AssetCard key={asset.id} asset={asset} />
+        <AssetCard
+          key={asset.id}
+          asset={asset}
+          maxAbsCashflowCents={maxAbsCashflowCents}
+        />
       ))}
     </div>
   );
+}
+
+const portfolioSegmentClasses: Record<string, string> = {
+  stocks: "bg-[#7b9cc6]",
+  real_estate: "bg-[#73a865]",
+  business: "bg-[#9d82b8]",
+  other: "bg-[#b99c5d]"
+};
+
+const portfolioCategoryLabels: Record<string, string> = {
+  stocks: "Акции",
+  real_estate: "Недвижимость",
+  business: "Бизнес",
+  other: "Другие активы"
+};
+
+function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
+  const totalCostCents = assets.reduce((sum, asset) => sum + asset.costBasisCents, 0);
+  const totalMarketCents = assets.reduce((sum, asset) => sum + asset.marketValueCents, 0);
+  const totalCashflowCents = assets.reduce((sum, asset) => sum + asset.cashflowCents, 0);
+  const resultCents = totalMarketCents - totalCostCents;
+  const grouped = Array.from(
+    assets.reduce((items, asset) => {
+      const category = assetPortfolioCategory(asset);
+      items.set(
+        category,
+        (items.get(category) ?? 0) +
+          Math.max(0, asset.marketValueCents || asset.costBasisCents)
+      );
+      return items;
+    }, new Map<string, number>())
+  ).filter(([, value]) => value > 0);
+  const compositionTotal = grouped.reduce((sum, [, value]) => sum + value, 0);
+
+  return (
+    <div className="rounded-md border border-line bg-surface p-3">
+      <div className="text-sm font-semibold">Портфель</div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Metric label="Вложено" value={money(totalCostCents)} />
+        <Metric label="Текущая стоимость" value={money(totalMarketCents)} />
+        <Metric
+          label={resultCents >= 0 ? "Прибыль" : "Убыток"}
+          value={money(Math.abs(resultCents))}
+        />
+        <Metric label="Cashflow активов" value={`${money(totalCashflowCents)}/мес`} />
+      </div>
+      {compositionTotal > 0 ? (
+        <>
+          <div
+            className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
+            role="img"
+            aria-label="Распределение стоимости портфеля по типам активов"
+          >
+            {grouped.map(([category, value]) => (
+              <div
+                key={category}
+                className={portfolioSegmentClasses[category] ?? "bg-neutral-400"}
+                style={{ width: `${(value / compositionTotal) * 100}%` }}
+                title={`${portfolioCategoryLabels[category] ?? category}: ${money(value)}`}
+              />
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {grouped.map(([category, value]) => (
+              <div key={category} className="inline-flex items-center gap-1.5 text-xs">
+                <span
+                  className={`h-2.5 w-2.5 rounded-sm ${portfolioSegmentClasses[category] ?? "bg-neutral-400"}`}
+                  aria-hidden="true"
+                />
+                <span className="text-neutral-600">
+                  {portfolioCategoryLabels[category] ?? category}
+                </span>
+                <strong>{Math.round((value / compositionTotal) * 100)}%</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function assetPortfolioCategory(asset: GamePlayer["assets"][number]) {
+  if (isStockAsset(asset)) return "stocks";
+  const type = asset.type.toLowerCase();
+  if (type.includes("realestate") || type.includes("real_estate")) {
+    return "real_estate";
+  }
+  if (type.includes("network") || type.includes("business")) return "business";
+  return "other";
 }
 
 function MobileBoard({
@@ -1901,24 +2170,70 @@ function PlayersGrid({
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {players.map((player) => (
-        <div
-          key={player.id}
-          className="rounded-md border border-line bg-surface p-3"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-medium">
-              {player.user?.displayName ?? player.role}
+      {players.map((player) => {
+        const state = player.financialState;
+        const trackLabel =
+          player.track === "FAST_TRACK" ? "⚡ Быстрый круг" : "🐀 Крысиные бега";
+
+        return (
+          <div
+            key={player.id}
+            className="rounded-md border border-line bg-surface p-3"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-medium">
+                {player.user?.displayName ?? player.role}
+              </div>
+              {currentPlayerId === player.id ? (
+                <Badge className="bg-green-100 text-success">ход</Badge>
+              ) : null}
             </div>
-            {currentPlayerId === player.id ? (
-              <Badge className="bg-green-100 text-success">ход</Badge>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500">
+              {player.seat ? <span>Место {player.seat}</span> : null}
+              <span>{gameRoles[player.role] ?? humanizeToken(player.role)}</span>
+              <span>{trackLabel}</span>
+            </div>
+            <div className="mt-2 text-sm">
+              {player.profession?.name ?? "Профессия не выдана"}
+            </div>
+            {state ? (
+              <>
+                <PlayerStatusBadges state={state} />
+                <PlayerFreedomMini
+                  passiveIncomeCents={state.passiveIncomeCents}
+                  totalExpensesCents={state.totalExpensesCents}
+                />
+              </>
             ) : null}
           </div>
-          <div className="mt-1 text-xs text-neutral-500">
-            seat {player.seat ?? "—"} · {player.role} · {player.track}
-          </div>
-          <div className="mt-2 text-sm">{player.profession?.name ?? "Профессия не выдана"}</div>
-        </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlayerStatusBadges({ state }: { state: FinancialState }) {
+  const statuses = compactDetails([
+    state.wonAt ? "🏆 Победитель" : null,
+    state.bankruptcyStatus === "LIQUIDATING" ? "⚠️ Банкротство" : null,
+    state.bankruptcyStatus === "RECOVERED"
+      ? `↻ Пропустить ходов: ${state.bankruptcyTurns}`
+      : null,
+    state.bankruptcyStatus === "ELIMINATED" ? "⛔ Выбыл" : null,
+    state.downsizedTurns > 0 ? `💼 Без работы: ${state.downsizedTurns}` : null,
+    state.charityTurns > 0 ? `🎲 Два кубика: ${state.charityTurns}` : null
+  ]);
+  if (statuses.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {statuses.map((status) => (
+        <span
+          key={status}
+          className="rounded-full border border-line bg-white px-2 py-1 text-xs text-neutral-700"
+        >
+          {status}
+        </span>
       ))}
     </div>
   );
@@ -1958,14 +2273,15 @@ function MobileGameTabs({
   const tabs: Array<{
     id: MobileGameTab;
     label: string;
+    icon: string;
     count?: number;
     attention?: boolean;
   }> = [
-    { id: "turn", label: "Ход", attention: actionAttention },
-    { id: "player", label: "Игрок" },
-    { id: "assets", label: "Активы", count: assetCount },
-    { id: "expenses", label: "Расходы" },
-    { id: "liabilities", label: "Долги", count: liabilities.length }
+    { id: "turn", label: "Ход", icon: "🎯", attention: actionAttention },
+    { id: "player", label: "Игрок", icon: "👤" },
+    { id: "assets", label: "Активы", icon: "💼", count: assetCount },
+    { id: "expenses", label: "Расходы", icon: "📊" },
+    { id: "liabilities", label: "Долги", icon: "🏦", count: liabilities.length }
   ];
 
   return (
@@ -2008,7 +2324,10 @@ function MobileGameTabs({
                   : "bg-white text-ink hover:bg-neutral-100"
               ].join(" ")}
             >
-              <span className="truncate">{tab.label}</span>
+              <span className="inline-flex min-w-0 items-center gap-0.5 min-[380px]:gap-1">
+                <span aria-hidden="true">{tab.icon}</span>
+                <span className="truncate">{tab.label}</span>
+              </span>
               {tab.count !== undefined ? (
                 <span
                   className={[
@@ -2066,6 +2385,11 @@ function MobileGameTabs({
                 <Metric label="Расходы" value={money(state.totalExpensesCents)} />
               </div>
             </div>
+            <FinancialFreedomProgress
+              passiveIncomeCents={state.passiveIncomeCents}
+              totalExpensesCents={state.totalExpensesCents}
+            />
+            <CashflowEquation state={state} />
           </div>
         ) : null}
 
@@ -2074,17 +2398,21 @@ function MobileGameTabs({
         ) : null}
 
         {activeTab === "expenses" && player && state ? (
-          <SectionList
-            title={money(state.totalExpensesCents)}
-            titleAlign="right"
-            rows={expenseRows(player)}
-          />
+          <div className="space-y-4">
+            <ExpenseComposition player={player} />
+            <SectionList
+              title={money(state.totalExpensesCents)}
+              titleAlign="right"
+              rows={expenseRows(player)}
+            />
+          </div>
         ) : null}
 
         {activeTab === "liabilities" && player && state ? (
           <CreditList
             liabilities={liabilities}
             currentCashCents={state.cashCents}
+            monthlyIncomeCents={state.totalIncomeCents}
             canManageLiabilities={canManageLiabilities}
             onCloseLiability={onCloseLiability}
           />
@@ -2094,7 +2422,13 @@ function MobileGameTabs({
   );
 }
 
-function AssetCard({ asset }: { asset: GamePlayer["assets"][number] }) {
+function AssetCard({
+  asset,
+  maxAbsCashflowCents
+}: {
+  asset: GamePlayer["assets"][number];
+  maxAbsCashflowCents: number;
+}) {
   const stock = isStockAsset(asset);
 
   return (
@@ -2120,6 +2454,45 @@ function AssetCard({ asset }: { asset: GamePlayer["assets"][number] }) {
         <AssetInfoRow label="Стоимость" value={money(asset.costBasisCents)} />
         <AssetInfoRow label="Денежный поток" value={`${money(asset.cashflowCents)}/мес`} />
       </div>
+      <AssetCashflowBar
+        cashflowCents={asset.cashflowCents}
+        maxAbsCashflowCents={maxAbsCashflowCents}
+      />
+    </div>
+  );
+}
+
+function AssetCashflowBar({
+  cashflowCents,
+  maxAbsCashflowCents
+}: {
+  cashflowCents: number;
+  maxAbsCashflowCents: number;
+}) {
+  if (cashflowCents === 0) {
+    return (
+      <div className="mt-3 inline-flex rounded-full bg-neutral-200 px-2 py-1 text-xs text-neutral-600">
+        Без ежемесячного cashflow
+      </div>
+    );
+  }
+
+  const positive = cashflowCents > 0;
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className={positive ? "text-success" : "text-red-700"}>
+          {positive ? "Вклад в cashflow" : "Снижение cashflow"}
+        </span>
+        <strong>{money(cashflowCents)}/мес</strong>
+      </div>
+      <ProgressBar
+        className="mt-1.5"
+        value={Math.abs(cashflowCents)}
+        max={Math.max(1, maxAbsCashflowCents)}
+        label={`${positive ? "Вклад" : "Снижение"} cashflow ${money(Math.abs(cashflowCents))} в месяц`}
+        tone={positive ? "success" : "danger"}
+      />
     </div>
   );
 }
@@ -2128,7 +2501,7 @@ function AssetInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
       <span className="text-neutral-600">{label}</span>
-      <span className="shrink-0 font-medium">{value}</span>
+      <span className="shrink-0 font-semibold">{value}</span>
     </div>
   );
 }
@@ -2152,53 +2525,10 @@ function assetUnitCostCents(asset: GamePlayer["assets"][number]) {
   return asset.quantity > 0 ? Math.round(asset.costBasisCents / asset.quantity) : 0;
 }
 
-function FinancialTabs({
-  player,
-  canManageLiabilities,
-  onCloseLiability
-}: {
-  player: GamePlayer;
-  canManageLiabilities: boolean;
-  onCloseLiability: (liability: PlayerLiability) => void;
-}) {
-  const [activeTab, setActiveTab] = useState<"expenses" | "liabilities">("expenses");
-
-  return (
-    <div className="rounded-md border border-line bg-surface p-3">
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab("expenses")}
-          className={tabClass(activeTab === "expenses")}
-        >
-          Расходы
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("liabilities")}
-          className={tabClass(activeTab === "liabilities")}
-        >
-          Долги
-        </button>
-      </div>
-      <div className="mt-4">
-        {activeTab === "expenses" ? (
-          <SectionList title="Расходы" rows={expenseRows(player)} />
-        ) : (
-          <CreditList
-            liabilities={repayableLiabilityRows(player)}
-            currentCashCents={player.financialState?.cashCents ?? 0}
-            canManageLiabilities={canManageLiabilities}
-            onCloseLiability={onCloseLiability}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function LoanPanel({
   loanAmount,
+  currentCashCents,
+  currentMonthlyCashflowCents,
   onLoanDecrease,
   onLoanIncrease,
   onLoanAmountChange,
@@ -2206,6 +2536,8 @@ function LoanPanel({
   canTakeLoan
 }: {
   loanAmount: number;
+  currentCashCents: number;
+  currentMonthlyCashflowCents: number;
   onLoanDecrease: () => void;
   onLoanIncrease: () => void;
   onLoanAmountChange: (value: number) => void;
@@ -2242,12 +2574,62 @@ function LoanPanel({
           &gt;
         </Button>
       </div>
+      <LoanPreview
+        loanAmountCents={loanAmount}
+        currentCashCents={currentCashCents}
+        currentMonthlyCashflowCents={currentMonthlyCashflowCents}
+      />
       <Button className="mt-3 w-full" variant="secondary" onClick={onTakeLoan} disabled={!canTakeLoan}>
         Взять кредит
       </Button>
       <p className="mt-2 text-xs text-neutral-500">
-        Доступен во время активной партии. Сумма должна быть кратна {money(1000)}.
+        Доступен во время активной партии. Сумма должна быть кратна{" "}
+        <strong>{money(1000)}</strong>.
       </p>
+    </div>
+  );
+}
+
+function LoanPreview({
+  loanAmountCents,
+  currentCashCents,
+  currentMonthlyCashflowCents
+}: {
+  loanAmountCents: number;
+  currentCashCents: number;
+  currentMonthlyCashflowCents: number;
+}) {
+  const paymentCents = Math.floor(loanAmountCents / 10);
+  const cashAfterCents = currentCashCents + loanAmountCents;
+  const cashflowAfterCents = currentMonthlyCashflowCents - paymentCents;
+
+  return (
+    <div className="mt-3 rounded-md border border-line bg-white p-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        После получения
+      </div>
+      <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+        <div>
+          <div className="text-xs text-neutral-500">Наличные</div>
+          <div className="mt-0.5 font-semibold">{money(cashAfterCents)}</div>
+        </div>
+        <div>
+          <div className="text-xs text-neutral-500">Новый платёж</div>
+          <div className="mt-0.5 font-semibold text-red-700">
+            −{money(paymentCents)}/мес
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-neutral-500">Cashflow после</div>
+          <div
+            className={`mt-0.5 font-semibold ${
+              cashflowAfterCents >= 0 ? "text-success" : "text-red-700"
+            }`}
+          >
+            {money(cashflowAfterCents)}/мес
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2255,11 +2637,13 @@ function LoanPanel({
 function CreditList({
   liabilities,
   currentCashCents,
+  monthlyIncomeCents,
   canManageLiabilities,
   onCloseLiability
 }: {
   liabilities: PlayerLiability[];
   currentCashCents: number;
+  monthlyIncomeCents: number;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
 }) {
@@ -2269,56 +2653,64 @@ function CreditList({
       {liabilities.length === 0 ? (
         <p className="mt-2 text-sm text-neutral-600">Нет кредитов для закрытия.</p>
       ) : (
-        <div className="mt-3 space-y-2">
-          {liabilities.map((liability) => {
-            const hasEnoughCash = currentCashCents >= liability.balanceCents;
-            const canClose = canManageLiabilities && hasEnoughCash;
-            return (
-              <div
-                key={liability.id}
-                className="grid gap-2 rounded-md border border-line bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-center"
-              >
-                <div>
-                  <div className="text-sm font-medium">
-                    {liabilityLabels[liability.type] ?? liability.name}
-                  </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Остаток: {money(liability.balanceCents)}
-                    {liability.paymentCents > 0
-                      ? ` · платеж: ${money(liability.paymentCents)}/мес`
-                      : ""}
-                  </div>
-                  {canManageLiabilities && !hasEnoughCash ? (
-                    <div className="mt-1 text-xs text-red-700">
-                      Недостаточно наличных для закрытия.
-                    </div>
-                  ) : null}
-                </div>
-                <Button
-                  variant="secondary"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => onCloseLiability(liability)}
-                  disabled={!canClose}
+        <>
+          <DebtComposition
+            liabilities={liabilities}
+            currentCashCents={currentCashCents}
+            monthlyIncomeCents={monthlyIncomeCents}
+          />
+          <div className="mt-3 space-y-2">
+            {liabilities.map((liability) => {
+              const hasEnoughCash = currentCashCents >= liability.balanceCents;
+              const canClose = canManageLiabilities && hasEnoughCash;
+              return (
+                <div
+                  key={liability.id}
+                  className="grid gap-2 rounded-md border border-line bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-center"
                 >
-                  Закрыть кредит
-                </Button>
-              </div>
-            );
-          })}
-        </div>
+                  <div>
+                    <div className="text-sm font-medium">
+                      {liabilityLabels[liability.type] ?? liability.name}
+                    </div>
+                    <div className="mt-1 text-xs text-neutral-500">
+                      Остаток: {money(liability.balanceCents)}
+                      {liability.paymentCents > 0
+                        ? ` · платеж: ${money(liability.paymentCents)}/мес`
+                        : ""}
+                    </div>
+                    {canManageLiabilities && !hasEnoughCash ? (
+                      <div className="mt-1 text-xs text-red-700">
+                        Недостаточно наличных для закрытия.
+                      </div>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => onCloseLiability(liability)}
+                    disabled={!canClose}
+                  >
+                    Закрыть кредит
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function tabClass(active: boolean) {
-  return [
-    "rounded-md px-3 py-2 text-sm font-medium transition",
-    active ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
-  ].join(" ");
+function expenseRows(player: GamePlayer) {
+  return expenseItems(player).map((item) => ({
+    id: item.id,
+    label: item.label,
+    value: money(item.amountCents)
+  }));
 }
 
-function expenseRows(player: GamePlayer) {
+function expenseItems(player: GamePlayer) {
   const profession = player.profession;
   const state = player.financialState;
 
@@ -2326,55 +2718,65 @@ function expenseRows(player: GamePlayer) {
     {
       id: "taxes",
       label: "Налоги",
-      value: money(profession?.taxesCents)
+      amountCents: profession?.taxesCents ?? 0
     },
     {
       id: "home_mortgage",
       label: "Оплата закладной на дом",
-      value: money(
-        liabilityPayment(player, "home_mortgage") ?? profession?.mortgagePaymentCents
-      )
+      amountCents:
+        liabilityPayment(player, "home_mortgage") ??
+        profession?.mortgagePaymentCents ??
+        0
     },
     {
       id: "school_debt",
       label: "Оплата кредита на образование",
-      value: money(
-        liabilityPayment(player, "school_debt") ?? profession?.schoolLoanPaymentCents
-      )
+      amountCents:
+        liabilityPayment(player, "school_debt") ??
+        profession?.schoolLoanPaymentCents ??
+        0
     },
     {
       id: "car_debt",
       label: "Оплата кредита на автомобиль",
-      value: money(liabilityPayment(player, "car_debt") ?? profession?.carLoanPaymentCents)
+      amountCents:
+        liabilityPayment(player, "car_debt") ??
+        profession?.carLoanPaymentCents ??
+        0
     },
     {
       id: "credit_cards",
       label: "Выплаты по кредитной карточке",
-      value: money(
-        liabilityPayment(player, "credit_cards") ?? profession?.creditCardPaymentCents
-      )
+      amountCents:
+        liabilityPayment(player, "credit_cards") ??
+        profession?.creditCardPaymentCents ??
+        0
     },
     {
       id: "retail_debt",
       label: "Розничные расходы",
-      value: money(liabilityPayment(player, "retail_debt") ?? profession?.retailPaymentCents)
+      amountCents:
+        liabilityPayment(player, "retail_debt") ??
+        profession?.retailPaymentCents ??
+        0
     },
     {
       id: "other_expenses",
       label: "Другие расходы",
-      value: money(profession?.otherExpensesCents)
+      amountCents: profession?.otherExpensesCents ?? 0
     },
     {
       id: "children",
       label: "Расходы на детей",
-      value: money(
-        state ? state.perChildCostCents * state.childrenCount : profession?.childrenExpenseCents
-      )
+      amountCents:
+        (state
+          ? state.perChildCostCents * state.childrenCount
+          : profession?.childrenExpenseCents) ?? 0
     },
     {
       id: "bank_loan",
       label: "Оплата кредита банка",
-      value: money(sumLiabilityPayments(player, "bank_loan"))
+      amountCents: sumLiabilityPayments(player, "bank_loan")
     }
   ];
 }
@@ -2439,6 +2841,7 @@ function ActionsPanel({
   marketSaleOffer,
   canAnswerMarketSale,
   currentCashCents,
+  currentMonthlyCashflowCents,
   waitingStockSellerCount,
   dealQuantity,
   setDealQuantity,
@@ -2479,6 +2882,7 @@ function ActionsPanel({
   marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
   canAnswerMarketSale: boolean;
   currentCashCents: number;
+  currentMonthlyCashflowCents: number;
   waitingStockSellerCount: number;
   dealQuantity: number | "";
   setDealQuantity: (value: number | "") => void;
@@ -2513,6 +2917,11 @@ function ActionsPanel({
   const validDealQuantity = typeof dealQuantity === "number" && dealQuantity >= 1;
   const totalStockCostCents =
     latestCard?.isStock && validDealQuantity ? latestCard.priceCents * dealQuantity : 0;
+  const fullDealCostCents = latestCard
+    ? latestCard.isStock
+      ? totalStockCostCents
+      : latestCard.priceCents || latestCard.downPaymentCents
+    : 0;
   const canPayCharity =
     charityChoice ? currentCashCents >= charityChoice.donationCents : false;
   const canCloseMarketSale =
@@ -2572,23 +2981,35 @@ function ActionsPanel({
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
             <div>Актив: {marketSaleOffer.assetName}</div>
-            <div>Цена продажи: {money(marketSaleOffer.salePriceCents)}</div>
+            <div>
+              Цена продажи: <strong>{money(marketSaleOffer.salePriceCents)}</strong>
+            </div>
             {marketSaleOffer.mortgageCents > 0 ? (
-              <div>Закладная: {money(marketSaleOffer.mortgageCents)}</div>
+              <div>
+                Закладная: <strong>{money(marketSaleOffer.mortgageCents)}</strong>
+              </div>
             ) : null}
             <div>
               {marketSaleOffer.proceedsCents >= 0 ? "К получению" : "К доплате"}:{" "}
-              {money(Math.abs(marketSaleOffer.proceedsCents))}
+              <strong>{money(Math.abs(marketSaleOffer.proceedsCents))}</strong>
             </div>
             {marketSaleOffer.cashflowCents !== 0 ? (
               <div>
                 {marketSaleOffer.cashflowCents > 0
                   ? "Денежный поток уменьшится на"
                   : "Денежный поток увеличится на"}{" "}
-                {money(Math.abs(marketSaleOffer.cashflowCents))}/мес
+                <strong>{money(Math.abs(marketSaleOffer.cashflowCents))}</strong>/мес
               </div>
             ) : null}
           </div>
+          {marketSaleOffer.proceedsCents < 0 ? (
+            <FundingProgress
+              className="mt-3"
+              availableCents={currentCashCents}
+              requiredCents={Math.abs(marketSaleOffer.proceedsCents)}
+              label="Доплата для закрытия продажи"
+            />
+          ) : null}
           {!canCloseMarketSale ? (
             <p className="mt-2 text-xs text-red-700">
               Недостаточно наличных, чтобы закрыть продажу.
@@ -2612,7 +3033,9 @@ function ActionsPanel({
             Заплатите 10% от своих общих доходов и кидайте 2 кубика 3 своих хода.
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-            <div>Пожертвование: {money(charityChoice.donationCents)}</div>
+            <div>
+              Пожертвование: <strong>{money(charityChoice.donationCents)}</strong>
+            </div>
             <div>Бонус: 2 кубика на {charityChoice.turns} хода</div>
           </div>
           {!canPayCharity ? (
@@ -2638,10 +3061,13 @@ function ActionsPanel({
             {doodadPaymentChoice.title}
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-            <div>Наличными: {money(doodadPaymentChoice.cashPriceCents)}</div>
             <div>
-              Кредитная карта: долг {money(doodadPaymentChoice.creditBalanceCents)}, платёж{" "}
-              {money(doodadPaymentChoice.creditPaymentCents)}/мес
+              Наличными: <strong>{money(doodadPaymentChoice.cashPriceCents)}</strong>
+            </div>
+            <div>
+              Кредитная карта: долг{" "}
+              <strong>{money(doodadPaymentChoice.creditBalanceCents)}</strong>, платёж{" "}
+              <strong>{money(doodadPaymentChoice.creditPaymentCents)}</strong>/мес
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -2670,12 +3096,21 @@ function ActionsPanel({
               <p className="mt-2 text-sm leading-6 text-neutral-700">{latestCard.bodyText}</p>
             ) : null}
             <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-              {latestCard.priceCents > 0 ? <div>Цена: {money(latestCard.priceCents)}</div> : null}
+              {latestCard.priceCents > 0 ? (
+                <div>
+                  Цена: <strong>{money(latestCard.priceCents)}</strong>
+                </div>
+              ) : null}
               {latestCard.downPaymentCents > 0 ? (
-                <div>Первоначальный взнос: {money(latestCard.downPaymentCents)}</div>
+                <div>
+                  Первоначальный взнос:{" "}
+                  <strong>{money(latestCard.downPaymentCents)}</strong>
+                </div>
               ) : null}
               {latestCard.cashflowCents !== 0 ? (
-                <div>Денежный поток: {money(latestCard.cashflowCents)}/мес</div>
+                <div>
+                  Денежный поток: <strong>{money(latestCard.cashflowCents)}</strong>/мес
+                </div>
               ) : null}
             </div>
             {latestCard.isStock ? (
@@ -2727,14 +3162,36 @@ function ActionsPanel({
                 <p className="mt-2 text-xs text-neutral-500">
                   На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит.
                 </p>
-                <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
-                  <div className="text-neutral-600">Полная стоимость</div>
-                  <div className="mt-1 font-semibold">
-                    {validDealQuantity ? dealQuantity : "—"} x {money(latestCard.priceCents)} ={" "}
-                    {money(totalStockCostCents)}
+                <div className="mt-3 rounded-md bg-surface p-3 text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                    Расчёт стоимости
+                  </div>
+                  <div className="mt-2 grid grid-cols-[1fr_auto_1.2fr_auto_1.4fr] items-stretch gap-1.5 text-center">
+                    <div className="rounded bg-white px-2 py-2">
+                      <div className="text-[10px] text-neutral-500">Количество</div>
+                      <strong>{validDealQuantity ? dealQuantity : "—"}</strong>
+                    </div>
+                    <span className="self-center text-neutral-400" aria-hidden="true">×</span>
+                    <div className="rounded bg-white px-2 py-2">
+                      <div className="text-[10px] text-neutral-500">Цена</div>
+                      <strong>{money(latestCard.priceCents)}</strong>
+                    </div>
+                    <span className="self-center text-neutral-400" aria-hidden="true">=</span>
+                    <div className="rounded bg-[#f5faf2] px-2 py-2">
+                      <div className="text-[10px] text-neutral-500">Стоимость</div>
+                      <strong>{money(totalStockCostCents)}</strong>
+                    </div>
                   </div>
                 </div>
               </div>
+            ) : null}
+            {fullDealCostCents > 0 && (!latestCard.isStock || validDealQuantity) ? (
+              <FundingProgress
+                className="mt-3"
+                availableCents={currentCashCents}
+                requiredCents={fullDealCostCents}
+                label="Полная стоимость сделки"
+              />
             ) : null}
             {!canResolveLatestDeal ? (
               <p className="mt-3 text-xs text-amber-700">
@@ -2757,18 +3214,17 @@ function ActionsPanel({
             </div>
           </>
         ) : !hasCurrentAction && latestTurnSummary ? (
-          <>
-            <p className="mt-1 text-sm font-medium text-neutral-800">{latestTurnSummary.title}</p>
-            {latestTurnSummary.details.length > 0 ? (
-              <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-                {latestTurnSummary.details.map((detail) => (
-                  <div key={detail}>{detail}</div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-neutral-600">Деталей нет.</p>
+          <div className="mt-3 space-y-3">
+            {latestTurnSummary.map((event) =>
+              event.type === realtimeEvents.cardDraw ? (
+                <JournalCardDraw key={event.id} event={event} />
+              ) : (
+                <div key={event.id} className="border-l-2 border-neutral-200 pl-3">
+                  <GameEventPresentation event={event} titleClassName="font-semibold" />
+                </div>
+              )
             )}
-          </>
+          </div>
         ) : hasCurrentAction ? (
           <p className="mt-1 text-sm text-neutral-600">Ожидается действие выше.</p>
         ) : (
@@ -2781,6 +3237,8 @@ function ActionsPanel({
           <div className="mb-3 text-sm font-medium">Банк</div>
           <LoanPanel
             loanAmount={loanAmount}
+            currentCashCents={currentCashCents}
+            currentMonthlyCashflowCents={currentMonthlyCashflowCents}
             onLoanDecrease={onLoanDecrease}
             onLoanIncrease={onLoanIncrease}
             onLoanAmountChange={onLoanAmountChange}
@@ -2825,6 +3283,100 @@ function ActionsPanel({
   );
 }
 
+type JournalEntry =
+  | {
+      kind: "event";
+      id: string;
+      event: GameEvent;
+    }
+  | {
+      kind: "turn";
+      id: string;
+      events: GameEvent[];
+    };
+
+const turnStartEventTypes = new Set([
+  realtimeEvents.playerRollDice,
+  "turn:skipped",
+  "bankruptcy:turn_skipped"
+]);
+
+const turnEndingStateReasons = new Set([
+  "roll_resolved",
+  "turn_skipped",
+  "bankruptcy_turn_skipped",
+  "financial_freedom_reached",
+  "time_limit_reached"
+]);
+
+function journalEntries(events: GameEvent[]) {
+  const entries: JournalEntry[] = [];
+  let activeTurn: GameEvent[] | null = null;
+
+  const finishActiveTurn = () => {
+    if (!activeTurn || activeTurn.length === 0) return;
+    entries.push({
+      kind: "turn",
+      id: `turn-${activeTurn[0]?.id ?? activeTurn[0]?.sequence ?? entries.length}`,
+      events: activeTurn
+    });
+    activeTurn = null;
+  };
+
+  for (const event of [...events].sort(
+    (left, right) => left.sequence - right.sequence
+  )) {
+    if (turnStartEventTypes.has(event.type)) {
+      finishActiveTurn();
+      activeTurn = [event];
+      continue;
+    }
+
+    if (event.type === realtimeEvents.stateUpdate) {
+      if (activeTurn) {
+        activeTurn.push(event);
+        if (isTurnEndingStateEvent(event)) finishActiveTurn();
+      }
+      continue;
+    }
+
+    if (activeTurn) {
+      activeTurn.push(event);
+      if (event.type === realtimeEvents.gameEnded) finishActiveTurn();
+      continue;
+    }
+
+    entries.push({ kind: "event", id: event.id, event });
+  }
+
+  finishActiveTurn();
+  return entries;
+}
+
+function isTurnEndingStateEvent(event: GameEvent) {
+  const reason = String(event.payload.reason ?? "");
+  return turnEndingStateReasons.has(reason) || reason.endsWith("_turn_ended");
+}
+
+function journalEntrySequence(entry: JournalEntry) {
+  if (entry.kind === "event") return entry.event.sequence;
+  return entry.events[entry.events.length - 1]?.sequence ?? 0;
+}
+
+function journalEntryActor(entry: JournalEntry) {
+  if (entry.kind === "event") return entry.event.actor;
+  return entry.events.find((event) => turnStartEventTypes.has(event.type))?.actor;
+}
+
+function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
+  const firstSequence = entry.events[0]?.sequence;
+  const lastSequence = entry.events[entry.events.length - 1]?.sequence;
+  if (firstSequence === undefined || lastSequence === undefined) return "";
+  return firstSequence === lastSequence
+    ? `#${firstSequence}`
+    : `#${firstSequence}–${lastSequence}`;
+}
+
 function EventLog({
   events,
   currentUserId,
@@ -2838,10 +3390,10 @@ function EventLog({
 }) {
   const [onlyMine, setOnlyMine] = useState(false);
   const [activeTab, setActiveTab] = useState<"events" | "players">("events");
-  const visibleEvents = useMemo(() => {
-    return [...events]
-      .sort((left, right) => right.sequence - left.sequence)
-      .filter((event) => !onlyMine || event.actor?.id === currentUserId);
+  const visibleEntries = useMemo(() => {
+    return journalEntries(events)
+      .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
+      .filter((entry) => !onlyMine || journalEntryActor(entry)?.id === currentUserId);
   }, [currentUserId, events, onlyMine]);
 
   return (
@@ -2885,32 +3437,67 @@ function EventLog({
         {activeTab === "events" ? (
           <div className="max-h-96 space-y-3 overflow-y-auto pr-1" role="tabpanel">
             <p className="text-xs text-neutral-500">Сначала показаны последние действия.</p>
-            {visibleEvents.length === 0 ? (
+            {visibleEntries.length === 0 ? (
               <p className="text-sm text-neutral-600">
                 {onlyMine ? "Ваших действий пока нет." : "Событий пока нет."}
               </p>
             ) : (
-              visibleEvents.map((event) => {
-                const details = eventDetails(event);
+              visibleEntries.map((entry) => {
+                if (entry.kind === "turn") {
+                  const actor = journalEntryActor(entry);
+                  const firstEvent = entry.events[0];
+                  const lastEvent = entry.events[entry.events.length - 1];
+                  const visibleTurnEvents = entry.events.filter(
+                    (event) => event.type !== realtimeEvents.stateUpdate
+                  );
+
+                  return (
+                    <div key={entry.id} className="rounded-md border border-line bg-surface p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold">Ход игрока</div>
+                          <div className="mt-1 text-xs text-neutral-500">
+                            {actor?.displayName ?? "Система"} ·{" "}
+                            {shortDate(firstEvent?.createdAt ?? lastEvent?.createdAt ?? "")}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-xs text-neutral-500">
+                          {turnSequenceLabel(entry)}
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {visibleTurnEvents.map((event) => {
+                          if (event.type === realtimeEvents.cardDraw) {
+                            return <JournalCardDraw key={event.id} event={event} />;
+                          }
+
+                          return (
+                            <div
+                              key={event.id}
+                              className="border-l-2 border-neutral-200 pl-3 text-sm"
+                            >
+                              <GameEventPresentation event={event} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const event = entry.event;
 
                 return (
-                  <div key={event.id} className="rounded-md border border-line bg-surface p-3">
+                  <div key={entry.id} className="rounded-md border border-line bg-surface p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold">{eventTitle(event.type)}</div>
+                        <GameEventPresentation event={event} titleClassName="font-semibold" />
                         <div className="mt-1 text-xs text-neutral-500">
                           {event.actor?.displayName ?? "Система"} · {shortDate(event.createdAt)}
                         </div>
                       </div>
                       <span className="shrink-0 text-xs text-neutral-500">#{event.sequence}</span>
                     </div>
-                    {details.length > 0 ? (
-                      <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-                        {details.map((detail, index) => (
-                          <div key={index}>{detail}</div>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
                 );
               })
@@ -2923,6 +3510,334 @@ function EventLog({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const eventTitleIcons: Record<string, string> = {
+  "loan:take": "🏦",
+  "loan:repay": "🏦",
+  "paycheck:receive": "💵",
+  "deal:buy": "🤝",
+  "deal:sell": "💰"
+};
+
+function GameEventPresentation({
+  event,
+  titleClassName = "font-medium"
+}: {
+  event: GameEvent;
+  titleClassName?: string;
+}) {
+  const cashChange = eventCashChange(event);
+  const details = compactEventDetails(event);
+
+  return (
+    <div className="text-sm">
+      <div className={`text-neutral-800 ${titleClassName}`}>
+        <GameEventHeadline event={event} />
+      </div>
+      {cashChange ? <CashChangeVisualization change={cashChange} /> : null}
+      {details.length > 0 ? (
+        <div className="mt-1 space-y-1 text-neutral-700">
+          {details.map((detail, index) => (
+            <div key={`${index}-${detail}`}>
+              <MoneyBoldText text={detail} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function GameEventHeadline({ event }: { event: GameEvent }) {
+  if (event.type === realtimeEvents.playerRollDice) {
+    const diceValues = Array.isArray(event.payload.diceValues)
+      ? event.payload.diceValues
+          .map((value) => toNumber(value))
+          .filter((value) => Number.isFinite(value))
+      : [];
+    const total = toNumber(event.payload.dice);
+    const expression =
+      diceValues.length > 0
+        ? `${diceValues.join(" + ")} = ${Number.isFinite(total) ? total : diceValues.reduce((sum, value) => sum + value, 0)}`
+        : String(Number.isFinite(total) ? total : "—");
+
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <span aria-hidden="true" className="text-base">🎲</span>
+        <span className="sr-only">Бросок кубика: </span>
+        <span>{expression}</span>
+      </span>
+    );
+  }
+
+  if (event.type === realtimeEvents.playerMove) {
+    const from = toNumber(event.payload.from);
+    const to = toNumber(event.payload.to);
+    const cell = isRecord(event.payload.cell) ? event.payload.cell : null;
+    const cellType = String(cell?.type ?? "");
+    const cellLabel = String(cell?.label ?? cellTypes[cellType] ?? "");
+    const appearance = boardCellAppearances[cellType] ?? defaultBoardCellAppearance;
+
+    return (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <span aria-hidden="true" className="text-base">➡️</span>
+        <span className="sr-only">Перемещение по полю: </span>
+        <span>
+          {compactBoardPosition(from)} → {compactBoardPosition(to)}
+        </span>
+        {cellLabel ? (
+          <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${appearance.tile}`}>
+            {cellTypes[cellType] ?? cellLabel}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  const icon = eventTitleIcons[event.type];
+  return (
+    <span className="inline-flex items-center gap-2">
+      {icon ? <span aria-hidden="true" className="text-base">{icon}</span> : null}
+      <span>{eventTitle(event.type)}</span>
+    </span>
+  );
+}
+
+function compactEventDetails(event: GameEvent) {
+  if (event.type === realtimeEvents.playerRollDice) {
+    return compactDetails([
+      numericDetail(
+        "Ходов благотворительности осталось",
+        event.payload.charityTurnsRemaining
+      )
+    ]);
+  }
+  if (event.type === realtimeEvents.playerMove) return [];
+  const details = eventDetails(event);
+  if (!eventCashChange(event)) return details;
+  const redundantCashPrefixes = [
+    "Наличные до:",
+    "Наличными было:",
+    "Наличные после:",
+    "После покупки актива осталось:",
+    "Получено наличными:",
+    "Погашено:",
+    "Пожертвование:",
+    "Расход:",
+    "Доход:",
+    "Выплата банка:"
+  ];
+  return details.filter(
+    (detail) => !redundantCashPrefixes.some((prefix) => detail.startsWith(prefix))
+  );
+}
+
+type CashChange = {
+  beforeCents: number | null;
+  afterCents: number | null;
+  deltaCents: number;
+};
+
+function eventCashChange(event: GameEvent): CashChange | null {
+  const before = optionalPayloadNumber(event.payload, "beforeCashCents");
+  const after = optionalPayloadNumber(event.payload, "afterCashCents");
+  if (before !== null && after !== null) {
+    return { beforeCents: before, afterCents: after, deltaCents: after - before };
+  }
+
+  let delta: number | null = null;
+  if (event.type === realtimeEvents.loanTake) {
+    delta = optionalPayloadNumber(event.payload, "amountCents");
+  } else if (event.type === "card:cash_delta") {
+    delta = optionalPayloadNumber(event.payload, "amountCents");
+  } else if (event.type === "bankruptcy:asset_sold") {
+    delta = optionalPayloadNumber(event.payload, "proceedsCents");
+  } else if (event.type === "bankruptcy:debt_repaid") {
+    const amount = optionalPayloadNumber(event.payload, "amountCents");
+    delta = amount === null ? null : -Math.abs(amount);
+  } else if (event.type === "doodad:paid") {
+    const amount = optionalPayloadNumber(event.payload, "amountCents");
+    delta = amount === null ? null : -Math.abs(amount);
+  } else if (
+    event.type === "doodad:payment_resolved" &&
+    event.payload.method === "cash"
+  ) {
+    const amount = optionalPayloadNumber(event.payload, "cashPriceCents");
+    delta = amount === null ? null : -Math.abs(amount);
+  }
+
+  return delta === null
+    ? null
+    : { beforeCents: null, afterCents: null, deltaCents: delta };
+}
+
+function optionalPayloadNumber(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  if (value === null || value === undefined || value === "") return null;
+  const number = toNumber(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function CashChangeVisualization({ change }: { change: CashChange }) {
+  const positive = change.deltaCents >= 0;
+  const deltaLabel = `${positive ? "+" : "−"}${money(Math.abs(change.deltaCents))}`;
+
+  return (
+    <div className="mt-1.5 inline-flex flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
+      <span aria-hidden="true">💵</span>
+      {change.beforeCents !== null && change.afterCents !== null ? (
+        <>
+          <strong>{money(change.beforeCents)}</strong>
+          <span className="text-neutral-400" aria-hidden="true">→</span>
+          <strong>{money(change.afterCents)}</strong>
+        </>
+      ) : null}
+      <strong className={positive ? "text-success" : "text-red-700"}>
+        {deltaLabel}
+      </strong>
+    </div>
+  );
+}
+
+function compactBoardPosition(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  return value < 0 ? "Старт" : String(value + 1);
+}
+
+function MoneyBoldText({ text }: { text: string }) {
+  const currencyPattern = /(-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$)/gu;
+  const currencyPartPattern = /^-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$$/u;
+  const parts = text.split(currencyPattern);
+
+  return (
+    <>
+      {parts.map((part, index) =>
+        currencyPartPattern.test(part) ? (
+          <strong key={index} className="font-semibold text-neutral-900">
+            {part}
+          </strong>
+        ) : (
+          <span key={index}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+type JournalCardAppearance = {
+  container: string;
+  badge: string;
+  section: string;
+};
+
+const defaultJournalCardAppearance: JournalCardAppearance = {
+  container: "border-neutral-300 bg-white",
+  badge: "bg-neutral-200 text-neutral-700",
+  section: "border-neutral-200"
+};
+
+const journalCardAppearances: Record<string, JournalCardAppearance> = {
+  SMALL_DEAL: {
+    container: "border-[#a8c99a] bg-[#f5faf2]",
+    badge: "bg-[#d1e3ca] text-[#35512d]",
+    section: "border-[#d1e3ca]"
+  },
+  BIG_DEAL: {
+    container: "border-[#91add3] bg-[#f3f7fc]",
+    badge: "bg-[#d2e0f2] text-[#294d78]",
+    section: "border-[#d2e0f2]"
+  },
+  MARKET: {
+    container: "border-[#a7add6] bg-[#f5f6fc]",
+    badge: "bg-[#d4d7ec] text-[#3f467d]",
+    section: "border-[#d4d7ec]"
+  },
+  DOODAD: {
+    container: "border-[#dfa1b3] bg-[#fff4f7]",
+    badge: "bg-[#eecbd5] text-[#7a3449]",
+    section: "border-[#eecbd5]"
+  },
+  FAST_TRACK: {
+    container: "border-[#d8b65a] bg-[#fff9e8]",
+    badge: "bg-[#f3e4ad] text-[#705719]",
+    section: "border-[#f3e4ad]"
+  },
+  DREAM: {
+    container: "border-[#b596c8] bg-[#faf5fc]",
+    badge: "bg-[#e1d2ea] text-[#604271]",
+    section: "border-[#e1d2ea]"
+  }
+};
+
+function JournalCardDraw({ event }: { event: GameEvent }) {
+  const payload = event.payload ?? {};
+  const cardType = String(payload.cardType ?? "");
+  const appearance = journalCardAppearances[cardType] ?? defaultJournalCardAppearance;
+  const title = toText(payload.title) ?? "Карточка";
+  const bodyText = toText(payload.bodyText);
+  const effectDetails = compactDetails(cardEffectDetails(payload.effects));
+  const financialDetails = compactDetails([
+    metaMoneyDetail("Цена", payload.meta, "price"),
+    metaMoneyDetail("Первоначальный взнос", payload.meta, "down_payment"),
+    metaMoneyDetail("Cashflow", payload.meta, "cashflow_monthly", "/мес")
+  ]);
+
+  return (
+    <div className={`overflow-hidden rounded-lg border ${appearance.container}`}>
+      <div className="p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
+            {cardTypes[cardType] ?? humanizeToken(cardType)}
+          </span>
+          <span className="text-xs font-medium text-neutral-500">Получена карточка</span>
+        </div>
+        <div className="mt-2 text-base font-semibold text-neutral-900">{title}</div>
+      </div>
+      {bodyText ? (
+        <div className={`border-t px-3 py-2.5 ${appearance.section}`}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Описание
+          </div>
+          <div className="mt-1 whitespace-pre-line text-sm leading-5 text-neutral-800">
+            <MoneyBoldText text={bodyText} />
+          </div>
+        </div>
+      ) : null}
+      {effectDetails.length > 0 || financialDetails.length > 0 ? (
+        <div className={`grid gap-3 border-t px-3 py-2.5 sm:grid-cols-2 ${appearance.section}`}>
+          {financialDetails.length > 0 ? (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Условия
+              </div>
+              <div className="mt-1 space-y-1 text-sm text-neutral-800">
+                {financialDetails.map((detail, index) => (
+                  <div key={`${index}-${detail}`}>
+                    <MoneyBoldText text={detail} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {effectDetails.length > 0 ? (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Эффект
+              </div>
+              <div className="mt-1 space-y-1 text-sm text-neutral-800">
+                {effectDetails.map((detail, index) => (
+                  <div key={`${index}-${detail}`}>
+                    <MoneyBoldText text={detail} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -3576,6 +4491,502 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ResultFinancialComparison({
+  state,
+  showCash = false
+}: {
+  state: FinancialState;
+  showCash?: boolean;
+}) {
+  const scale = Math.max(1, state.passiveIncomeCents, state.totalExpensesCents);
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-neutral-600">Пассивный доход</span>
+          <strong>{money(state.passiveIncomeCents)}/мес</strong>
+        </div>
+        <ProgressBar
+          className="mt-1.5"
+          value={state.passiveIncomeCents}
+          max={scale}
+          label={`Пассивный доход ${money(state.passiveIncomeCents)} в месяц`}
+          tone="success"
+        />
+      </div>
+      <div>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-neutral-600">Расходы</span>
+          <strong>{money(state.totalExpensesCents)}/мес</strong>
+        </div>
+        <ProgressBar
+          className="mt-1.5"
+          value={state.totalExpensesCents}
+          max={scale}
+          label={`Расходы ${money(state.totalExpensesCents)} в месяц`}
+          tone="danger"
+        />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {showCash ? <Metric label="Наличные" value={money(state.cashCents)} /> : null}
+        <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
+      </div>
+    </div>
+  );
+}
+
+function CashflowEquation({
+  state,
+  className = ""
+}: {
+  state: FinancialState;
+  className?: string;
+}) {
+  const scale = Math.max(1, state.totalIncomeCents, state.totalExpensesCents);
+  const positive = state.monthlyCashflowCents >= 0;
+
+  return (
+    <div className={`rounded-md border border-line bg-surface p-3 ${className}`}>
+      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+        Как формируется cashflow
+      </div>
+      <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-center">
+        <div className="min-w-0">
+          <div className="text-xs text-neutral-500">Доходы</div>
+          <div className="mt-0.5 break-words text-sm font-semibold text-success">
+            {money(state.totalIncomeCents)}
+          </div>
+        </div>
+        <span className="text-neutral-400" aria-hidden="true">−</span>
+        <div className="min-w-0">
+          <div className="text-xs text-neutral-500">Расходы</div>
+          <div className="mt-0.5 break-words text-sm font-semibold text-red-700">
+            {money(state.totalExpensesCents)}
+          </div>
+        </div>
+        <span className="text-neutral-400" aria-hidden="true">=</span>
+        <div className="min-w-0">
+          <div className="text-xs text-neutral-500">Cashflow</div>
+          <div
+            className={`mt-0.5 break-words text-sm font-semibold ${
+              positive ? "text-success" : "text-red-700"
+            }`}
+          >
+            {money(state.monthlyCashflowCents)}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 space-y-1.5">
+        <ProgressBar
+          value={state.totalIncomeCents}
+          max={scale}
+          label={`Общие доходы ${money(state.totalIncomeCents)}`}
+          tone="success"
+        />
+        <ProgressBar
+          value={state.totalExpensesCents}
+          max={scale}
+          label={`Общие расходы ${money(state.totalExpensesCents)}`}
+          tone="danger"
+        />
+      </div>
+    </div>
+  );
+}
+
+type ProgressTone = "neutral" | "success" | "warning" | "danger";
+
+const progressToneClasses: Record<ProgressTone, string> = {
+  neutral: "bg-[#8da7c4]",
+  success: "bg-[#73a865]",
+  warning: "bg-[#d5ad45]",
+  danger: "bg-[#cf6679]"
+};
+
+function ProgressBar({
+  value,
+  max,
+  label,
+  tone = "neutral",
+  className = ""
+}: {
+  value: number;
+  max: number;
+  label: string;
+  tone?: ProgressTone;
+  className?: string;
+}) {
+  const safeMax = Math.max(1, max);
+  const percentage = Math.min(100, Math.max(0, (value / safeMax) * 100));
+
+  return (
+    <div
+      className={`h-2 overflow-hidden rounded-full bg-neutral-200 ${className}`}
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={safeMax}
+      aria-valuenow={Math.min(safeMax, Math.max(0, value))}
+      aria-valuetext={label}
+    >
+      <div
+        className={`h-full rounded-full transition-[width] ${progressToneClasses[tone]}`}
+        style={{ width: `${percentage}%` }}
+      />
+    </div>
+  );
+}
+
+function FinancialFreedomProgress({
+  passiveIncomeCents,
+  totalExpensesCents,
+  className = ""
+}: {
+  passiveIncomeCents: number;
+  totalExpensesCents: number;
+  className?: string;
+}) {
+  const reached = passiveIncomeCents >= totalExpensesCents;
+  const target = Math.max(1, totalExpensesCents);
+  const percentage = reached
+    ? 100
+    : Math.round(Math.min(100, Math.max(0, (passiveIncomeCents / target) * 100)));
+  const missingCents = Math.max(0, totalExpensesCents - passiveIncomeCents);
+  const label = reached
+    ? "Финансовая свобода достигнута"
+    : `До финансовой свободы не хватает ${money(missingCents)} в месяц`;
+
+  return (
+    <div className={`rounded-md border border-line bg-surface px-3 py-2.5 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-neutral-700">Финансовая свобода</span>
+        <span className={reached ? "font-semibold text-success" : "font-semibold text-neutral-700"}>
+          {percentage}%
+        </span>
+      </div>
+      <ProgressBar
+        className="mt-2"
+        value={reached ? target : passiveIncomeCents}
+        max={target}
+        label={label}
+        tone={reached ? "success" : "neutral"}
+      />
+      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-600">
+        <span>
+          Пассивный доход: <strong>{money(passiveIncomeCents)}</strong>/мес
+        </span>
+        <span>
+          Расходы: <strong>{money(totalExpensesCents)}</strong>/мес
+        </span>
+      </div>
+      <div className={`mt-1 text-xs ${reached ? "text-success" : "text-neutral-600"}`}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function PlayerFreedomMini({
+  passiveIncomeCents,
+  totalExpensesCents
+}: {
+  passiveIncomeCents: number;
+  totalExpensesCents: number;
+}) {
+  const target = Math.max(1, totalExpensesCents);
+  const reached = passiveIncomeCents >= totalExpensesCents;
+  const percentage = reached
+    ? 100
+    : Math.round(Math.min(100, Math.max(0, (passiveIncomeCents / target) * 100)));
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
+        <span>Финансовая свобода</span>
+        <strong className={reached ? "text-success" : "text-neutral-700"}>
+          {percentage}%
+        </strong>
+      </div>
+      <ProgressBar
+        className="mt-1.5"
+        value={reached ? target : passiveIncomeCents}
+        max={target}
+        label={`Прогресс игрока к финансовой свободе ${percentage}%`}
+        tone={reached ? "success" : "neutral"}
+      />
+    </div>
+  );
+}
+
+function FundingProgress({
+  availableCents,
+  requiredCents,
+  label,
+  className = ""
+}: {
+  availableCents: number;
+  requiredCents: number;
+  label: string;
+  className?: string;
+}) {
+  if (requiredCents <= 0) return null;
+  const available = Math.max(0, availableCents);
+  const enough = available >= requiredCents;
+  const missingCents = Math.max(0, requiredCents - available);
+  const progressLabel = enough
+    ? `${label}: наличных достаточно`
+    : `${label}: не хватает ${money(missingCents)}`;
+
+  return (
+    <div className={`rounded-md border border-line bg-white p-3 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-neutral-700">{label}</span>
+        <span className={enough ? "font-semibold text-success" : "font-semibold text-amber-700"}>
+          {enough ? "Денег хватает" : "Нужен кредит"}
+        </span>
+      </div>
+      <ProgressBar
+        className="mt-2"
+        value={available}
+        max={requiredCents}
+        label={progressLabel}
+        tone={enough ? "success" : "warning"}
+      />
+      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-600">
+        <span>
+          Наличные: <strong>{money(available)}</strong>
+        </span>
+        <span>
+          Нужно: <strong>{money(requiredCents)}</strong>
+        </span>
+      </div>
+      {!enough ? (
+        <div className="mt-1 text-xs text-amber-700">
+          Не хватает: <strong>{money(missingCents)}</strong>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BankruptcyRecoveryProgress({
+  deficitCents,
+  totalExpensesCents
+}: {
+  deficitCents: number;
+  totalExpensesCents: number;
+}) {
+  const scale = Math.max(1, totalExpensesCents, deficitCents);
+  const recoveredCents = Math.max(0, scale - deficitCents);
+  const recovered = deficitCents <= 0;
+
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-red-900">Восстановление cashflow</span>
+        <strong className={recovered ? "text-success" : "text-red-800"}>
+          {recovered ? "Восстановлен" : `−${money(deficitCents)}/мес`}
+        </strong>
+      </div>
+      <ProgressBar
+        className="mt-2"
+        value={recovered ? scale : recoveredCents}
+        max={scale}
+        label={
+          recovered
+            ? "Денежный поток восстановлен"
+            : `До положительного денежного потока не хватает ${money(deficitCents)} в месяц`
+        }
+        tone={recovered ? "success" : "danger"}
+      />
+      <div className="mt-2 text-xs text-red-800">
+        Цель: сократить дефицит до <strong>{money(0)}/мес</strong>
+      </div>
+    </div>
+  );
+}
+
+const expenseSegmentClasses: Record<string, string> = {
+  taxes: "bg-[#7b9cc6]",
+  home_mortgage: "bg-[#9d82b8]",
+  school_debt: "bg-[#66a7a0]",
+  car_debt: "bg-[#d59a62]",
+  credit_cards: "bg-[#c87383]",
+  retail_debt: "bg-[#b99c5d]",
+  other_expenses: "bg-[#8b9a73]",
+  children: "bg-[#c98aaf]",
+  bank_loan: "bg-[#77818f]"
+};
+
+function ExpenseComposition({ player }: { player: GamePlayer }) {
+  const items = expenseItems(player).filter((item) => item.amountCents > 0);
+  const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+  if (total <= 0) return null;
+
+  return (
+    <div className="rounded-md border border-line bg-white p-3">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="font-medium">Структура расходов</span>
+        <strong>{money(total)}/мес</strong>
+      </div>
+      <div
+        className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
+        role="img"
+        aria-label={`Структура ежемесячных расходов на сумму ${money(total)}`}
+      >
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={expenseSegmentClasses[item.id] ?? "bg-neutral-400"}
+            style={{ width: `${(item.amountCents / total) * 100}%` }}
+            title={`${item.label}: ${money(item.amountCents)}`}
+          />
+        ))}
+      </div>
+      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {items.map((item) => {
+          const percentage = Math.round((item.amountCents / total) * 100);
+          return (
+            <div key={item.id} className="flex min-w-0 items-center gap-2 text-xs">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-sm ${expenseSegmentClasses[item.id] ?? "bg-neutral-400"}`}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1 truncate text-neutral-600">{item.label}</span>
+              <span className="shrink-0 font-semibold">{percentage}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const debtSegmentClasses: Record<string, string> = {
+  home_mortgage: "bg-[#9d82b8]",
+  school_debt: "bg-[#66a7a0]",
+  car_debt: "bg-[#d59a62]",
+  credit_cards: "bg-[#c87383]",
+  retail_debt: "bg-[#b99c5d]",
+  bank_loan: "bg-[#7b9cc6]"
+};
+
+function DebtComposition({
+  liabilities,
+  currentCashCents,
+  monthlyIncomeCents
+}: {
+  liabilities: PlayerLiability[];
+  currentCashCents: number;
+  monthlyIncomeCents: number;
+}) {
+  const grouped = Array.from(
+    liabilities.reduce((items, liability) => {
+      const current = items.get(liability.type) ?? {
+        type: liability.type,
+        label: liabilityLabels[liability.type] ?? liability.name,
+        balanceCents: 0,
+        paymentCents: 0
+      };
+      current.balanceCents += liability.balanceCents;
+      current.paymentCents += liability.paymentCents;
+      items.set(liability.type, current);
+      return items;
+    }, new Map<string, { type: string; label: string; balanceCents: number; paymentCents: number }>())
+      .values()
+  ).filter((item) => item.balanceCents > 0);
+  const totalBalanceCents = grouped.reduce((sum, item) => sum + item.balanceCents, 0);
+  const totalPaymentCents = grouped.reduce((sum, item) => sum + item.paymentCents, 0);
+  if (totalBalanceCents <= 0) return null;
+  const burdenRatio =
+    monthlyIncomeCents > 0
+      ? totalPaymentCents / monthlyIncomeCents
+      : totalPaymentCents > 0
+        ? 1
+        : 0;
+  const burdenPercent = Math.round(burdenRatio * 100);
+  const burdenTone: ProgressTone =
+    burdenRatio >= 0.5 ? "danger" : burdenRatio >= 0.3 ? "warning" : "neutral";
+
+  return (
+    <div className="mt-3 rounded-md border border-line bg-white p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+        <span className="font-medium">Структура долгов</span>
+        <div className="text-right">
+          <div className="font-semibold">{money(totalBalanceCents)}</div>
+          <div className="text-xs text-neutral-500">
+            {money(totalPaymentCents)}/мес
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
+            <span>Платежи от дохода</span>
+            <strong className={burdenRatio >= 0.5 ? "text-red-700" : "text-neutral-800"}>
+              {burdenPercent}%
+            </strong>
+          </div>
+          <ProgressBar
+            className="mt-1.5"
+            value={totalPaymentCents}
+            max={Math.max(1, monthlyIncomeCents)}
+            label={`Долговые платежи занимают ${burdenPercent}% ежемесячного дохода`}
+            tone={burdenTone}
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
+            <span>Покрытие наличными</span>
+            <strong>
+              {Math.round(
+                Math.min(1, Math.max(0, currentCashCents / totalBalanceCents)) * 100
+              )}
+              %
+            </strong>
+          </div>
+          <ProgressBar
+            className="mt-1.5"
+            value={Math.max(0, currentCashCents)}
+            max={totalBalanceCents}
+            label={`Наличными покрывается ${money(Math.min(currentCashCents, totalBalanceCents))} из долга ${money(totalBalanceCents)}`}
+            tone={currentCashCents >= totalBalanceCents ? "success" : "neutral"}
+          />
+        </div>
+      </div>
+      <div
+        className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
+        role="img"
+        aria-label={`Общая задолженность ${money(totalBalanceCents)}, ежемесячный платёж ${money(totalPaymentCents)}`}
+      >
+        {grouped.map((item) => (
+          <div
+            key={item.type}
+            className={debtSegmentClasses[item.type] ?? "bg-neutral-400"}
+            style={{ width: `${(item.balanceCents / totalBalanceCents) * 100}%` }}
+            title={`${item.label}: ${money(item.balanceCents)}`}
+          />
+        ))}
+      </div>
+      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {grouped.map((item) => (
+          <div key={item.type} className="flex min-w-0 items-center gap-2 text-xs">
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-sm ${debtSegmentClasses[item.type] ?? "bg-neutral-400"}`}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate text-neutral-600">{item.label}</span>
+            <span className="shrink-0 font-semibold">
+              {Math.round((item.balanceCents / totalBalanceCents) * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SectionList({
   title,
   titleAlign = "left",
@@ -3696,44 +5107,19 @@ function stockSaleOfferForPlayer(
 function latestPlayerActionSummary(events: GameEvent[], gamePlayerId: string | undefined) {
   if (!gamePlayerId) return null;
 
-  const turnEventTypes = new Set([
-    "player:roll_dice",
-    "player:move",
-    "paycheck:receive",
-    "card:draw",
-    "card:cash_delta",
-    "card:cashflow_delta",
-    "card:liability_created",
-    "card:condition_not_met",
-    "card:no_matching_assets",
-    "card:stock_quantity_changed",
-    "network_marketing:level_applied",
-    "network_marketing:level_stored",
-    "network_marketing:discarded",
-    "deal:buy",
-    "deal:decline",
-    "deal:sell",
-    "market:sale_offer",
-    "market:sale_declined",
-    "player:baby",
-    "player:downsized",
-    "player:charity",
-    "player:charity_choice_required",
-    "player:charity_declined",
-    "doodad:paid",
-    "player:escaped_rat_race",
-    "turn:skipped"
-  ]);
-  const event = [...events]
-    .sort((left, right) => right.sequence - left.sequence)
-    .find((item) => item.gamePlayer?.id === gamePlayerId && turnEventTypes.has(item.type));
+  const turn = journalEntries(events)
+    .filter((entry): entry is Extract<JournalEntry, { kind: "turn" }> => entry.kind === "turn")
+    .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
+    .find((entry) =>
+      entry.events.some(
+        (event) =>
+          turnStartEventTypes.has(event.type) && event.gamePlayer?.id === gamePlayerId
+      )
+    );
 
-  if (!event) return null;
-
-  return {
-    title: eventTitle(event.type),
-    details: eventDetails(event)
-  };
+  return (
+    turn?.events.filter((event) => event.type !== realtimeEvents.stateUpdate) ?? null
+  );
 }
 
 function stockPriceCents(meta: Record<string, unknown>, text: string) {

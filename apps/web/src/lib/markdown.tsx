@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 type Block =
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; lines: string[] }
+  | { type: "blockquote"; lines: string[] }
   | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[] }
+  | { type: "ol"; items: string[]; start: number }
   | { type: "code"; code: string }
+  | { type: "hr" }
   | { type: "table"; headers: string[]; rows: string[][] };
 
 export interface MarkdownHeading {
@@ -66,6 +68,22 @@ function parseMarkdown(markdown: string): Block[] {
       continue;
     }
 
+    if (/^>\s?/.test(trimmed)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s?/.test((lines[index] ?? "").trim())) {
+        quoteLines.push((lines[index] ?? "").trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+      blocks.push({ type: "blockquote", lines: quoteLines });
+      continue;
+    }
+
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      blocks.push({ type: "hr" });
+      index += 1;
+      continue;
+    }
+
     const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
     if (heading) {
       const marker = heading[1] ?? "#";
@@ -101,11 +119,12 @@ function parseMarkdown(markdown: string): Block[] {
 
     if (/^\d+\.\s+/.test(trimmed)) {
       const items: string[] = [];
+      const start = Number(trimmed.match(/^(\d+)\./)?.[1] ?? "1");
       while (index < lines.length && /^\d+\.\s+/.test((lines[index] ?? "").trim())) {
         items.push((lines[index] ?? "").trim().replace(/^\d+\.\s+/, ""));
         index += 1;
       }
-      blocks.push({ type: "ol", items });
+      blocks.push({ type: "ol", items, start });
       continue;
     }
 
@@ -124,6 +143,8 @@ function isParagraphLine(lines: string[], index: number) {
   const trimmed = (lines[index] ?? "").trim();
   if (!trimmed) return false;
   if (trimmed.startsWith("```")) return false;
+  if (/^>\s?/.test(trimmed)) return false;
+  if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) return false;
   if (/^(#{1,4})\s+/.test(trimmed)) return false;
   if (/^-\s+/.test(trimmed)) return false;
   if (/^\d+\.\s+/.test(trimmed)) return false;
@@ -198,6 +219,17 @@ function renderBlock(block: Block, index: number, headingId?: string) {
     );
   }
 
+  if (block.type === "blockquote") {
+    return (
+      <blockquote
+        key={index}
+        className="mt-4 border-l-4 border-success/40 bg-surface px-4 py-3 leading-7 text-neutral-700"
+      >
+        {renderInline(block.lines.join(" "))}
+      </blockquote>
+    );
+  }
+
   if (block.type === "ul") {
     return (
       <ul key={index} className="mt-4 list-disc space-y-2 pl-6 leading-7 text-neutral-700">
@@ -210,7 +242,11 @@ function renderBlock(block: Block, index: number, headingId?: string) {
 
   if (block.type === "ol") {
     return (
-      <ol key={index} className="mt-4 list-decimal space-y-2 pl-6 leading-7 text-neutral-700">
+      <ol
+        key={index}
+        start={block.start}
+        className="mt-4 list-decimal space-y-2 pl-6 leading-7 text-neutral-700"
+      >
         {block.items.map((item, itemIndex) => (
           <li key={itemIndex}>{renderInline(item)}</li>
         ))}
@@ -220,10 +256,17 @@ function renderBlock(block: Block, index: number, headingId?: string) {
 
   if (block.type === "code") {
     return (
-      <pre key={index} className="mt-4 overflow-x-auto rounded-md bg-ink p-4 text-sm text-white">
+      <pre
+        key={index}
+        className="mt-4 overflow-x-auto rounded-md border border-line bg-surface p-4 text-sm text-neutral-700"
+      >
         <code>{block.code}</code>
       </pre>
     );
+  }
+
+  if (block.type === "hr") {
+    return <hr key={index} className="my-8 border-line" />;
   }
 
   return (
@@ -280,7 +323,9 @@ function slugify(value: string) {
 }
 
 function renderInline(text: string) {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean);
+  const parts = text
+    .split(/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g)
+    .filter(Boolean);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
@@ -292,6 +337,23 @@ function renderInline(text: string) {
 
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      const [, label, href] = link;
+      const isExternal = href?.startsWith("http://") || href?.startsWith("https://");
+      return (
+        <a
+          key={index}
+          href={href}
+          className="font-medium text-success underline decoration-success/40 underline-offset-2 hover:decoration-success"
+          target={isExternal ? "_blank" : undefined}
+          rel={isExternal ? "noreferrer" : undefined}
+        >
+          {label}
+        </a>
+      );
     }
 
     return part;
