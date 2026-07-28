@@ -82,6 +82,7 @@ model User {
   displayName  String        @map("display_name")
   avatarUrl    String?       @map("avatar_url")
   avatarColor     String?   @map("avatar_color")
+  figurine        String?
   gender          String?
   birthDate       DateTime? @map("birth_date")
   gameExperience  Int?      @map("game_experience")
@@ -135,6 +136,7 @@ model GamePlayer {
   status            GamePlayerStatus @default(JOINED)
   seat              Int?
   color             String?
+  figurine          String?
   isReady           Boolean          @default(false) @map("is_ready")
   professionId      Int?             @map("profession_id")
   track             BoardTrack       @default(RAT_RACE)
@@ -154,6 +156,7 @@ model GamePlayer {
 
   @@unique([gameId, userId])
   @@unique([gameId, seat])
+  @@unique([gameId, figurine])
   @@index([gameId, role, status])
   @@index([professionId])
   @@map("game_players")

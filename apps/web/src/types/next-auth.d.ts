@@ -10,6 +10,8 @@ declare module "next-auth" {
       displayName: string;
       role: "USER" | "HOST" | "ADMIN";
       status: "ACTIVE" | "BLOCKED" | "DELETED";
+      avatarUrl: string | null;
+      figurine: string | null;
     } & DefaultSession["user"];
   }
 
@@ -18,6 +20,8 @@ declare module "next-auth" {
     displayName?: string;
     role?: string;
     status?: string;
+    avatarUrl?: string | null;
+    figurine?: string | null;
   }
 }
 
@@ -28,5 +32,7 @@ declare module "next-auth/jwt" {
     displayName?: string;
     role?: string;
     status?: string;
+    avatarUrl?: string | null;
+    figurine?: string | null;
   }
 }

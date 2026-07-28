@@ -36,6 +36,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: string;
             displayName: string;
             avatarUrl: string | null;
+            figurine: string | null;
             role: "USER" | "HOST" | "ADMIN";
             status: "ACTIVE" | "BLOCKED" | "DELETED";
           };
@@ -57,6 +58,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           displayName?: string;
           role?: string;
           status?: string;
+          avatarUrl?: string | null;
+          figurine?: string | null;
         };
         if (authenticatedUser.accessToken) {
           token.accessToken = authenticatedUser.accessToken;
@@ -67,6 +70,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         if (authenticatedUser.role) token.role = authenticatedUser.role;
         if (authenticatedUser.status) token.status = authenticatedUser.status;
+        token.avatarUrl = authenticatedUser.avatarUrl ?? null;
+        token.figurine = authenticatedUser.figurine ?? null;
       }
       return token;
     },
@@ -79,6 +84,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         | "ACTIVE"
         | "BLOCKED"
         | "DELETED";
+      session.user.avatarUrl = typeof token.avatarUrl === "string" ? token.avatarUrl : null;
+      session.user.figurine = typeof token.figurine === "string" ? token.figurine : null;
       return session;
     }
   }

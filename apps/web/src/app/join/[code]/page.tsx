@@ -41,6 +41,8 @@ export default async function JoinByInvitePage({
   return (
     <AppShell
       userName={userName}
+      userAvatarUrl={session.user.avatarUrl}
+      userFigurine={session.user.figurine}
       userAvatarColor={generateAvatarColor(session.user.id)}
       userInitials={avatarInitials(userName ?? "")}
     >

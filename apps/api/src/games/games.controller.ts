@@ -9,6 +9,7 @@ import { AddGameUserDto } from "./dto/add-game-user.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
+import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
@@ -53,6 +54,17 @@ export class GamesController {
   @Post(":id/start")
   async start(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     const result = await this.games.startGame(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/figurine")
+  async chooseFigurine(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: ChooseFigurineDto
+  ) {
+    const result = await this.games.chooseFigurine(id, user.userId, dto.figurine);
     this.realtime.broadcastAction(id, result);
     return result;
   }

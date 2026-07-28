@@ -40,6 +40,8 @@ export default async function GamePage({
     return (
       <AppShell
         userName={userName}
+        userAvatarUrl={session.user.avatarUrl}
+        userFigurine={session.user.figurine}
         userAvatarColor={userAvatarColor}
         userInitials={userInitials}
       >
@@ -64,10 +66,15 @@ export default async function GamePage({
   }
 
   if (snapshot.game.status === "CANCELLED") redirect("/dashboard");
+  const membership = snapshot.players.find(
+    (player) => player.userId === session.user.id
+  );
 
   return (
     <AppShell
       userName={userName}
+      userAvatarUrl={membership?.user?.avatarUrl ?? session.user.avatarUrl}
+      userFigurine={membership?.user?.figurine ?? session.user.figurine}
       userAvatarColor={userAvatarColor}
       userInitials={userInitials}
     >

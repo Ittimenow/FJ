@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
+import { FigurinePicker } from "@/components/figurine-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,7 @@ interface ProfileFormProps {
 }
 
 export function ProfileForm({ profile, token }: ProfileFormProps) {
+  const router = useRouter();
   const [displayName, setDisplayName] = useState(profile.user.displayName);
   const [gender, setGender] = useState(profile.user.gender ?? "");
   const [birthDate, setBirthDate] = useState(toDateInputValue(profile.user.birthDate));
@@ -38,6 +41,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     profile.user.gameExperience != null ? String(profile.user.gameExperience) : ""
   );
   const [avatarPending, setAvatarPending] = useState<string | null | undefined>(undefined);
+  const [figurine, setFigurine] = useState<string | null>(profile.user.figurine);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -90,6 +94,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       const expNum = gameExperience !== "" ? Number(gameExperience) : null;
       if (expNum !== (profile.user.gameExperience ?? null))
         body.gameExperience = expNum;
+      if (figurine !== profile.user.figurine)
+        body.figurine = figurine;
 
       if (Object.keys(body).length > 0) {
         const res = await fetch(`${publicApiBaseUrl()}/api/users/me`, {
@@ -108,6 +114,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
 
       setAvatarPending(undefined);
       setProfileMsg({ ok: true, text: "Профиль сохранён" });
+      router.refresh();
     } catch (err) {
       setProfileMsg({
         ok: false,
@@ -172,8 +179,33 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               currentAvatarUrl={currentAvatarUrl ?? null}
               avatarColor={avatarColor}
               initials={initials}
+              figurine={figurine}
               onAvatarChange={(dataUrl) => setAvatarPending(dataUrl)}
             />
+
+            <div className="space-y-3 rounded-lg border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-neutral-800">
+                    Фигурка профиля
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    Она отображается вместо фотографии и инициалов.
+                  </p>
+                </div>
+                {figurine ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setFigurine(null)}
+                  >
+                    Использовать фото
+                  </Button>
+                ) : null}
+              </div>
+              <FigurinePicker value={figurine} onChange={setFigurine} />
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">

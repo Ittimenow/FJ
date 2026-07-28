@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException
 } from "@nestjs/common";
+import { isFigurineId } from "@cashflow/shared";
 import { AccountStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { MailService } from "../mail/mail.service";
@@ -27,6 +28,7 @@ export class UsersService {
         displayName: true,
         avatarUrl: true,
         avatarColor: true,
+        figurine: true,
         gender: true,
         birthDate: true,
         gameExperience: true,
@@ -95,6 +97,10 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
+    if (dto.figurine != null && !isFigurineId(dto.figurine)) {
+      throw new BadRequestException("Unknown figurine");
+    }
+
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -105,7 +111,8 @@ export class UsersService {
         }),
         ...(dto.gameExperience !== undefined && {
           gameExperience: dto.gameExperience
-        })
+        }),
+        ...(dto.figurine !== undefined && { figurine: dto.figurine || null })
       },
       select: {
         id: true,
@@ -113,6 +120,7 @@ export class UsersService {
         displayName: true,
         avatarUrl: true,
         avatarColor: true,
+        figurine: true,
         gender: true,
         birthDate: true,
         gameExperience: true,

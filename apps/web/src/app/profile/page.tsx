@@ -25,6 +25,7 @@ export default async function ProfilePage() {
     <AppShell
       userName={profile.user.displayName}
       userAvatarUrl={profile.user.avatarUrl}
+      userFigurine={profile.user.figurine}
       userAvatarColor={profile.user.avatarColor ?? generateAvatarColor(profile.user.id)}
       userInitials={avatarInitials(profile.user.displayName)}
     >

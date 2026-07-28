@@ -1,6 +1,10 @@
 "use client";
 
-import { realtimeEvents } from "@cashflow/shared";
+import {
+  figurineImagePath,
+  realtimeEvents,
+  type FigurineId
+} from "@cashflow/shared";
 import { Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -18,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { FigurinePicker } from "@/components/figurine-picker";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
@@ -49,6 +54,16 @@ export function GameRoom({
   currentUserRole: "USER" | "HOST" | "ADMIN";
 }) {
   const router = useRouter();
+  const initialMe = initialSnapshot.players.find(
+    (player) => player.userId === currentUserId && player.role === "PLAYER"
+  );
+  const initialTakenFigurines = new Set(
+    initialSnapshot.players
+      .filter((player) => player.id !== initialMe?.id)
+      .map((player) => player.figurine)
+      .filter((figurine): figurine is string => Boolean(figurine))
+  );
+  const initialPreferredFigurine = initialMe?.user?.figurine;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +79,16 @@ export function GameRoom({
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [changingParticipation, setChangingParticipation] = useState(false);
+  const [figurinePickerOpen, setFigurinePickerOpen] = useState(
+    initialSnapshot.game.status === "WAITING" && Boolean(initialMe && !initialMe.figurine)
+  );
+  const [figurineChoice, setFigurineChoice] = useState<string | null>(
+    initialMe?.figurine ??
+      (initialPreferredFigurine && !initialTakenFigurines.has(initialPreferredFigurine)
+        ? initialPreferredFigurine
+        : null)
+  );
+  const [figurineSaving, setFigurineSaving] = useState(false);
   const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,6 +181,17 @@ export function GameRoom({
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
   const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
+  const takenFigurines = gamePlayers
+    .filter((player) => player.id !== me?.id)
+    .map((player) => player.figurine)
+    .filter((figurine): figurine is string => Boolean(figurine));
+  const playersWithoutFigurines = gamePlayers.filter((player) => !player.figurine);
+  const startDisabledReason =
+    gamePlayers.length < 2
+      ? "Для старта нужны минимум два игрока."
+      : playersWithoutFigurines.length > 0
+        ? "Все игроки должны выбрать фигурки."
+        : null;
   const gameEndEvent = [...snapshot.events]
     .reverse()
     .find((event) => event.type === realtimeEvents.gameEnded);
@@ -225,6 +261,19 @@ export function GameRoom({
     () => latestPlayerActionSummary(snapshot.events, me?.id),
     [me?.id, snapshot.events]
   );
+
+  useEffect(() => {
+    if (snapshot.game.status !== "WAITING" || !me) {
+      setFigurinePickerOpen(false);
+      return;
+    }
+    if (me.figurine) {
+      setFigurineChoice(me.figurine);
+      setFigurinePickerOpen(false);
+    } else {
+      setFigurinePickerOpen(true);
+    }
+  }, [me, snapshot.game.status]);
 
   useEffect(() => {
     setGameRoomHeader({
@@ -305,6 +354,39 @@ export function GameRoom({
       return;
     }
     setSnapshot(result.snapshot ?? result);
+  }
+
+  async function chooseFigurine() {
+    if (!figurineChoice) return;
+    setError(null);
+    setFigurineSaving(true);
+    try {
+      const response = await fetch(
+        `${publicApiBaseUrl()}/api/games/${snapshot.game.id}/figurine`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ figurine: figurineChoice })
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          result.message === "Figurine is already taken"
+            ? "Эту фигурку уже выбрал другой игрок"
+            : result.message ?? "Не удалось выбрать фигурку"
+        );
+      }
+      setSnapshot(result.snapshot ?? result);
+      setFigurinePickerOpen(false);
+    } catch (event) {
+      setError(event instanceof Error ? event.message : "Не удалось выбрать фигурку");
+    } finally {
+      setFigurineSaving(false);
+    }
   }
 
   async function addUserToGame(body: { email: string; role: string }) {
@@ -651,6 +733,16 @@ export function GameRoom({
         reason={typeof gameEndEvent?.payload.reason === "string" ? gameEndEvent.payload.reason : null}
         onClose={() => setGameEndOpen(false)}
       />
+      <FigurineDialog
+        open={figurinePickerOpen && snapshot.game.status === "WAITING" && Boolean(me)}
+        value={figurineChoice}
+        taken={takenFigurines}
+        saving={figurineSaving}
+        canClose={Boolean(me?.figurine)}
+        onChange={setFigurineChoice}
+        onConfirm={chooseFigurine}
+        onClose={() => setFigurinePickerOpen(false)}
+      />
       {me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
           player={me}
@@ -661,6 +753,30 @@ export function GameRoom({
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {error}
+        </div>
+      ) : null}
+      {snapshot.game.status === "WAITING" && me ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-white p-3 text-sm">
+          <div>
+            {me.figurine ? (
+              <span className="font-medium text-neutral-800">Ваша фигурка выбрана.</span>
+            ) : (
+              <span className="font-medium text-amber-800">Выберите фигурку для партии.</span>
+            )}
+            {playersWithoutFigurines.length > 0 ? (
+              <span className="ml-2 text-neutral-500">
+                Без фигурки: {playersWithoutFigurines.length}
+              </span>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 px-3 text-xs"
+            onClick={() => setFigurinePickerOpen(true)}
+          >
+            {me.figurine ? "Сменить фигурку" : "Выбрать фигурку"}
+          </Button>
         </div>
       ) : null}
       {me?.financialState?.bankruptcyStatus === "RECOVERED" ? (
@@ -678,7 +794,7 @@ export function GameRoom({
           totalMinutes={snapshot.game.timeLimitMinutes}
         />
       ) : snapshot.game.status === "ENDED" ? (
-        <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium">
+        <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium md:hidden">
           {winner
             ? `Победитель: ${winner.user?.displayName ?? "Игрок"}`
             : "Партия завершена по времени"}
@@ -701,6 +817,7 @@ export function GameRoom({
           <ActionsPanel
             onStartGame={startGame}
             canStart={canStart}
+            startDisabledReason={startDisabledReason}
             canChooseDeal={canChooseDeal}
             onDrawSmallDeal={() => draw("SMALL_DEAL")}
             onDrawBigDeal={() => draw("BIG_DEAL")}
@@ -777,6 +894,7 @@ export function GameRoom({
               <ActionsPanel
                 onStartGame={startGame}
                 canStart={canStart}
+                startDisabledReason={startDisabledReason}
                 canChooseDeal={canChooseDeal}
                 onDrawSmallDeal={() => draw("SMALL_DEAL")}
                 onDrawBigDeal={() => draw("BIG_DEAL")}
@@ -2044,29 +2162,38 @@ function BoardCellTile({
         className={`absolute inset-x-0 top-0 h-1.5 ${appearance.marker}`}
       />
       <div
-        className={
-          mobile ? "grid gap-1 pt-1" : "flex items-start justify-between gap-2 pt-1"
-        }
+        className="flex items-center justify-start gap-2 pt-1"
       >
         <span
-          className={
+          className={[
+            "shrink-0",
             compact || mobile
               ? "text-lg font-bold text-neutral-700"
               : "text-xs font-semibold text-neutral-600"
-          }
+          ].join(" ")}
         >
           {cell.index + 1}
         </span>
         <Badge
           className={[
-            "justify-center bg-transparent text-center font-semibold leading-tight text-ink",
+            "min-w-0 justify-start bg-transparent text-left font-semibold text-ink",
             compact ? "max-w-[7rem] px-2 text-[11px]" : "",
             mobile
-              ? "w-full max-w-full px-1 py-1 text-[10px] [overflow-wrap:anywhere]"
+              ? "max-w-full flex-1 px-1 py-1 text-[10px] [overflow-wrap:anywhere]"
               : ""
           ].join(" ")}
         >
-          {cellTypes[cell.type] ?? cell.type}
+          {cell.type === "charity" ? (
+            <span className="inline-block leading-tight">
+              Благотвори-
+              <br />
+              тельность
+            </span>
+          ) : (
+            <span className="inline-block leading-tight">
+              {cellTypes[cell.type] ?? cell.type}
+            </span>
+          )}
         </Badge>
       </div>
       <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
@@ -2087,6 +2214,26 @@ function PlayerToken({
   small?: boolean;
   moving?: boolean;
 }) {
+  const title = player.user?.displayName ?? `Игрок ${player.seat ?? ""}`;
+  if (player.figurine) {
+    return (
+      <span
+        className={[
+          "inline-flex shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
+          small ? "h-5 w-5" : "h-8 w-8",
+          moving ? "timeline-moving-token" : ""
+        ].join(" ")}
+        title={title}
+      >
+        <img
+          src={figurineImagePath(player.figurine)}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </span>
+    );
+  }
+
   return (
     <span
       className={[
@@ -2095,10 +2242,75 @@ function PlayerToken({
         moving ? "timeline-moving-token" : ""
       ].join(" ")}
       style={{ backgroundColor: player.color ?? "#171717" }}
-      title={player.user?.displayName ?? `Игрок ${player.seat ?? ""}`}
+      title={title}
     >
       {player.seat}
     </span>
+  );
+}
+
+function FigurineDialog({
+  open,
+  value,
+  taken,
+  saving,
+  canClose,
+  onChange,
+  onConfirm,
+  onClose
+}: {
+  open: boolean;
+  value: string | null;
+  taken: string[];
+  saving: boolean;
+  canClose: boolean;
+  onChange: (figurine: FigurineId) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="figurine-dialog-title"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+      >
+        <div className="border-b border-line px-4 py-4 sm:px-6">
+          <h2 id="figurine-dialog-title" className="text-lg font-semibold">
+            Выберите фигурку
+          </h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Она будет представлять вас на игровом поле. В одной комнате фигурки не
+            повторяются.
+          </p>
+        </div>
+        <div className="overflow-y-auto p-4 sm:p-6">
+          <FigurinePicker
+            value={value}
+            taken={taken}
+            disabled={saving}
+            onChange={onChange}
+          />
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-3 sm:px-6">
+          {canClose ? (
+            <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
+              Отмена
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={!value || saving || taken.includes(value)}
+          >
+            {saving ? "Сохраняем…" : "Выбрать"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2829,6 +3041,7 @@ function liabilitySortOrder(type: string) {
 function ActionsPanel({
   onStartGame,
   canStart,
+  startDisabledReason,
   canChooseDeal,
   onDrawSmallDeal,
   onDrawBigDeal,
@@ -2870,6 +3083,7 @@ function ActionsPanel({
 }: {
   onStartGame: () => void;
   canStart: boolean;
+  startDisabledReason: string | null;
   canChooseDeal: boolean;
   onDrawSmallDeal: () => void;
   onDrawBigDeal: () => void;
@@ -2941,9 +3155,16 @@ function ActionsPanel({
       {canStart ? (
         <div className="rounded-md border border-line bg-surface p-3">
           <div className="text-sm font-medium">Текущий ход</div>
-          <Button className="mt-3 w-full" onClick={onStartGame}>
+          <Button
+            className="mt-3 w-full"
+            onClick={onStartGame}
+            disabled={Boolean(startDisabledReason)}
+          >
             Начать партию
           </Button>
+          {startDisabledReason ? (
+            <p className="mt-2 text-xs text-neutral-500">{startDisabledReason}</p>
+          ) : null}
         </div>
       ) : null}
 

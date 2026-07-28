@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException
@@ -24,7 +25,8 @@ import {
   normalizeCardTypeForCell,
   ratRaceBoard,
   realtimeEvents,
-  rollDie
+  rollDie,
+  isFigurineId
 } from "@cashflow/shared";
 import { randomInt } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
@@ -476,6 +478,9 @@ export class GamesService {
       if (game.players.length < 2) {
         throw new BadRequestException("At least two players are required");
       }
+      if (game.players.some((player) => !player.figurine)) {
+        throw new BadRequestException("All players must choose a figurine");
+      }
 
       const professions = await tx.profession.findMany({
         where: { isActive: true },
@@ -529,6 +534,59 @@ export class GamesService {
 
     return this.actionResult(gameId, [
       { type: "game:started", payload: {} },
+      { type: realtimeEvents.stateUpdate, payload: {} }
+    ]);
+  }
+
+  async chooseFigurine(gameId: string, userId: string, figurine: string) {
+    if (!isFigurineId(figurine)) {
+      throw new BadRequestException("Unknown figurine");
+    }
+
+    const membership = await this.prisma.gamePlayer.findFirst({
+      where: {
+        gameId,
+        userId,
+        role: GameRole.PLAYER,
+        status: GamePlayerStatus.JOINED
+      },
+      include: { game: { select: { status: true } } }
+    });
+    if (!membership) throw new ForbiddenException("Player membership is required");
+    if (membership.game.status !== GameStatus.WAITING) {
+      throw new BadRequestException("Figurine can be changed only before game start");
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.gamePlayer.update({
+          where: { id: membership.id },
+          data: { figurine, isReady: true }
+        });
+        await this.appendEvents(tx, gameId, userId, [
+          {
+            type: "player:figurine_selected",
+            gamePlayerId: membership.id,
+            payload: { figurine }
+          },
+          {
+            type: realtimeEvents.stateUpdate,
+            payload: { reason: "figurine_selected" }
+          }
+        ]);
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Figurine is already taken");
+      }
+      throw error;
+    }
+
+    return this.actionResult(gameId, [
+      { type: "player:figurine_selected", payload: { figurine } },
       { type: realtimeEvents.stateUpdate, payload: {} }
     ]);
   }
@@ -588,6 +646,7 @@ export class GamesService {
           seat,
           color,
           isReady: !participates,
+          figurine: null,
           position: -1
         }
       });
@@ -4354,7 +4413,15 @@ export class GamesService {
       include: {
         players: {
           include: {
-            user: { select: { id: true, email: true, displayName: true } },
+            user: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+                figurine: true
+              }
+            },
             profession: true,
             financialState: true,
             assets: {

@@ -81,6 +81,7 @@ export class AuthService {
         email: true,
         displayName: true,
         avatarUrl: true,
+        figurine: true,
         role: true,
         status: true,
         createdAt: true
@@ -95,6 +96,7 @@ export class AuthService {
     email: string;
     displayName: string;
     avatarUrl?: string | null;
+    figurine?: string | null;
     role: SystemRole;
     status: AccountStatus;
   }) {
@@ -118,6 +120,7 @@ export class AuthService {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl ?? null,
+        figurine: user.figurine ?? null,
         role: user.role,
         status: user.status
       }

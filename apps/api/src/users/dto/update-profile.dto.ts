@@ -21,4 +21,8 @@ export class UpdateProfileDto {
   @Min(0)
   @Max(100)
   gameExperience?: number;
+
+  @IsOptional()
+  @IsString()
+  figurine?: string | null;
 }

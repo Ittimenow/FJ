@@ -5,6 +5,7 @@ export interface ProfileResponse {
     displayName: string;
     avatarUrl: string | null;
     avatarColor: string | null;
+    figurine: string | null;
     gender: string | null;
     birthDate: string | null;
     gameExperience: number | null;
@@ -92,6 +93,7 @@ export interface GamePlayer {
   status: string;
   seat: number | null;
   color: string | null;
+  figurine: string | null;
   track: "RAT_RACE" | "FAST_TRACK";
   position: number;
   fastTrackPosition: number;
@@ -99,6 +101,8 @@ export interface GamePlayer {
     id: string;
     displayName: string;
     email: string;
+    avatarUrl: string | null;
+    figurine: string | null;
   } | null;
   profession: {
     id: number;

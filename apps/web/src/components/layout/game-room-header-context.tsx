@@ -42,23 +42,29 @@ export function GameRoomHeaderSlot() {
     <div className="hidden min-w-0 justify-center md:flex">
       {state ? (
         <div className="flex max-w-full items-center gap-2 text-xs text-neutral-600">
-          <span className="truncate font-medium text-ink">{state.title}</span>
-          <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-medium text-ink">
-            {state.status}
-          </span>
-          <span
-            className={[
-              "shrink-0 rounded px-1.5 py-0.5 font-medium",
-              state.connected ? "bg-green-100 text-success" : "bg-red-100 text-red-700"
-            ].join(" ")}
-          >
-            {state.connected ? "online" : "offline"}
-          </span>
-          <span className="min-w-0 truncate">
-            Код: <span className="font-mono text-ink">{state.code}</span> · Раунд{" "}
-            {state.currentRound}
-            {state.currentPlayerName ? ` · Ход: ${state.currentPlayerName}` : ""}
-          </span>
+          {state.status === "ENDED" ? (
+            <span className="font-medium text-ink">Партия завершена по времени</span>
+          ) : (
+            <>
+              <span className="truncate font-medium text-ink">{state.title}</span>
+              <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-medium text-ink">
+                {state.status}
+              </span>
+              <span
+                className={[
+                  "shrink-0 rounded px-1.5 py-0.5 font-medium",
+                  state.connected ? "bg-green-100 text-success" : "bg-red-100 text-red-700"
+                ].join(" ")}
+              >
+                {state.connected ? "online" : "offline"}
+              </span>
+              <span className="min-w-0 truncate">
+                Код: <span className="font-mono text-ink">{state.code}</span> · Раунд{" "}
+                {state.currentRound}
+                {state.currentPlayerName ? ` · Ход: ${state.currentPlayerName}` : ""}
+              </span>
+            </>
+          )}
           {state.onDeleteGame ? (
             <button
               type="button"

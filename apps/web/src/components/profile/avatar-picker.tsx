@@ -1,5 +1,6 @@
 "use client";
 
+import { figurineImagePath } from "@cashflow/shared";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -7,6 +8,7 @@ interface AvatarPickerProps {
   currentAvatarUrl: string | null;
   avatarColor: string;
   initials: string;
+  figurine: string | null;
   onAvatarChange: (dataUrl: string | null) => void;
 }
 
@@ -14,6 +16,7 @@ export function AvatarPicker({
   currentAvatarUrl,
   avatarColor,
   initials,
+  figurine,
   onAvatarChange
 }: AvatarPickerProps) {
   const [preview, setPreview] = useState<string | null>(currentAvatarUrl);
@@ -105,7 +108,13 @@ export function AvatarPicker({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative">
-        {preview ? (
+        {figurine ? (
+          <img
+            src={figurineImagePath(figurine)}
+            alt="Игровая фигурка"
+            className="h-24 w-24 rounded-full border border-line object-cover"
+          />
+        ) : preview ? (
           <img
             src={preview}
             alt="Аватар"

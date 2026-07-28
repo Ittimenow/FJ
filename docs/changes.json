@@ -4,6 +4,26 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "unique-player-figurines",
+          "category": "feature",
+          "summary": "Игроки теперь выбирают уникальные фигурки для партии и могут использовать любимую фигурку вместо аватара профиля."
+        },
+        {
+          "id": "centered-player-figurines",
+          "category": "fix",
+          "summary": "Все игровые фигурки теперь аккуратно отделены от соседних изображений и одинаково выровнены по центру."
+        },
+        {
+          "id": "completed-game-responsive-header",
+          "category": "improvement",
+          "summary": "После завершения партии компьютерная шапка стала компактнее, а мобильные элементы профиля теперь выровнены по правому краю."
+        },
+        {
+          "id": "russian-game-title-in-header",
+          "category": "improvement",
+          "summary": "Название игры в шапке теперь отображается на русском языке."
+        },
+        {
           "id": "cashflow-rules-guide",
           "category": "improvement",
           "summary": "Правила игры «Финансовое путешествие» теперь доступны из общего меню приложения по информационной иконке рядом с профилем."
@@ -12,6 +32,16 @@
           "id": "guide-profile-avatar",
           "category": "fix",
           "summary": "На странице правил теперь отображается актуальное изображение профиля вместо замены аватара инициалами."
+        },
+        {
+          "id": "guide-return-to-origin",
+          "category": "improvement",
+          "summary": "После просмотра правил теперь можно одним нажатием вернуться в ту же игру или раздел приложения."
+        },
+        {
+          "id": "desktop-only-guide-toc",
+          "category": "improvement",
+          "summary": "На мобильных устройствах правила теперь открываются сразу с текста без занимающего экран оглавления."
         },
         {
           "id": "desktop-player-information-tabs",
@@ -57,6 +87,11 @@
           "id": "rat-race-cell-color-coding",
           "category": "improvement",
           "summary": "Типы ячеек малого круга теперь выделены узнаваемыми цветами и единым контрастным оформлением."
+        },
+        {
+          "id": "board-cell-title-alignment",
+          "category": "improvement",
+          "summary": "Названия игровых ячеек теперь выровнены слева на одной высоте с номером, а длинные названия отображаются компактнее и аккуратно переносятся."
         },
         {
           "id": "extend-vps-deploy-timeout",
