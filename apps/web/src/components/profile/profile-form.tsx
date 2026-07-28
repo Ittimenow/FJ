@@ -34,6 +34,15 @@ interface ProfileFormProps {
 
 export function ProfileForm({ profile, token }: ProfileFormProps) {
   const router = useRouter();
+  const [savedProfile, setSavedProfile] = useState(() => ({
+    displayName: profile.user.displayName,
+    gender: profile.user.gender ?? "",
+    birthDate: toDateInputValue(profile.user.birthDate),
+    gameExperience:
+      profile.user.gameExperience != null ? Number(profile.user.gameExperience) : null,
+    avatarUrl: profile.user.avatarUrl,
+    figurine: profile.user.figurine
+  }));
   const [displayName, setDisplayName] = useState(profile.user.displayName);
   const [gender, setGender] = useState(profile.user.gender ?? "");
   const [birthDate, setBirthDate] = useState(toDateInputValue(profile.user.birthDate));
@@ -54,16 +63,31 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
 
   const avatarColor = profile.user.avatarColor ?? "#64748b";
   const initials = avatarInitials(displayName || profile.user.displayName);
-  const currentAvatarUrl = avatarPending === undefined ? profile.user.avatarUrl : avatarPending;
+  const currentAvatarUrl = avatarPending === undefined ? savedProfile.avatarUrl : avatarPending;
   const computedAge = calcAge(birthDate);
+  const normalizedDisplayName = displayName.trim();
+  const normalizedGameExperience = gameExperience !== "" ? Number(gameExperience) : null;
+  const hasAvatarChanges =
+    avatarPending !== undefined && avatarPending !== savedProfile.avatarUrl;
+  const hasProfileChanges =
+    hasAvatarChanges ||
+    normalizedDisplayName !== savedProfile.displayName ||
+    gender !== savedProfile.gender ||
+    birthDate !== savedProfile.birthDate ||
+    normalizedGameExperience !== savedProfile.gameExperience ||
+    figurine !== savedProfile.figurine;
+  const visibleProfileMsg =
+    profileMsg?.ok && hasProfileChanges ? null : profileMsg;
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
+    if (!hasProfileChanges || profileLoading) return;
+
     setProfileLoading(true);
     setProfileMsg(null);
 
     try {
-      if (avatarPending !== undefined) {
+      if (hasAvatarChanges) {
         if (avatarPending === null) {
           const res = await fetch(`${publicApiBaseUrl()}/api/users/me/avatar`, {
             method: "DELETE",
@@ -84,17 +108,15 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       }
 
       const body: Record<string, unknown> = {};
-      if (displayName.trim() !== profile.user.displayName)
-        body.displayName = displayName.trim();
-      if (gender !== (profile.user.gender ?? ""))
+      if (normalizedDisplayName !== savedProfile.displayName)
+        body.displayName = normalizedDisplayName;
+      if (gender !== savedProfile.gender)
         body.gender = gender || null;
-      const origBirth = toDateInputValue(profile.user.birthDate);
-      if (birthDate !== origBirth)
+      if (birthDate !== savedProfile.birthDate)
         body.birthDate = birthDate || null;
-      const expNum = gameExperience !== "" ? Number(gameExperience) : null;
-      if (expNum !== (profile.user.gameExperience ?? null))
-        body.gameExperience = expNum;
-      if (figurine !== profile.user.figurine)
+      if (normalizedGameExperience !== savedProfile.gameExperience)
+        body.gameExperience = normalizedGameExperience;
+      if (figurine !== savedProfile.figurine)
         body.figurine = figurine;
 
       if (Object.keys(body).length > 0) {
@@ -112,6 +134,15 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         }
       }
 
+      setSavedProfile({
+        displayName: normalizedDisplayName,
+        gender,
+        birthDate,
+        gameExperience: normalizedGameExperience,
+        avatarUrl: hasAvatarChanges ? avatarPending : savedProfile.avatarUrl,
+        figurine
+      });
+      setDisplayName(normalizedDisplayName);
       setAvatarPending(undefined);
       setProfileMsg({ ok: true, text: "Профиль сохранён" });
       router.refresh();
@@ -170,11 +201,29 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   return (
     <div className="grid gap-6">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Профиль</CardTitle>
+          <div className="flex flex-wrap items-center gap-3">
+            {visibleProfileMsg ? (
+              <p
+                className={`text-sm ${
+                  visibleProfileMsg.ok ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                {visibleProfileMsg.text}
+              </p>
+            ) : null}
+            <Button
+              type="submit"
+              form="profile-form"
+              disabled={profileLoading || !hasProfileChanges}
+            >
+              {profileLoading ? "Сохранение..." : "Сохранить профиль"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={saveProfile} className="space-y-6">
+          <form id="profile-form" onSubmit={saveProfile} className="space-y-6">
             <AvatarPicker
               currentAvatarUrl={currentAvatarUrl ?? null}
               avatarColor={avatarColor}
@@ -281,13 +330,18 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               </div>
             </div>
 
-            {profileMsg && (
-              <p className={`text-sm ${profileMsg.ok ? "text-green-700" : "text-red-700"}`}>
-                {profileMsg.text}
+            {visibleProfileMsg ? (
+              <p
+                className={`text-sm ${
+                  visibleProfileMsg.ok ? "text-green-700" : "text-red-700"
+                }`}
+                aria-live="polite"
+              >
+                {visibleProfileMsg.text}
               </p>
-            )}
+            ) : null}
 
-            <Button type="submit" disabled={profileLoading}>
+            <Button type="submit" disabled={profileLoading || !hasProfileChanges}>
               {profileLoading ? "Сохранение..." : "Сохранить профиль"}
             </Button>
           </form>

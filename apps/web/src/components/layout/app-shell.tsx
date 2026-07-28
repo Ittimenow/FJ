@@ -68,7 +68,7 @@ function UserAvatar({
       <img
         src={figurineImagePath(figurine)}
         alt=""
-        className="h-8 w-8 shrink-0 rounded-full border border-line object-cover"
+        className="h-10 w-10 shrink-0 object-contain"
       />
     );
   }

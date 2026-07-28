@@ -2198,7 +2198,7 @@ function BoardCellTile({
       </div>
       <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
         {players.map((player) => (
-          <PlayerToken key={player.id} player={player} />
+          <PlayerToken key={player.id} player={player} desktopBoard={compact} />
         ))}
       </div>
     </div>
@@ -2208,19 +2208,24 @@ function BoardCellTile({
 function PlayerToken({
   player,
   small = false,
-  moving = false
+  moving = false,
+  desktopBoard = false
 }: {
   player: GamePlayer;
   small?: boolean;
   moving?: boolean;
+  desktopBoard?: boolean;
 }) {
   const title = player.user?.displayName ?? `Игрок ${player.seat ?? ""}`;
   if (player.figurine) {
     return (
       <span
         className={[
-          "inline-flex shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
-          small ? "h-5 w-5" : "h-8 w-8",
+          "inline-flex shrink-0",
+          desktopBoard
+            ? "h-10 w-10"
+            : "overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
+          desktopBoard ? "" : small ? "h-5 w-5" : "h-8 w-8",
           moving ? "timeline-moving-token" : ""
         ].join(" ")}
         title={title}
@@ -2228,7 +2233,7 @@ function PlayerToken({
         <img
           src={figurineImagePath(player.figurine)}
           alt=""
-          className="h-full w-full object-cover"
+          className={`h-full w-full ${desktopBoard ? "object-contain" : "object-cover"}`}
         />
       </span>
     );
