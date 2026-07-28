@@ -73,10 +73,27 @@ jobs:
 
             export GITHUB_RUN_NUMBER="${{ github.run_number }}"
             export GITHUB_SHA="${{ github.sha }}"
-            docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build --wait --wait-timeout 180
-            docker compose --env-file .env.vps -f docker-compose.vps.yml exec -T app \
+
+            compose() {
+              docker compose --env-file .env.vps -f docker-compose.vps.yml "$@"
+            }
+            report_deploy_failure() {
+              exit_code=$?
+              if [ "$exit_code" -ne 0 ]; then
+                echo "::group::VPS compose diagnostics"
+                compose ps || true
+                compose logs --no-color --tail=200 app postgres || true
+                echo "::endgroup::"
+              fi
+              exit "$exit_code"
+            }
+            trap report_deploy_failure EXIT
+
+            compose up -d --build --wait --wait-timeout 180
+            compose exec -T app \
               wget -qO- http://127.0.0.1:3000/healthz | grep -q '"status":"ok"'
 
-            docker compose --env-file .env.vps -f docker-compose.vps.yml exec -T app \
+            compose exec -T app \
               head -n 2 /app/.game-release-version
             docker image prune -f
+            trap - EXIT

@@ -174,6 +174,13 @@ async function setupDatabaseIfNeeded() {
   log("Generating Prisma Client.");
   await run(npmCommand, ["run", "db:generate"]);
 
+  log("Applying safe schema preparation.");
+  await run(npmCommand, [
+    "run",
+    "prisma:prepare-figurines",
+    "--workspace=@cashflow/database"
+  ]);
+
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);
 

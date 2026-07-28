@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "safe-figurine-schema-deployment",
+          "category": "technical",
+          "summary": "Обновление с выбором фигурок теперь безопасно развёртывается на существующей базе данных и не блокирует запуск приложения."
+        },
+        {
           "id": "unique-player-figurines",
           "category": "feature",
           "summary": "Игроки теперь выбирают уникальные фигурки для партии и могут использовать любимую фигурку вместо аватара профиля."
