@@ -6,6 +6,7 @@ import {
 import { isFigurineId } from "@cashflow/shared";
 import { AccountStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { MailService } from "../mail/mail.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { cents, toSerializable } from "../common/json";
@@ -32,6 +33,7 @@ export class UsersService {
         gender: true,
         birthDate: true,
         gameExperience: true,
+        gameRoomView: true,
         role: true,
         status: true,
         createdAt: true
@@ -112,7 +114,8 @@ export class UsersService {
         ...(dto.gameExperience !== undefined && {
           gameExperience: dto.gameExperience
         }),
-        ...(dto.figurine !== undefined && { figurine: dto.figurine || null })
+        ...(dto.figurine !== undefined && { figurine: dto.figurine || null }),
+        ...(dto.gameRoomView !== undefined && { gameRoomView: dto.gameRoomView })
       },
       select: {
         id: true,
@@ -124,6 +127,7 @@ export class UsersService {
         gender: true,
         birthDate: true,
         gameExperience: true,
+        gameRoomView: true,
         role: true,
         status: true
       }
@@ -176,6 +180,43 @@ export class UsersService {
     });
 
     void this.mail.sendPasswordChanged(user.email, user.displayName);
+
+    return { ok: true };
+  }
+
+  async revokeConsentAndDeleteAccount(userId: string, currentPassword: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { passwordHash: true }
+    });
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException("Неверный текущий пароль.");
+    }
+
+    const deletedAt = new Date();
+    const replacementPasswordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 12);
+    await this.prisma.$transaction([
+      this.prisma.personalDataConsent.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: deletedAt }
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: `deleted-${userId}@deleted.invalid`,
+          passwordHash: replacementPasswordHash,
+          displayName: "Удалённый пользователь",
+          avatarUrl: null,
+          avatarColor: null,
+          figurine: null,
+          gender: null,
+          birthDate: null,
+          gameExperience: null,
+          status: AccountStatus.DELETED,
+          deletedAt
+        }
+      })
+    ]);
 
     return { ok: true };
   }

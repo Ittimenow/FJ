@@ -5,7 +5,21 @@ import {
   realtimeEvents,
   type FigurineId
 } from "@cashflow/shared";
-import { Send } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  CircleDot,
+  Dices,
+  Landmark,
+  ListRestart,
+  MessageCircle,
+  ReceiptText,
+  Send,
+  UserRound,
+  UsersRound
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   CSSProperties,
@@ -23,9 +37,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FigurinePicker } from "@/components/figurine-picker";
+import {
+  GameRoomVariantTwo,
+  type GameRoomView
+} from "@/components/game/game-room-variant-two";
+import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
+import { gameStatusLabel } from "@/lib/game-labels";
 import type {
   FinancialState,
   GameEvent,
@@ -41,6 +61,12 @@ type GameActionResult = {
 };
 
 type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed" | "closing";
+
+type UserSearchResult = {
+  id: string;
+  displayName: string;
+  email: string;
+};
 
 export function GameRoom({
   initialSnapshot,
@@ -65,6 +91,7 @@ export function GameRoom({
   );
   const initialPreferredFigurine = initialMe?.user?.figurine;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [gameRoomView] = useState<GameRoomView>(initialMe?.user?.gameRoomView ?? "classic");
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
@@ -283,6 +310,7 @@ export function GameRoom({
       code: snapshot.game.code,
       currentRound: snapshot.game.currentRound,
       currentPlayerName: currentPlayer?.user?.displayName ?? null,
+      remainingSeconds,
       onDeleteGame: canManage ? deleteGame : null
     });
 
@@ -295,7 +323,8 @@ export function GameRoom({
     snapshot.game.code,
     snapshot.game.currentRound,
     snapshot.game.status,
-    snapshot.game.title
+    snapshot.game.title,
+    remainingSeconds
   ]);
 
   useEffect(() => {
@@ -323,11 +352,11 @@ export function GameRoom({
       setTurnAnimationPhase("ready");
       setTurnPopupOrigin(popupOriginFrom(mobileBoardRef.current));
       turnPopupClosingRef.current = false;
-      setTurnPopupOpen(true);
+      setTurnPopupOpen(gameRoomView === "classic");
     } else if (!rollingDice) {
       setTurnPopupOpen(false);
     }
-  }, [activeDiceCount, canRoll, me?.position, pendingAction, rollingDice]);
+  }, [activeDiceCount, canRoll, gameRoomView, me?.position, pendingAction, rollingDice]);
 
   async function startGame() {
     setError(null);
@@ -389,7 +418,7 @@ export function GameRoom({
     }
   }
 
-  async function addUserToGame(body: { email: string; role: string }) {
+  async function addUserToGame(body: { userId: string; role: string }) {
     setError(null);
     const response = await fetch(
       `${publicApiBaseUrl()}/api/games/${snapshot.game.id}/users`,
@@ -712,7 +741,7 @@ export function GameRoom({
   }
 
   return (
-    <div className="grid w-full min-w-0 max-w-full gap-5 overflow-x-clip">
+    <div className="game-room grid w-full min-w-0 max-w-full gap-5">
       <TurnPopup
         open={turnPopupOpen}
         snapshot={snapshot}
@@ -755,30 +784,6 @@ export function GameRoom({
           {error}
         </div>
       ) : null}
-      {snapshot.game.status === "WAITING" && me ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-white p-3 text-sm">
-          <div>
-            {me.figurine ? (
-              <span className="font-medium text-neutral-800">Ваша фигурка выбрана.</span>
-            ) : (
-              <span className="font-medium text-amber-800">Выберите фигурку для партии.</span>
-            )}
-            {playersWithoutFigurines.length > 0 ? (
-              <span className="ml-2 text-neutral-500">
-                Без фигурки: {playersWithoutFigurines.length}
-              </span>
-            ) : null}
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-8 px-3 text-xs"
-            onClick={() => setFigurinePickerOpen(true)}
-          >
-            {me.figurine ? "Сменить фигурку" : "Выбрать фигурку"}
-          </Button>
-        </div>
-      ) : null}
       {me?.financialState?.bankruptcyStatus === "RECOVERED" ? (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Банкротство преодолено. Осталось пропустить ходов: {me.financialState.bankruptcyTurns}.
@@ -788,12 +793,7 @@ export function GameRoom({
           Денежный поток не удалось восстановить — вы выбыли из игры.
         </div>
       ) : null}
-      {snapshot.game.status === "IN_PROGRESS" && remainingSeconds !== null ? (
-        <GameTimer
-          remainingSeconds={remainingSeconds}
-          totalMinutes={snapshot.game.timeLimitMinutes}
-        />
-      ) : snapshot.game.status === "ENDED" ? (
+      {snapshot.game.status === "ENDED" ? (
         <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium md:hidden">
           {winner
             ? `Победитель: ${winner.user?.displayName ?? "Игрок"}`
@@ -801,7 +801,112 @@ export function GameRoom({
         </div>
       ) : null}
 
-      <div className="hidden xl:block">
+      {snapshot.game.status === "WAITING" ? (
+        <WaitingRoomOverview
+          snapshot={snapshot}
+          canManage={canManage}
+          canStart={canStart}
+          startDisabledReason={startDisabledReason}
+          onStartGame={startGame}
+          code={snapshot.game.code}
+          token={token}
+          onAddUser={addUserToGame}
+          canChangeParticipation={canChangeHostParticipation}
+          participates={roomMembership?.role === "PLAYER"}
+          changingParticipation={changingParticipation}
+          onChangeParticipation={changeHostParticipation}
+          currentPlayer={me}
+          onChooseFigurine={() => setFigurinePickerOpen(true)}
+        />
+      ) : null}
+
+      {snapshot.game.status === "WAITING" ? (
+        <ChatPanel
+          messages={snapshot.chatMessages}
+          onSend={(body) => emit("chat:send", { body })}
+        />
+      ) : null}
+
+      {gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+        <GameRoomVariantTwo
+          snapshot={snapshot}
+          currentUserId={currentUserId}
+          canRoll={canRoll && !pendingAction}
+          rolling={rollingDice}
+          onRoll={rollDice}
+          actions={
+            <ActionsPanel
+              canChooseDeal={canChooseDeal}
+              onDrawSmallDeal={() => draw("SMALL_DEAL")}
+              onDrawBigDeal={() => draw("BIG_DEAL")}
+              latestCard={latestDealDecisionCard}
+              latestTurnSummary={latestTurnSummary}
+              charityChoice={charityChoice}
+              canAnswerCharity={canAnswerCharity}
+              doodadPaymentChoice={doodadPaymentChoice}
+              canAnswerDoodadPayment={canAnswerDoodadPayment}
+              marketSaleOffer={marketSaleOffer}
+              canAnswerMarketSale={canAnswerMarketSale}
+              currentCashCents={me?.financialState?.cashCents ?? 0}
+              currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
+              waitingStockSellerCount={waitingStockSellerCount}
+              dealQuantity={dealQuantity}
+              setDealQuantity={updateDealQuantity}
+              onBuyLatest={buyLatestDeal}
+              onDeclineLatest={declineLatestDeal}
+              onSellMarketAsset={sellMarketAsset}
+              onDeclineMarketSale={declineMarketSale}
+              onAcceptCharity={acceptCharity}
+              onDeclineCharity={declineCharity}
+              onPayDoodadWithCash={payDoodadWithCash}
+              onPayDoodadWithCredit={payDoodadWithCredit}
+              stockSaleOffer={stockSaleOffer}
+              stockSaleQuantity={stockSaleQuantity}
+              onStockSaleQuantityChange={updateStockSaleQuantity}
+              onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
+              onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+              onSellStock={sellStockFromDeal}
+              onDeclineStockSale={declineStockSale}
+              loanAmount={loanAmount}
+              onLoanDecrease={() => changeLoanAmount(-1000)}
+              onLoanIncrease={() => changeLoanAmount(1000)}
+              onLoanAmountChange={updateLoanAmount}
+              onTakeLoan={takeLoan}
+              canTakeLoan={canTakeLoan}
+              embedded
+            />
+          }
+          activity={
+            <>
+              <div className="hidden gap-4 xl:grid xl:grid-cols-[1.15fr_.85fr]">
+                <EventLog
+                  events={snapshot.events}
+                  currentUserId={currentUserId}
+                  players={gamePlayers}
+                  currentPlayerId={snapshot.game.currentPlayerId}
+                />
+                <ChatPanel
+                  messages={snapshot.chatMessages}
+                  onSend={(body) => emit("chat:send", { body })}
+                />
+              </div>
+              <div className="xl:hidden">
+                <MobileActivityPanel
+                  events={snapshot.events}
+                  currentUserId={currentUserId}
+                  players={gamePlayers}
+                  currentPlayerId={snapshot.game.currentPlayerId}
+                  messages={snapshot.chatMessages}
+                  onSend={(body) => emit("chat:send", { body })}
+                />
+              </div>
+            </>
+          }
+        />
+      ) : (
+        <>
+          {snapshot.game.status !== "WAITING" ? (
+          <div className="hidden xl:block">
         <DesktopGameBoard
           snapshot={snapshot}
           selectedPlayer={selectedPlayer}
@@ -815,9 +920,6 @@ export function GameRoom({
           )}
         >
           <ActionsPanel
-            onStartGame={startGame}
-            canStart={canStart}
-            startDisabledReason={startDisabledReason}
             canChooseDeal={canChooseDeal}
             onDrawSmallDeal={() => draw("SMALL_DEAL")}
             onDrawBigDeal={() => draw("BIG_DEAL")}
@@ -858,98 +960,74 @@ export function GameRoom({
             embedded
           />
         </DesktopGameBoard>
-      </div>
+          </div>
+          ) : null}
 
-      {canManage && snapshot.game.status === "WAITING" ? (
-        <div className="hidden xl:block">
-          <HostPanel
-            code={snapshot.game.code}
-            onAddUser={addUserToGame}
-            canChangeParticipation={canChangeHostParticipation}
-            participates={roomMembership?.role === "PLAYER"}
-            changingParticipation={changingParticipation}
-            onChangeParticipation={changeHostParticipation}
-          />
-        </div>
-      ) : null}
-
-      <div className="grid w-full min-w-0 max-w-full gap-5 overflow-x-clip xl:hidden">
-        <div className="grid w-full min-w-0 max-w-full gap-2">
-          <MobileBoard
-            snapshot={snapshot}
-            selectedPlayer={selectedPlayer}
-            containerRef={mobileBoardRef}
-          />
-          <MobileGameTabs
-            player={selectedPlayer}
-            canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
-            onCloseLiability={closeLiability}
-            actionAttentionKey={
-              canStart
-                ? "start_game"
-                : ownPendingAction?.type ?? (stockSaleOffer ? "stock_sale_window" : null)
-            }
-            turnTabRequest={turnTabRequest}
-            actions={
-              <ActionsPanel
-                onStartGame={startGame}
-                canStart={canStart}
-                startDisabledReason={startDisabledReason}
-                canChooseDeal={canChooseDeal}
-                onDrawSmallDeal={() => draw("SMALL_DEAL")}
-                onDrawBigDeal={() => draw("BIG_DEAL")}
-                latestCard={latestDealDecisionCard}
-                latestTurnSummary={latestTurnSummary}
-                charityChoice={charityChoice}
-                canAnswerCharity={canAnswerCharity}
-                doodadPaymentChoice={doodadPaymentChoice}
-                canAnswerDoodadPayment={canAnswerDoodadPayment}
-                marketSaleOffer={marketSaleOffer}
-                canAnswerMarketSale={canAnswerMarketSale}
-                currentCashCents={me?.financialState?.cashCents ?? 0}
-                currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
-                waitingStockSellerCount={waitingStockSellerCount}
-                dealQuantity={dealQuantity}
-                setDealQuantity={updateDealQuantity}
-                onBuyLatest={buyLatestDeal}
-                onDeclineLatest={declineLatestDeal}
-                onSellMarketAsset={sellMarketAsset}
-                onDeclineMarketSale={declineMarketSale}
-                onAcceptCharity={acceptCharity}
-                onDeclineCharity={declineCharity}
-                onPayDoodadWithCash={payDoodadWithCash}
-                onPayDoodadWithCredit={payDoodadWithCredit}
-                stockSaleOffer={stockSaleOffer}
-                stockSaleQuantity={stockSaleQuantity}
-                onStockSaleQuantityChange={updateStockSaleQuantity}
-                onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-                onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
-                onSellStock={sellStockFromDeal}
-                onDeclineStockSale={declineStockSale}
-                loanAmount={loanAmount}
-                onLoanDecrease={() => changeLoanAmount(-1000)}
-                onLoanIncrease={() => changeLoanAmount(1000)}
-                onLoanAmountChange={updateLoanAmount}
-                onTakeLoan={takeLoan}
-                canTakeLoan={canTakeLoan}
-                embedded
-              />
-            }
-          />
-        </div>
-        {canManage && snapshot.game.status === "WAITING" ? (
-          <HostPanel
-            code={snapshot.game.code}
-            onAddUser={addUserToGame}
-            canChangeParticipation={canChangeHostParticipation}
-            participates={roomMembership?.role === "PLAYER"}
-            changingParticipation={changingParticipation}
-            onChangeParticipation={changeHostParticipation}
-          />
+      <div className="grid w-full min-w-0 max-w-full gap-5 xl:hidden">
+        {snapshot.game.status !== "WAITING" ? (
+          <div className="grid w-full min-w-0 max-w-full gap-2">
+            <MobileBoard
+              snapshot={snapshot}
+              selectedPlayer={selectedPlayer}
+              containerRef={mobileBoardRef}
+            />
+            <MobileGameTabs
+              player={selectedPlayer}
+              canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
+              onCloseLiability={closeLiability}
+              actionAttentionKey={
+                ownPendingAction?.type ?? (stockSaleOffer ? "stock_sale_window" : null)
+              }
+              turnTabRequest={turnTabRequest}
+              actions={
+                <ActionsPanel
+                  canChooseDeal={canChooseDeal}
+                  onDrawSmallDeal={() => draw("SMALL_DEAL")}
+                  onDrawBigDeal={() => draw("BIG_DEAL")}
+                  latestCard={latestDealDecisionCard}
+                  latestTurnSummary={latestTurnSummary}
+                  charityChoice={charityChoice}
+                  canAnswerCharity={canAnswerCharity}
+                  doodadPaymentChoice={doodadPaymentChoice}
+                  canAnswerDoodadPayment={canAnswerDoodadPayment}
+                  marketSaleOffer={marketSaleOffer}
+                  canAnswerMarketSale={canAnswerMarketSale}
+                  currentCashCents={me?.financialState?.cashCents ?? 0}
+                  currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
+                  waitingStockSellerCount={waitingStockSellerCount}
+                  dealQuantity={dealQuantity}
+                  setDealQuantity={updateDealQuantity}
+                  onBuyLatest={buyLatestDeal}
+                  onDeclineLatest={declineLatestDeal}
+                  onSellMarketAsset={sellMarketAsset}
+                  onDeclineMarketSale={declineMarketSale}
+                  onAcceptCharity={acceptCharity}
+                  onDeclineCharity={declineCharity}
+                  onPayDoodadWithCash={payDoodadWithCash}
+                  onPayDoodadWithCredit={payDoodadWithCredit}
+                  stockSaleOffer={stockSaleOffer}
+                  stockSaleQuantity={stockSaleQuantity}
+                  onStockSaleQuantityChange={updateStockSaleQuantity}
+                  onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
+                  onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+                  onSellStock={sellStockFromDeal}
+                  onDeclineStockSale={declineStockSale}
+                  loanAmount={loanAmount}
+                  onLoanDecrease={() => changeLoanAmount(-1000)}
+                  onLoanIncrease={() => changeLoanAmount(1000)}
+                  onLoanAmountChange={updateLoanAmount}
+                  onTakeLoan={takeLoan}
+                  canTakeLoan={canTakeLoan}
+                  embedded
+                />
+              }
+            />
+          </div>
         ) : null}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      {snapshot.game.status !== "WAITING" ? (
+      <div className="hidden gap-5 lg:grid lg:grid-cols-[1.15fr_0.85fr]">
         <EventLog
           events={snapshot.events}
           currentUserId={currentUserId}
@@ -961,6 +1039,19 @@ export function GameRoom({
           onSend={(body) => emit("chat:send", { body })}
         />
       </div>
+      ) : null}
+      {snapshot.game.status !== "WAITING" ? (
+      <MobileActivityPanel
+        events={snapshot.events}
+        currentUserId={currentUserId}
+        players={gamePlayers}
+        currentPlayerId={snapshot.game.currentPlayerId}
+        messages={snapshot.chatMessages}
+        onSend={(body) => emit("chat:send", { body })}
+      />
+      ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -1148,7 +1239,7 @@ function TurnPopup({
         </div>
         {phase === "ready" ? (
           <>
-            <Button className="mt-5 w-full" onClick={onRoll}>
+            <Button className="mt-5 w-full" variant="action" onClick={onRoll}>
               {diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"}
             </Button>
             <button
@@ -1494,48 +1585,10 @@ function wait(ms: number) {
   });
 }
 
-function formatRemainingTime(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map((value) => String(value).padStart(2, "0"))
-    .join(":");
-}
-
-function GameTimer({
-  remainingSeconds,
-  totalMinutes
-}: {
-  remainingSeconds: number;
-  totalMinutes: number;
-}) {
-  const totalSeconds = Math.max(1, totalMinutes * 60);
-  const remainingRatio = Math.min(1, Math.max(0, remainingSeconds / totalSeconds));
-  const tone =
-    remainingRatio <= 0.1 ? "danger" : remainingRatio <= 0.25 ? "warning" : "neutral";
-
-  return (
-    <div className="rounded-md border border-line bg-white px-3 py-2.5">
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-neutral-600">⏱ До завершения партии</span>
-        <span className="font-semibold tabular-nums">
-          {formatRemainingTime(remainingSeconds)}
-        </span>
-      </div>
-      <ProgressBar
-        className="mt-2"
-        value={remainingSeconds}
-        max={totalSeconds}
-        label={`До завершения партии осталось ${formatRemainingTime(remainingSeconds)}`}
-        tone={tone}
-      />
-    </div>
-  );
-}
-
 function HostPanel({
   code,
+  gameId,
+  token,
   onAddUser,
   canChangeParticipation,
   participates,
@@ -1543,56 +1596,96 @@ function HostPanel({
   onChangeParticipation
 }: {
   code: string;
-  onAddUser: (body: { email: string; role: string }) => void;
+  gameId: string;
+  token: string;
+  onAddUser: (body: { userId: string; role: string }) => void;
   canChangeParticipation: boolean;
   participates: boolean;
   changingParticipation: boolean;
   onChangeParticipation: (participates: boolean) => void;
 }) {
-  const [inviteUrl, setInviteUrl] = useState(`/join/${code}`);
-  const [copied, setCopied] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<UserSearchResult[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setInviteUrl(`${window.location.origin}/join/${code}`);
-  }, [code]);
+    const normalizedQuery = query.trim();
+    if (selectedUser || normalizedQuery.length < 2) {
+      setResults([]);
+      setSearching(false);
+      setSearchError(null);
+      return;
+    }
 
-  async function copyInvite() {
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setSearching(true);
+      setSearchError(null);
+      try {
+        const response = await fetch(
+          `${publicApiBaseUrl()}/api/games/${gameId}/users/search?query=${encodeURIComponent(normalizedQuery)}`,
+          { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal }
+        );
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message ?? "Не удалось найти пользователей");
+        setResults(result);
+        setOpen(true);
+      } catch (event) {
+        if (controller.signal.aborted) return;
+        setResults([]);
+        setSearchError(event instanceof Error ? event.message : "Не удалось найти пользователей");
+        setOpen(true);
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [gameId, query, selectedUser, token]);
+
+  function chooseUser(user: UserSearchResult) {
+    setSelectedUser(user);
+    setQuery(`${user.displayName} · ${user.email}`);
+    setResults([]);
+    setOpen(false);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "").trim();
     const role = String(form.get("role") ?? "PLAYER");
-    if (!email) return;
-    onAddUser({ email, role });
+    if (!selectedUser) return;
+    onAddUser({ userId: selectedUser.id, role });
     event.currentTarget.reset();
+    setQuery("");
+    setSelectedUser(null);
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ведущий</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-md border border-line bg-surface p-3">
-          <div className="text-sm font-medium">Ссылка-приглашение</div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Input value={inviteUrl} readOnly aria-label="Ссылка-приглашение" />
-            <Button type="button" variant="secondary" onClick={copyInvite}>
-              {copied ? "Скопировано" : "Копировать"}
-            </Button>
+    <div className="mt-6 grid gap-3 border-t border-line/70 pt-5 lg:grid-cols-2">
+        <div className="rounded-xl bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-extrabold">Приглашение в игру</div>
+              <p className="mt-1 text-xs text-neutral-600">
+                Скопируйте код или готовую ссылку для участника.
+              </p>
+            </div>
+            <RoomInviteActions code={code} />
           </div>
-          <p className="mt-2 text-xs text-neutral-600">
+          <p className="mt-3 text-xs text-neutral-600">
             Пользователь войдёт в комнату как игрок после авторизации.
           </p>
         </div>
         {canChangeParticipation ? (
-          <div className="rounded-md border border-line bg-surface p-3">
-            <div className="text-sm font-medium">Участие ведущего</div>
+          <div className="rounded-xl bg-card p-4">
+            <div className="text-sm font-extrabold">Участие ведущего</div>
             <p className="mt-1 text-xs text-neutral-600">
               {participates
                 ? "Вы занимаете место игрока и будете участвовать в партии."
@@ -1613,21 +1706,263 @@ function HostPanel({
             </Button>
           </div>
         ) : null}
-        <form className="grid gap-2" onSubmit={submit}>
-          <Input name="email" type="email" placeholder="Email пользователя" required />
-          <select
-            name="role"
-            className="h-10 rounded-md border border-line bg-white px-3 text-sm"
-            defaultValue="PLAYER"
-          >
-            <option value="PLAYER">Игрок</option>
-            <option value="BANKER">Банкир</option>
-            <option value="OBSERVER">Наблюдатель</option>
-          </select>
-          <Button type="submit">Добавить в игру</Button>
+        <form className="rounded-xl bg-card p-4 lg:col-span-2" onSubmit={submit}>
+          <div className="text-sm font-extrabold">Добавление игрока</div>
+          <p className="mt-1 text-xs text-neutral-600">
+            Найдите зарегистрированного пользователя по имени, фамилии или почте.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]">
+            <div className="relative min-w-0">
+              <Input
+                value={query}
+                placeholder="Имя, фамилия или email"
+                autoComplete="off"
+                role="combobox"
+                aria-label="Поиск пользователя"
+                aria-expanded={open && !selectedUser}
+                aria-controls="game-user-search-results"
+                aria-autocomplete="list"
+                onFocus={() => setOpen(true)}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelectedUser(null);
+                  setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setOpen(false);
+                  if (event.key === "ArrowDown" && results[0]) {
+                    event.preventDefault();
+                    document.getElementById(`game-user-option-${results[0].id}`)?.focus();
+                  }
+                }}
+              />
+              {selectedUser ? (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 text-success" size={18} aria-hidden="true" />
+              ) : null}
+              {open && !selectedUser && query.trim().length >= 2 ? (
+                <div
+                  id="game-user-search-results"
+                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-64 overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_20px_45px_rgba(27,57,118,.16),0_4px_10px_rgba(27,57,118,.08)]"
+                >
+                  {searching ? <p className="px-3 py-3 text-sm text-muted">Ищем пользователей…</p> : null}
+                  {!searching && searchError ? <p className="px-3 py-3 text-sm text-red-700">{searchError}</p> : null}
+                  {!searching && !searchError && results.length === 0 ? (
+                    <p className="px-3 py-3 text-sm text-muted">Подходящих пользователей не найдено.</p>
+                  ) : null}
+                  {results.map((user) => (
+                    <button
+                      key={user.id}
+                      id={`game-user-option-${user.id}`}
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      className="block w-full rounded-lg px-3 py-2.5 text-left transition hover:bg-card focus-visible:bg-card focus-visible:outline-none"
+                      onClick={() => chooseUser(user)}
+                    >
+                      <span className="block truncate text-sm font-bold text-ink">{user.displayName}</span>
+                      <span className="mt-0.5 block truncate text-xs text-muted">{user.email}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="relative">
+              <select
+                name="role"
+                aria-label="Роль пользователя"
+                className="h-10 w-full appearance-none rounded-md border border-line bg-white px-3 pr-9 text-sm"
+                defaultValue="PLAYER"
+              >
+                <option value="PLAYER">Игрок</option>
+                <option value="BANKER">Банкир</option>
+                <option value="OBSERVER">Наблюдатель</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" size={16} aria-hidden="true" />
+            </div>
+            <Button type="submit" disabled={!selectedUser}>Добавить в игру</Button>
+          </div>
         </form>
-      </CardContent>
-    </Card>
+    </div>
+  );
+}
+
+function WaitingRoomOverview({
+  snapshot,
+  canManage,
+  canStart,
+  startDisabledReason,
+  onStartGame,
+  code,
+  token,
+  onAddUser,
+  canChangeParticipation,
+  participates,
+  changingParticipation,
+  onChangeParticipation,
+  currentPlayer,
+  onChooseFigurine
+}: {
+  snapshot: GameSnapshot;
+  canManage: boolean;
+  canStart: boolean;
+  startDisabledReason: string | null;
+  onStartGame: () => void;
+  code: string;
+  token: string;
+  onAddUser: (body: { userId: string; role: string }) => void;
+  canChangeParticipation: boolean;
+  participates: boolean;
+  changingParticipation: boolean;
+  onChangeParticipation: (participates: boolean) => void;
+  currentPlayer: GamePlayer | undefined;
+  onChooseFigurine: () => void;
+}) {
+  const players = snapshot.players.filter((player) => player.status === "JOINED");
+  const gamePlayers = players.filter((player) => player.role === "PLAYER");
+  const readyPlayers = gamePlayers.filter((player) => Boolean(player.figurine));
+  const enoughPlayers = gamePlayers.length >= 2;
+  const figurinesReady = gamePlayers.length > 0 && readyPlayers.length === gamePlayers.length;
+  const completedChecks =
+    Number(enoughPlayers) + Number(figurinesReady) + Number(canManage);
+
+  return (
+    <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">
+              Соберите команду
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужна своя фигурка.
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8effe] px-3 py-2 text-sm font-extrabold text-journey">
+            <UsersRound size={16} aria-hidden="true" />
+            {gamePlayers.length}/{snapshot.game.maxPlayers} игроков
+          </span>
+        </div>
+
+        {players.length > 0 ? (
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {players.map((player) => {
+              const isPlayer = player.role === "PLAYER";
+              const ready = !isPlayer || Boolean(player.figurine);
+              return (
+                <div key={player.id} className="flex min-w-0 items-center gap-3 rounded-xl bg-card p-3">
+                  <PlayerToken player={player} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-extrabold">
+                      {player.user?.displayName ?? gameRoles[player.role] ?? "Участник"}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted">
+                      {gameRoles[player.role] ?? humanizeToken(player.role)}
+                      {player.seat ? ` · место ${player.seat}` : ""}
+                    </div>
+                  </div>
+                  <span
+                    className={[
+                      "shrink-0 rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide",
+                      ready ? "bg-[#eaf3e0] text-success" : "bg-[#fff0df] text-[#8a3d0a]"
+                    ].join(" ")}
+                  >
+                    {ready ? "Готов" : "Без фигурки"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl bg-card p-5 text-sm text-muted">
+            В комнате пока никого нет. Отправьте участникам код {snapshot.game.code}.
+          </div>
+        )}
+        {currentPlayer ? (
+          <div className="mt-3 flex flex-col gap-3 rounded-xl bg-card p-4 text-sm min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+            <div className="min-w-0">
+              <div className="font-extrabold text-ink">
+                {currentPlayer.figurine ? "Ваша фигурка выбрана" : "Выберите свою фигурку"}
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                {gamePlayers.length - readyPlayers.length > 0
+                  ? `Без фигурки: ${gamePlayers.length - readyPlayers.length}`
+                  : "Все игроки выбрали фигурки."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 w-full shrink-0 px-3 text-xs min-[420px]:w-auto"
+              onClick={onChooseFigurine}
+            >
+              {currentPlayer.figurine ? "Сменить фигурку" : "Выбрать фигурку"}
+            </Button>
+          </div>
+        ) : null}
+        {canManage ? (
+          <HostPanel
+            code={code}
+            gameId={snapshot.game.id}
+            token={token}
+            onAddUser={onAddUser}
+            canChangeParticipation={canChangeParticipation}
+            participates={participates}
+            changingParticipation={changingParticipation}
+            onChangeParticipation={onChangeParticipation}
+          />
+        ) : null}
+      </div>
+
+      <aside className="rounded-xl bg-card p-4 text-ink sm:p-5">
+        <h2 className="text-lg font-extrabold">Готовность к старту</h2>
+        <div className="mt-4 space-y-3">
+          <LobbyCheck
+            complete={enoughPlayers}
+            label={enoughPlayers ? "Игроков достаточно" : "Нужно минимум два игрока"}
+          />
+          <LobbyCheck
+            complete={figurinesReady}
+            label={figurinesReady ? "Фигурки выбраны" : `Фигурки: ${readyPlayers.length}/${gamePlayers.length}`}
+          />
+          <LobbyCheck
+            complete={canManage}
+            label={canManage ? "Вы можете запустить партию" : "Старт запустит ведущий"}
+          />
+        </div>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#dce4ef]">
+          <div
+            className="h-full rounded-full bg-action transition-[width] duration-300"
+            style={{ width: `${Math.round((completedChecks / 3) * 100)}%` }}
+          />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-muted">
+          {canStart && !startDisabledReason
+            ? "Все условия выполнены — можно начинать."
+            : startDisabledReason ?? "Ожидаем действия ведущего."}
+        </p>
+        {canManage ? (
+          <Button
+            className="mt-4 w-full"
+            variant="action"
+            onClick={onStartGame}
+            disabled={!canStart || Boolean(startDisabledReason)}
+          >
+            Начать партию
+          </Button>
+        ) : null}
+      </aside>
+    </section>
+  );
+}
+
+function LobbyCheck({ complete, label }: { complete: boolean; label: string }) {
+  const Icon = complete ? CheckCircle2 : Circle;
+  return (
+    <div className="flex items-center gap-2.5 text-sm">
+      <Icon className={complete ? "text-success" : "text-muted/55"} size={17} aria-hidden="true" />
+      <span className={complete ? "font-bold text-ink" : "text-muted"}>{label}</span>
+    </div>
   );
 }
 
@@ -1647,7 +1982,7 @@ function DesktopGameBoard({
   children: ReactNode;
 }) {
   return (
-    <section className="w-full rounded-md border border-line bg-white p-3 shadow-panel">
+    <section className="w-full rounded-2xl bg-card p-3 shadow-panel">
       <div className="grid grid-cols-[repeat(8,145px)] grid-rows-[repeat(6,105px)] justify-center gap-2 overflow-x-auto">
         {snapshot.board.map((cell) => {
           const players = cellPlayers(snapshot, cell.index);
@@ -1663,7 +1998,7 @@ function DesktopGameBoard({
         })}
 
         <div
-          className="grid min-h-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] gap-3 rounded-md border border-line bg-surface p-3"
+          className="grid min-h-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] gap-3 rounded-xl bg-surface p-3"
           style={{ gridColumn: "2 / 8", gridRow: "2 / 6" }}
         >
           <DesktopFinancialPanel
@@ -1672,7 +2007,7 @@ function DesktopGameBoard({
             onCloseLiability={onCloseLiability}
             outsidePlayers={outsidePlayers}
           />
-          <div className="min-h-0 overflow-y-auto rounded-md border border-line bg-white p-3">
+          <div className="min-h-0 overflow-y-auto rounded-xl bg-white p-3 shadow-panel">
             {children}
           </div>
         </div>
@@ -1710,19 +2045,19 @@ function DesktopFinancialPanel({
   const tabs: Array<{
     id: DesktopFinancialTab;
     label: string;
-    icon: string;
+    icon: ReactNode;
     count?: number;
   }> = [
-    { id: "player", label: "Игрок", icon: "👤" },
-    { id: "assets", label: "Активы", icon: "💼", count: player.assets.length },
-    { id: "expenses", label: "Расходы", icon: "📊" },
-    { id: "liabilities", label: "Долги", icon: "🏦", count: liabilities.length }
+    { id: "player", label: "Игрок", icon: <UserRound size={15} /> },
+    { id: "assets", label: "Активы", icon: <BriefcaseBusiness size={15} />, count: player.assets.length },
+    { id: "expenses", label: "Расходы", icon: <ReceiptText size={15} /> },
+    { id: "liabilities", label: "Долги", icon: <Landmark size={15} />, count: liabilities.length }
   ];
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-md border border-line bg-white">
+    <div className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-xl bg-white shadow-panel">
       <div
-        className="grid grid-cols-4 gap-1 border-b border-line bg-surface p-2"
+        className="grid grid-cols-4 gap-1 border-b border-line/70 bg-card p-2"
         role="tablist"
         aria-label="Информация об игроке"
       >
@@ -1757,8 +2092,8 @@ function DesktopFinancialPanel({
               className={[
                 "relative flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition",
                 active
-                  ? "bg-ink text-white shadow-sm"
-                  : "bg-white text-ink hover:bg-neutral-100"
+                  ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
+                  : "bg-transparent text-ink hover:bg-white"
               ].join(" ")}
             >
               <span aria-hidden="true">{tab.icon}</span>
@@ -2058,15 +2393,42 @@ function MobileBoard({
 
   return (
     <div ref={containerRef} className="w-full min-w-0 max-w-full">
-      <Card className="min-w-0 max-w-full overflow-hidden">
-        <div className="px-3 pb-1 pt-2 text-center">
-          <div className="truncate text-sm font-semibold">
-            Клетка {targetCellIndex + 1} · {targetCell?.label ?? "Малый круг"}
+      <Card className="min-w-0 max-w-full overflow-hidden rounded-2xl border-0">
+        <div className="p-3 pb-2">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">
+                Позиция на поле
+              </div>
+              <div className="mt-1 truncate text-sm font-extrabold">
+                {selectedPlayer?.user?.displayName ?? "Игрок"}
+              </div>
+            </div>
+            <span className="shrink-0 rounded-lg bg-[#e8effe] px-2.5 py-1.5 text-xs font-extrabold text-journey">
+              Клетка {targetCellIndex + 1}
+            </span>
+          </div>
+          <div className="mt-2 flex min-w-0 items-center gap-2 rounded-xl bg-card px-3 py-2.5">
+            <span
+              className={`h-3 w-3 shrink-0 rounded-full ${
+                (boardCellAppearances[targetCell?.type ?? ""] ?? defaultBoardCellAppearance)
+                  .timelineMarker
+              }`}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold">
+                {targetCell?.label ?? "Малый круг"}
+              </div>
+              <div className="mt-0.5 truncate text-[11px] text-muted">
+                {targetCell ? cellTypes[targetCell.type] ?? targetCell.type : "Стартовая позиция"}
+              </div>
+            </div>
           </div>
         </div>
         {outsidePlayers.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-center gap-1 px-3 pb-1">
-            <span className="text-xs text-neutral-500">Вне поля</span>
+          <div className="flex flex-wrap items-center gap-1 px-3 pb-2">
+            <span className="mr-1 text-xs text-neutral-500">На старте</span>
             {outsidePlayers.map((player) => (
               <PlayerToken key={player.id} player={player} small />
             ))}
@@ -2074,7 +2436,7 @@ function MobileBoard({
         ) : null}
         <div
           ref={scrollRef}
-          className="grid w-full min-w-0 max-w-full snap-x snap-mandatory grid-flow-col auto-cols-[44px] overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_22px)] pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-[46px] overflow-x-auto overscroll-x-contain scroll-smooth border-t border-line/60 bg-card/60 px-[calc(50%_-_23px)] pb-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
@@ -2107,7 +2469,7 @@ function MobileBoard({
                     ].join(" ")}
                   />
                 </div>
-                <div className="mt-1 flex min-h-4 flex-wrap justify-center gap-0.5">
+                <div className="mt-1 flex min-h-5 flex-wrap justify-center gap-0.5">
                   {players.map((player) => (
                     <PlayerToken
                       key={player.id}
@@ -2490,21 +2852,21 @@ function MobileGameTabs({
   const tabs: Array<{
     id: MobileGameTab;
     label: string;
-    icon: string;
+    icon: ReactNode;
     count?: number;
     attention?: boolean;
   }> = [
-    { id: "turn", label: "Ход", icon: "🎯", attention: actionAttention },
-    { id: "player", label: "Игрок", icon: "👤" },
-    { id: "assets", label: "Активы", icon: "💼", count: assetCount },
-    { id: "expenses", label: "Расходы", icon: "📊" },
-    { id: "liabilities", label: "Долги", icon: "🏦", count: liabilities.length }
+    { id: "turn", label: "Ход", icon: <Dices size={17} />, attention: actionAttention },
+    { id: "player", label: "Игрок", icon: <UserRound size={17} /> },
+    { id: "assets", label: "Активы", icon: <BriefcaseBusiness size={17} />, count: assetCount },
+    { id: "expenses", label: "Расходы", icon: <ReceiptText size={17} /> },
+    { id: "liabilities", label: "Долги", icon: <Landmark size={17} />, count: liabilities.length }
   ];
 
   return (
-    <Card className="w-full min-w-0 max-w-full">
+    <Card className="w-full min-w-0 max-w-full rounded-2xl border-0">
       <div
-        className="grid min-w-0 grid-cols-5 gap-1 border-b border-line bg-surface p-2"
+        className="grid min-w-0 grid-cols-5 gap-1 border-b border-line/70 bg-card p-2"
         role="tablist"
         aria-label="Информация об игроке"
       >
@@ -2535,21 +2897,19 @@ function MobileGameTabs({
                 document.getElementById(`mobile-game-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative flex h-10 min-w-0 items-center justify-center overflow-hidden rounded-md px-0.5 text-[9px] font-medium transition min-[340px]:text-[10px] min-[380px]:text-xs",
+                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey min-[360px]:text-[10px]",
                 active
-                  ? "bg-ink text-white shadow-sm"
-                  : "bg-white text-ink hover:bg-neutral-100"
+                  ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
+                  : "bg-transparent text-muted hover:bg-white hover:text-ink"
               ].join(" ")}
             >
-              <span className="inline-flex min-w-0 items-center gap-0.5 min-[380px]:gap-1">
-                <span aria-hidden="true">{tab.icon}</span>
-                <span className="truncate">{tab.label}</span>
-              </span>
+              <span aria-hidden="true">{tab.icon}</span>
+              <span className="w-full truncate text-center">{tab.label}</span>
               {tab.count !== undefined ? (
                 <span
                   className={[
-                    "absolute right-0.5 top-0.5 inline-flex min-w-3 justify-center rounded-full px-0.5 text-[8px] leading-3",
-                    active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-600"
+                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[8px] leading-4",
+                    active ? "bg-white/20 text-white" : "bg-white text-neutral-600"
                   ].join(" ")}
                 >
                   {tab.count}
@@ -2557,7 +2917,7 @@ function MobileGameTabs({
               ) : null}
               {tab.attention ? (
                 <span
-                  className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500 ring-2 ring-white"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-action ring-2 ring-white"
                   aria-label="Требуется действие"
                 />
               ) : null}
@@ -2570,7 +2930,7 @@ function MobileGameTabs({
         id="mobile-game-tab-panel"
         role="tabpanel"
         aria-labelledby={`mobile-game-tab-${activeTab}`}
-        className="min-w-0 max-w-full overflow-x-hidden p-3"
+        className="min-w-0 max-w-full overflow-x-hidden p-3 min-[420px]:p-4"
       >
         {activeTab === "turn" ? actions : null}
 
@@ -2593,12 +2953,12 @@ function MobileGameTabs({
               </div>
               <Badge className="shrink-0 bg-surface text-ink">финансы</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
               <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
               <Metric label="Зарплата" value={money(state.salaryCents)} />
               <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
-              <div className="col-span-2">
+              <div className="min-[360px]:col-span-2">
                 <Metric label="Расходы" value={money(state.totalExpensesCents)} />
               </div>
             </div>
@@ -3044,9 +3404,6 @@ function liabilitySortOrder(type: string) {
 }
 
 function ActionsPanel({
-  onStartGame,
-  canStart,
-  startDisabledReason,
   canChooseDeal,
   onDrawSmallDeal,
   onDrawBigDeal,
@@ -3086,9 +3443,6 @@ function ActionsPanel({
   canTakeLoan,
   embedded = false
 }: {
-  onStartGame: () => void;
-  canStart: boolean;
-  startDisabledReason: string | null;
   canChooseDeal: boolean;
   onDrawSmallDeal: () => void;
   onDrawBigDeal: () => void;
@@ -3147,7 +3501,6 @@ function ActionsPanel({
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerCount === 0;
   const hasCurrentAction =
-    canStart ||
     canChooseDeal ||
     Boolean(stockSaleOffer) ||
     Boolean(marketSaleOffer) ||
@@ -3157,22 +3510,6 @@ function ActionsPanel({
 
   const content = (
     <>
-      {canStart ? (
-        <div className="rounded-md border border-line bg-surface p-3">
-          <div className="text-sm font-medium">Текущий ход</div>
-          <Button
-            className="mt-3 w-full"
-            onClick={onStartGame}
-            disabled={Boolean(startDisabledReason)}
-          >
-            Начать партию
-          </Button>
-          {startDisabledReason ? (
-            <p className="mt-2 text-xs text-neutral-500">{startDisabledReason}</p>
-          ) : null}
-        </div>
-      ) : null}
-
       {canChooseDeal ? (
         <div className="rounded-md border border-line bg-surface p-3">
           <div className="text-sm font-medium">Возможность</div>
@@ -3342,17 +3679,24 @@ function ActionsPanel({
             {latestCard.isStock ? (
               <div className="mt-3 rounded-md border border-line bg-white p-3">
                 <div className="text-sm font-medium">Количество акций</div>
-                <div className="mt-2 grid grid-cols-[auto_auto_1fr_auto_auto] items-center gap-2">
+                <div
+                  className={[
+                    "mt-2 grid items-center",
+                    embedded
+                      ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-1"
+                      : "grid-cols-[auto_auto_1fr_auto_auto] gap-2"
+                  ].join(" ")}
+                >
                   <Button
                     variant="secondary"
-                    className="px-3"
+                    className={embedded ? "px-2" : "px-3"}
                     onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 50))}
                   >
                     &lt;&lt;
                   </Button>
                   <Button
                     variant="secondary"
-                    className="px-3"
+                    className={embedded ? "px-2" : "px-3"}
                     onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 1))}
                   >
                     &lt;
@@ -3372,14 +3716,14 @@ function ActionsPanel({
                   />
                   <Button
                     variant="secondary"
-                    className="px-3"
+                    className={embedded ? "px-2" : "px-3"}
                     onClick={() => setDealQuantity((dealQuantity || 0) + 1)}
                   >
                     &gt;
                   </Button>
                   <Button
                     variant="secondary"
-                    className="px-3"
+                    className={embedded ? "px-2" : "px-3"}
                     onClick={() => setDealQuantity((dealQuantity || 0) + 50)}
                   >
                     &gt;&gt;
@@ -3392,17 +3736,32 @@ function ActionsPanel({
                   <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                     Расчёт стоимости
                   </div>
-                  <div className="mt-2 grid grid-cols-[1fr_auto_1.2fr_auto_1.4fr] items-stretch gap-1.5 text-center">
+                  <div
+                    className={[
+                      "mt-2 grid items-stretch gap-1.5 text-center",
+                      embedded ? "grid-cols-1" : "grid-cols-[1fr_auto_1.2fr_auto_1.4fr]"
+                    ].join(" ")}
+                  >
                     <div className="rounded bg-white px-2 py-2">
                       <div className="text-[10px] text-neutral-500">Количество</div>
                       <strong>{validDealQuantity ? dealQuantity : "—"}</strong>
                     </div>
-                    <span className="self-center text-neutral-400" aria-hidden="true">×</span>
+                    <span
+                      className={["self-center text-neutral-400", embedded ? "hidden" : ""].join(" ")}
+                      aria-hidden="true"
+                    >
+                      ×
+                    </span>
                     <div className="rounded bg-white px-2 py-2">
                       <div className="text-[10px] text-neutral-500">Цена</div>
                       <strong>{money(latestCard.priceCents)}</strong>
                     </div>
-                    <span className="self-center text-neutral-400" aria-hidden="true">=</span>
+                    <span
+                      className={["self-center text-neutral-400", embedded ? "hidden" : ""].join(" ")}
+                      aria-hidden="true"
+                    >
+                      =
+                    </span>
                     <div className="rounded bg-[#f5faf2] px-2 py-2">
                       <div className="text-[10px] text-neutral-500">Стоимость</div>
                       <strong>{money(totalStockCostCents)}</strong>
@@ -3424,7 +3783,7 @@ function ActionsPanel({
                 Ожидаем решение по продаже от игроков: {waitingStockSellerCount}.
               </p>
             ) : null}
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className={["mt-3 grid gap-2", embedded ? "grid-cols-1" : "sm:grid-cols-3"].join(" ")}>
               <Button
                 onClick={onBuyLatest}
                 disabled={!canResolveLatestDeal || (Boolean(latestCard?.isStock) && !validDealQuantity)}
@@ -3603,16 +3962,109 @@ function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
     : `#${firstSequence}–${lastSequence}`;
 }
 
-function EventLog({
+function MobileActivityPanel({
   events,
   currentUserId,
   players,
-  currentPlayerId
+  currentPlayerId,
+  messages,
+  onSend
 }: {
   events: GameEvent[];
   currentUserId: string;
   players: GamePlayer[];
   currentPlayerId: string | null;
+  messages: GameSnapshot["chatMessages"];
+  onSend: (body: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"game" | "chat">("game");
+
+  return (
+    <section className="min-w-0 lg:hidden">
+      <div
+        className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-card p-1.5 shadow-panel"
+        role="tablist"
+        aria-label="События партии и чат"
+      >
+        <button
+          id="mobile-activity-tab-game"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "game"}
+          aria-controls="mobile-activity-panel"
+          onClick={() => setActiveTab("game")}
+          className={[
+            "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey",
+            activeTab === "game"
+              ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
+              : "text-muted hover:bg-white hover:text-ink"
+          ].join(" ")}
+        >
+          <ListRestart size={17} aria-hidden="true" />
+          Игра
+        </button>
+        <button
+          id="mobile-activity-tab-chat"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "chat"}
+          aria-controls="mobile-activity-panel"
+          onClick={() => setActiveTab("chat")}
+          className={[
+            "relative inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey",
+            activeTab === "chat"
+              ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
+              : "text-muted hover:bg-white hover:text-ink"
+          ].join(" ")}
+        >
+          <MessageCircle size={17} aria-hidden="true" />
+          Чат
+          {messages.length > 0 ? (
+            <span
+              className={[
+                "inline-flex min-w-5 justify-center rounded-full px-1 text-[10px] leading-5",
+                activeTab === "chat" ? "bg-white/20 text-white" : "bg-white text-muted"
+              ].join(" ")}
+              aria-label={`${messages.length} сообщений`}
+            >
+              {messages.length > 99 ? "99+" : messages.length}
+            </span>
+          ) : null}
+        </button>
+      </div>
+      <div
+        id="mobile-activity-panel"
+        role="tabpanel"
+        aria-labelledby={`mobile-activity-tab-${activeTab}`}
+      >
+        {activeTab === "game" ? (
+          <EventLog
+            events={events}
+            currentUserId={currentUserId}
+            players={players}
+            currentPlayerId={currentPlayerId}
+            compact
+          />
+        ) : (
+          <ChatPanel messages={messages} onSend={onSend} compact />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EventLog({
+  events,
+  currentUserId,
+  players,
+  currentPlayerId,
+  compact = false
+}: {
+  events: GameEvent[];
+  currentUserId: string;
+  players: GamePlayer[];
+  currentPlayerId: string | null;
+  compact?: boolean;
 }) {
   const [onlyMine, setOnlyMine] = useState(false);
   const [activeTab, setActiveTab] = useState<"events" | "players">("events");
@@ -3623,9 +4075,9 @@ function EventLog({
   }, [currentUserId, events, onlyMine]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1 rounded-md bg-surface p-1" role="tablist" aria-label="Информация об игре">
+    <Card className={compact ? "rounded-2xl border-0" : ""}>
+      <CardHeader className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1" role="tablist" aria-label="Информация об игре">
           <button
             type="button"
             role="tab"
@@ -3635,7 +4087,7 @@ function EventLog({
             }`}
             onClick={() => setActiveTab("events")}
           >
-            Журнал действий
+            {compact ? "События" : "Журнал действий"}
           </button>
           <button
             type="button"
@@ -3659,9 +4111,9 @@ function EventLog({
           </Button>
         ) : null}
       </CardHeader>
-      <CardContent>
+      <CardContent className={compact ? "p-3" : ""}>
         {activeTab === "events" ? (
-          <div className="max-h-96 space-y-3 overflow-y-auto pr-1" role="tabpanel">
+          <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1 sm:max-h-96" role="tabpanel">
             <p className="text-xs text-neutral-500">Сначала показаны последние действия.</p>
             {visibleEntries.length === 0 ? (
               <p className="text-sm text-neutral-600">
@@ -4667,10 +5119,12 @@ function humanizeToken(value: unknown) {
 
 function ChatPanel({
   messages,
-  onSend
+  onSend,
+  compact = false
 }: {
   messages: GameSnapshot["chatMessages"];
   onSend: (body: string) => void;
+  compact?: boolean;
 }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -4682,24 +5136,32 @@ function ChatPanel({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Чат</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
-          {messages.map((message) => (
-            <div key={message.id} className="rounded-md bg-surface p-3">
-              <div className="text-xs text-neutral-500">
-                {message.user?.displayName ?? "Игрок"} · {shortDate(message.createdAt)}
-              </div>
-              <div className="mt-1 text-sm">{message.body}</div>
+    <Card className={compact ? "rounded-2xl border-0" : ""}>
+      {!compact ? (
+        <CardHeader>
+          <CardTitle>Чат</CardTitle>
+        </CardHeader>
+      ) : null}
+      <CardContent className={compact ? "p-3" : ""}>
+        <div className="max-h-96 space-y-3 overflow-y-auto pr-1 sm:max-h-80">
+          {messages.length === 0 ? (
+            <div className="rounded-xl bg-card p-4 text-sm leading-6 text-muted">
+              Сообщений пока нет. Напишите первым, чтобы участники увидели сообщение в комнате.
             </div>
-          ))}
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className="rounded-xl bg-surface p-3">
+                <div className="text-xs text-neutral-500">
+                  {message.user?.displayName ?? "Игрок"} · {shortDate(message.createdAt)}
+                </div>
+                <div className="mt-1 break-words text-sm">{message.body}</div>
+              </div>
+            ))
+          )}
         </div>
         <form className="mt-4 grid grid-cols-[1fr_auto] gap-2" onSubmit={submit}>
-          <Input name="body" placeholder="Сообщение" autoComplete="off" />
-          <Button type="submit" aria-label="Отправить">
+          <Input name="body" placeholder="Сообщение" autoComplete="off" className="min-w-0" />
+          <Button type="submit" aria-label="Отправить" className="w-11 px-0">
             <Send size={16} />
           </Button>
         </form>

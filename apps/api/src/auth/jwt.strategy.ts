@@ -37,7 +37,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user || user.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException("Account is not active");
+      throw new UnauthorizedException("Аккаунт недоступен.");
     }
 
     return {

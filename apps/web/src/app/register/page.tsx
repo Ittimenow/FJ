@@ -1,23 +1,26 @@
 import { redirect } from "next/navigation";
-import type { Route } from "next";
 import { auth } from "@/auth";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { RegisterForm } from "@/components/auth/register-form";
+import { inviteCodeFromCallbackUrl, safeAuthCallbackUrl } from "@/lib/auth-redirect";
 
 export default async function RegisterPage({
   searchParams
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  const value = (await searchParams).callbackUrl;
-  const callbackUrl = (value?.startsWith("/") && !value.startsWith("//")
-    ? value
-    : "/dashboard") as Route;
+  const callbackUrl = safeAuthCallbackUrl((await searchParams).callbackUrl);
+  const inviteCode = inviteCodeFromCallbackUrl(callbackUrl);
   const session = await auth();
   if (session?.accessToken) redirect(callbackUrl);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface px-4">
-      <RegisterForm callbackUrl={callbackUrl} />
-    </main>
+    <AuthShell
+      title={inviteCode ? "Создайте профиль игрока" : "Начните финансовое путешествие"}
+      description={inviteCode ? "Создайте аккаунт — после регистрации вы сразу перейдёте в комнату по приглашению." : undefined}
+      inviteCode={inviteCode}
+    >
+      <RegisterForm callbackUrl={callbackUrl} invited={Boolean(inviteCode)} />
+    </AuthShell>
   );
 }

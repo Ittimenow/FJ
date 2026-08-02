@@ -58,7 +58,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           displayName?: string;
           role?: string;
           status?: string;
-          avatarUrl?: string | null;
           figurine?: string | null;
         };
         if (authenticatedUser.accessToken) {
@@ -70,7 +69,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         if (authenticatedUser.role) token.role = authenticatedUser.role;
         if (authenticatedUser.status) token.status = authenticatedUser.status;
-        token.avatarUrl = authenticatedUser.avatarUrl ?? null;
         token.figurine = authenticatedUser.figurine ?? null;
       }
       return token;
@@ -84,7 +82,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         | "ACTIVE"
         | "BLOCKED"
         | "DELETED";
-      session.user.avatarUrl = typeof token.avatarUrl === "string" ? token.avatarUrl : null;
+      // Avatar images are stored as data URLs and must never be copied into the
+      // JWT-backed session cookie. Pages load them from the profile/game API.
+      session.user.avatarUrl = null;
       session.user.figurine = typeof token.figurine === "string" ? token.figurine : null;
       return session;
     }

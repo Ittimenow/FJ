@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsDateString, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -25,4 +25,9 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   figurine?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(["classic", "journey"])
+  gameRoomView?: "classic" | "journey";
 }

@@ -21,25 +21,38 @@ interface IndexedMarkdownHeading extends MarkdownHeading {
 }
 
 const headingClasses: Record<number, string> = {
-  1: "text-3xl font-semibold tracking-tight",
-  2: "mt-10 border-t border-line pt-8 text-2xl font-semibold",
-  3: "mt-7 text-xl font-semibold",
-  4: "mt-5 text-lg font-semibold"
+  1: "text-4xl font-extrabold tracking-[-0.04em] text-ink",
+  2: "mt-14 border-t border-line/70 pt-10 text-3xl font-extrabold tracking-[-0.03em] text-ink",
+  3: "mt-9 text-xl font-extrabold tracking-[-0.02em] text-ink",
+  4: "mt-7 text-lg font-extrabold text-ink"
 };
+
+interface RenderMarkdownOptions {
+  omitTitle?: boolean;
+}
 
 export function extractMarkdownHeadings(markdown: string): MarkdownHeading[] {
   return createHeadingIndex(parseMarkdown(markdown));
 }
 
-export function renderMarkdown(markdown: string): ReactNode[] {
+export function renderMarkdown(
+  markdown: string,
+  options: RenderMarkdownOptions = {}
+): ReactNode[] {
   const blocks = parseMarkdown(markdown);
   const headingIds = new Map<number, string>();
+  const introductionIndex = blocks.findIndex((block) => block.type === "paragraph");
 
   createHeadingIndex(blocks).forEach((heading) => {
     headingIds.set(heading.blockIndex, heading.id);
   });
 
-  return blocks.map((block, index) => renderBlock(block, index, headingIds.get(index)));
+  return blocks.flatMap((block, index) => {
+    if (options.omitTitle && block.type === "heading" && block.level === 1) {
+      return [];
+    }
+    return [renderBlock(block, index, headingIds.get(index), index === introductionIndex)];
+  });
 }
 
 function parseMarkdown(markdown: string): Block[] {
@@ -176,12 +189,17 @@ function splitTableRow(line: string) {
     .map((cell) => cell.trim());
 }
 
-function renderBlock(block: Block, index: number, headingId?: string) {
+function renderBlock(
+  block: Block,
+  index: number,
+  headingId?: string,
+  introduction = false
+) {
   if (block.type === "heading") {
     const className = headingClasses[block.level] ?? headingClasses[4];
     const headingProps = {
       id: headingId,
-      className: `${className} scroll-mt-6`
+      className: `${className} scroll-mt-28 text-balance`
     };
     if (block.level === 1) {
       return (
@@ -213,7 +231,14 @@ function renderBlock(block: Block, index: number, headingId?: string) {
 
   if (block.type === "paragraph") {
     return (
-      <p key={index} className="mt-4 leading-7 text-neutral-700">
+      <p
+        key={index}
+        className={
+          introduction
+            ? "text-lg leading-8 text-muted"
+            : "mt-4 leading-7 text-muted"
+        }
+      >
         {renderInline(block.lines.join(" "))}
       </p>
     );
@@ -223,7 +248,7 @@ function renderBlock(block: Block, index: number, headingId?: string) {
     return (
       <blockquote
         key={index}
-        className="mt-4 border-l-4 border-success/40 bg-surface px-4 py-3 leading-7 text-neutral-700"
+        className="mt-5 rounded-xl bg-[#e8effe] px-5 py-4 font-medium leading-7 text-ink"
       >
         {renderInline(block.lines.join(" "))}
       </blockquote>
@@ -232,7 +257,10 @@ function renderBlock(block: Block, index: number, headingId?: string) {
 
   if (block.type === "ul") {
     return (
-      <ul key={index} className="mt-4 list-disc space-y-2 pl-6 leading-7 text-neutral-700">
+      <ul
+        key={index}
+        className="mt-4 list-disc space-y-2.5 pl-6 leading-7 text-muted marker:font-bold marker:text-journey"
+      >
         {block.items.map((item, itemIndex) => (
           <li key={itemIndex}>{renderInline(item)}</li>
         ))}
@@ -245,7 +273,7 @@ function renderBlock(block: Block, index: number, headingId?: string) {
       <ol
         key={index}
         start={block.start}
-        className="mt-4 list-decimal space-y-2 pl-6 leading-7 text-neutral-700"
+        className="mt-4 list-decimal space-y-2.5 pl-6 leading-7 text-muted marker:font-extrabold marker:text-journey"
       >
         {block.items.map((item, itemIndex) => (
           <li key={itemIndex}>{renderInline(item)}</li>
@@ -258,7 +286,7 @@ function renderBlock(block: Block, index: number, headingId?: string) {
     return (
       <pre
         key={index}
-        className="mt-4 overflow-x-auto rounded-md border border-line bg-surface p-4 text-sm text-neutral-700"
+        className="mt-5 overflow-x-auto rounded-xl bg-ink p-5 text-sm leading-6 text-white shadow-[0_12px_28px_rgba(5,18,45,.14)]"
       >
         <code>{block.code}</code>
       </pre>
@@ -266,16 +294,22 @@ function renderBlock(block: Block, index: number, headingId?: string) {
   }
 
   if (block.type === "hr") {
-    return <hr key={index} className="my-8 border-line" />;
+    return <hr key={index} className="my-10 border-line/70" />;
   }
 
   return (
-    <div key={index} className="mt-4 overflow-x-auto rounded-md border border-line">
+    <div
+      key={index}
+      className="mt-5 overflow-x-auto rounded-xl border border-line/70"
+      tabIndex={0}
+      role="region"
+      aria-label="Таблица из правил игры"
+    >
       <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="bg-surface text-ink">
+        <thead className="bg-ink text-white">
           <tr>
             {block.headers.map((header, headerIndex) => (
-              <th key={headerIndex} className="border-b border-line px-3 py-2 font-semibold">
+              <th key={headerIndex} className="px-4 py-3 font-extrabold">
                 {renderInline(header)}
               </th>
             ))}
@@ -283,9 +317,9 @@ function renderBlock(block: Block, index: number, headingId?: string) {
         </thead>
         <tbody>
           {block.rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-line last:border-b-0">
+            <tr key={rowIndex} className="border-b border-line/70 last:border-b-0 even:bg-card/60">
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-3 py-2 align-top text-neutral-700">
+                <td key={cellIndex} className="px-4 py-3 align-top leading-6 text-muted">
                   {renderInline(cell)}
                 </td>
               ))}
@@ -329,14 +363,14 @@ function renderInline(text: string) {
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
-        <code key={index} className="rounded bg-surface px-1.5 py-0.5 font-mono text-sm text-ink">
+        <code key={index} className="rounded-md bg-card px-1.5 py-0.5 font-mono text-sm text-ink">
           {part.slice(1, -1)}
         </code>
       );
     }
 
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
+      return <strong key={index} className="font-extrabold text-ink">{part.slice(2, -2)}</strong>;
     }
 
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -347,7 +381,7 @@ function renderInline(text: string) {
         <a
           key={index}
           href={href}
-          className="font-medium text-success underline decoration-success/40 underline-offset-2 hover:decoration-success"
+          className="font-bold text-journey underline decoration-journey/35 underline-offset-2 transition hover:decoration-journey focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
           target={isExternal ? "_blank" : undefined}
           rel={isExternal ? "noreferrer" : undefined}
         >

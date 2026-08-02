@@ -45,7 +45,7 @@ export class MailService {
         to,
         subject: "Пароль был изменён — Financial Journey",
         html: `
-          <p>Здравствуйте, ${displayName}!</p>
+          <p>Здравствуйте, ${escapeHtml(displayName)}!</p>
           <p>Пароль вашего аккаунта <strong>${to}</strong> был успешно изменён ${date}.</p>
           <p>Если это были не вы — немедленно обратитесь к администратору.</p>
           <br/>
@@ -56,4 +56,41 @@ export class MailService {
         this.logger.error(`Failed to send password-changed email to ${to}`, err);
       });
   }
+
+  async sendPasswordReset(to: string, displayName: string, resetUrl: string) {
+    if (!this.transporter) return;
+
+    const from =
+      this.config.get<string>("SMTP_FROM") ??
+      this.config.get<string>("SMTP_USER") ??
+      "no-reply@financialjourney.app";
+
+    await this.transporter
+      .sendMail({
+        from,
+        to,
+        subject: "Восстановление пароля — Финансовое путешествие",
+        html: `
+          <p>Здравствуйте, ${escapeHtml(displayName)}!</p>
+          <p>Чтобы задать новый пароль, перейдите по ссылке:</p>
+          <p><a href="${escapeHtml(resetUrl)}">Восстановить пароль</a></p>
+          <p>Ссылка действует один час. Если вы не запрашивали восстановление, просто проигнорируйте это письмо.</p>
+          <br/>
+          <p>Финансовое путешествие</p>
+        `
+      })
+      .catch((err: unknown) => {
+        this.logger.error(`Failed to send password reset email to ${to}`, err);
+      });
+  }
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    "\"": "&quot;"
+  })[character] ?? character);
 }

@@ -21,11 +21,16 @@ export function AppShell({
   userFigurine
 }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-surface text-ink">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3">
-          <Link href="/dashboard" className="text-sm font-semibold tracking-wide">
-            Финансовое путешествие
+    <div className="min-h-screen min-w-0 bg-surface text-ink">
+      <header className="app-shell-header sticky top-0 z-50 sm:px-4">
+        <div className="mx-auto grid min-h-16 min-w-0 max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl bg-card/95 px-2.5 py-2 shadow-panel backdrop-blur-md min-[420px]:gap-3 min-[420px]:px-3 sm:px-4">
+          <Link
+            href="/dashboard"
+            aria-label="Финансовое путешествие — личный кабинет"
+            className="flex min-h-11 min-w-11 items-center gap-3 rounded-xl font-extrabold tracking-[-0.025em] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+          >
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-journey text-lg text-white shadow-[0_8px_20px_rgba(41,103,223,.22)]" aria-hidden="true">Ф</span>
+            <span className="hidden sm:inline">Финансовое путешествие</span>
           </Link>
           <GameRoomHeaderSlot />
           {userName ? (
@@ -33,7 +38,8 @@ export function AppShell({
               <GuideLink />
               <Link
                 href="/profile"
-                className="flex items-center gap-2 text-neutral-600 transition hover:text-ink"
+                aria-label={`Открыть профиль: ${userName}`}
+                className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-1.5 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 min-[420px]:px-2"
               >
                 <UserAvatar
                   url={userAvatarUrl}
@@ -47,7 +53,7 @@ export function AppShell({
           ) : null}
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      <main className="app-shell-main mx-auto min-w-0 max-w-[1480px] px-3 py-6 sm:px-4 sm:py-8">{children}</main>
     </div>
   );
 }

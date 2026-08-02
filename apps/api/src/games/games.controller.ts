@@ -14,6 +14,7 @@ import { CreateGameDto } from "./dto/create-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { SearchGameUsersDto } from "./dto/search-game-users.dto";
 import { UpdateHostParticipationDto } from "./dto/update-host-participation.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
@@ -93,6 +94,15 @@ export class GamesController {
     const result = await this.games.addUserToGame(id, user.userId, dto);
     this.realtime.broadcastAction(id, result);
     return result;
+  }
+
+  @Get(":id/users/search")
+  searchUsers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Query() dto: SearchGameUsersDto
+  ) {
+    return this.games.searchUsersForGame(id, user.userId, dto.query);
   }
 
   @Delete(":id")

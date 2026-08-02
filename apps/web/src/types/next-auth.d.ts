@@ -20,7 +20,6 @@ declare module "next-auth" {
     displayName?: string;
     role?: string;
     status?: string;
-    avatarUrl?: string | null;
     figurine?: string | null;
   }
 }
@@ -32,7 +31,6 @@ declare module "next-auth/jwt" {
     displayName?: string;
     role?: string;
     status?: string;
-    avatarUrl?: string | null;
     figurine?: string | null;
   }
 }

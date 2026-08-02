@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-31T00:00:00+03:00",
+  "title": "Design System: Финансовое путешествие",
+  "extensions": {
+    "colorMeta": {
+      "warm-parchment": {
+        "role": "neutral",
+        "displayName": "Тёплый пергамент",
+        "canonical": "#faf2e8",
+        "tonalRamp": ["#38281d", "#614733", "#89684e", "#b18c6d", "#d0ae8e", "#e7cdb3", "#f4e2cf", "#faf2e8"]
+      },
+      "warm-card": {
+        "role": "neutral",
+        "displayName": "Тёплая карточка",
+        "canonical": "#fff9f1",
+        "tonalRamp": ["#372b20", "#604c39", "#876d53", "#ad9173", "#ccb294", "#e5ceb3", "#f4e5d3", "#fff9f1"]
+      },
+      "journey-ink": {
+        "role": "neutral",
+        "displayName": "Чернила путешествия",
+        "canonical": "#17243f",
+        "tonalRamp": ["#0a101d", "#17243f", "#2c3e61", "#475a7d", "#687b9a", "#91a1b8", "#bec8d5", "#eef1f5"]
+      },
+      "journey-blue": {
+        "role": "primary",
+        "displayName": "Путевой синий",
+        "canonical": "#2967df",
+        "tonalRamp": ["#081936", "#0d2d68", "#174397", "#2057bf", "#2967df", "#5c8bea", "#94b4f2", "#e8effe"]
+      },
+      "action-orange": {
+        "role": "secondary",
+        "displayName": "Энергичный оранжевый",
+        "canonical": "#f98f2f",
+        "tonalRamp": ["#361a06", "#6c330b", "#a24c10", "#d46719", "#f98f2f", "#fbb16b", "#fdd2a8", "#fff0df"]
+      },
+      "progress-green": {
+        "role": "tertiary",
+        "displayName": "Зелёный прогресса",
+        "canonical": "#6f8e2f",
+        "tonalRamp": ["#172008", "#2b3b10", "#405719", "#587424", "#6f8e2f", "#91ae58", "#bad08c", "#eaf3e0"]
+      },
+      "ai-purple": {
+        "role": "tertiary",
+        "displayName": "Фиолетовый ИИ",
+        "canonical": "#7655c7",
+        "tonalRamp": ["#1c1038", "#352164", "#4d328f", "#6547b1", "#7655c7", "#9b80da", "#c5b4ea", "#eee9fa"]
+      },
+      "parchment-border": {
+        "role": "neutral",
+        "displayName": "Пергаментная граница",
+        "canonical": "#dfcebb",
+        "tonalRamp": ["#31291f", "#55483a", "#796957", "#9e8c77", "#bdac95", "#d4c4af", "#e8dccb", "#f8f2e9"]
+      },
+      "muted-blue": {
+        "role": "neutral",
+        "displayName": "Приглушённый синий",
+        "canonical": "#657597",
+        "tonalRamp": ["#121925", "#263044", "#3d4961", "#55627e", "#657597", "#8c99b2", "#bbc4d2", "#eef1f5"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Маршрутный заголовок",
+        "purpose": "Главный заголовок первого экрана."
+      },
+      "headline": {
+        "displayName": "Заголовок раздела",
+        "purpose": "Крупные этапы портала и основные рабочие области."
+      },
+      "title": {
+        "displayName": "Заголовок карточки",
+        "purpose": "Карточки маршрутов и ключевые рабочие блоки."
+      },
+      "body": {
+        "displayName": "Основной текст",
+        "purpose": "Объяснения, правила и игровые данные."
+      },
+      "label": {
+        "displayName": "Уверенная подпись",
+        "purpose": "Кнопки, поля, статусы и короткие маркеры."
+      }
+    },
+    "shadows": [
+      {
+        "name": "soft-surface",
+        "value": "0 20px 45px rgba(27, 57, 118, 0.10), 0 4px 10px rgba(27, 57, 118, 0.06)",
+        "purpose": "Карточки, меню и плавающие панели."
+      },
+      {
+        "name": "blue-action",
+        "value": "0 10px 28px rgba(41, 103, 223, 0.25)",
+        "purpose": "Главная синяя кнопка."
+      },
+      {
+        "name": "orange-action",
+        "value": "0 10px 26px rgba(249, 143, 47, 0.25)",
+        "purpose": "Оранжевое действие."
+      },
+      {
+        "name": "raised-card",
+        "value": "0 24px 50px rgba(27, 57, 118, 0.16)",
+        "purpose": "Наведение на крупную маршрутную карточку."
+      },
+      {
+        "name": "dialog",
+        "value": "0 34px 90px rgba(5, 18, 45, 0.35)",
+        "purpose": "Модальное окно поверх затемнённого фона."
+      }
+    ],
+    "motion": [
+      {
+        "name": "interaction",
+        "value": "180ms ease",
+        "purpose": "Наведение, изменение фона и короткий подъём интерактивного элемента."
+      },
+      {
+        "name": "card-lift",
+        "value": "200ms ease",
+        "purpose": "Переход крупной маршрутной карточки."
+      },
+      {
+        "name": "popup-enter",
+        "value": "360ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Раскрытие панели игрового хода с поддержкой reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile-navigation",
+        "value": "920px"
+      },
+      {
+        "name": "compact-game-ui",
+        "value": "1279px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Путевая кнопка",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Главный переход или подтверждение маршрута.",
+      "html": "<button class=\"ds-btn-primary\">СОЗДАТЬ КОМНАТУ</button>",
+      "css": ".ds-btn-primary { min-height: 52px; padding: 0 23px; border: 0; border-radius: 15px; background: #2967df; color: #fff; box-shadow: 0 10px 28px rgba(41,103,223,.25); font: 800 14px Manrope,Arial,sans-serif; cursor: pointer; transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease; } .ds-btn-primary:hover { background: #1f56c8; transform: translateY(-2px); } .ds-btn-primary:focus-visible { outline: 3px solid #f98f2f; outline-offset: 4px; } .ds-btn-primary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Кнопка действия",
+      "kind": "button",
+      "refersTo": "button-action",
+      "description": "Непосредственное действие, требующее внимания пользователя.",
+      "html": "<button class=\"ds-btn-action\">НАЧАТЬ ПАРТИЮ</button>",
+      "css": ".ds-btn-action { min-height: 52px; padding: 0 23px; border: 0; border-radius: 15px; background: #f98f2f; color: #17243f; box-shadow: 0 10px 26px rgba(249,143,47,.25); font: 800 14px Manrope,Arial,sans-serif; cursor: pointer; transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease; } .ds-btn-action:hover { background: #e77b1e; transform: translateY(-2px); } .ds-btn-action:focus-visible { outline: 3px solid #2967df; outline-offset: 4px; } .ds-btn-action:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Светлая кнопка",
+      "kind": "button",
+      "refersTo": "button-light",
+      "description": "Спокойное альтернативное действие.",
+      "html": "<button class=\"ds-btn-light\">ВОЙТИ ПО КОДУ</button>",
+      "css": ".ds-btn-light { min-height: 52px; padding: 0 23px; border: 1px solid #dfcebb; border-radius: 15px; background: #fff9f1; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font: 800 14px Manrope,Arial,sans-serif; cursor: pointer; transition: transform 180ms ease, background 180ms ease; } .ds-btn-light:hover { background: #fff; transform: translateY(-2px); } .ds-btn-light:focus-visible { outline: 3px solid #f98f2f; outline-offset: 4px; }"
+    },
+    {
+      "name": "Поле ввода",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Поле формы на тёплой карточной поверхности.",
+      "html": "<label class=\"ds-field\"><span>Код комнаты</span><input class=\"ds-input\" placeholder=\"Например, FJ-4821\"></label>",
+      "css": ".ds-field { display: grid; gap: 7px; color: #17243f; font: 800 12px Manrope,Arial,sans-serif; } .ds-input { min-height: 50px; padding: 0 14px; border: 1px solid #dfcebb; border-radius: 12px; background: #fff; color: #17243f; font: 400 14px Manrope,Arial,sans-serif; outline: none; transition: border 180ms ease, box-shadow 180ms ease; } .ds-input::placeholder { color: #657597; } .ds-input:hover { border-color: #bbccf3; } .ds-input:focus-visible { border-color: #f98f2f; box-shadow: 0 0 0 3px rgba(249,143,47,.22); }"
+    },
+    {
+      "name": "Маршрутная карточка",
+      "kind": "card",
+      "refersTo": "card-route",
+      "description": "Карточка направления портала с явным статусом и следующим шагом.",
+      "html": "<article class=\"ds-route-card\"><div class=\"ds-route-icon\">●●●</div><span class=\"ds-status\">ДОСТУПНО</span><p class=\"ds-eyebrow\">У МЕНЯ ЕСТЬ КОМАНДА</p><h3>Играть со своей командой</h3><p>Создайте комнату и отправьте участникам код приглашения.</p><button>Создать комнату <span>→</span></button></article>",
+      "css": ".ds-route-card { display: grid; min-height: 360px; padding: 24px; gap: 14px; border: 1px solid #dfcebb; border-radius: 26px; background: #fff; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font-family: Manrope,Arial,sans-serif; transition: transform 200ms ease, box-shadow 200ms ease; } .ds-route-card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px rgba(27,57,118,.16); } .ds-route-card:focus-within { outline: 3px solid #f98f2f; outline-offset: 4px; } .ds-route-icon { display:grid; width:62px; height:62px; place-items:center; border-radius:19px; background:#e8effe; color:#2967df; font-weight:900; } .ds-status { justify-self:end; padding:6px 9px; border-radius:8px; background:#eaf3e0; color:#426018; font-size:9px; font-weight:850; } .ds-eyebrow { color:#2967df; font-size:10px; font-weight:850; letter-spacing:.08em; } .ds-route-card h3 { margin:0; font-size:24px; line-height:1.15; } .ds-route-card p { margin:0; color:#657597; line-height:1.65; } .ds-route-card button { align-self:end; display:flex; justify-content:space-between; min-height:48px; padding:0; border:0; border-bottom:1px solid #dfcebb; background:transparent; color:#2967df; font-weight:850; cursor:pointer; }"
+    },
+    {
+      "name": "Статус",
+      "kind": "chip",
+      "refersTo": "status",
+      "description": "Текстовый статус с цветовой поддержкой.",
+      "html": "<span class=\"ds-status-chip\">ДОСТУПНО</span>",
+      "css": ".ds-status-chip { display:inline-flex; min-height:27px; padding:0 9px; align-items:center; border-radius:8px; background:#eaf3e0; color:#426018; font:850 9px Manrope,Arial,sans-serif; letter-spacing:.04em; text-transform:uppercase; } .ds-status-chip:hover { filter:brightness(.97); } .ds-status-chip:focus-visible { outline:3px solid #f98f2f; outline-offset:3px; }"
+    },
+    {
+      "name": "Портальная навигация",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Тёплая плавающая навигация с оранжевым указателем.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#game\">Об игре</a><a href=\"#features\">Возможности</a><a href=\"#hosts\">Ведущим</a></nav>",
+      "css": ".ds-nav { display:flex; gap:27px; padding:14px 24px; border:1px solid rgba(223,206,187,.72); border-radius:20px; background:rgba(255,249,241,.92); box-shadow:0 12px 34px rgba(27,57,118,.08); font:750 12px Manrope,Arial,sans-serif; } .ds-nav a { position:relative; padding:12px 0; color:#17243f; text-decoration:none; } .ds-nav a::after { position:absolute; right:0; bottom:6px; left:0; height:2px; background:#f98f2f; content:''; transform:scaleX(0); transition:transform 180ms ease; } .ds-nav a:hover::after, .ds-nav a:focus-visible::after { transform:scaleX(1); } .ds-nav a:focus-visible { outline:3px solid #f98f2f; outline-offset:4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Финансовое путешествие",
+    "overview": "Система превращает работу с финансовыми решениями в яркий, понятный маршрут. Тёплая основа напоминает игровое поле и бумажные материалы настольной игры, а насыщенные акценты обозначают движение, действие и прогресс. Характер приключенческий, но не детский: интерфейс помогает ведущему уверенно управлять партией и сохраняет ощущение совместной игры.\n\nЛендинг является визуальным источником истины для всего портала. Рабочие экраны игрового приложения пока используют более нейтральную систему; при последующих изменениях их следует последовательно приводить к этой палитре, типографике, форме и глубине, сохраняя высокую плотность данных там, где она нужна ведущему.",
+    "keyCharacteristics": [
+      "тёплый пергаментный фон вместо холодного служебного холста;",
+      "энергичные синие и оранжевые акценты с ясной семантикой;",
+      "крупная уверенная типографика Manrope;",
+      "мягко округлённые, ощутимые поверхности с выраженной глубиной;",
+      "дружелюбные, уверенные компоненты и ясные состояния;",
+      "приключенческий образ без потери точности финансовой информации."
+    ],
+    "rules": [
+      {
+        "name": "The Orange Means Action Rule",
+        "body": "Энергичный оранжевый обозначает действие или немедленную точку внимания; его нельзя превращать в универсальный декоративный цвет.",
+        "section": "colors"
+      },
+      {
+        "name": "The Card Semantics Are Open Rule",
+        "body": "Цветовая схема типов игровых карточек ещё не определена. До отдельной проработки нельзя назначать существующие акцентные цвета категориям карточек или считать совпадение цвета доказательством одинакового смысла.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Canvas Rule",
+        "body": "Основной пользовательский маршрут строится на тёплом пергаменте; холодный серый фон не должен становиться новой визуальной основой портала.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Пока новая гарнитура не утверждена отдельно, весь портал использует Manrope; характер создаётся масштабом, весом и ритмом, а не случайным смешением шрифтов.",
+        "section": "typography"
+      },
+      {
+        "name": "The Soft Lift Rule",
+        "body": "Глубина должна ощущаться как мягко поднятый игровой материал, а не как жёсткая чёрная тень.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do использовать тёплый пергамент как общий холст портала и будущую основу игровых экранов.",
+      "Do сохранять за оранжевым смысл действия, а за синим — смысл пути, навигации и основного акцента.",
+      "Do поддерживать достаточный контраст, текстовые статусы и заметную клавиатурную фокусировку.",
+      "Do адаптировать плотность рабочих экранов, сохраняя палитру, типографику, форму и глубину лендинга.",
+      "Do отдельно исследовать и утвердить семантическую палитру типов игровых карточек."
+    ],
+    "donts": [
+      "Don't назначать цвета категориям игровых карточек до отдельной проработки их семантики и доступности.",
+      "Don't возвращать холодную серо-белую служебную эстетику как основную визуальную систему приложения.",
+      "Don't использовать оранжевый как случайное украшение или одновременно для нескольких противоречивых смыслов.",
+      "Don't превращать каждый контейнер в одинаково тяжёлую карточку с одинаковой тенью.",
+      "Don't полагаться только на цвет для статуса, ошибки, типа карточки или текущего хода."
+    ]
+  }
+}

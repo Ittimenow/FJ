@@ -40,22 +40,22 @@ export default async function GamePage({
     return (
       <AppShell
         userName={userName}
-        userAvatarUrl={session.user.avatarUrl}
+        userAvatarUrl={null}
         userFigurine={session.user.figurine}
         userAvatarColor={userAvatarColor}
         userInitials={userInitials}
       >
-        <Card>
+        <Card className="mx-auto max-w-2xl rounded-2xl border-0">
           <CardHeader>
             <CardTitle>Не удалось загрузить игру</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm leading-6 text-muted">
               Партия недоступна, была удалена или сессия больше не имеет к ней доступа.
             </p>
             <Link
               href="/dashboard"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-ink px-4 text-sm font-medium text-white transition hover:bg-black"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-journey px-4 text-sm font-bold text-white shadow-[0_10px_28px_rgba(41,103,223,.25)] transition hover:-translate-y-0.5 hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
             >
               Вернуться в кабинет
             </Link>
@@ -73,7 +73,7 @@ export default async function GamePage({
   return (
     <AppShell
       userName={userName}
-      userAvatarUrl={membership?.user?.avatarUrl ?? session.user.avatarUrl}
+      userAvatarUrl={membership?.user?.avatarUrl ?? null}
       userFigurine={membership?.user?.figurine ?? session.user.figurine}
       userAvatarColor={userAvatarColor}
       userInitials={userInitials}

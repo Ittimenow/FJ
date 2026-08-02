@@ -1,0 +1,2 @@
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "game_room_view" TEXT NOT NULL DEFAULT 'classic';

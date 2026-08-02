@@ -5,14 +5,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        surface: "#f6f7f2",
-        ink: "#171717",
-        line: "#dedfd8",
-        success: "#166534",
-        warning: "#b45309"
+        surface: "#faf2e8",
+        card: "#fff9f1",
+        ink: "#17243f",
+        line: "#dfcebb",
+        journey: "#2967df",
+        action: "#f98f2f",
+        muted: "#657597",
+        success: "#587424",
+        warning: "#c0560c"
       },
       boxShadow: {
-        panel: "0 1px 2px rgba(23, 23, 23, 0.08)"
+        panel: "0 20px 45px rgba(27, 57, 118, 0.10), 0 4px 10px rgba(27, 57, 118, 0.06)",
+        action: "0 10px 26px rgba(249, 143, 47, 0.25)"
       }
     }
   },

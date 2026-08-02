@@ -1,10 +1,21 @@
 "use client";
 
 import { fastTrackBoard, ratRaceBoard } from "@cashflow/shared";
+import {
+  BookOpenText,
+  Boxes,
+  CircleHelp,
+  Download,
+  History,
+  LayoutDashboard,
+  Map as MapIcon,
+  MessageSquareText,
+  UsersRound
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
 import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
@@ -18,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { SystemRelease } from "@/lib/changes";
 import { money, shortDate } from "@/lib/format";
+import { gameStatusLabel } from "@/lib/game-labels";
 import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
 type AdminSection =
@@ -29,18 +41,26 @@ type AdminSection =
   | "feedback"
   | "changes";
 
-const mainMenu: Array<{ id: AdminSection; label: string }> = [
-  { id: "dashboard", label: "Дашборд" },
-  { id: "users", label: "Пользователи" },
-  { id: "feedback", label: "Предложения" },
-  { id: "changes", label: "Последние изменения" }
+type AdminMenuItem = {
+  id: AdminSection;
+  label: string;
+  icon: LucideIcon;
+};
+
+const mainMenu: AdminMenuItem[] = [
+  { id: "dashboard", label: "Обзор", icon: LayoutDashboard },
+  { id: "users", label: "Пользователи", icon: UsersRound },
+  { id: "feedback", label: "Предложения", icon: MessageSquareText },
+  { id: "changes", label: "Изменения", icon: History }
 ];
 
-const settingsMenu: Array<{ id: AdminSection; label: string }> = [
-  { id: "cards", label: "Карточки игры" },
-  { id: "rules", label: "Правила игры" },
-  { id: "board", label: "Игровое поле" }
+const settingsMenu: AdminMenuItem[] = [
+  { id: "cards", label: "Карточки игры", icon: Boxes },
+  { id: "rules", label: "Справочник правил", icon: BookOpenText },
+  { id: "board", label: "Игровое поле", icon: MapIcon }
 ];
+
+const allMenuItems = [...mainMenu, ...settingsMenu];
 
 const adminSections = new Set<AdminSection>([
   "dashboard",
@@ -67,59 +87,84 @@ export function AdminPanel({
 }) {
   const searchParams = useSearchParams();
   const section = parseAdminSection(searchParams.get("section"));
+  const activeMenuItem = allMenuItems.find((item) => item.id === section) ?? mainMenu[0];
+  const ActiveSectionIcon = activeMenuItem?.icon;
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[240px_1fr]">
-      <aside className="lg:sticky lg:top-4 lg:self-start">
-        <nav className="rounded-md border border-line bg-white p-3 shadow-panel">
-          <div className="mb-3 px-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-            Админ-панель
+    <div className="grid gap-5 sm:gap-6">
+      <section className="rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-3xl">
+            <h1 className="text-balance text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">
+              Управление порталом
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65 sm:text-base">
+              Контролируйте комнаты, аккаунты, игровые данные и обратную связь из одного рабочего пространства.
+            </p>
           </div>
-          <div className="space-y-1">
-            {mainMenu.map((item) => (
-              <MenuLink
-                key={item.id}
-                active={section === item.id}
-                href={adminSectionHref(item.id)}
-              >
-                {item.label}
-              </MenuLink>
-            ))}
-            <Link
-              href="/guide"
-              className="block rounded-md px-3 py-2 text-sm font-medium text-ink transition hover:bg-surface"
-            >
-              Правила игры
-            </Link>
+          <div className="inline-flex items-center gap-2 self-start rounded-xl bg-white/10 px-3 py-2 text-sm font-extrabold sm:self-auto">
+            {ActiveSectionIcon ? <ActiveSectionIcon size={17} aria-hidden="true" /> : null}
+            {activeMenuItem?.label ?? "Обзор"}
           </div>
+        </div>
+      </section>
 
-          <div className="mt-4 border-t border-line pt-3">
-            <div className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Настройки
+      <nav
+        aria-label="Разделы административной панели"
+        className="flex snap-x gap-2 overflow-x-auto pb-2 lg:hidden"
+      >
+        {allMenuItems.map((item) => (
+          <MobileMenuLink key={item.id} item={item} active={section === item.id} />
+        ))}
+        <Link
+          href="/guide"
+          className="inline-flex h-11 shrink-0 snap-start items-center gap-2 rounded-xl bg-card px-4 text-sm font-extrabold text-ink shadow-panel focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+        >
+          <CircleHelp size={17} aria-hidden="true" />
+          Правила для игроков
+        </Link>
+      </nav>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
+          <nav className="overflow-hidden rounded-2xl bg-card shadow-panel" aria-label="Разделы административной панели">
+            <div className="border-b border-line/70 p-4">
+              <div className="text-base font-extrabold text-ink">Разделы управления</div>
+              <p className="mt-1 text-xs leading-5 text-muted">Рабочие инструменты администратора.</p>
             </div>
-            <div className="space-y-1">
-              {settingsMenu.map((item) => (
-                <MenuLink
-                  key={item.id}
-                  active={section === item.id}
-                  href={adminSectionHref(item.id)}
-                >
-                  {item.label}
-                </MenuLink>
+            <div className="space-y-1 p-2">
+              {mainMenu.map((item) => (
+                <MenuLink key={item.id} item={item} active={section === item.id} />
               ))}
             </div>
-          </div>
-        </nav>
-      </aside>
 
-      <main className="min-w-0">
+            <div className="border-t border-line/70 p-2">
+              <div className="px-3 pb-2 pt-1 text-xs font-bold text-muted">Игровые данные</div>
+              <div className="space-y-1">
+                {settingsMenu.map((item) => (
+                  <MenuLink key={item.id} item={item} active={section === item.id} />
+                ))}
+              </div>
+            </div>
+            <Link
+              href="/guide"
+              className="flex items-center gap-3 border-t border-line/70 px-5 py-4 text-sm font-extrabold text-journey transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/25"
+            >
+              <CircleHelp size={18} aria-hidden="true" />
+              Правила для игроков
+            </Link>
+          </nav>
+        </aside>
+
+        <main className="min-w-0">
         {section === "dashboard" ? (
           <AdminDashboard profile={profile} games={games} token={token} />
         ) : null}
         {section === "users" ? (
-          <Card>
+          <Card className="rounded-2xl border-0">
             <CardHeader>
-              <CardTitle>Администрирование аккаунтов</CardTitle>
+              <CardTitle className="text-xl">Пользователи</CardTitle>
+              <p className="mt-1 text-sm leading-6 text-muted">Создавайте аккаунты, назначайте роли и контролируйте доступ к порталу.</p>
             </CardHeader>
             <CardContent>
               <AdminUsersPanel token={token} />
@@ -127,9 +172,10 @@ export function AdminPanel({
           </Card>
         ) : null}
         {section === "cards" ? (
-          <Card>
+          <Card className="rounded-2xl border-0">
             <CardHeader>
-              <CardTitle>Управление карточками игры</CardTitle>
+              <CardTitle className="text-xl">Карточки игры</CardTitle>
+              <p className="mt-1 text-sm leading-6 text-muted">Управляйте содержанием колод и техническими эффектами карточек.</p>
             </CardHeader>
             <CardContent>
               <AdminCardsPanel token={token} />
@@ -139,9 +185,10 @@ export function AdminPanel({
         {section === "rules" ? <GameRulesSettings /> : null}
         {section === "board" ? <GameBoardSettings /> : null}
         {section === "feedback" ? (
-          <Card>
+          <Card className="rounded-2xl border-0">
             <CardHeader>
-              <CardTitle>Предложения пользователей</CardTitle>
+              <CardTitle className="text-xl">Предложения пользователей</CardTitle>
+              <p className="mt-1 text-sm leading-6 text-muted">Новые сообщения остаются заметными, пока вы не отметите их прочитанными.</p>
             </CardHeader>
             <CardContent>
               <AdminFeedbackPanel token={token} />
@@ -149,16 +196,18 @@ export function AdminPanel({
           </Card>
         ) : null}
         {section === "changes" ? (
-          <Card>
+          <Card className="rounded-2xl border-0">
             <CardHeader>
-              <CardTitle>Последние изменения</CardTitle>
+              <CardTitle className="text-xl">Последние изменения</CardTitle>
+              <p className="mt-1 text-sm leading-6 text-muted">Что уже выпущено и какие улучшения готовятся к следующему релизу.</p>
             </CardHeader>
             <CardContent>
               <AdminChangesPanel releases={releases} currentVersion={currentVersion} />
             </CardContent>
           </Card>
         ) : null}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
@@ -175,24 +224,36 @@ function adminSectionHref(section: AdminSection) {
   ) as Route;
 }
 
-function MenuLink({
-  active,
-  href,
-  children
-}: {
-  active: boolean;
-  href: Route;
-  children: ReactNode;
-}) {
+function MenuLink({ item, active }: { item: AdminMenuItem; active: boolean }) {
+  const Icon = item.icon;
   return (
     <Link
-      href={href}
+      href={adminSectionHref(item.id)}
+      aria-current={active ? "page" : undefined}
       className={[
-        "block w-full rounded-md px-3 py-2 text-left text-sm font-medium transition",
-        active ? "bg-ink text-white" : "text-ink hover:bg-surface"
+        "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25",
+        active ? "bg-ink text-white shadow-[0_8px_20px_rgba(5,18,45,.16)]" : "text-muted hover:bg-white hover:text-ink"
       ].join(" ")}
     >
-      {children}
+      <Icon size={18} aria-hidden="true" />
+      {item.label}
+    </Link>
+  );
+}
+
+function MobileMenuLink({ item, active }: { item: AdminMenuItem; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={adminSectionHref(item.id)}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "inline-flex h-11 shrink-0 snap-start items-center gap-2 rounded-xl px-4 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25",
+        active ? "bg-ink text-white shadow-panel" : "bg-card text-muted shadow-panel"
+      ].join(" ")}
+    >
+      <Icon size={17} aria-hidden="true" />
+      {item.label}
     </Link>
   );
 }
@@ -210,12 +271,12 @@ function AdminDashboard({
 
   return (
     <div className="grid gap-5">
-      <Card>
-        <CardHeader>
-          <CardTitle>Краткие результаты</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
+        <div>
+          <h2 className="text-xl font-extrabold tracking-[-0.025em]">Состояние портала</h2>
+          <p className="mt-1 text-sm text-muted">Агрегированные результаты сыгранных партий.</p>
+        </div>
+          <dl className="mt-5 grid grid-cols-2 gap-y-5 sm:grid-cols-4 sm:divide-x sm:divide-line/70">
             <Metric label="Партий" value={profile.stats.gamesPlayed} />
             <Metric label="Побед" value={profile.stats.wins} />
             <Metric label="Выходов из крысиных бегов" value={profile.stats.escapedRatRace} />
@@ -223,27 +284,27 @@ function AdminDashboard({
               label="Средний cashflow"
               value={money(profile.stats.averageMonthlyCashflowCents)}
             />
-          </div>
-        </CardContent>
-      </Card>
+          </dl>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_380px]">
-        <Card>
+        <Card className="rounded-2xl border-0">
           <CardHeader>
-            <CardTitle>Список текущих игр</CardTitle>
+            <CardTitle className="text-xl">Текущие комнаты</CardTitle>
+            <p className="mt-1 text-sm text-muted">Все открытые и активные партии портала.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {currentGames.length === 0 ? (
-              <p className="text-sm text-neutral-600">Текущих игр пока нет.</p>
+              <p className="rounded-xl bg-card p-4 text-sm text-muted">Текущих игр пока нет.</p>
             ) : (
               currentGames.map((game) => <AdminGameRow key={game.id} game={game} />)
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border-0">
           <CardHeader>
-            <CardTitle>Новая комната</CardTitle>
+            <CardTitle className="text-xl">Новая комната</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <CreateGameForm token={token} />
@@ -254,9 +315,12 @@ function AdminDashboard({
         </Card>
       </section>
 
-      <Card>
+      <Card className="rounded-2xl border-0">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>История игр</CardTitle>
+          <div>
+            <CardTitle className="text-xl">История игр</CardTitle>
+            <p className="mt-1 text-sm text-muted">Завершённые партии и экспорт аналитики.</p>
+          </div>
           <AnalyticsExportButton token={token} />
         </CardHeader>
         <CardContent>
@@ -312,9 +376,10 @@ function AnalyticsExportButton({ token }: { token: string }) {
   return (
     <div className="flex flex-col items-start gap-1 sm:items-end">
       <Button variant="secondary" onClick={downloadExport} disabled={loading}>
+        <Download className="mr-2" size={16} aria-hidden="true" />
         {loading ? "Готовлю файл..." : "Скачать историю игр"}
       </Button>
-      {error ? <p className="max-w-sm text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="max-w-sm text-xs text-red-700" role="alert">{error}</p> : null}
     </div>
   );
 }
@@ -322,9 +387,10 @@ function AnalyticsExportButton({ token }: { token: string }) {
 function GameRulesSettings() {
   return (
     <div className="grid gap-5">
-      <Card>
+      <Card className="rounded-2xl border-0">
         <CardHeader>
-          <CardTitle>Правила игры</CardTitle>
+          <CardTitle className="text-xl">Справочник игровых данных</CardTitle>
+          <p className="mt-1 text-sm leading-6 text-muted">Технические обозначения, эффекты и условия, которые используются редактором карточек.</p>
         </CardHeader>
         <CardContent className="space-y-6">
           <RulesSection
@@ -374,22 +440,22 @@ function RulesSection({
 }) {
   return (
     <section>
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
-      <div className="overflow-x-auto rounded-md border border-line">
+      <h3 className="mb-3 text-base font-extrabold">{title}</h3>
+      <div className="overflow-x-auto rounded-xl border border-line/70" role="region" aria-label={title} tabIndex={0}>
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-line bg-surface text-neutral-500">
+          <thead className="bg-ink text-white">
             <tr>
-              <th className="w-56 px-3 py-2 font-medium">Поле / обозначение</th>
-              <th className="px-3 py-2 font-medium">Правило</th>
-              <th className="w-72 px-3 py-2 font-medium">Пример</th>
+              <th className="w-56 px-4 py-3 font-extrabold">Поле / обозначение</th>
+              <th className="px-4 py-3 font-extrabold">Правило</th>
+              <th className="w-72 px-4 py-3 font-extrabold">Пример</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="border-b border-line align-top last:border-b-0">
-                <td className="px-3 py-3 font-mono text-xs text-ink">{row.key}</td>
-                <td className="px-3 py-3 leading-5 text-ink">{row.rule}</td>
-                <td className="px-3 py-3 font-mono text-xs leading-5 text-neutral-700">
+              <tr key={row.key} className="border-b border-line/70 align-top last:border-b-0 even:bg-card/60">
+                <td className="px-4 py-3 font-mono text-xs font-bold text-ink">{row.key}</td>
+                <td className="px-4 py-3 leading-6 text-ink">{row.rule}</td>
+                <td className="px-4 py-3 font-mono text-xs leading-5 text-muted">
                   {row.example}
                 </td>
               </tr>
@@ -404,9 +470,10 @@ function RulesSection({
 function GameBoardSettings() {
   return (
     <div className="grid gap-5">
-      <Card>
+      <Card className="rounded-2xl border-0">
         <CardHeader>
-          <CardTitle>Игровое поле</CardTitle>
+          <CardTitle className="text-xl">Игровое поле</CardTitle>
+          <p className="mt-1 text-sm leading-6 text-muted">Порядок и системные типы клеток малого и быстрого кругов.</p>
         </CardHeader>
         <CardContent className="grid gap-5 xl:grid-cols-2">
           <BoardTable title="Малый круг" cells={ratRaceBoard} />
@@ -820,75 +887,102 @@ function BoardTable({
   cells: Array<{ index: number; type: string; label: string }>;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <h3 className="mb-3 text-sm font-semibold">{title}</h3>
+    <div>
+      <h3 className="mb-3 text-base font-extrabold">{title}</h3>
+      <div className="overflow-x-auto rounded-xl border border-line/70" role="region" aria-label={title} tabIndex={0}>
       <table className="w-full min-w-[420px] text-left text-sm">
-        <thead className="border-b border-line text-neutral-500">
+        <thead className="bg-ink text-white">
           <tr>
-            <th className="py-2 font-medium">#</th>
-            <th className="py-2 font-medium">Тип</th>
-            <th className="py-2 font-medium">Название клетки</th>
+            <th className="px-3 py-3 font-extrabold">#</th>
+            <th className="px-3 py-3 font-extrabold">Тип</th>
+            <th className="px-3 py-3 font-extrabold">Название клетки</th>
           </tr>
         </thead>
         <tbody>
           {cells.map((cell) => (
-            <tr key={`${title}-${cell.index}`} className="border-b border-line">
-              <td className="py-2">{cell.index + 1}</td>
-              <td className="py-2 font-mono text-xs">{cell.type}</td>
-              <td className="py-2">{cell.label}</td>
+            <tr key={`${title}-${cell.index}`} className="border-b border-line/70 last:border-b-0 even:bg-card/60">
+              <td className="px-3 py-3 font-bold">{cell.index + 1}</td>
+              <td className="px-3 py-3 font-mono text-xs">{cell.type}</td>
+              <td className="px-3 py-3">{cell.label}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
 
 function HistoryTable({ history }: { history: ProfileResponse["history"] }) {
   if (history.length === 0) {
-    return <p className="text-sm text-neutral-600">Истории игр пока нет.</p>;
+    return <p className="rounded-xl bg-card p-4 text-sm text-muted">Истории игр пока нет.</p>;
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+      <div className="grid gap-3 md:hidden">
+        {history.map((item) => (
+          <article key={`${item.gameId}-${item.joinedAt}`} className="rounded-xl bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link className="font-extrabold text-journey" href={`/games/${item.gameId}`}>
+                  {item.title}
+                </Link>
+                <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
+              </div>
+              <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">
+                {gameStatusLabel(item.status)}
+              </Badge>
+            </div>
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div><dt className="text-xs text-muted">Результат</dt><dd className="mt-1 font-bold">{gameResult(item)}</dd></div>
+              <div><dt className="text-xs text-muted">Cashflow</dt><dd className="mt-1 font-bold">{money(item.monthlyCashflowCents)}</dd></div>
+              <div><dt className="text-xs text-muted">Профессия</dt><dd className="mt-1 font-bold">{item.profession ?? "—"}</dd></div>
+              <div><dt className="text-xs text-muted">Дата</dt><dd className="mt-1 font-bold">{shortDate(item.joinedAt)}</dd></div>
+            </dl>
+          </article>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[780px] text-left text-sm">
-        <thead className="border-b border-line text-neutral-500">
+        <thead className="border-b border-line/70 text-muted">
           <tr>
-            <th className="py-2 font-medium">Партия</th>
-            <th className="py-2 font-medium">Статус</th>
-            <th className="py-2 font-medium">Результат</th>
-            <th className="py-2 font-medium">Профессия</th>
-            <th className="py-2 font-medium">Cashflow</th>
-            <th className="py-2 font-medium">Дата</th>
+            <th className="pb-3 font-bold">Партия</th>
+            <th className="pb-3 font-bold">Статус</th>
+            <th className="pb-3 font-bold">Результат</th>
+            <th className="pb-3 font-bold">Профессия</th>
+            <th className="pb-3 font-bold">Cashflow</th>
+            <th className="pb-3 font-bold">Дата</th>
           </tr>
         </thead>
         <tbody>
           {history.map((item) => (
-            <tr key={`${item.gameId}-${item.joinedAt}`} className="border-b border-line">
-              <td className="py-3">
-                <Link className="font-medium text-success" href={`/games/${item.gameId}`}>
+            <tr key={`${item.gameId}-${item.joinedAt}`} className="border-b border-line/70 last:border-b-0">
+              <td className="py-4 pr-4">
+                <Link className="font-extrabold text-journey" href={`/games/${item.gameId}`}>
                   {item.title}
                 </Link>
-                <div className="text-xs text-neutral-500">{item.code}</div>
+                <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
               </td>
-              <td className="py-3">{item.status}</td>
-              <td className="py-3">{gameResult(item)}</td>
-              <td className="py-3">{item.profession ?? "—"}</td>
-              <td className="py-3">{money(item.monthlyCashflowCents)}</td>
-              <td className="py-3">{shortDate(item.joinedAt)}</td>
+              <td className="py-4 pr-4">{gameStatusLabel(item.status)}</td>
+              <td className="py-4 pr-4">{gameResult(item)}</td>
+              <td className="py-4 pr-4">{item.profession ?? "—"}</td>
+              <td className="py-4 pr-4 font-bold">{money(item.monthlyCashflowCents)}</td>
+              <td className="py-4">{shortDate(item.joinedAt)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-md border border-line bg-surface p-3">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
+    <div className="min-w-0 px-3 sm:px-5 first:pl-0 last:pr-0">
+      <dt className="text-xs font-bold text-muted">{label}</dt>
+      <dd className="mt-1 break-words text-xl font-extrabold tracking-[-0.025em] text-ink">{value}</dd>
     </div>
   );
 }
@@ -898,15 +992,15 @@ function AdminGameRow({ game }: { game: GameListItem }) {
   return (
     <Link
       href={`/games/${game.id}`}
-      className="flex items-center justify-between gap-3 rounded-md border border-line p-3 transition hover:bg-surface"
+      className="flex items-center justify-between gap-3 rounded-xl bg-card p-4 transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
     >
       <div>
-        <div className="font-medium">{game.title}</div>
-        <div className="text-xs text-neutral-500">
+        <div className="font-extrabold">{game.title}</div>
+        <div className="mt-1 text-xs text-muted">
           {game.code} · {players.length}/{game.maxPlayers} игроков
         </div>
       </div>
-      <Badge className="bg-surface text-ink">{game.status}</Badge>
+      <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">{gameStatusLabel(game.status)}</Badge>
     </Link>
   );
 }

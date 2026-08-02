@@ -425,6 +425,35 @@ export class GamesService {
     ]);
   }
 
+  async searchUsersForGame(gameId: string, actorUserId: string, rawQuery: string) {
+    await this.ensureCanManageGame(gameId, actorUserId);
+
+    const query = rawQuery.trim();
+    if (query.length < 2) return [];
+
+    const game = await this.prisma.game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { players: { select: { userId: true } } }
+    });
+    const existingUserIds = game.players
+      .map((player) => player.userId)
+      .filter((userId): userId is string => Boolean(userId));
+
+    return this.prisma.user.findMany({
+      where: {
+        status: AccountStatus.ACTIVE,
+        id: { notIn: existingUserIds },
+        OR: [
+          { email: { contains: query, mode: "insensitive" } },
+          { displayName: { contains: query, mode: "insensitive" } }
+        ]
+      },
+      orderBy: [{ displayName: "asc" }, { email: "asc" }],
+      take: 8,
+      select: { id: true, displayName: true, email: true }
+    });
+  }
+
   async deleteGame(gameId: string, actorUserId: string) {
     await this.ensureCanManageGame(gameId, actorUserId);
 
@@ -4419,7 +4448,8 @@ export class GamesService {
                 email: true,
                 displayName: true,
                 avatarUrl: true,
-                figurine: true
+                figurine: true,
+                gameRoomView: true
               }
             },
             profession: true,

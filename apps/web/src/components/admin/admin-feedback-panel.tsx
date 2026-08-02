@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Inbox } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { publicApiBaseUrl } from "@/lib/api";
@@ -8,16 +9,25 @@ import type { FeedbackMessage } from "@/lib/types";
 export function AdminFeedbackPanel({ token }: { token: string }) {
   const [messages, setMessages] = useState<FeedbackMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function load() {
-    const response = await fetch(`${publicApiBaseUrl()}/api/feedback`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!response.ok) {
-      setError("Не удалось загрузить предложения");
-      return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/feedback`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Не удалось загрузить предложения");
+      setMessages((await response.json()) as FeedbackMessage[]);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : "Не удалось загрузить предложения"
+      );
+    } finally {
+      setLoading(false);
     }
-    setMessages((await response.json()) as FeedbackMessage[]);
   }
 
   useEffect(() => {
@@ -25,100 +35,143 @@ export function AdminFeedbackPanel({ token }: { token: string }) {
   }, []);
 
   async function markRead(id: string) {
-    await fetch(`${publicApiBaseUrl()}/api/feedback/${id}/read`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isRead: true } : m))
+    setPendingId(id);
+    setError(null);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/feedback/${id}/read`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Не удалось отметить сообщение прочитанным");
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === id ? { ...message, isRead: true } : message
+        )
+      );
+    } catch (markError) {
+      setError(
+        markError instanceof Error
+          ? markError.message
+          : "Не удалось отметить сообщение прочитанным"
+      );
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  const unread = messages.filter((message) => !message.isRead);
+  const read = messages.filter((message) => message.isRead);
+
+  if (loading) {
+    return <div className="rounded-xl bg-card p-5 text-sm text-muted" role="status">Загружаем предложения…</div>;
+  }
+
+  if (messages.length === 0 && !error) {
+    return (
+      <div className="flex items-start gap-3 rounded-xl bg-card p-5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8effe] text-journey" aria-hidden="true">
+          <Inbox size={19} />
+        </span>
+        <div>
+          <div className="font-extrabold">Новых предложений пока нет</div>
+          <p className="mt-1 text-sm leading-6 text-muted">Сообщения пользователей появятся здесь автоматически.</p>
+        </div>
+      </div>
     );
-  }
-
-  const unread = messages.filter((m) => !m.isRead);
-  const read = messages.filter((m) => m.isRead);
-
-  if (error) {
-    return <p className="text-sm text-red-700">{error}</p>;
-  }
-
-  if (messages.length === 0) {
-    return <p className="text-sm text-neutral-600">Предложений пока нет.</p>;
   }
 
   return (
     <div className="space-y-6">
-      {unread.length > 0 && (
-        <section>
-          <h3 className="mb-3 text-sm font-semibold text-ink">
-            Новые ({unread.length})
-          </h3>
-          <div className="space-y-3">
-            {unread.map((msg) => (
-              <FeedbackRow key={msg.id} msg={msg} onMarkRead={markRead} />
-            ))}
-          </div>
-        </section>
-      )}
+      {error ? (
+        <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-800" role="alert">
+          {error}
+        </div>
+      ) : null}
 
-      {read.length > 0 && (
-        <section>
-          <h3 className="mb-3 text-sm font-semibold text-neutral-500">
-            Прочитанные ({read.length})
-          </h3>
+      {unread.length > 0 ? (
+        <section aria-labelledby="new-feedback-heading">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 id="new-feedback-heading" className="text-lg font-extrabold text-ink">Новые сообщения</h3>
+            <span className="rounded-lg bg-[#e8effe] px-2.5 py-1 text-xs font-extrabold text-journey">{unread.length}</span>
+          </div>
           <div className="space-y-3">
-            {read.map((msg) => (
-              <FeedbackRow key={msg.id} msg={msg} onMarkRead={markRead} />
+            {unread.map((message) => (
+              <FeedbackRow
+                key={message.id}
+                message={message}
+                pending={pendingId === message.id}
+                onMarkRead={markRead}
+              />
             ))}
           </div>
         </section>
-      )}
+      ) : null}
+
+      {read.length > 0 ? (
+        <section aria-labelledby="read-feedback-heading">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 id="read-feedback-heading" className="text-lg font-extrabold text-ink">Прочитанные</h3>
+            <span className="rounded-lg bg-card px-2.5 py-1 text-xs font-extrabold text-muted">{read.length}</span>
+          </div>
+          <div className="space-y-3">
+            {read.map((message) => (
+              <FeedbackRow
+                key={message.id}
+                message={message}
+                pending={false}
+                onMarkRead={markRead}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
 
 function FeedbackRow({
-  msg,
+  message,
+  pending,
   onMarkRead
 }: {
-  msg: FeedbackMessage;
+  message: FeedbackMessage;
+  pending: boolean;
   onMarkRead: (id: string) => void;
 }) {
-  const date = new Date(msg.createdAt).toLocaleString("ru-RU", {
+  const date = new Date(message.createdAt).toLocaleString("ru-RU", {
     day: "2-digit",
-    month: "2-digit",
+    month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit"
   });
 
   return (
-    <div
-      className={[
-        "rounded-md border p-4",
-        msg.isRead ? "border-line bg-white" : "border-blue-200 bg-blue-50"
-      ].join(" ")}
-    >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="text-xs text-neutral-500">
-          <span className="font-medium text-ink">
-            {msg.user?.displayName ?? "Аноним"}
-          </span>
-          {msg.user?.email ? (
-            <span className="ml-1">({msg.user.email})</span>
-          ) : null}
-          <span className="ml-2">{date}</span>
+    <article className={message.isRead ? "rounded-xl bg-card p-4 sm:p-5" : "rounded-xl bg-[#e8effe] p-4 sm:p-5"}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="font-extrabold text-ink">
+            {message.user?.displayName ?? "Анонимный пользователь"}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted">
+            {message.user?.email ? <span>{message.user.email}</span> : null}
+            <time dateTime={message.createdAt}>{date}</time>
+          </div>
         </div>
-        {!msg.isRead && (
+        {!message.isRead ? (
           <Button
+            type="button"
             variant="secondary"
-            className="h-7 shrink-0 text-xs"
-            onClick={() => onMarkRead(msg.id)}
+            className="h-9 shrink-0 px-3 text-xs"
+            disabled={pending}
+            onClick={() => void onMarkRead(message.id)}
           >
-            Отметить прочитанным
+            <Check className="mr-1.5" size={15} aria-hidden="true" />
+            {pending ? "Сохраняем..." : "Отметить прочитанным"}
           </Button>
-        )}
+        ) : null}
       </div>
-      <p className="whitespace-pre-wrap text-sm text-ink">{msg.body}</p>
-    </div>
+      <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{message.body}</p>
+    </article>
   );
 }

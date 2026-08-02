@@ -9,6 +9,7 @@ export interface ProfileResponse {
     gender: string | null;
     birthDate: string | null;
     gameExperience: number | null;
+    gameRoomView: "classic" | "journey";
     role: "USER" | "HOST" | "ADMIN";
     status: "ACTIVE" | "BLOCKED" | "DELETED";
     createdAt: string;
@@ -103,6 +104,7 @@ export interface GamePlayer {
     email: string;
     avatarUrl: string | null;
     figurine: string | null;
+    gameRoomView: "classic" | "journey";
   } | null;
   profession: {
     id: number;

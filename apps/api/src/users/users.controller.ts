@@ -17,6 +17,7 @@ import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateAvatarDto } from "./dto/update-avatar.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
+import { DeleteAccountDto } from "./dto/delete-account.dto";
 import { UsersService } from "./users.service";
 
 @UseGuards(JwtAuthGuard)
@@ -58,5 +59,14 @@ export class UsersController {
     @Body() dto: ChangePasswordDto
   ) {
     return this.users.changePassword(user.userId, dto);
+  }
+
+  @Delete("me/personal-data")
+  @HttpCode(HttpStatus.OK)
+  revokeConsentAndDeleteAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: DeleteAccountDto
+  ) {
+    return this.users.revokeConsentAndDeleteAccount(user.userId, dto.currentPassword);
   }
 }

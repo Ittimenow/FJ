@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus, Save, Trash2 } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -85,16 +86,22 @@ export function AdminCardsPanel({ token }: { token: string }) {
   }, [filter, view]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap gap-2 border-b border-line pb-4">
+    <div className="space-y-6">
+      <div className="flex gap-2 overflow-x-auto border-b border-line/70 pb-4" role="tablist" aria-label="Режим редактора карточек">
         <Button
           variant={view === "editor" ? "primary" : "secondary"}
+          className="shrink-0"
+          role="tab"
+          aria-selected={view === "editor"}
           onClick={() => setView("editor")}
         >
           Редактор карточек
         </Button>
         <Button
           variant={view === "unclear" ? "primary" : "secondary"}
+          className="shrink-0"
+          role="tab"
+          aria-selected={view === "unclear"}
           onClick={() => setView("unclear")}
         >
           Непонятные карточки
@@ -105,11 +112,13 @@ export function AdminCardsPanel({ token }: { token: string }) {
 
       {view === "editor" ? (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Тип карточек">
             {cardTypes.map((type) => (
               <Button
                 key={type.value}
+                className="shrink-0"
                 variant={filter === type.value ? "primary" : "secondary"}
+                aria-pressed={filter === type.value}
                 onClick={() => setFilter(type.value)}
               >
                 {type.label}
@@ -117,18 +126,20 @@ export function AdminCardsPanel({ token }: { token: string }) {
             ))}
           </div>
 
-          <div className="rounded-md border border-line bg-surface p-4">
+          <section className="rounded-xl bg-card p-4 sm:p-5" aria-labelledby="new-card-heading">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold">Новая карточка</h3>
-                <p className="mt-1 text-xs text-neutral-500">
+                <h3 id="new-card-heading" className="font-extrabold">Новая карточка</h3>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
                   Создается в выбранном типе карточек. Meta, effects и conditions используют формат редактора.
                 </p>
               </div>
               <Button
-                variant={createFormOpen ? "secondary" : "primary"}
+                variant={createFormOpen ? "secondary" : "action"}
+                aria-expanded={createFormOpen}
                 onClick={() => setCreateFormOpen((current) => !current)}
               >
+                {!createFormOpen ? <Plus className="mr-2" size={16} aria-hidden="true" /> : null}
                 {createFormOpen ? "Скрыть форму" : "Создать карточку"}
               </Button>
             </div>
@@ -149,23 +160,23 @@ export function AdminCardsPanel({ token }: { token: string }) {
                 }}
               />
             ) : null}
-          </div>
+          </section>
 
           {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-800" role="alert">
               {error}
             </div>
           ) : null}
 
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold">
+            <h3 className="text-lg font-extrabold">
               {cardTypeLabel(filter)}: {cards.length}
             </h3>
-            {loading ? <span className="text-xs text-neutral-500">Загрузка...</span> : null}
+            {loading ? <span className="text-sm text-muted" role="status">Загрузка…</span> : null}
           </div>
 
           {cards.length === 0 && !loading ? (
-            <p className="rounded-md border border-line bg-surface p-3 text-sm text-neutral-600">
+            <p className="rounded-xl bg-card p-4 text-sm text-muted">
               Карточек этого типа пока нет.
             </p>
           ) : null}
@@ -223,25 +234,25 @@ function UnclearCardsPage({ token }: { token: string }) {
   return (
     <div className="space-y-4">
       {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-800" role="alert">
           {error}
         </div>
       ) : null}
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">
+          <h3 className="text-lg font-extrabold">
             Непонятные карточки: {cards.length}
           </h3>
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-sm text-muted">
             Активные карточки без строк в card_effects.
           </p>
         </div>
-        {loading ? <span className="text-xs text-neutral-500">Загрузка...</span> : null}
+        {loading ? <span className="text-sm text-muted" role="status">Загрузка…</span> : null}
       </div>
 
       {cards.length === 0 && !loading ? (
-        <p className="rounded-md border border-line bg-surface p-3 text-sm text-neutral-600">
+        <p className="rounded-xl bg-card p-4 text-sm text-muted">
           Таких карточек сейчас нет.
         </p>
       ) : null}
@@ -316,12 +327,12 @@ function CreateCardForm({
   }
 
   return (
-    <form className="mt-4 grid gap-3" onSubmit={createCard}>
+    <form className="mt-5 grid gap-4 border-t border-line/70 pt-5" onSubmit={createCard} aria-busy={saving}>
       <div className="grid gap-3 lg:grid-cols-[220px_1fr_1fr]">
-        <label className="grid gap-1 text-xs font-medium text-neutral-600">
+        <label className="grid gap-2 text-sm font-extrabold text-ink">
           Тип
           <select
-            className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-ink"
+            className="h-12 rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
             value={form.cardType}
             onChange={(event) =>
               setForm((current) => ({
@@ -351,10 +362,10 @@ function CreateCardForm({
         />
       </div>
 
-      <label className="grid gap-1 text-xs font-medium text-neutral-600">
+      <label className="grid gap-2 text-sm font-extrabold text-ink">
         Текст карточки
         <textarea
-          className="min-h-24 rounded-md border border-line bg-white p-2 text-sm leading-5 text-ink outline-none transition placeholder:text-neutral-400 focus:border-ink"
+          className="min-h-28 rounded-lg border border-line bg-white p-3 text-sm leading-6 text-ink outline-none transition placeholder:text-muted focus:border-action focus:ring-4 focus:ring-action/20"
           value={form.bodyText}
           placeholder="Описание карточки"
           onChange={(event) =>
@@ -378,7 +389,7 @@ function CreateCardForm({
           }
           placeholder="real_estate"
         />
-        <label className="flex items-end gap-2 pb-2 text-sm font-medium text-neutral-700">
+        <label className="flex min-h-12 items-center gap-2 self-end rounded-lg bg-white px-3 text-sm font-bold text-ink">
           <input
             type="checkbox"
             checked={form.isActive}
@@ -416,8 +427,9 @@ function CreateCardForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={saving}>
-          {saving ? "Создание" : "Создать карточку"}
+        <Button type="submit" variant="action" disabled={saving}>
+          <Plus className="mr-2" size={16} aria-hidden="true" />
+          {saving ? "Создаём..." : "Создать карточку"}
         </Button>
         <Button
           variant="secondary"
@@ -430,7 +442,7 @@ function CreateCardForm({
           Очистить
         </Button>
         {error ? (
-          <p className="break-words text-xs leading-4 text-red-700">{error}</p>
+          <p className="break-words text-sm leading-5 text-red-700" role="alert">{error}</p>
         ) : null}
       </div>
     </form>
@@ -449,17 +461,22 @@ function CardsTable({
   onCardDeleted: (card: ApiCard) => void;
 }) {
   return (
-    <div className="max-w-full overflow-x-auto rounded-md border border-line">
+    <div
+      className="max-w-full overflow-x-auto rounded-xl border border-line/70"
+      role="region"
+      aria-label="Редактор карточек"
+      tabIndex={0}
+    >
       <table className="min-w-[1280px] table-fixed text-left text-sm">
-        <thead className="border-b border-line bg-surface text-neutral-500">
+        <thead className="sticky top-0 z-10 bg-ink text-white">
           <tr>
             <HeaderCell className="w-16">ID</HeaderCell>
-            <HeaderCell className="w-64">title</HeaderCell>
-            <HeaderCell className="w-96">bodyText</HeaderCell>
-            <HeaderCell className="w-80">meta</HeaderCell>
-            <HeaderCell className="w-96">effects</HeaderCell>
-            <HeaderCell className="w-80">conditions</HeaderCell>
-            <HeaderCell className="w-40">actions</HeaderCell>
+            <HeaderCell className="w-64">Название</HeaderCell>
+            <HeaderCell className="w-96">Текст карточки</HeaderCell>
+            <HeaderCell className="w-80">Meta</HeaderCell>
+            <HeaderCell className="w-96">Effects</HeaderCell>
+            <HeaderCell className="w-80">Conditions</HeaderCell>
+            <HeaderCell className="w-40">Действия</HeaderCell>
           </tr>
         </thead>
         <tbody>
@@ -584,7 +601,7 @@ function EditableCardRow({
   }
 
   return (
-    <tr className="border-b border-line align-top last:border-b-0">
+    <tr className="border-b border-line/70 align-top last:border-b-0 even:bg-card/50">
       <BodyCell>{card.id}</BodyCell>
       <BodyCell>{card.title}</BodyCell>
       <BodyCell>{card.bodyText}</BodyCell>
@@ -606,24 +623,26 @@ function EditableCardRow({
       <td className="px-3 py-3">
         <div className="grid gap-2">
           <Button
-            className="h-8 w-full px-3 text-xs"
-            variant={changed ? "primary" : "secondary"}
+            className="h-9 w-full px-3 text-xs"
+            variant={changed ? "action" : "secondary"}
             disabled={!changed || saving || deleting}
             onClick={saveCard}
           >
-            {saving ? "Сохранение" : "Сохранить"}
+            <Save className="mr-1.5" size={14} aria-hidden="true" />
+            {saving ? "Сохраняем..." : "Сохранить"}
           </Button>
           <Button
-            className="h-8 w-full px-3 text-xs"
+            className="h-9 w-full px-3 text-xs"
             variant="danger"
             disabled={saving || deleting}
             onClick={deleteCard}
           >
-            {deleting ? "Удаление" : "Удалить"}
+            <Trash2 className="mr-1.5" size={14} aria-hidden="true" />
+            {deleting ? "Удаляем..." : "Удалить"}
           </Button>
         </div>
         {error ? (
-          <p className="mt-2 break-words text-xs leading-4 text-red-700">{error}</p>
+          <p className="mt-2 break-words text-xs leading-4 text-red-700" role="alert">{error}</p>
         ) : null}
       </td>
     </tr>
@@ -638,7 +657,7 @@ function HeaderCell({
   children: ReactNode;
 }) {
   return (
-    <th className={`px-3 py-2 font-medium ${className ?? ""}`}>
+    <th className={`px-3 py-3 font-extrabold ${className ?? ""}`}>
       {children}
     </th>
   );
@@ -664,7 +683,7 @@ function EditableTextCell({
   return (
     <td className="px-3 py-3">
       <textarea
-        className="min-h-32 w-full resize-y rounded-md border border-line bg-white p-2 font-mono text-xs leading-5 text-ink outline-none transition placeholder:text-neutral-400 focus:border-ink"
+        className="min-h-32 w-full resize-y rounded-lg border border-line bg-white p-2.5 font-mono text-xs leading-5 text-ink outline-none transition placeholder:text-muted focus:border-action focus:ring-4 focus:ring-action/20"
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
@@ -685,10 +704,10 @@ function TextInput({
   placeholder: string;
 }) {
   return (
-    <label className="grid gap-1 text-xs font-medium text-neutral-600">
+    <label className="grid gap-2 text-sm font-extrabold text-ink">
       {label}
       <input
-        className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition placeholder:text-neutral-400 focus:border-ink"
+        className="h-12 rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition placeholder:text-muted focus:border-action focus:ring-4 focus:ring-action/20"
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
@@ -709,10 +728,10 @@ function TextAreaInput({
   placeholder: string;
 }) {
   return (
-    <label className="grid gap-1 text-xs font-medium text-neutral-600">
+    <label className="grid gap-2 text-sm font-extrabold text-ink">
       {label}
       <textarea
-        className="min-h-32 w-full resize-y rounded-md border border-line bg-white p-2 font-mono text-xs leading-5 text-ink outline-none transition placeholder:text-neutral-400 focus:border-ink"
+        className="min-h-32 w-full resize-y rounded-lg border border-line bg-white p-2.5 font-mono text-xs leading-5 text-ink outline-none transition placeholder:text-muted focus:border-action focus:ring-4 focus:ring-action/20"
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}

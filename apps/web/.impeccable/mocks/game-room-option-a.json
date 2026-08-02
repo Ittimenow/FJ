@@ -1,0 +1,8 @@
+{
+  "approved": true,
+  "surface": "game-room",
+  "mode": "operate",
+  "conceptSeed": "1299dbdc",
+  "composition": "Центральное игровое поле, финансовая панель слева, действия текущего хода справа и горизонтальная история событий снизу.",
+  "source": "game-room-option-a.png"
+}

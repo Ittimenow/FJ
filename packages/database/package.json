@@ -9,6 +9,8 @@
     "build": "tsc",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:prepare-figurines": "prisma db execute --file prisma/deploy/20260728_add_figurines.sql --schema prisma/schema.prisma",
+    "prisma:prepare-password-reset": "prisma db execute --file prisma/deploy/20260802_add_password_reset_tokens.sql --schema prisma/schema.prisma",
+    "prisma:prepare-personal-data-consents": "prisma db execute --file prisma/deploy/20260802_add_personal_data_consents.sql --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "prisma:push": "prisma db push --schema prisma/schema.prisma --skip-generate",
     "prisma:seed": "tsx prisma/seed.ts",
