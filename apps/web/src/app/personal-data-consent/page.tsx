@@ -1,5 +1,11 @@
 import { PERSONAL_DATA_CONSENT_TEXT, PERSONAL_DATA_CONSENT_VERSION } from "@cashflow/shared";
+import type { Metadata } from "next";
 import { LegalDocument } from "@/components/legal/legal-document";
+
+export const metadata: Metadata = {
+  title: "Согласие на обработку персональных данных | Financial Journey",
+  alternates: { canonical: "/personal-data-consent" }
+};
 
 export default function PersonalDataConsentPage() {
   const [heading, ...paragraphs] = PERSONAL_DATA_CONSENT_TEXT.split("\n\n");

@@ -13,7 +13,8 @@ import { GuideToc } from "./guide-toc";
 
 export const metadata: Metadata = {
   title: "Правила игры «Финансовое путешествие» | Financial Journey",
-  description: "Правила финансовой игры «Финансовое путешествие» по мотивам CASHFLOW"
+  description: "Правила финансовой игры «Финансовое путешествие» по мотивам CASHFLOW",
+  alternates: { canonical: "/guide" }
 };
 
 export default async function GuidePage({

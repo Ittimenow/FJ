@@ -5,6 +5,22 @@ export default function nextConfig(phase) {
   return {
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
     transpilePackages: ["@cashflow/shared"],
-    typedRoutes: true
+    typedRoutes: true,
+    async headers() {
+      return [
+        {
+          source: "/:path(login|register|forgot-password|reset-password|dashboard|profile|design-preview)",
+          headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+        },
+        {
+          source: "/games/:path*",
+          headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+        },
+        {
+          source: "/join/:path*",
+          headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+        }
+      ];
+    }
   };
 }

@@ -11,6 +11,13 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   metadataBase: publicSiteMetadataBase,
+  alternates: {
+    canonical: "/"
+  },
+  robots: {
+    index: true,
+    follow: true
+  },
   title: "Финансовое путешествие — онлайн-игра о финансовых решениях",
   description:
     "Создавайте игровые комнаты для 2–6 участников, управляйте доходами и расходами, оценивайте сделки и развивайте финансовое мышление.",

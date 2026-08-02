@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "search-engine-indexing-foundations",
+          "category": "improvement",
+          "summary": "Поисковые системы теперь получают карту публичных страниц, корректные адреса материалов и запрет на индексацию закрытых разделов."
+        },
+        {
           "id": "account-type-registration-choice",
           "category": "feature",
           "summary": "При регистрации теперь можно выбрать аккаунт игрока или ведущего, чтобы сразу получить подходящие возможности в личном кабинете."
