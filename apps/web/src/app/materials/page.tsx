@@ -2,6 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { ArrowRight, BookOpenText } from "lucide-react";
 import { materials } from "./content";
+import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
 
 export const metadata: Metadata = {
   title: "Материалы о финансовых играх | Financial Journey",
@@ -41,7 +42,7 @@ export default function MaterialsPage() {
           </Link>
         ))}
       </section>
-      <footer className="material-footer"><Link href="/">Вернуться на главную</Link><p>© 2026 Financial Journey</p></footer>
+      <footer className="material-footer"><Link href="/">Вернуться на главную</Link><CookieSettingsLink /><p>© 2026 Financial Journey</p></footer>
     </main>
   );
 }

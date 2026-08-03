@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "consent-controlled-site-analytics",
+          "category": "feature",
+          "summary": "На сайте появилась аналитика посещений с понятным выбором cookies: она включается только после разрешения и может быть отключена в любой момент."
+        },
+        {
           "id": "financial-game-learning-materials",
           "category": "feature",
           "summary": "На сайте появился раздел с понятными материалами о финансовых играх, ходе партии и подготовке командной встречи."

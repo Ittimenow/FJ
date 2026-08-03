@@ -1,6 +1,7 @@
 import { ArrowLeft, TicketCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
 
 export function AuthShell({
   title,
@@ -56,6 +57,9 @@ export function AuthShell({
               <p className="mt-3 text-sm leading-6 text-muted sm:text-base sm:leading-7">{description}</p>
             ) : null}
             <div className="mt-7">{children}</div>
+          </div>
+          <div className="mt-6 flex justify-center border-t border-line/70 pt-4 text-xs font-bold text-muted">
+            <CookieSettingsLink />
           </div>
       </section>
     </main>

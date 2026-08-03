@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { materials, type MaterialSlug } from "@/app/materials/content";
 import { publicSiteUrl } from "@/lib/site";
+import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
 
 type Section = {
   heading: string;
@@ -93,6 +94,7 @@ export function MaterialPage({ slug, intro, sections, takeaway }: MaterialPagePr
 
       <footer className="material-footer">
         <Link href={"/materials" as Route}><ArrowLeft aria-hidden="true" size={18} />Все материалы</Link>
+        <CookieSettingsLink />
         <p>Материалы носят образовательный характер и не являются финансовой рекомендацией.</p>
       </footer>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Providers } from "@/components/layout/providers";
+import { YandexMetrikaConsent } from "@/components/analytics/yandex-metrika-consent";
 import { publicSiteMetadataBase } from "@/lib/site";
 import "./globals.css";
 
@@ -61,6 +62,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={manrope.variable} suppressHydrationWarning>
+        <YandexMetrikaConsent />
         <Providers>{children}</Providers>
       </body>
     </html>

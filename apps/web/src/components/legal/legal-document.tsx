@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
 
 export function LegalDocument({ title, version, children }: { title: string; version: string; children: ReactNode }) {
   return (
@@ -17,6 +18,10 @@ export function LegalDocument({ title, version, children }: { title: string; ver
         <div className="mt-7 space-y-7 text-base leading-7 text-ink [&_h2]:text-xl [&_h2]:font-extrabold [&_h2]:tracking-[-0.02em] [&_li]:ml-5 [&_li]:list-disc [&_p]:text-muted">
           {children}
         </div>
+        <footer className="mt-9 flex flex-wrap items-center justify-between gap-4 border-t border-line/70 bg-transparent p-0 pt-5 text-sm font-bold text-muted">
+          <Link href="/">На главную</Link>
+          <CookieSettingsLink className="text-journey" />
+        </footer>
       </article>
     </main>
   );
