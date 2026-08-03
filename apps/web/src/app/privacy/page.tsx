@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { LegalDocument } from "@/components/legal/legal-document";
 
 export const metadata: Metadata = {
-  title: "Политика обработки персональных данных | Financial Journey",
+  title: "Политика обработки персональных данных | Финансовое путешествие",
   alternates: { canonical: "/privacy" }
 };
 

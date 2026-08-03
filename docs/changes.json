@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "mobile-global-menu-login-link",
+          "category": "fix",
+          "summary": "В мобильной шапке появилась постоянно доступная кнопка входа и перехода в личный кабинет."
+        },
+        {
+          "id": "unified-project-logo-and-favicon",
+          "category": "improvement",
+          "summary": "На всех страницах появился единый знак с двухстрочным названием проекта, а вкладки браузера получили новый фирменный значок."
+        },
+        {
           "id": "consent-controlled-site-analytics",
           "category": "feature",
           "summary": "На сайте появилась аналитика посещений с понятным выбором cookies: она включается только после разрешения и может быть отключена в любой момент."

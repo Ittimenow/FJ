@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: "Финансовое путешествие",
     description:
       "Онлайн-игра, где каждое решение меняет ваш денежный поток и маршрут.",
-    siteName: "Financial Journey",
+    siteName: "Финансовое путешествие",
     locale: "ru_RU",
     type: "website",
     images: [
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
         url: "/financial-journey-board.png",
         width: 1586,
         height: 992,
-        alt: "Изометрический игровой маршрут Financial Journey"
+        alt: "Изометрический игровой маршрут «Финансовое путешествие»"
       }
     ]
   },
@@ -46,7 +46,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.svg",
-    shortcut: "/favicon.svg"
+    shortcut: "/favicon.svg",
+    apple: "/logo.svg"
   }
 };
 

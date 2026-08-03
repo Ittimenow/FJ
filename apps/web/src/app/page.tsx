@@ -15,12 +15,14 @@ import {
   Rocket,
   Scale,
   Target,
+  UserRound,
   Users,
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { publicSiteUrl } from "@/lib/site";
 import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 type ModalKind = "create" | "join" | "team" | "host" | "leader" | "ai" | null;
 
@@ -408,11 +410,7 @@ export default function Home() {
     <main id="top" className="landing-root">
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Финансовое путешествие — на главную">
-          <span className="brand-mark" aria-hidden="true"><span>↗</span></span>
-          <span className="brand-copy">
-            <strong>Financial Journey</strong>
-            <small>Финансовое путешествие</small>
-          </span>
+          <BrandLogo markClassName="h-[42px] w-[42px]" textClassName="text-[13px]" />
         </a>
 
         <nav className="desktop-nav" aria-label="Основная навигация">
@@ -433,26 +431,36 @@ export default function Home() {
           </a>
         </div>
 
-        <details
-          className="mobile-nav"
-          ref={mobileMenuRef}
-          onToggle={(event) => setMobileMenuOpen(event.currentTarget.open)}
-        >
-          <summary
-            aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}
-            aria-expanded={mobileMenuOpen}
-          ><span /><span /></summary>
-          <nav aria-label="Мобильная навигация">
-            <a href="#journey" onClick={closeMobileMenu}>Как проходит игра</a>
-            <a href="#routes" onClick={closeMobileMenu}>Игрокам</a>
-            <a href="#team" onClick={closeMobileMenu}>Найти команду</a>
-            <a href="#hosts" onClick={closeMobileMenu}>Ведущим</a>
-            <a href="#ai" onClick={closeMobileMenu}>Игра с ИИ <small>Скоро</small></a>
-            <a href="#faq" onClick={closeMobileMenu}>FAQ</a>
-            <a href="/materials" onClick={closeMobileMenu}>Материалы</a>
-            <a className="mobile-start-link" href="/register" onClick={() => track("register_click", "mobile_menu")}>Начать игру</a>
-          </nav>
-        </details>
+        <div className="mobile-header-actions">
+          <a
+            className="mobile-account-link"
+            href="/login"
+            aria-label="Войти или открыть личный кабинет"
+            onClick={() => track("login_click", "mobile_header")}
+          >
+            <UserRound size={23} strokeWidth={2.2} aria-hidden="true" />
+          </a>
+          <details
+            className="mobile-nav"
+            ref={mobileMenuRef}
+            onToggle={(event) => setMobileMenuOpen(event.currentTarget.open)}
+          >
+            <summary
+              aria-label={mobileMenuOpen ? "Закрыть меню" : "Открыть меню"}
+              aria-expanded={mobileMenuOpen}
+            ><span /><span /></summary>
+            <nav aria-label="Мобильная навигация">
+              <a href="#journey" onClick={closeMobileMenu}>Как проходит игра</a>
+              <a href="#routes" onClick={closeMobileMenu}>Игрокам</a>
+              <a href="#team" onClick={closeMobileMenu}>Найти команду</a>
+              <a href="#hosts" onClick={closeMobileMenu}>Ведущим</a>
+              <a href="#ai" onClick={closeMobileMenu}>Игра с ИИ <small>Скоро</small></a>
+              <a href="#faq" onClick={closeMobileMenu}>FAQ</a>
+              <a href="/materials" onClick={closeMobileMenu}>Материалы</a>
+              <a className="mobile-start-link" href="/register" onClick={() => track("register_click", "mobile_menu")}>Начать игру</a>
+            </nav>
+          </details>
+        </div>
       </header>
 
       <section className="hero">
@@ -784,11 +792,10 @@ export default function Home() {
 
       <footer>
         <a className="brand footer-brand" href="#top">
-          <span className="brand-mark" aria-hidden="true"><span>↗</span></span>
-          <span className="brand-copy"><strong>Financial Journey</strong><small>Финансовое путешествие</small></span>
+          <BrandLogo markClassName="h-[42px] w-[42px]" textClassName="text-[13px] text-white" />
         </a>
         <nav aria-label="Документы"><a href="/materials">Материалы</a><a href="/privacy">Конфиденциальность</a><a href="#terms">Условия</a><a href="#faq">FAQ</a><CookieSettingsLink /></nav>
-        <p>© 2026 Financial Journey</p>
+        <p>© 2026 Финансовое путешествие</p>
       </footer>
 
       {modal && <Modal kind={modal} onClose={() => setModal(null)} />}
@@ -802,7 +809,7 @@ export default function Home() {
               {
                 "@type": "Organization",
                 "@id": `${publicSiteUrl}/#organization`,
-                name: "Financial Journey",
+                name: "Финансовое путешествие",
                 url: `${publicSiteUrl}/`,
               },
               {

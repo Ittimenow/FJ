@@ -12,7 +12,7 @@ import type { ProfileResponse } from "@/lib/types";
 import { GuideToc } from "./guide-toc";
 
 export const metadata: Metadata = {
-  title: "Правила игры «Финансовое путешествие» | Financial Journey",
+  title: "Правила игры «Финансовое путешествие»",
   description: "Правила финансовой игры «Финансовое путешествие» по мотивам CASHFLOW",
   alternates: { canonical: "/guide" }
 };

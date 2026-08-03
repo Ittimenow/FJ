@@ -2,6 +2,7 @@ import { ArrowLeft, TicketCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 export function AuthShell({
   title,
@@ -20,12 +21,9 @@ export function AuthShell({
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/"
-              className="inline-flex min-w-0 items-center gap-2 text-sm font-extrabold text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey"
+              className="inline-flex min-w-0 items-center text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey"
             >
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-journey text-sm text-white" aria-hidden="true">
-                Ф
-              </span>
-              <span className="truncate">Финансовое путешествие</span>
+              <BrandLogo markClassName="h-10 w-10" textClassName="text-[12px] sm:text-[13px]" />
             </Link>
             <Link
               href="/"

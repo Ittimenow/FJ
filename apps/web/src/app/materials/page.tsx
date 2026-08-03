@@ -3,9 +3,10 @@ import Link from "next/link";
 import { ArrowRight, BookOpenText } from "lucide-react";
 import { materials } from "./content";
 import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 export const metadata: Metadata = {
-  title: "Материалы о финансовых играх | Financial Journey",
+  title: "Материалы о финансовых играх | Финансовое путешествие",
   description: "Практические материалы о финансовых играх, ходе партии и организации совместной игры.",
   alternates: { canonical: "/materials" },
   openGraph: {
@@ -25,7 +26,9 @@ export default function MaterialsPage() {
   return (
     <main className="material-shell material-index">
       <header className="material-header">
-        <Link className="material-brand" href="/">Financial Journey</Link>
+        <Link className="material-brand" href="/" aria-label="Финансовое путешествие — на главную">
+          <BrandLogo markClassName="h-11 w-11" textClassName="text-[13px]" />
+        </Link>
         <nav aria-label="Основная навигация"><Link href="/guide">Правила игры</Link><Link className="material-header-action" href="/login">Начать игру</Link></nav>
       </header>
       <section className="material-index-hero">
@@ -42,7 +45,7 @@ export default function MaterialsPage() {
           </Link>
         ))}
       </section>
-      <footer className="material-footer"><Link href="/">Вернуться на главную</Link><CookieSettingsLink /><p>© 2026 Financial Journey</p></footer>
+      <footer className="material-footer"><Link href="/">Вернуться на главную</Link><CookieSettingsLink /><p>© 2026 Финансовое путешествие</p></footer>
     </main>
   );
 }

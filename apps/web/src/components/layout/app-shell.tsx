@@ -2,6 +2,7 @@ import { figurineImagePath } from "@cashflow/shared";
 import Link from "next/link";
 import { GameRoomHeaderSlot } from "@/components/layout/game-room-header-context";
 import { GuideLink } from "@/components/layout/guide-link";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -27,10 +28,12 @@ export function AppShell({
           <Link
             href="/dashboard"
             aria-label="Финансовое путешествие — личный кабинет"
-            className="flex min-h-11 min-w-11 items-center gap-3 rounded-xl font-extrabold tracking-[-0.025em] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+            className="flex min-h-11 min-w-11 items-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
           >
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-journey text-lg text-white shadow-[0_8px_20px_rgba(41,103,223,.22)]" aria-hidden="true">Ф</span>
-            <span className="hidden sm:inline">Финансовое путешествие</span>
+            <BrandLogo
+              markClassName="h-10 w-10"
+              textClassName="text-[11px] min-[420px]:text-[12px] sm:text-[13px]"
+            />
           </Link>
           <GameRoomHeaderSlot />
           {userName ? (

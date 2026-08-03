@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { materials, type MaterialSlug } from "@/app/materials/content";
 import { publicSiteUrl } from "@/lib/site";
 import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 type Section = {
   heading: string;
@@ -31,7 +32,7 @@ export function MaterialPage({ slug, intro, sections, takeaway }: MaterialPagePr
         description: material.description,
         inLanguage: "ru-RU",
         mainEntityOfPage: url,
-        author: { "@type": "Organization", name: "Financial Journey", url: publicSiteUrl }
+        author: { "@type": "Organization", name: "Финансовое путешествие", url: publicSiteUrl }
       },
       {
         "@type": "BreadcrumbList",
@@ -47,7 +48,9 @@ export function MaterialPage({ slug, intro, sections, takeaway }: MaterialPagePr
   return (
     <main className="material-shell">
       <header className="material-header">
-        <Link className="material-brand" href="/">Financial Journey</Link>
+        <Link className="material-brand" href="/" aria-label="Финансовое путешествие — на главную">
+          <BrandLogo markClassName="h-11 w-11" textClassName="text-[13px]" />
+        </Link>
         <nav aria-label="Навигация по материалам">
           <Link href={"/materials" as Route}>Все материалы</Link>
           <Link className="material-header-action" href="/login">Начать игру</Link>

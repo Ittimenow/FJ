@@ -4,7 +4,7 @@ import { materialBySlug } from "../content";
 
 const material = materialBySlug("how-to-play");
 export const metadata: Metadata = {
-  title: `${material.title} | Financial Journey`, description: material.description,
+  title: `${material.title} | Финансовое путешествие`, description: material.description,
   alternates: { canonical: "/materials/how-to-play" },
   openGraph: { title: material.title, description: material.description, url: "/materials/how-to-play", type: "article" },
   twitter: { card: "summary_large_image", title: material.title, description: material.description }
