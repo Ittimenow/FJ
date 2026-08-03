@@ -420,6 +420,7 @@ export default function Home() {
           <a href="#team">Найти команду</a>
           <a href="#hosts">Ведущим</a>
           <a href="#faq">FAQ</a>
+          <a href="/materials">Материалы</a>
         </nav>
 
         <div className="header-actions">
@@ -447,6 +448,7 @@ export default function Home() {
             <a href="#hosts" onClick={closeMobileMenu}>Ведущим</a>
             <a href="#ai" onClick={closeMobileMenu}>Игра с ИИ <small>Скоро</small></a>
             <a href="#faq" onClick={closeMobileMenu}>FAQ</a>
+            <a href="/materials" onClick={closeMobileMenu}>Материалы</a>
             <a className="mobile-start-link" href="/register" onClick={() => track("register_click", "mobile_menu")}>Начать игру</a>
           </nav>
         </details>
@@ -784,7 +786,7 @@ export default function Home() {
           <span className="brand-mark" aria-hidden="true"><span>↗</span></span>
           <span className="brand-copy"><strong>Financial Journey</strong><small>Финансовое путешествие</small></span>
         </a>
-        <nav aria-label="Документы"><a href="/privacy">Конфиденциальность</a><a href="#terms">Условия</a><a href="#faq">FAQ</a></nav>
+        <nav aria-label="Документы"><a href="/materials">Материалы</a><a href="/privacy">Конфиденциальность</a><a href="#terms">Условия</a><a href="#faq">FAQ</a></nav>
         <p>© 2026 Financial Journey</p>
       </footer>
 
