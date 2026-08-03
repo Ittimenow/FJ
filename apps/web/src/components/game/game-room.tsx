@@ -352,7 +352,7 @@ export function GameRoom({
       setTurnAnimationPhase("ready");
       setTurnPopupOrigin(popupOriginFrom(mobileBoardRef.current));
       turnPopupClosingRef.current = false;
-      setTurnPopupOpen(gameRoomView === "classic");
+      setTurnPopupOpen(gameRoomView === "classic" && desktopTurnPopupEnabled());
     } else if (!rollingDice) {
       setTurnPopupOpen(false);
     }
@@ -536,7 +536,7 @@ export function GameRoom({
     if (rollingDice) return;
     setError(null);
     turnPopupClosingRef.current = false;
-    setTurnPopupOpen(true);
+    setTurnPopupOpen(desktopTurnPopupEnabled());
     setRollingDice(true);
     setTurnAnimationPhase("rolling");
     setAnimatedPosition(me?.position ?? null);
@@ -574,7 +574,12 @@ export function GameRoom({
   }
 
   async function closeTurnPopup() {
-    if (turnPopupClosingRef.current || !turnPopupOpen) return;
+    if (turnPopupClosingRef.current) return;
+    if (!turnPopupOpen) {
+      setAnimatedPosition(null);
+      setTurnTabRequest((current) => current + 1);
+      return;
+    }
     turnPopupClosingRef.current = true;
     setTurnAnimationPhase("closing");
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -835,7 +840,16 @@ export function GameRoom({
           rolling={rollingDice}
           onRoll={rollDice}
           actions={
-            <ActionsPanel
+            <>
+              <MobileDiceAction
+                canRoll={canRoll && !pendingAction}
+                rolling={rollingDice}
+                phase={turnAnimationPhase}
+                diceValues={diceFaces}
+                onRoll={rollDice}
+                onSkip={skipTurn}
+              />
+              <ActionsPanel
               canChooseDeal={canChooseDeal}
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
               onDrawBigDeal={() => draw("BIG_DEAL")}
@@ -873,8 +887,9 @@ export function GameRoom({
               onLoanAmountChange={updateLoanAmount}
               onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
-              embedded
-            />
+                embedded
+              />
+            </>
           }
           activity={
             <>
@@ -980,7 +995,16 @@ export function GameRoom({
               }
               turnTabRequest={turnTabRequest}
               actions={
-                <ActionsPanel
+                <>
+                  <MobileDiceAction
+                    canRoll={canRoll && !pendingAction}
+                    rolling={rollingDice}
+                    phase={turnAnimationPhase}
+                    diceValues={diceFaces}
+                    onRoll={rollDice}
+                    onSkip={skipTurn}
+                  />
+                  <ActionsPanel
                   canChooseDeal={canChooseDeal}
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
                   onDrawBigDeal={() => draw("BIG_DEAL")}
@@ -1018,8 +1042,9 @@ export function GameRoom({
                   onLoanAmountChange={updateLoanAmount}
                   onTakeLoan={takeLoan}
                   canTakeLoan={canTakeLoan}
-                  embedded
-                />
+                    embedded
+                  />
+                </>
               }
             />
           </div>
@@ -1261,6 +1286,74 @@ function TurnPopup({
         )}
       </div>
     </div>
+  );
+}
+
+function MobileDiceAction({
+  canRoll,
+  rolling,
+  phase,
+  diceValues,
+  onRoll,
+  onSkip
+}: {
+  canRoll: boolean;
+  rolling: boolean;
+  phase: TurnAnimationPhase;
+  diceValues: number[];
+  onRoll: () => void;
+  onSkip: () => void;
+}) {
+  const status = rolling
+    ? "Бросаем кубик…"
+    : phase === "moving"
+      ? "Фишка движется по полю…"
+      : phase === "landed"
+        ? "Ход выполнен"
+        : canRoll
+          ? "Ваш ход"
+          : "Ожидайте своего хода";
+
+  return (
+    <section className="mb-3 rounded-xl bg-[#fff5ed] p-3 xl:hidden" aria-label="Бросок кубика">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
+          <p className="mt-1 text-xs text-[#8f5b37]">
+            {diceValues.length > 1 ? "Бонус благотворительности: два кубика" : "Обычный ход: один кубик"}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-2" aria-live="polite">
+          {diceValues.map((diceValue, index) => (
+            <div key={index} className="scale-[.58] -m-4">
+              <DiceFace value={diceValue} rolling={rolling} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <Button
+        className="mt-3 w-full"
+        variant="action"
+        onClick={onRoll}
+        disabled={!canRoll || rolling}
+        aria-busy={rolling}
+      >
+        {rolling
+          ? "Бросаем…"
+          : canRoll
+            ? diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"
+            : "Ожидайте ход"}
+      </Button>
+      {canRoll && !rolling ? (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="mt-2 w-full rounded-lg py-2 text-xs font-medium text-[#7b3f17] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
+        >
+          Пропустить ход
+        </button>
+      ) : null}
+    </section>
   );
 }
 
@@ -1564,6 +1657,10 @@ function normalizeBoardPosition(position: number, boardSize: number) {
 
 function popupMoveDuration(steps: number) {
   return Math.min(1100, Math.max(420, 300 + steps * 110));
+}
+
+function desktopTurnPopupEnabled() {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches;
 }
 
 function popupOriginFrom(element: HTMLElement | null) {
@@ -3511,7 +3608,7 @@ function ActionsPanel({
   const content = (
     <>
       {canChooseDeal ? (
-        <div className="rounded-md border border-line bg-surface p-3">
+        <div className="rounded-md bg-[#f5faf2] p-3">
           <div className="text-sm font-medium">Возможность</div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button variant="secondary" onClick={onDrawSmallDeal}>
@@ -3537,7 +3634,7 @@ function ActionsPanel({
       ) : null}
 
       {marketSaleOffer ? (
-        <div className="rounded-md border border-line bg-surface p-3">
+        <div className="rounded-md bg-[#f5f6fc] p-3">
           <div className="text-sm font-medium">Предложение рынка</div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             {marketSaleOffer.title}
@@ -3590,7 +3687,7 @@ function ActionsPanel({
       ) : null}
 
       {charityChoice ? (
-        <div className="rounded-md border border-line bg-surface p-3">
+        <div className="rounded-md bg-[#fff5ed] p-3">
           <div className="text-sm font-medium">Благотворительность</div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             Заплатите 10% от своих общих доходов и кидайте 2 кубика 3 своих хода.
@@ -3618,7 +3715,7 @@ function ActionsPanel({
       ) : null}
 
       {doodadPaymentChoice ? (
-        <div className="rounded-md border border-line bg-surface p-3">
+        <div className="rounded-md bg-[#fff4f7] p-3">
           <div className="text-sm font-medium">Выбор оплаты</div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             {doodadPaymentChoice.title}
@@ -3648,7 +3745,10 @@ function ActionsPanel({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-line bg-surface p-3">
+      <div className={[
+        "rounded-md p-3",
+        latestCard ? "bg-[#f5faf2]" : "bg-surface"
+      ].join(" ")}>
         <div className="text-sm font-medium">
           {latestCard ? "Текущая сделка" : "Последняя сделка"}
         </div>

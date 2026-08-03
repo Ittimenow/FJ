@@ -97,7 +97,7 @@ export function GameRoomVariantTwo({
 
   return (
     <section className="journey-game-view grid min-w-0 gap-4" aria-label="Игровое поле, вариант 2">
-      <div className="flex justify-end">
+      <div className="hidden justify-end xl:flex">
         <button
           type="button"
           onClick={onRoll}

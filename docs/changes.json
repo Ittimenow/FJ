@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "mobile-inline-dice-and-colored-actions",
+          "category": "improvement",
+          "summary": "На мобильных устройствах бросок кубика перенесён в блок хода без всплывающего окна, а карточки действий получили цвета соответствующих клеток поля."
+        },
+        {
           "id": "mobile-global-menu-login-link",
           "category": "fix",
           "summary": "В мобильной шапке появилась постоянно доступная кнопка входа и перехода в личный кабинет."
