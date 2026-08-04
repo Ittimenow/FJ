@@ -19,6 +19,7 @@ services:
       - .env.vps
     environment:
       HOST: 127.0.0.1
+      WEB_PORT: 3011
       DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:?set POSTGRES_DB}?schema=public
     depends_on:
       postgres:
