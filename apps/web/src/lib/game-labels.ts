@@ -1,6 +1,7 @@
 export const gameStatusLabels: Record<string, string> = {
   WAITING: "Собираем игроков",
   IN_PROGRESS: "Партия идёт",
+  PAUSED: "На паузе",
   ENDED: "Завершена",
   CANCELLED: "Отменена"
 };
