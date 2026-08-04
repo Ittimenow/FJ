@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "telegram-registration-notifications",
+          "category": "feature",
+          "summary": "Администратор может получать в Telegram уведомления с основными сведениями о каждой новой регистрации."
+        },
+        {
+          "id": "mobile-dashboard-history-card-width",
+          "category": "fix",
+          "summary": "Карточки истории партий теперь остаются в пределах личного кабинета на телефонах, а длинные названия аккуратно переносятся на новые строки."
+        },
+        {
           "id": "mobile-chat-independent-overlay",
           "category": "fix",
           "summary": "Мобильные всплывающие окна теперь полностью помещаются между глобальным меню и краями экрана, а затемнение покрывает весь экран."

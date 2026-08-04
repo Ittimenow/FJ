@@ -96,6 +96,18 @@ nano .env.vps
 - `JWT_SECRET` вторым `openssl rand -base64 32`;
 - `POSTGRES_PASSWORD` значением `openssl rand -hex 24`.
 
+Чтобы получать уведомления о новых регистрациях, создайте Telegram-бота через
+`@BotFather`, отправьте ему любое сообщение и задайте в `.env.vps`:
+
+```env
+TELEGRAM_BOT_TOKEN=токен_бота
+TELEGRAM_CHAT_ID=id_вашего_чата
+```
+
+ID личного чата находится в поле `message.chat.id` ответа
+`https://api.telegram.org/bot<токен>/getUpdates`. Без этих переменных уведомления
+отключены и не влияют на регистрацию.
+
 Если домен уже направлен A-записью на сервер:
 
 ```env

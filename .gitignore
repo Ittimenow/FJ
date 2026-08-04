@@ -7,6 +7,7 @@ build
 coverage
 backups
 .env
+.env.vps
 .env.local
 .env.*.local
 *.log

@@ -190,7 +190,7 @@ export default async function DashboardPage() {
                 />
               ) : (
                 <>
-                  <div className="grid gap-3 md:hidden">
+                  <div className="grid min-w-0 gap-3 md:hidden">
                     {profile.history.map((item) => (
                       <HistoryCard key={`${item.gameId}-${item.joinedAt}`} item={item} />
                     ))}
@@ -309,11 +309,11 @@ function GameCard({
 
 function HistoryCard({ item }: { item: ProfileResponse["history"][number] }) {
   return (
-    <article className="rounded-xl bg-card p-4">
-      <div className="flex min-w-0 items-start justify-between gap-3">
+    <article className="w-full min-w-0 rounded-xl bg-card p-4">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
         <div className="min-w-0">
           <Link
-            className="block truncate font-extrabold text-journey hover:text-[#1f56c8]"
+            className="block min-w-0 break-words font-extrabold text-journey hover:text-[#1f56c8]"
             href={`/games/${item.gameId}`}
           >
             {item.title}
@@ -322,22 +322,22 @@ function HistoryCard({ item }: { item: ProfileResponse["history"][number] }) {
         </div>
         <Badge className={gameStatusBadgeClass(item.status)}>{gameStatusLabel(item.status)}</Badge>
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div>
+      <dl className="mt-4 grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 text-sm">
+        <div className="min-w-0">
           <dt className="text-xs font-bold text-muted">Профессия</dt>
-          <dd className="mt-1 font-medium text-ink">{item.profession ?? "—"}</dd>
+          <dd className="mt-1 break-words font-medium text-ink">{item.profession ?? "—"}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs font-bold text-muted">Cashflow</dt>
-          <dd className="mt-1 font-extrabold text-ink">{money(item.monthlyCashflowCents)}</dd>
+          <dd className="mt-1 break-words font-extrabold text-ink">{money(item.monthlyCashflowCents)}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs font-bold text-muted">Результат</dt>
-          <dd className="mt-1 font-medium text-ink">{historyResult(item)}</dd>
+          <dd className="mt-1 break-words font-medium text-ink">{historyResult(item)}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="text-xs font-bold text-muted">Дата</dt>
-          <dd className="mt-1 font-medium text-ink">{shortDate(item.joinedAt)}</dd>
+          <dd className="mt-1 break-words font-medium text-ink">{shortDate(item.joinedAt)}</dd>
         </div>
       </dl>
     </article>

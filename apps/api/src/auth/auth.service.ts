@@ -16,6 +16,7 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { TelegramRegistrationService } from "./telegram-registration.service";
 
 const AVATAR_COLORS = [
   "#e11d48","#db2777","#9333ea","#7c3aed","#2563eb",
@@ -32,7 +33,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly mail: MailService
+    private readonly mail: MailService,
+    private readonly telegramRegistration: TelegramRegistrationService
   ) {}
 
   async register(dto: RegisterDto, metadata: { ipAddress: string | null; userAgent: string | null }) {
@@ -71,6 +73,13 @@ export class AuthService {
         }
       });
       return created;
+    });
+
+    void this.telegramRegistration.sendRegistration({
+      email: user.email,
+      displayName: user.displayName,
+      accountType: dto.accountType,
+      registeredAt: user.createdAt
     });
 
     return this.authPayload(user);
