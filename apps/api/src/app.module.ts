@@ -2,6 +2,7 @@ import { Controller, Get, Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
+import { CitiesModule } from "./cities/cities.module";
 import { FeedbackModule } from "./feedback/feedback.module";
 import { GamesModule } from "./games/games.module";
 import { MailModule } from "./mail/mail.module";
@@ -93,6 +94,7 @@ function classifyDatabaseError(error: unknown) {
     MailModule,
     PrismaModule,
     AuthModule,
+    CitiesModule,
     AdminModule,
     UsersModule,
     GamesModule,

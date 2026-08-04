@@ -3,6 +3,7 @@ export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 export const DISPLAY_NAME_MIN_LENGTH = 2;
 export const DISPLAY_NAME_MAX_LENGTH = 80;
+export const TELEGRAM_CHANNEL_MAX_LENGTH = 32;
 export type AccountType = "PLAYER" | "HOST";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,4 +47,18 @@ export function validateDisplayName(value: string) {
 
 export function validateAccountType(value: string): value is AccountType {
   return value === "PLAYER" || value === "HOST";
+}
+
+export function normalizeTelegramChannel(value: string) {
+  const username = value.trim().replace(/^@/, "").toLowerCase();
+  return username ? `@${username}` : "";
+}
+
+export function validateTelegramChannel(value: string) {
+  const channel = normalizeTelegramChannel(value);
+  if (!channel) return "Введите Telegram-канал.";
+  if (!/^@[a-z][a-z0-9_]{4,31}$/i.test(channel)) {
+    return `Используйте от 5 до ${TELEGRAM_CHANNEL_MAX_LENGTH} латинских букв, цифр или подчёркиваний после @.`;
+  }
+  return null;
 }

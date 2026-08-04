@@ -88,6 +88,8 @@ model User {
   birthDate       DateTime? @map("birth_date")
   gameExperience  Int?      @map("game_experience")
   gameRoomView    String    @default("classic") @map("game_room_view")
+  telegramChannel String?   @map("telegram_channel")
+  cityId          String?   @map("city_id") @db.Uuid
   role         SystemRole    @default(USER)
   status       AccountStatus @default(ACTIVE)
   blockedAt    DateTime?     @map("blocked_at")
@@ -102,8 +104,22 @@ model User {
   feedbackMessages  FeedbackMessage[]   @relation("UserFeedback")
   passwordResetTokens PasswordResetToken[]
   personalDataConsents PersonalDataConsent[]
+  city                 City?                 @relation(fields: [cityId], references: [id], onDelete: SetNull)
 
   @@map("users")
+}
+
+model City {
+  id         String @id @db.Uuid
+  name       String
+  searchName String @map("search_name")
+  region     String
+  regionCode String @map("region_code")
+  users      User[]
+
+  @@unique([name, region])
+  @@index([searchName])
+  @@map("cities")
 }
 
 model PersonalDataConsent {

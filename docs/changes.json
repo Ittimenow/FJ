@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "registration-telegram-and-russian-city",
+          "category": "feature",
+          "summary": "При регистрации теперь указываются Telegram-канал и город с проверкой имени канала и поиском по справочнику городов России."
+        },
+        {
           "id": "reliable-vps-outbound-integrations",
           "category": "fix",
           "summary": "Серверные интеграции, включая уведомления о регистрациях в Telegram, теперь используют стабильное сетевое подключение VPS."

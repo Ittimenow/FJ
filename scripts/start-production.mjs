@@ -180,9 +180,17 @@ async function setupDatabaseIfNeeded() {
     "prisma:prepare-figurines",
     "--workspace=@cashflow/database"
   ]);
+  await run(npmCommand, [
+    "run",
+    "prisma:prepare-registration-details",
+    "--workspace=@cashflow/database"
+  ]);
 
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);
+
+  log("Synchronizing Russian cities.");
+  await run(npmCommand, ["run", "db:sync-cities"]);
 
   const { PrismaClient } = await import("@prisma/client");
   const prisma = new PrismaClient();

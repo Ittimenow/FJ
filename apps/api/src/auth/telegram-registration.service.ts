@@ -5,6 +5,8 @@ type RegistrationNotification = {
   email: string;
   displayName: string;
   accountType: "PLAYER" | "HOST";
+  telegramChannel: string;
+  city: string;
   registeredAt: Date;
 };
 
@@ -38,6 +40,8 @@ export class TelegramRegistrationService {
       "🆕 Новая регистрация",
       `Имя: ${notification.displayName}`,
       `Email: ${notification.email}`,
+      `Telegram: ${notification.telegramChannel}`,
+      `Город: ${notification.city}`,
       `Тип аккаунта: ${accountType}`,
       `Дата: ${registeredAt} (МСК)`
     ].join("\n");

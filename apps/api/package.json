@@ -6,10 +6,11 @@
     "prestart:dev": "npm run build --workspace=@cashflow/shared",
     "prebuild": "npm run build --workspace=@cashflow/shared",
     "pretypecheck": "npm run build --workspace=@cashflow/shared",
+    "pretest": "npm run build --workspace=@cashflow/shared",
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
-    "test": "node --import tsx --test src/games/*.test.ts src/auth/*.test.ts",
+    "test": "node --import tsx --test src/games/*.test.ts src/auth/*.test.ts src/cities/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

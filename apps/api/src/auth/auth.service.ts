@@ -39,11 +39,16 @@ export class AuthService {
 
   async register(dto: RegisterDto, metadata: { ipAddress: string | null; userAgent: string | null }) {
     const email = dto.email.toLowerCase();
-    const [existing, userCount] = await Promise.all([
+    const [existing, userCount, city] = await Promise.all([
       this.prisma.user.findUnique({ where: { email } }),
-      this.prisma.user.count()
+      this.prisma.user.count(),
+      this.prisma.city.findUnique({
+        where: { id: dto.cityId },
+        select: { id: true, name: true, region: true }
+      })
     ]);
     if (existing) throw new ConflictException("Аккаунт с такой электронной почтой уже существует.");
+    if (!city) throw new BadRequestException("Выберите город из списка.");
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const adminEmails = (this.config.get<string>("ADMIN_EMAILS") ?? "")
@@ -56,6 +61,8 @@ export class AuthService {
           email,
           passwordHash,
           displayName: dto.displayName,
+          telegramChannel: dto.telegramChannel,
+          cityId: city.id,
           avatarColor: randomAvatarColor() ?? null,
           role: registrationSystemRole(
             dto.accountType,
@@ -79,6 +86,8 @@ export class AuthService {
       email: user.email,
       displayName: user.displayName,
       accountType: dto.accountType,
+      telegramChannel: user.telegramChannel ?? dto.telegramChannel,
+      city: `${city.name}, ${city.region}`,
       registeredAt: user.createdAt
     });
 

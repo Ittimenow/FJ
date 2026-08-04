@@ -11,20 +11,26 @@ import { Input } from "@/components/ui/input";
 import { publicApiBaseUrl } from "@/lib/api";
 import { PERSONAL_DATA_CONSENT_VERSION } from "@cashflow/shared";
 import { FieldError, FieldHint, FormNotice } from "./auth-form-feedback";
+import { CityCombobox } from "./city-combobox";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
+  TELEGRAM_CHANNEL_MAX_LENGTH,
   normalizeDisplayName,
   normalizeEmail,
   validateDisplayName,
   validateEmail,
   validatePassword,
-  validateAccountType
+  validateAccountType,
+  normalizeTelegramChannel,
+  validateTelegramChannel
 } from "./auth-validation";
 
 type RegisterErrors = {
   displayName?: string | undefined;
+  telegramChannel?: string | undefined;
+  cityId?: string | undefined;
   email?: string | undefined;
   password?: string | undefined;
   accountType?: string | undefined;
@@ -51,26 +57,34 @@ export function RegisterForm({
     const email = normalizeEmail(String(form.get("email") ?? ""));
     const password = String(form.get("password") ?? "");
     const displayName = normalizeDisplayName(String(form.get("displayName") ?? ""));
+    const telegramChannel = normalizeTelegramChannel(String(form.get("telegramChannel") ?? ""));
+    const cityId = String(form.get("cityId") ?? "");
     const accountType = invited ? "PLAYER" : String(form.get("accountType") ?? "");
     const personalDataConsent = form.get("personalDataConsent") === "on";
     const nextErrors: RegisterErrors = {
       displayName: validateDisplayName(displayName) ?? undefined,
+      telegramChannel: validateTelegramChannel(telegramChannel) ?? undefined,
+      cityId: cityId ? undefined : "Выберите город из списка.",
       email: validateEmail(email) ?? undefined,
       password: validatePassword(password) ?? undefined,
       accountType: validateAccountType(accountType) ? undefined : "Выберите, как вы планируете использовать аккаунт.",
       consent: personalDataConsent ? undefined : "Подтвердите согласие на обработку персональных данных."
     };
-    if (nextErrors.displayName || nextErrors.email || nextErrors.password || nextErrors.accountType || nextErrors.consent) {
+    if (nextErrors.displayName || nextErrors.telegramChannel || nextErrors.cityId || nextErrors.email || nextErrors.password || nextErrors.accountType || nextErrors.consent) {
       setErrors(nextErrors);
       const target = nextErrors.displayName
         ? "#register-name"
-        : nextErrors.email
-          ? "#register-email"
-          : nextErrors.password
-            ? "#register-password"
-            : nextErrors.accountType
-              ? "#register-account-player"
-              : "#personal-data-consent";
+        : nextErrors.telegramChannel
+          ? "#register-telegram-channel"
+          : nextErrors.cityId
+            ? "#register-city"
+            : nextErrors.email
+              ? "#register-email"
+              : nextErrors.password
+                ? "#register-password"
+                : nextErrors.accountType
+                  ? "#register-account-player"
+                  : "#personal-data-consent";
       event.currentTarget.querySelector<HTMLInputElement>(target)?.focus();
       setLoading(false);
       return;
@@ -84,6 +98,8 @@ export function RegisterForm({
           email,
           password,
           displayName,
+          telegramChannel,
+          cityId,
           accountType,
           personalDataConsent,
           consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -186,6 +202,33 @@ export function RegisterForm({
           />
           <FieldError id="register-name-error">{errors.displayName}</FieldError>
         </div>
+        <div>
+          <label htmlFor="register-telegram-channel" className="mb-2 block text-sm font-extrabold text-ink">
+            Telegram-канал
+          </label>
+          <Input
+            id="register-telegram-channel"
+            name="telegramChannel"
+            placeholder="@channel_name или channel_name"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            maxLength={TELEGRAM_CHANNEL_MAX_LENGTH + 1}
+            aria-invalid={Boolean(errors.telegramChannel)}
+            aria-describedby={`register-telegram-hint${errors.telegramChannel ? " register-telegram-error" : ""}`}
+            onChange={() => setErrors((current) => ({ ...current, telegramChannel: undefined, form: undefined }))}
+            className="h-[50px]"
+          />
+          <FieldHint id="register-telegram-hint">
+            Можно вводить с @ или без него; используются латинские буквы, цифры и подчёркивания.
+          </FieldHint>
+          <FieldError id="register-telegram-error">{errors.telegramChannel}</FieldError>
+        </div>
+        <CityCombobox
+          error={errors.cityId}
+          onChange={() => setErrors((current) => ({ ...current, cityId: undefined, form: undefined }))}
+        />
         <div>
           <label htmlFor="register-email" className="mb-2 block text-sm font-extrabold text-ink">
             Электронная почта

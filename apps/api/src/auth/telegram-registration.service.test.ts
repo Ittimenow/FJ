@@ -7,6 +7,8 @@ const notification = {
   email: "player@example.com",
   displayName: "Анна Смирнова",
   accountType: "PLAYER" as const,
+  telegramChannel: "@anna_channel",
+  city: "Барнаул, Алтайский край",
   registeredAt: new Date("2026-08-04T09:30:00.000Z")
 };
 
@@ -55,6 +57,8 @@ test("Telegram-уведомление содержит данные новой �
     assert.match(body.text, /Анна Смирнова/);
     assert.match(body.text, /player@example\.com/);
     assert.match(body.text, /Игрок/);
+    assert.match(body.text, /@anna_channel/);
+    assert.match(body.text, /Барнаул, Алтайский край/);
     assert.match(body.text, /4 августа 2026/);
   } finally {
     globalThis.fetch = originalFetch;

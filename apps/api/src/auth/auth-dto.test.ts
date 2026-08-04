@@ -14,6 +14,8 @@ test("DTO регистрации нормализует данные", async () 
     email: "  PLAYER@Example.COM ",
     password: "12345678",
     displayName: "  Анна   Смирнова  ",
+    telegramChannel: "  Example_Channel ",
+    cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
     accountType: "PLAYER",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -21,6 +23,7 @@ test("DTO регистрации нормализует данные", async () 
   assert.deepEqual(await validate(dto), []);
   assert.equal(dto.email, "player@example.com");
   assert.equal(dto.displayName, "Анна Смирнова");
+  assert.equal(dto.telegramChannel, "@example_channel");
 });
 
 test("DTO регистрации возвращает русские сообщения", async () => {
@@ -28,6 +31,8 @@ test("DTO регистрации возвращает русские сообщ�
     email: "wrong",
     password: "123",
     displayName: " ",
+    telegramChannel: "@неверно",
+    cityId: "wrong",
     accountType: "ADMIN",
     personalDataConsent: false,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -37,6 +42,8 @@ test("DTO регистрации возвращает русские сообщ�
   assert.ok(messages.includes("Пароль должен содержать не менее 8 символов."));
   assert.ok(messages.includes("Имя должно содержать не менее 2 символов."));
   assert.ok(messages.includes("Выберите тип аккаунта: игрок или ведущий."));
+  assert.ok(messages.includes("Введите Telegram-имя из 5–32 латинских букв, цифр или подчёркиваний."));
+  assert.ok(messages.includes("Выберите город из списка."));
   assert.ok(messages.includes("Подтвердите согласие на обработку персональных данных."));
 });
 
@@ -45,6 +52,8 @@ test("DTO регистрации принимает аккаунт ведуще�
     email: "host@example.com",
     password: "12345678",
     displayName: "Анна",
+    telegramChannel: "@host_channel",
+    cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
     accountType: "HOST",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION

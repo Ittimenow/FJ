@@ -22,6 +22,8 @@ function loadRootEnv() {
 loadRootEnv();
 
 const prisma = new PrismaClient();
+const citiesFile = resolve(here, "data/russian-cities.csv");
+const cityAliasesFile = resolve(here, "data/russian-city-aliases.json");
 
 type SqlValue = string | number | null | { variable: string };
 type SqlRow = Record<string, SqlValue>;
@@ -49,6 +51,84 @@ const sectionMap: Record<string, ProfessionLineSection> = {
   liability: ProfessionLineSection.LIABILITY,
   total: ProfessionLineSection.TOTAL
 };
+
+function parseCsvRow(row: string) {
+  const values: string[] = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < row.length; index += 1) {
+    const char = row[index];
+    const next = row[index + 1];
+    if (char === '"') {
+      if (quoted && next === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+    if (char === "," && !quoted) {
+      values.push(value);
+      value = "";
+      continue;
+    }
+    value += char;
+  }
+
+  values.push(value);
+  return values;
+}
+
+function normalizeCitySearchName(value: string) {
+  return value.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+}
+
+async function seedCities(db: PrismaClient | Prisma.TransactionClient = prisma) {
+  if (!existsSync(citiesFile) || !existsSync(cityAliasesFile)) {
+    console.warn("Skipping cities: city reference files not found");
+    return;
+  }
+
+  const aliases = JSON.parse(
+    readFileSync(cityAliasesFile, "utf8")
+  ) as Record<string, string>;
+  const [headerLine, ...rows] = readFileSync(citiesFile, "utf8")
+    .trim()
+    .split(/\r?\n/);
+  const headers = parseCsvRow(headerLine ?? "");
+  const column = (name: string) => {
+    const index = headers.indexOf(name);
+    if (index < 0) throw new Error(`Missing city data column: ${name}`);
+    return index;
+  };
+  const cityIndex = column("city");
+  const regionIndex = column("region_name");
+  const autonomousRegionIndex = column("region_name_ao");
+  const regionCodeIndex = column("region_iso_code");
+  const fiasIdIndex = column("fias_id");
+
+  const cities = rows.map((row) => {
+    const values = parseCsvRow(row);
+    const sourceName = values[cityIndex] ?? "";
+    const name = aliases[sourceName] ?? sourceName;
+    return {
+      id: values[fiasIdIndex] ?? "",
+      name,
+      searchName: normalizeCitySearchName(name),
+      region: values[autonomousRegionIndex] || values[regionIndex] || "",
+      regionCode: values[regionCodeIndex] ?? ""
+    };
+  });
+
+  if (cities.some((city) => !city.id || !city.name || !city.region)) {
+    throw new Error("City reference data contains incomplete rows");
+  }
+
+  const result = await db.city.createMany({ data: cities, skipDuplicates: true });
+  console.log(`Synchronized Russian cities: ${cities.length} total, ${result.count} added`);
+}
 
 function splitSqlStatements(sql: string): string[] {
   const statements: string[] = [];
@@ -487,6 +567,11 @@ async function seedCards(
 }
 
 async function main() {
+  if (process.argv.includes("--sync-cities")) {
+    await seedCities();
+    return;
+  }
+
   if (process.argv.includes("--sync-cards")) {
     const migrationId = "2026-07-21-correct-original-card-data";
     const didApply = await prisma.$transaction(
@@ -529,6 +614,7 @@ async function main() {
     return;
   }
 
+  await seedCities();
   await seedProfessions();
   await seedCards();
 }

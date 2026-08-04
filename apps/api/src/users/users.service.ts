@@ -212,6 +212,8 @@ export class UsersService {
           gender: null,
           birthDate: null,
           gameExperience: null,
+          telegramChannel: null,
+          cityId: null,
           status: AccountStatus.DELETED,
           deletedAt
         }
