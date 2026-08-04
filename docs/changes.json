@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "reliable-vps-outbound-integrations",
+          "category": "fix",
+          "summary": "Серверные интеграции, включая уведомления о регистрациях в Telegram, теперь используют стабильное сетевое подключение VPS."
+        },
+        {
           "id": "reliable-vps-code-sync",
           "category": "technical",
           "summary": "Автоматический деплой теперь надёжно синхронизирует сервер с проверенным коммитом даже после безопасной очистки истории репозитория."

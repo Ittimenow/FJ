@@ -14,12 +14,12 @@ services:
         SOURCE_COMMIT: ${SOURCE_COMMIT:-}
         SOURCE_VERSION: ${SOURCE_VERSION:-}
     restart: unless-stopped
+    network_mode: host
     env_file:
       - .env.vps
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}?schema=public
-    ports:
-      - "127.0.0.1:3000:3000"
+      HOST: 127.0.0.1
+      DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:?set POSTGRES_DB}?schema=public
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +39,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?set POSTGRES_USER} -d ${POSTGRES_DB:?set POSTGRES_DB}"]
       interval: 5s
@@ -64,6 +66,8 @@ services:
     restart: unless-stopped
     profiles:
       - redis
+    ports:
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
