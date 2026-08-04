@@ -68,6 +68,42 @@ body {
   padding-left: max(0.75rem, env(safe-area-inset-left));
 }
 
+@media (max-width: 1023px) {
+  :root {
+    --app-shell-mobile-header-offset: calc(max(0.75rem, env(safe-area-inset-top)) + 4rem);
+    --app-shell-mobile-overlay-gap: 0.75rem;
+    --app-shell-mobile-overlay-top: calc(
+      var(--app-shell-mobile-header-offset) + var(--app-shell-mobile-overlay-gap)
+    );
+    --app-shell-mobile-overlay-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .app-shell-overlay {
+    top: 0;
+    display: grid;
+    overflow: hidden;
+    padding-top: var(--app-shell-mobile-overlay-top);
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-bottom: var(--app-shell-mobile-overlay-bottom);
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    place-items: center;
+  }
+
+  .app-shell-overlay-panel {
+    max-width: 100%;
+    max-height: calc(
+      100dvh - var(--app-shell-mobile-overlay-top) - var(--app-shell-mobile-overlay-bottom)
+    );
+  }
+
+  .app-shell-overlay-scroll {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 .app-shell-main {
   padding-right: max(1rem, env(safe-area-inset-right));
   padding-bottom: max(1.5rem, env(safe-area-inset-bottom));

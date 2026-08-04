@@ -6,6 +6,7 @@ import {
   type FigurineId
 } from "@cashflow/shared";
 import {
+  ArrowUp,
   BellRing,
   BriefcaseBusiness,
   CheckCircle2,
@@ -15,11 +16,9 @@ import {
   Dices,
   Landmark,
   ListRestart,
-  MessageCircle,
   PauseCircle,
   Play,
   ReceiptText,
-  Send,
   UserRound,
   UsersRound
 } from "lucide-react";
@@ -353,6 +352,8 @@ export function GameRoom({
 
   useEffect(() => {
     setGameRoomHeader({
+      gameId: snapshot.game.id,
+      currentUserId,
       title: snapshot.game.title,
       status: snapshot.game.status,
       connected,
@@ -364,29 +365,36 @@ export function GameRoom({
       remainingSeconds,
       timelineLoading,
       startsNextPeriod: snapshot.game.pauseReason === "period_complete",
+      chatMessages: snapshot.chatMessages,
+      onSendChat: (body) => emit("chat:send", { body }),
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
       onDeleteGame: canManage ? deleteGame : null
     });
-
-    return () => setGameRoomHeader(null);
   }, [
     canManage,
     canPause,
     canResume,
     connected,
     currentPlayer?.user?.displayName,
+    currentUserId,
     setGameRoomHeader,
     snapshot.game.code,
+    snapshot.game.id,
     snapshot.game.currentPeriod,
     snapshot.game.currentRound,
     snapshot.game.pauseReason,
     snapshot.game.periodCount,
     snapshot.game.status,
     snapshot.game.title,
+    snapshot.chatMessages,
     remainingSeconds,
     timelineLoading
   ]);
+
+  useEffect(() => {
+    return () => setGameRoomHeader(null);
+  }, [setGameRoomHeader]);
 
   useEffect(() => {
     setDealQuantity(1);
@@ -951,13 +959,6 @@ export function GameRoom({
         />
       ) : null}
 
-      {snapshot.game.status === "WAITING" ? (
-        <ChatPanel
-          messages={snapshot.chatMessages}
-          onSend={(body) => emit("chat:send", { body })}
-        />
-      ) : null}
-
       {gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={snapshot}
@@ -1012,35 +1013,27 @@ export function GameRoom({
               onLoanAmountChange={updateLoanAmount}
               onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
+              activityFeed={
+                <div className="xl:hidden">
+                  <MobileActionFeed
+                    gameId={snapshot.game.id}
+                    token={token}
+                    events={snapshot.events}
+                    currentUserId={currentUserId}
+                  />
+                </div>
+              }
                 embedded
               />
             </>
           }
           activity={
-            <>
-              <div className="hidden gap-4 xl:grid xl:grid-cols-[1.15fr_.85fr]">
-                <EventLog
-                  events={snapshot.events}
-                  currentUserId={currentUserId}
-                  players={gamePlayers}
-                  currentPlayerId={snapshot.game.currentPlayerId}
-                />
-                <ChatPanel
-                  messages={snapshot.chatMessages}
-                  onSend={(body) => emit("chat:send", { body })}
-                />
-              </div>
-              <div className="xl:hidden">
-                <MobileActivityPanel
-                  events={snapshot.events}
-                  currentUserId={currentUserId}
-                  players={gamePlayers}
-                  currentPlayerId={snapshot.game.currentPlayerId}
-                  messages={snapshot.chatMessages}
-                  onSend={(body) => emit("chat:send", { body })}
-                />
-              </div>
-            </>
+            <EventLog
+              events={snapshot.events}
+              currentUserId={currentUserId}
+              players={gamePlayers}
+              currentPlayerId={snapshot.game.currentPlayerId}
+            />
           }
         />
       ) : (
@@ -1123,6 +1116,8 @@ export function GameRoom({
             />
             <MobileGameTabs
               player={selectedPlayer}
+              players={gamePlayers}
+              currentPlayerId={snapshot.game.currentPlayerId}
               canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
               onCloseLiability={closeLiability}
               actionAttentionKey={
@@ -1177,6 +1172,16 @@ export function GameRoom({
                   onLoanAmountChange={updateLoanAmount}
                   onTakeLoan={takeLoan}
                   canTakeLoan={canTakeLoan}
+                  activityFeed={
+                    <div className="lg:hidden">
+                      <MobileActionFeed
+                        gameId={snapshot.game.id}
+                        token={token}
+                        events={snapshot.events}
+                        currentUserId={currentUserId}
+                      />
+                    </div>
+                  }
                     embedded
                   />
                 </>
@@ -1187,28 +1192,14 @@ export function GameRoom({
       </div>
 
       {snapshot.game.status !== "WAITING" ? (
-      <div className="hidden gap-5 lg:grid lg:grid-cols-[1.15fr_0.85fr]">
+      <div className="hidden lg:block">
         <EventLog
           events={snapshot.events}
           currentUserId={currentUserId}
           players={gamePlayers}
           currentPlayerId={snapshot.game.currentPlayerId}
         />
-        <ChatPanel
-          messages={snapshot.chatMessages}
-          onSend={(body) => emit("chat:send", { body })}
-        />
       </div>
-      ) : null}
-      {snapshot.game.status !== "WAITING" ? (
-      <MobileActivityPanel
-        events={snapshot.events}
-        currentUserId={currentUserId}
-        players={gamePlayers}
-        currentPlayerId={snapshot.game.currentPlayerId}
-        messages={snapshot.chatMessages}
-        onSend={(body) => emit("chat:send", { body })}
-      />
       ) : null}
         </>
       )}
@@ -1306,12 +1297,12 @@ function BankruptcyPanel({
   );
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/50 px-4 py-8">
+    <div className="app-shell-overlay fixed inset-0 z-[60] overflow-y-auto bg-black/50 px-4 py-8">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="bankruptcy-title"
-        className="mx-auto w-full max-w-3xl rounded-md border border-red-300 bg-white p-5 shadow-panel"
+        className="app-shell-overlay-panel app-shell-overlay-scroll mx-auto w-full max-w-3xl rounded-md border border-red-300 bg-white p-5 shadow-panel"
       >
         <h2 id="bankruptcy-title" className="text-xl font-semibold text-red-800">
           Объявлено банкротство
@@ -1510,13 +1501,13 @@ function GameEndPopup({
       : "Время партии истекло — победителя нет";
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/50 px-4 py-8">
+    <div className="app-shell-overlay fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/50 px-4 py-8">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="game-end-title"
         aria-describedby="game-end-description"
-        className="w-full max-w-xl rounded-md border border-line bg-white p-5 shadow-panel sm:p-6"
+        className="app-shell-overlay-panel app-shell-overlay-scroll w-full max-w-xl rounded-md border border-line bg-white p-5 shadow-panel sm:p-6"
       >
         <div className="text-center">
           <div className="text-4xl" aria-hidden="true">🏆</div>
@@ -2731,14 +2722,14 @@ function FigurineDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
+    <div className="app-shell-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="figurine-dialog-title"
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="app-shell-overlay-panel flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
       >
-        <div className="border-b border-line px-4 py-4 sm:px-6">
+        <div className="shrink-0 border-b border-line px-4 py-4 sm:px-6">
           <h2 id="figurine-dialog-title" className="text-lg font-semibold">
             Выберите фигурку
           </h2>
@@ -2747,7 +2738,7 @@ function FigurineDialog({
             повторяются.
           </p>
         </div>
-        <div className="overflow-y-auto p-4 sm:p-6">
+        <div className="app-shell-overlay-scroll min-h-0 p-4 sm:p-6">
           <FigurinePicker
             value={value}
             taken={taken}
@@ -2755,7 +2746,7 @@ function FigurineDialog({
             onChange={onChange}
           />
         </div>
-        <div className="flex justify-end gap-2 border-t border-line px-4 py-3 sm:px-6">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-line px-4 py-3 sm:px-6">
           {canClose ? (
             <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
               Отмена
@@ -2900,6 +2891,8 @@ type MobileGameTab = "turn" | "player" | "assets" | "expenses" | "liabilities";
 
 function MobileGameTabs({
   player,
+  players,
+  currentPlayerId,
   canManageLiabilities,
   onCloseLiability,
   actionAttentionKey,
@@ -2907,6 +2900,8 @@ function MobileGameTabs({
   actions
 }: {
   player: GamePlayer | undefined;
+  players: GamePlayer[];
+  currentPlayerId: string | null;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
   actionAttentionKey: string | null;
@@ -3010,7 +3005,9 @@ function MobileGameTabs({
         aria-labelledby={`mobile-game-tab-${activeTab}`}
         className="min-w-0 max-w-full overflow-x-hidden p-3 min-[420px]:p-4"
       >
-        {activeTab === "turn" ? actions : null}
+        <div className={activeTab === "turn" ? "block" : "hidden"} aria-hidden={activeTab !== "turn"}>
+          {actions}
+        </div>
 
         {activeTab !== "turn" && (!player || !state) ? (
           <p className="py-2 text-sm text-neutral-600">
@@ -3044,6 +3041,14 @@ function MobileGameTabs({
               totalExpensesCents={state.totalExpensesCents}
             />
             <CashflowEquation state={state} />
+            <section className="border-t border-line/70 pt-3" aria-labelledby="mobile-players-title">
+              <h3 id="mobile-players-title" className="text-sm font-semibold">
+                Игроки
+              </h3>
+              <div className="mt-3">
+                <PlayersGrid players={players} currentPlayerId={currentPlayerId} />
+              </div>
+            </section>
           </div>
         ) : null}
 
@@ -3526,6 +3531,7 @@ function ActionsPanel({
   onLoanAmountChange,
   onTakeLoan,
   canTakeLoan,
+  activityFeed,
   embedded = false
 }: {
   canChooseDeal: boolean;
@@ -3565,6 +3571,7 @@ function ActionsPanel({
   onLoanAmountChange: (value: number) => void;
   onTakeLoan: () => void;
   canTakeLoan: boolean;
+  activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
   const [bankOpen, setBankOpen] = useState(false);
@@ -3943,6 +3950,9 @@ function ActionsPanel({
       <section className="grid gap-3">
         {header}
         {content}
+        {activityFeed ? (
+          <div className="mt-1 border-t border-line/70 pt-4">{activityFeed}</div>
+        ) : null}
       </section>
     );
   }
@@ -3952,7 +3962,12 @@ function ActionsPanel({
       <CardHeader className="p-4">
         {header}
       </CardHeader>
-      <CardContent className="space-y-4">{content}</CardContent>
+      <CardContent className="space-y-4">
+        {content}
+        {activityFeed ? (
+          <div className="border-t border-line/70 pt-4">{activityFeed}</div>
+        ) : null}
+      </CardContent>
     </Card>
   );
 }
@@ -4051,97 +4066,179 @@ function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
     : `#${firstSequence}–${lastSequence}`;
 }
 
-function MobileActivityPanel({
+function MobileActionFeed({
+  gameId,
+  token,
   events,
-  currentUserId,
-  players,
-  currentPlayerId,
-  messages,
-  onSend
+  currentUserId
 }: {
+  gameId: string;
+  token: string;
   events: GameEvent[];
   currentUserId: string;
-  players: GamePlayer[];
-  currentPlayerId: string | null;
-  messages: GameSnapshot["chatMessages"];
-  onSend: (body: string) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"game" | "chat">("game");
+  const [historyEvents, setHistoryEvents] = useState(events);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [replayLoaded, setReplayLoaded] = useState(events.length < 80);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setHistoryEvents(events);
+    setVisibleCount(10);
+    setOnlyMine(false);
+    setReplayLoaded(events.length < 80);
+    setLoadError(null);
+  }, [gameId]);
+
+  useEffect(() => {
+    setHistoryEvents((current) => mergeGameEvents(current, events));
+  }, [events]);
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [onlyMine]);
+
+  const turns = useMemo(
+    () =>
+      journalEntries(historyEvents)
+        .filter((entry): entry is Extract<JournalEntry, { kind: "turn" }> => entry.kind === "turn")
+        .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
+        .filter((entry) => !onlyMine || journalEntryActor(entry)?.id === currentUserId),
+    [currentUserId, historyEvents, onlyMine]
+  );
+  const visibleTurns = turns.slice(0, visibleCount);
+  const canLoadArchive = !replayLoaded && events.length >= 80;
+  const hasMore = visibleCount < turns.length || canLoadArchive;
+
+  async function loadMore() {
+    setLoadError(null);
+    if (visibleCount < turns.length) {
+      setVisibleCount((count) => count + 10);
+      return;
+    }
+    if (!canLoadArchive || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Не удалось загрузить историю партии");
+      const data = (await response.json()) as { events?: GameEvent[] };
+      setHistoryEvents((current) => mergeGameEvents(current, data.events ?? []));
+      setReplayLoaded(true);
+      setVisibleCount((count) => count + 10);
+    } catch (event) {
+      setLoadError(event instanceof Error ? event.message : "Не удалось загрузить историю партии");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-panel lg:hidden">
-      <div
-        className="grid grid-cols-2 gap-1.5 bg-[#eef3e8] p-2"
-        role="tablist"
-        aria-label="События партии и чат"
-      >
-        <button
-          id="mobile-activity-tab-game"
+    <section aria-labelledby="mobile-action-feed-title">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 id="mobile-action-feed-title" className="text-base font-extrabold">
+            Лента ходов
+          </h3>
+          <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
+        </div>
+        <Button
           type="button"
-          role="tab"
-          aria-selected={activeTab === "game"}
-          aria-controls="mobile-activity-panel"
-          onClick={() => setActiveTab("game")}
-          className={[
-            "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
-            activeTab === "game"
-              ? "bg-[#dfe9d4] text-[#3f5b35]"
-              : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-          ].join(" ")}
+          variant={onlyMine ? "primary" : "secondary"}
+          className="h-9 px-3"
+          onClick={() => setOnlyMine((value) => !value)}
         >
-          <ListRestart size={17} aria-hidden="true" />
-          Игра
-        </button>
-        <button
-          id="mobile-activity-tab-chat"
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "chat"}
-          aria-controls="mobile-activity-panel"
-          onClick={() => setActiveTab("chat")}
-          className={[
-            "relative inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
-            activeTab === "chat"
-              ? "bg-[#dfe9d4] text-[#3f5b35]"
-              : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-          ].join(" ")}
-        >
-          <MessageCircle size={17} aria-hidden="true" />
-          Чат
-          {messages.length > 0 ? (
-            <span
-              className={[
-                "inline-flex min-w-5 justify-center rounded-full px-1 text-[10px] leading-5",
-                activeTab === "chat"
-                  ? "bg-[#718866] text-white"
-                  : "bg-white text-[#61715b]"
-              ].join(" ")}
-              aria-label={`${messages.length} сообщений`}
-            >
-              {messages.length > 99 ? "99+" : messages.length}
-            </span>
-          ) : null}
-        </button>
+          {onlyMine ? "Показать всех" : "Только мои"}
+        </Button>
       </div>
-      <div
-        id="mobile-activity-panel"
-        role="tabpanel"
-        aria-labelledby={`mobile-activity-tab-${activeTab}`}
-        className="min-w-0"
-      >
-        {activeTab === "game" ? (
-          <EventLog
-            events={events}
-            currentUserId={currentUserId}
-            players={players}
-            currentPlayerId={currentPlayerId}
-            compact
-          />
+
+      <div className="mt-3 space-y-3" role="feed" aria-live="polite" aria-busy={loadingMore}>
+        {visibleTurns.length === 0 ? (
+          <p className="rounded-xl bg-surface p-3 text-sm text-muted">
+            {onlyMine ? "Ваших ходов пока нет." : "Ходов пока нет."}
+          </p>
         ) : (
-          <ChatPanel messages={messages} onSend={onSend} compact />
+          visibleTurns.map((entry) => <TurnJournalCard key={entry.id} entry={entry} />)
         )}
       </div>
+
+      {loadError ? (
+        <p className="mt-3 text-sm text-red-700" role="alert">
+          {loadError}. Попробуйте ещё раз.
+        </p>
+      ) : null}
+      {hasMore ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-4 w-full"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore ? "Загружаем…" : "Показать ещё"}
+        </Button>
+      ) : null}
+
+      {visibleCount > 10 ? (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed bottom-20 right-4 z-40 grid h-12 w-12 place-items-center rounded-xl bg-journey text-white shadow-[0_14px_34px_rgba(41,103,223,.3)] transition hover:-translate-y-0.5 hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30 md:right-6"
+          aria-label="Вернуться к началу страницы"
+          title="Наверх"
+        >
+          <ArrowUp size={20} aria-hidden="true" />
+        </button>
+      ) : null}
     </section>
+  );
+}
+
+function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
+  const eventsById = new Map(current.map((event) => [event.id, event]));
+  for (const event of incoming) eventsById.set(event.id, event);
+  return [...eventsById.values()].sort((left, right) => left.sequence - right.sequence);
+}
+
+function TurnJournalCard({
+  entry
+}: {
+  entry: Extract<JournalEntry, { kind: "turn" }>;
+}) {
+  const actor = journalEntryActor(entry);
+  const firstEvent = entry.events[0];
+  const lastEvent = entry.events[entry.events.length - 1];
+  const visibleTurnEvents = entry.events.filter(
+    (event) => event.type !== realtimeEvents.stateUpdate
+  );
+
+  return (
+    <article className="rounded-xl bg-surface p-3" aria-label={`Ход игрока ${actor?.displayName ?? "Система"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-extrabold">Ход игрока</div>
+          <div className="mt-1 text-xs text-muted">
+            {actor?.displayName ?? "Система"} · {shortDate(firstEvent?.createdAt ?? lastEvent?.createdAt ?? "")}
+          </div>
+        </div>
+        <span className="shrink-0 text-xs text-muted">{turnSequenceLabel(entry)}</span>
+      </div>
+      <div className="mt-3 space-y-3">
+        {visibleTurnEvents.map((event) =>
+          event.type === realtimeEvents.cardDraw ? (
+            <JournalCardDraw key={event.id} event={event} />
+          ) : (
+            <div key={event.id} className="text-sm">
+              <GameEventPresentation event={event} />
+            </div>
+          )
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -4163,59 +4260,90 @@ function EventLog({
   const visibleEntries = useMemo(() => {
     return journalEntries(events)
       .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
-      .filter((entry) => !onlyMine || journalEntryActor(entry)?.id === currentUserId);
+      .filter(
+        (entry) =>
+          !onlyMine ||
+          (entry.kind === "turn" && journalEntryActor(entry)?.id === currentUserId)
+      );
   }, [currentUserId, events, onlyMine]);
 
   return (
     <Card className={compact ? "rounded-none border-0 shadow-none" : ""}>
       <CardHeader className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        <div
-          className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#eef3e8] p-1.5"
-          role="tablist"
-          aria-label="Информация об игре"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "events"}
-            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
-              activeTab === "events"
-                ? "bg-[#dfe9d4] text-[#3f5b35]"
-                : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-            }`}
-            onClick={() => setActiveTab("events")}
-          >
-            <ListRestart size={16} aria-hidden="true" />
-            {compact ? "События" : "Журнал действий"}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "players"}
-            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
-              activeTab === "players"
-                ? "bg-[#dfe9d4] text-[#3f5b35]"
-                : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-            }`}
-            onClick={() => setActiveTab("players")}
-          >
-            <UsersRound size={16} aria-hidden="true" />
-            Игроки
-          </button>
-        </div>
-        {activeTab === "events" ? (
-          <Button
-            variant={onlyMine ? "primary" : "secondary"}
-            className="h-9 self-start px-3"
-            onClick={() => setOnlyMine((value) => !value)}
-          >
-            {onlyMine ? "Показать всех" : "Только мои"}
-          </Button>
-        ) : null}
+        {compact ? (
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold">Журнал действий</h2>
+              <p className="mt-0.5 text-xs text-neutral-500">Новые действия появляются сверху.</p>
+            </div>
+            <Button
+              variant={onlyMine ? "primary" : "secondary"}
+              className="h-9 px-3"
+              onClick={() => setOnlyMine((value) => !value)}
+            >
+              {onlyMine ? "Показать всех" : "Только мои"}
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div
+              className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#eef3e8] p-1.5"
+              role="tablist"
+              aria-label="Информация об игре"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "events"}
+                className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
+                  activeTab === "events"
+                    ? "bg-[#dfe9d4] text-[#3f5b35]"
+                    : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
+                }`}
+                onClick={() => setActiveTab("events")}
+              >
+                <ListRestart size={16} aria-hidden="true" />
+                Журнал действий
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "players"}
+                className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
+                  activeTab === "players"
+                    ? "bg-[#dfe9d4] text-[#3f5b35]"
+                    : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
+                }`}
+                onClick={() => setActiveTab("players")}
+              >
+                <UsersRound size={16} aria-hidden="true" />
+                Игроки
+              </button>
+            </div>
+            {activeTab === "events" ? (
+              <Button
+                variant={onlyMine ? "primary" : "secondary"}
+                className="h-9 self-start px-3"
+                onClick={() => setOnlyMine((value) => !value)}
+              >
+                {onlyMine ? "Показать всех" : "Только мои"}
+              </Button>
+            ) : null}
+          </>
+        )}
       </CardHeader>
       <CardContent className={compact ? "p-3" : ""}>
         {activeTab === "events" ? (
-          <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1 sm:max-h-96" role="tabpanel">
+          <div
+            className={cn(
+              "space-y-3 overflow-y-auto pr-1",
+              compact ? "max-h-[42dvh]" : "max-h-[28rem] sm:max-h-96"
+            )}
+            role={compact ? "log" : "tabpanel"}
+            aria-live={compact ? "polite" : undefined}
+            aria-relevant={compact ? "additions text" : undefined}
+            tabIndex={0}
+          >
             <p className="text-xs text-neutral-500">Сначала показаны последние действия.</p>
             {visibleEntries.length === 0 ? (
               <p className="text-sm text-neutral-600">
@@ -5238,59 +5366,6 @@ function humanizeToken(value: unknown) {
     .replace(/[_:]+/g, " ")
     .trim()
     .replace(/^./, (letter) => letter.toUpperCase());
-}
-
-function ChatPanel({
-  messages,
-  onSend,
-  compact = false
-}: {
-  messages: GameSnapshot["chatMessages"];
-  onSend: (body: string) => void;
-  compact?: boolean;
-}) {
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const body = String(form.get("body") ?? "").trim();
-    if (!body) return;
-    onSend(body);
-    event.currentTarget.reset();
-  }
-
-  return (
-    <Card className={compact ? "rounded-none border-0 shadow-none" : ""}>
-      {!compact ? (
-        <CardHeader>
-          <CardTitle>Чат</CardTitle>
-        </CardHeader>
-      ) : null}
-      <CardContent className={compact ? "p-3" : ""}>
-        <div className="max-h-96 space-y-3 overflow-y-auto pr-1 sm:max-h-80">
-          {messages.length === 0 ? (
-            <div className="rounded-xl bg-card p-4 text-sm leading-6 text-muted">
-              Сообщений пока нет. Напишите первым, чтобы участники увидели сообщение в комнате.
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className="rounded-xl bg-surface p-3">
-                <div className="text-xs text-neutral-500">
-                  {message.user?.displayName ?? "Игрок"} · {shortDate(message.createdAt)}
-                </div>
-                <div className="mt-1 break-words text-sm">{message.body}</div>
-              </div>
-            ))
-          )}
-        </div>
-        <form className="mt-4 grid grid-cols-[1fr_auto] gap-2" onSubmit={submit}>
-          <Input name="body" placeholder="Сообщение" autoComplete="off" className="min-w-0" />
-          <Button type="submit" aria-label="Отправить" className="w-11 px-0">
-            <Send size={16} />
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
 }
 
 function Metric({

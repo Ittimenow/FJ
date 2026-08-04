@@ -8,8 +8,11 @@
   ],
   "scripts": {
     "changes:check": "node scripts/check-changes.mjs",
+    "predev:local": "node scripts/check-dev-ports.mjs FJ 3000:web 4000:api",
     "dev:local": "node scripts/dev-local.mjs",
+    "predev:api": "node scripts/check-dev-ports.mjs FJ 4000:api",
     "dev:api": "npm run start:dev --workspace=@cashflow/api",
+    "predev:web": "node scripts/check-dev-ports.mjs FJ 3000:web",
     "dev:web": "npm run dev --workspace=@cashflow/web",
     "start:production": "node scripts/start-production.mjs",
     "build": "npm run build --workspaces --if-present",

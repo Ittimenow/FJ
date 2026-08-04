@@ -2,7 +2,6 @@
 
 import { figurineImagePath } from "@cashflow/shared";
 import {
-  Activity,
   Baby,
   Banknote,
   BriefcaseBusiness,
@@ -49,7 +48,7 @@ type VariantTwoProps = {
   activity: ReactNode;
 };
 
-type CompactSection = "board" | "finance" | "actions" | "activity";
+type CompactSection = "board" | "finance" | "actions";
 
 export function GameRoomVariantTwo({
   snapshot,
@@ -93,14 +92,13 @@ export function GameRoomVariantTwo({
   }> = [
     { id: "board", label: "Поле", icon: MapIcon },
     { id: "finance", label: "Финансы", icon: WalletCards },
-    { id: "actions", label: "Ход", icon: Dices, attention: actionAttention },
-    { id: "activity", label: "События", icon: Activity }
+    { id: "actions", label: "Ход", icon: Dices, attention: actionAttention }
   ];
 
   return (
     <section className="journey-game-view grid min-w-0 gap-4" aria-label="Игровое поле, вариант 2">
       <div
-        className="grid grid-cols-4 gap-1.5 rounded-xl bg-[#eef3e8] p-1.5 shadow-[0_10px_24px_rgba(83,109,69,.14)] xl:hidden"
+        className="grid grid-cols-3 gap-1.5 rounded-xl bg-[#eef3e8] p-1.5 shadow-[0_10px_24px_rgba(83,109,69,.14)] xl:hidden"
         role="tablist"
         aria-label="Разделы игрового экрана"
       >
@@ -208,15 +206,7 @@ export function GameRoomVariantTwo({
         </aside>
       </div>
 
-      <div
-        id="journey-mobile-panel-activity"
-        role="tabpanel"
-        aria-labelledby="journey-mobile-tab-activity"
-        className={[
-          "min-w-0 space-y-4 xl:block",
-          compactSection === "activity" ? "block" : "hidden"
-        ].join(" ")}
-      >
+      <div className="hidden min-w-0 xl:block">
         {activity}
       </div>
     </section>

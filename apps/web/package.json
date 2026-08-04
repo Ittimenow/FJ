@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "test": "node --import tsx --test src/components/auth/*.test.ts src/components/analytics/*.test.ts",

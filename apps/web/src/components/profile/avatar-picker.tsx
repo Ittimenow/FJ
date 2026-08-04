@@ -183,12 +183,12 @@ export function AvatarPicker({
 
       {cameraOpen && (
         <div
-          className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-[#071225]/80 p-4 backdrop-blur-sm"
+          className="app-shell-overlay fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-[#071225]/80 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="profile-camera-title"
         >
-          <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-[0_34px_90px_rgba(5,18,45,.35)] sm:p-6">
+          <div className="app-shell-overlay-panel app-shell-overlay-scroll w-full max-w-md rounded-2xl bg-card p-5 shadow-[0_34px_90px_rgba(5,18,45,.35)] sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 id="profile-camera-title" className="text-xl font-extrabold text-ink">
