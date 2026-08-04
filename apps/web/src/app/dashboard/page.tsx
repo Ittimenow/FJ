@@ -362,6 +362,7 @@ function EmptyGamesMessage({
 function gameStatusBadgeClass(status: string) {
   if (status === "WAITING") return "shrink-0 bg-[#e8effe] font-bold text-journey";
   if (status === "IN_PROGRESS") return "shrink-0 bg-[#eaf3e0] font-bold text-success";
+  if (status === "PAUSED") return "shrink-0 bg-[#fff0df] font-bold text-[#8a3d0a]";
   if (status === "CANCELLED") return "shrink-0 bg-red-50 font-bold text-red-700";
   return "shrink-0 bg-white font-bold text-muted";
 }

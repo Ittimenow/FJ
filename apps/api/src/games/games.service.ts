@@ -39,6 +39,12 @@ import { CreateGameDto } from "./dto/create-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import {
+  gameTimeline,
+  pauseGameTimeline,
+  resumeGameTimeline,
+  startGameTimeline
+} from "./game-timeline";
 import { isRentalRealEstateAsset, marketSalePriceForUnits } from "./market-sale";
 
 type Tx = Prisma.TransactionClient;
@@ -118,6 +124,12 @@ type GamePendingAction =
 interface GameSettings {
   pendingAction?: GamePendingAction | null;
   timeLimitMinutes?: number;
+  periodCount?: number;
+  currentPeriod?: number;
+  periodDeadlineAt?: string | null;
+  remainingPeriodSeconds?: number | null;
+  pauseReason?: "manual" | "period_complete" | null;
+  pausedAt?: string | null;
   cardDecks?: Partial<Record<CardType, CardDeckState>>;
 }
 
@@ -139,8 +151,6 @@ interface CardDeckDrawResult {
   settings: Prisma.JsonValue;
   drawState: CardDrawState;
 }
-
-const defaultGameTimeLimitMinutes = 90;
 
 const playerColors = [
   "#166534",
@@ -165,7 +175,8 @@ export class GamesService {
         title: dto.title?.trim() || "Новая партия",
         maxPlayers: dto.maxPlayers ?? 6,
         settings: {
-          timeLimitMinutes: dto.timeLimitMinutes ?? defaultGameTimeLimitMinutes
+          timeLimitMinutes: dto.timeLimitMinutes ?? 90,
+          periodCount: dto.periodCount ?? 1
         },
         createdById: userId,
         players: {
@@ -251,7 +262,7 @@ export class GamesService {
 
   async getGame(gameId: string, userId: string) {
     await this.ensureGameAccess(gameId, userId);
-    await this.expireGameIfNeeded(gameId);
+    await this.syncGameTimelineIfNeeded(gameId);
     return this.snapshot(gameId);
   }
 
@@ -535,24 +546,33 @@ export class GamesService {
         await this.createInitialFinancialState(tx, player.id, profession);
       }
 
+      const startedAt = new Date();
       await tx.game.update({
         where: { id: gameId },
         data: {
           status: GameStatus.IN_PROGRESS,
-          startedAt: new Date(),
+          startedAt,
           endedAt: null,
           currentTurnIndex: 0,
-          currentRound: 1
+          currentRound: 1,
+          settings: startGameTimeline(game.settings, startedAt)
         }
       });
+
+      const timeline = gameTimeline(game.settings, null);
 
       await this.appendEvents(tx, gameId, userId, [
         {
           type: "game:started",
           payload: {
             playerCount: game.players.length,
-            timeLimitMinutes: this.timeLimitMinutes(game.settings)
+            timeLimitMinutes: timeline.timeLimitMinutes,
+            periodCount: timeline.periodCount
           }
+        },
+        {
+          type: realtimeEvents.gamePeriodStarted,
+          payload: { currentPeriod: 1, periodCount: timeline.periodCount }
         },
         {
           type: realtimeEvents.stateUpdate,
@@ -563,8 +583,104 @@ export class GamesService {
 
     return this.actionResult(gameId, [
       { type: "game:started", payload: {} },
+      { type: realtimeEvents.gamePeriodStarted, payload: { currentPeriod: 1 } },
       { type: realtimeEvents.stateUpdate, payload: {} }
     ]);
+  }
+
+  async pauseGame(gameId: string, userId: string) {
+    await this.ensureCanManageGame(gameId, userId);
+    const timelineEvents = await this.syncGameTimelineIfNeeded(gameId);
+    if (timelineEvents) return this.actionResult(gameId, timelineEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      if (game.status === GameStatus.PAUSED) return;
+      if (game.status !== GameStatus.IN_PROGRESS) {
+        throw new BadRequestException("Only an active game can be paused");
+      }
+
+      const now = new Date();
+      const timeline = gameTimeline(game.settings, game.startedAt);
+      const update = await tx.game.updateMany({
+        where: { id: gameId, status: GameStatus.IN_PROGRESS },
+        data: {
+          status: GameStatus.PAUSED,
+          settings: pauseGameTimeline(game.settings, game.startedAt, now, "manual")
+        }
+      });
+      if (update.count === 0) return;
+      emittedEvents.push({
+        type: realtimeEvents.gamePaused,
+        payload: {
+          reason: "manual",
+          currentPeriod: timeline.currentPeriod,
+          periodCount: timeline.periodCount
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "game_paused" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async resumeGame(gameId: string, userId: string) {
+    await this.ensureCanManageGame(gameId, userId);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      if (game.status === GameStatus.IN_PROGRESS) return;
+      if (game.status !== GameStatus.PAUSED) {
+        throw new BadRequestException("Only a paused game can be resumed");
+      }
+
+      const resumed = resumeGameTimeline(game.settings, game.startedAt, new Date());
+      const timeline = gameTimeline(resumed.settings, game.startedAt);
+      const update = await tx.game.updateMany({
+        where: { id: gameId, status: GameStatus.PAUSED },
+        data: {
+          status: GameStatus.IN_PROGRESS,
+          settings: resumed.settings
+        }
+      });
+      if (update.count === 0) return;
+      emittedEvents.push({
+        type: realtimeEvents.gameResumed,
+        payload: {
+          currentPeriod: timeline.currentPeriod,
+          periodCount: timeline.periodCount,
+          startsNextPeriod: resumed.startsNextPeriod
+        }
+      });
+      if (resumed.startsNextPeriod) {
+        emittedEvents.push({
+          type: realtimeEvents.gamePeriodStarted,
+          payload: {
+            currentPeriod: timeline.currentPeriod,
+            periodCount: timeline.periodCount
+          }
+        });
+      }
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: resumed.startsNextPeriod ? "period_started" : "game_resumed" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async syncGameTimer(gameId: string, userId: string) {
+    await this.ensureGameAccess(gameId, userId);
+    const events = await this.syncGameTimelineIfNeeded(gameId);
+    return this.actionResult(gameId, events ?? []);
   }
 
   async chooseFigurine(gameId: string, userId: string, figurine: string) {
@@ -2089,6 +2205,8 @@ export class GamesService {
     userId: string,
     dto: SellBankruptcyAssetDto
   ) {
+    const timelineEvents = await this.syncGameTimelineIfNeeded(gameId);
+    if (timelineEvents) return this.actionResult(gameId, timelineEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -2177,6 +2295,8 @@ export class GamesService {
     userId: string,
     dto: RepayBankruptcyDebtDto
   ) {
+    const timelineEvents = await this.syncGameTimelineIfNeeded(gameId);
+    if (timelineEvents) return this.actionResult(gameId, timelineEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -4212,28 +4332,12 @@ export class GamesService {
     return base as Prisma.JsonObject;
   }
 
-  private timeLimitMinutes(settings: Prisma.JsonValue) {
-    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
-      return defaultGameTimeLimitMinutes;
-    }
-    const value = (settings as Record<string, unknown>).timeLimitMinutes;
-    return typeof value === "number" && Number.isInteger(value) && value > 0
-      ? value
-      : defaultGameTimeLimitMinutes;
-  }
-
-  private gameDeadline(startedAt: Date | null, settings: Prisma.JsonValue) {
-    if (!startedAt) return null;
-    return new Date(
-      startedAt.getTime() + this.timeLimitMinutes(settings) * 60_000
-    );
-  }
-
-  private async expireGameIfNeeded(gameId: string) {
+  private async syncGameTimelineIfNeeded(gameId: string) {
     const emittedEvents: PendingEvent[] = [];
-    const expired = await this.prisma.$transaction(async (tx) => {
+    const transitioned = await this.prisma.$transaction(async (tx) => {
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
-      const deadline = this.gameDeadline(game.startedAt, game.settings);
+      const timeline = gameTimeline(game.settings, game.startedAt);
+      const deadline = timeline.periodDeadlineAt;
       if (
         game.status !== GameStatus.IN_PROGRESS ||
         !deadline ||
@@ -4242,29 +4346,63 @@ export class GamesService {
         return false;
       }
 
-      await tx.game.update({
-        where: { id: gameId },
-        data: {
-          status: GameStatus.ENDED,
-          endedAt: deadline,
-          settings: this.settingsWithPending(game.settings, null)
-        }
+      const finalPeriod = timeline.currentPeriod >= timeline.periodCount;
+      const update = await tx.game.updateMany({
+        where: { id: gameId, status: GameStatus.IN_PROGRESS },
+        data: finalPeriod
+          ? {
+              status: GameStatus.ENDED,
+              endedAt: deadline,
+              settings: this.settingsWithPending(game.settings, null)
+            }
+          : {
+              status: GameStatus.PAUSED,
+              settings: pauseGameTimeline(
+                game.settings,
+                game.startedAt,
+                deadline,
+                "period_complete"
+              )
+            }
       });
-      emittedEvents.push({
-        type: realtimeEvents.gameEnded,
-        payload: {
-          reason: "time_limit",
-          deadlineAt: deadline.toISOString()
-        }
-      });
-      emittedEvents.push({
-        type: realtimeEvents.stateUpdate,
-        payload: { reason: "time_limit_reached" }
-      });
+      if (update.count === 0) return false;
+
+      if (finalPeriod) {
+        emittedEvents.push({
+          type: realtimeEvents.gameEnded,
+          payload: {
+            reason: "time_limit",
+            deadlineAt: deadline.toISOString(),
+            currentPeriod: timeline.currentPeriod,
+            periodCount: timeline.periodCount
+          }
+        });
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "time_limit_reached" }
+        });
+      } else {
+        emittedEvents.push({
+          type: realtimeEvents.gamePaused,
+          payload: {
+            reason: "period_complete",
+            currentPeriod: timeline.currentPeriod,
+            periodCount: timeline.periodCount
+          }
+        });
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "period_complete" }
+        });
+      }
       await this.appendEvents(tx, gameId, null, emittedEvents);
       return true;
     });
-    return expired ? emittedEvents : null;
+    return transitioned ? emittedEvents : null;
+  }
+
+  private async expireGameIfNeeded(gameId: string) {
+    return this.syncGameTimelineIfNeeded(gameId);
   }
 
   private async requirePlayer(
@@ -4279,11 +4417,17 @@ export class GamesService {
         userId,
         status: "JOINED"
       },
-      include: { financialState: true }
+      include: {
+        financialState: true,
+        game: { select: { status: true } }
+      }
     });
     if (!player) throw new ForbiddenException("You are not in this game");
     if (player.role !== GameRole.PLAYER) {
       throw new ForbiddenException("Only players can perform this action");
+    }
+    if (player.game.status !== GameStatus.IN_PROGRESS) {
+      throw new BadRequestException("Game is paused or not in progress");
     }
     if (
       !allowLiquidation &&
@@ -4488,8 +4632,7 @@ export class GamesService {
       activePlayers.length > 0
         ? activePlayers[game.currentTurnIndex % activePlayers.length]
         : null;
-    const timeLimitMinutes = this.timeLimitMinutes(game.settings);
-    const deadlineAt = this.gameDeadline(game.startedAt, game.settings);
+    const timeline = gameTimeline(game.settings, game.startedAt);
 
     return toSerializable({
       game: {
@@ -4504,8 +4647,14 @@ export class GamesService {
         createdById: game.createdById,
         startedAt: game.startedAt,
         endedAt: game.endedAt,
-        timeLimitMinutes,
-        deadlineAt,
+        timeLimitMinutes: timeline.timeLimitMinutes,
+        periodCount: timeline.periodCount,
+        currentPeriod: timeline.currentPeriod,
+        periodDeadlineAt: timeline.periodDeadlineAt,
+        deadlineAt: timeline.periodDeadlineAt,
+        remainingPeriodSeconds: timeline.remainingPeriodSeconds,
+        pauseReason: timeline.pauseReason,
+        pausedAt: timeline.pausedAt,
         pendingAction: this.pendingAction(game.settings)
       },
       board: ratRaceBoard,

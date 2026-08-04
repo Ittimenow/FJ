@@ -10,6 +10,7 @@ datasource db {
 enum GameStatus {
   WAITING
   IN_PROGRESS
+  PAUSED
   ENDED
   CANCELLED
 }

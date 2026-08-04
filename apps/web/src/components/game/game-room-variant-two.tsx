@@ -44,8 +44,7 @@ type VariantTwoProps = {
   snapshot: GameSnapshot;
   currentUserId: string;
   canRoll: boolean;
-  rolling: boolean;
-  onRoll: () => void;
+  turnTabRequest: number;
   actions: ReactNode;
   activity: ReactNode;
 };
@@ -56,8 +55,7 @@ export function GameRoomVariantTwo({
   snapshot,
   currentUserId,
   canRoll,
-  rolling,
-  onRoll,
+  turnTabRequest,
   actions,
   activity
 }: VariantTwoProps) {
@@ -83,6 +81,10 @@ export function GameRoomVariantTwo({
     if (actionAttention) setCompactSection("actions");
   }, [actionAttention]);
 
+  useEffect(() => {
+    if (turnTabRequest > 0) setCompactSection("actions");
+  }, [turnTabRequest]);
+
   const compactTabs: Array<{
     id: CompactSection;
     label: string;
@@ -97,21 +99,8 @@ export function GameRoomVariantTwo({
 
   return (
     <section className="journey-game-view grid min-w-0 gap-4" aria-label="Игровое поле, вариант 2">
-      <div className="hidden justify-end xl:flex">
-        <button
-          type="button"
-          onClick={onRoll}
-          disabled={!canRoll || rolling}
-          aria-busy={rolling}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-action px-5 text-sm font-extrabold text-ink shadow-[0_10px_26px_rgba(249,143,47,.25)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/25 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-        >
-          <Dices size={20} aria-hidden="true" />
-          {rolling ? "Бросаем…" : canRoll ? "Бросить кубик" : "Ожидайте ход"}
-        </button>
-      </div>
-
       <div
-        className="grid grid-cols-4 gap-1 rounded-xl bg-card p-1.5 shadow-panel xl:hidden"
+        className="grid grid-cols-4 gap-1.5 rounded-xl bg-[#eef3e8] p-1.5 shadow-[0_10px_24px_rgba(83,109,69,.14)] xl:hidden"
         role="tablist"
         aria-label="Разделы игрового экрана"
       >
@@ -145,15 +134,17 @@ export function GameRoomVariantTwo({
                 document.getElementById(`journey-mobile-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative grid min-h-12 place-items-center gap-0.5 rounded-lg px-1 text-xs font-extrabold transition",
-                active ? "bg-journey text-white" : "text-muted hover:bg-white hover:text-ink"
+                "relative grid min-h-12 place-items-center gap-0.5 rounded-lg px-1 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
+                active
+                  ? "bg-[#dfe9d4] text-[#3f5b35]"
+                  : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
               ].join(" ")}
             >
               <Icon size={17} aria-hidden="true" />
               <span>{tab.label}</span>
               {tab.attention ? (
                 <span
-                  className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-action ring-2 ring-card"
+                  className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-[#9d82b8] ring-2 ring-white"
                   aria-label="Требуется действие"
                 />
               ) : null}
@@ -716,6 +707,10 @@ function JourneyHint({
 
   if (snapshot.game.status === "ENDED") {
     text = "Партия завершена. Итоговые показатели сохранены в личном кабинете.";
+  } else if (snapshot.game.status === "PAUSED") {
+    text = snapshot.game.pauseReason === "period_complete"
+      ? `Период ${snapshot.game.currentPeriod} завершён. Ожидайте начала следующего периода.`
+      : "Игра поставлена на паузу. Текущий ход и все незавершённые действия сохранены.";
   } else if (canRoll) {
     text = "Ваш ход: бросьте кубик. После движения здесь появится следующее обязательное действие.";
   } else if (pending && pending.gamePlayerId === me?.id) {

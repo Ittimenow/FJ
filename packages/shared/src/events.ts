@@ -8,6 +8,9 @@ export const realtimeEvents = {
   loanRepay: "loan:repay",
   paycheckReceive: "paycheck:receive",
   stateUpdate: "state:update",
+  gamePaused: "game:paused",
+  gameResumed: "game:resumed",
+  gamePeriodStarted: "game:period_started",
   gameEnded: "game:ended",
   chatMessage: "chat:message"
 } as const;

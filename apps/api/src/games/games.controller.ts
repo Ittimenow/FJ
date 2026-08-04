@@ -59,6 +59,27 @@ export class GamesController {
     return result;
   }
 
+  @Post(":id/pause")
+  async pause(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.pauseGame(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/resume")
+  async resume(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.resumeGame(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/timer/sync")
+  async syncTimer(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.syncGameTimer(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
   @Post(":id/figurine")
   async chooseFigurine(
     @CurrentUser() user: AuthenticatedUser,

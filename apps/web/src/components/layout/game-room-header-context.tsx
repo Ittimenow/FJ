@@ -1,7 +1,7 @@
 "use client";
 
-import { CircleDot, Clock3, Info, Trash2, X } from "lucide-react";
-import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { CircleDot, Clock3, Pause, Play, Trash2 } from "lucide-react";
+import { createContext, ReactNode, useContext, useMemo, useState } from "react";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import { gameStatusLabel } from "@/lib/game-labels";
 
@@ -12,7 +12,13 @@ export interface GameRoomHeaderState {
   code: string;
   currentRound: number;
   currentPlayerName: string | null;
+  currentPeriod: number;
+  periodCount: number;
   remainingSeconds: number | null;
+  timelineLoading: boolean;
+  startsNextPeriod: boolean;
+  onPause: (() => void) | null;
+  onResume: (() => void) | null;
   onDeleteGame: (() => void) | null;
 }
 
@@ -42,19 +48,6 @@ export function GameRoomHeaderSlot() {
   const context = useContext(GameRoomHeaderContext);
   const state = context?.state ?? null;
 
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!detailsOpen) return;
-    closeButtonRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDetailsOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [detailsOpen]);
-
   return (
     <div className="flex min-w-0 justify-center">
       {state ? (
@@ -62,22 +55,43 @@ export function GameRoomHeaderSlot() {
           {state.remainingSeconds !== null ? (
             <span
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 font-extrabold tabular-nums text-ink"
-              aria-label={`До завершения партии осталось ${formatRemainingTime(state.remainingSeconds)}`}
+              aria-label={`${state.status === "PAUSED" ? "Таймер периода остановлен, осталось" : `До конца периода ${state.currentPeriod} осталось`} ${formatRemainingTime(state.remainingSeconds)}`}
             >
               <Clock3 size={14} aria-hidden="true" />
               {formatRemainingTime(state.remainingSeconds)}
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(true)}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 md:hidden"
-            aria-label="Информация о партии"
-            aria-haspopup="dialog"
-            aria-expanded={detailsOpen}
-          >
-            <Info size={17} aria-hidden="true" />
-          </button>
+          {state.status !== "WAITING" && state.status !== "ENDED" ? (
+            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink sm:inline">
+              Период {state.currentPeriod}/{state.periodCount}
+            </span>
+          ) : null}
+          {state.onPause ? (
+            <button
+              type="button"
+              onClick={state.onPause}
+              disabled={state.timelineLoading}
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-card px-2.5 font-extrabold text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 disabled:cursor-wait disabled:opacity-60"
+              aria-label="Поставить игру на паузу"
+            >
+              <Pause size={14} aria-hidden="true" />
+              <span className="hidden xl:inline">Пауза</span>
+            </button>
+          ) : null}
+          {state.onResume ? (
+            <button
+              type="button"
+              onClick={state.onResume}
+              disabled={state.timelineLoading}
+              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-action px-2.5 font-extrabold text-ink shadow-[0_8px_20px_rgba(249,143,47,.22)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/25 disabled:cursor-wait disabled:opacity-60 disabled:shadow-none"
+              aria-label={state.startsNextPeriod ? "Начать следующий период" : "Продолжить игру"}
+            >
+              <Play size={14} aria-hidden="true" />
+              <span className="hidden xl:inline">
+                {state.startsNextPeriod ? "Следующий период" : "Продолжить"}
+              </span>
+            </button>
+          ) : null}
           <div className="hidden items-center gap-2 md:flex">
           {state.status === "ENDED" ? (
             <span className="rounded-lg bg-card px-3 py-2 font-bold text-ink">
@@ -122,59 +136,6 @@ export function GameRoomHeaderSlot() {
             </button>
           ) : null}
           </div>
-        </div>
-      ) : null}
-      {state && detailsOpen ? (
-        <div
-          className="fixed inset-0 z-[80] grid place-items-center bg-ink/55 p-4 md:hidden"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setDetailsOpen(false);
-          }}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mobile-room-details-title"
-            className="w-full max-w-sm overflow-hidden rounded-2xl bg-ink p-4 text-white shadow-[0_34px_90px_rgba(5,18,45,.35)]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 id="mobile-room-details-title" className="truncate text-lg font-extrabold">
-                  {state.title}
-                </h2>
-                <div className="mt-2 flex items-center gap-2 text-xs text-white/70">
-                  <CircleDot size={13} className={state.connected ? "text-[#bad08c]" : "text-red-300"} aria-hidden="true" />
-                  {state.connected ? "На связи" : "Нет связи"}
-                  <span aria-hidden="true">·</span>
-                  {gameStatusLabel(state.status)}
-                </div>
-              </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={() => setDetailsOpen(false)}
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/10 transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/40"
-                aria-label="Закрыть информацию о партии"
-              >
-                <X size={19} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-white/10 pt-4 text-sm">
-              <div className="rounded-xl bg-white/10 p-3">
-                <div className="text-xs text-white/60">Этап</div>
-                <div className="mt-1 font-extrabold">{state.status === "WAITING" ? "Лобби" : `Раунд ${state.currentRound}`}</div>
-              </div>
-              <div className="rounded-xl bg-[#fff0df] p-3 text-[#8a3d0a]">
-                <div className="text-xs opacity-70">Текущий ход</div>
-                <div className="mt-1 truncate font-extrabold">{state.currentPlayerName ?? "Ожидаем"}</div>
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-white/10 p-3 text-sm">
-              <span>Код комнаты: <strong>{state.code}</strong></span>
-              <RoomInviteActions code={state.code} tone="dark" />
-            </div>
-          </section>
         </div>
       ) : null}
     </div>

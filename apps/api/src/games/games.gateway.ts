@@ -117,6 +117,36 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     return result;
   }
 
+  @SubscribeMessage("game:pause")
+  async pauseGame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.pauseGame(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("game:resume")
+  async resumeGame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.resumeGame(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("game:timer_sync")
+  async syncGameTimer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.syncGameTimer(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
   @SubscribeMessage("game:delete")
   async deleteGame(
     @ConnectedSocket() client: Socket,

@@ -20,4 +20,11 @@ export class CreateGameDto {
   @Min(15)
   @Max(240)
   timeLimitMinutes?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  periodCount?: number;
 }

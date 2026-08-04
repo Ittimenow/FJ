@@ -65,7 +65,7 @@ export interface GameSnapshot {
     id: string;
     code: string;
     title: string;
-    status: "WAITING" | "IN_PROGRESS" | "ENDED" | "CANCELLED";
+    status: "WAITING" | "IN_PROGRESS" | "PAUSED" | "ENDED" | "CANCELLED";
     maxPlayers: number;
     currentTurnIndex: number;
     currentRound: number;
@@ -74,7 +74,13 @@ export interface GameSnapshot {
     startedAt: string | null;
     endedAt: string | null;
     timeLimitMinutes: number;
+    periodCount: number;
+    currentPeriod: number;
+    periodDeadlineAt: string | null;
     deadlineAt: string | null;
+    remainingPeriodSeconds: number | null;
+    pauseReason: "manual" | "period_complete" | null;
+    pausedAt: string | null;
     pendingAction: GamePendingAction | null;
   };
   board: Array<{

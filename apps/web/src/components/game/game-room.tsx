@@ -6,6 +6,7 @@ import {
   type FigurineId
 } from "@cashflow/shared";
 import {
+  BellRing,
   BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
@@ -15,6 +16,8 @@ import {
   Landmark,
   ListRestart,
   MessageCircle,
+  PauseCircle,
+  Play,
   ReceiptText,
   Send,
   UserRound,
@@ -46,6 +49,7 @@ import { useSetGameRoomHeader } from "@/components/layout/game-room-header-conte
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
+import { cn } from "@/lib/utils";
 import type {
   FinancialState,
   GameEvent,
@@ -60,7 +64,7 @@ type GameActionResult = {
   message?: string;
 };
 
-type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed" | "closing";
+type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed";
 
 type UserSearchResult = {
   id: string;
@@ -96,15 +100,14 @@ export function GameRoom({
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
   const [dealQuantity, setDealQuantity] = useState<number | "">(1);
-  const [turnPopupOpen, setTurnPopupOpen] = useState(false);
   const [turnAnimationPhase, setTurnAnimationPhase] = useState<TurnAnimationPhase>("ready");
-  const [animatedPosition, setAnimatedPosition] = useState<number | null>(null);
   const [turnTabRequest, setTurnTabRequest] = useState(0);
-  const [turnPopupOrigin, setTurnPopupOrigin] = useState({ x: 0, y: 0 });
   const [rollingDice, setRollingDice] = useState(false);
   const [diceFaces, setDiceFaces] = useState([6]);
   const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [gameAnnouncement, setGameAnnouncement] = useState<string | null>(null);
   const [changingParticipation, setChangingParticipation] = useState(false);
   const [figurinePickerOpen, setFigurinePickerOpen] = useState(
     initialSnapshot.game.status === "WAITING" && Boolean(initialMe && !initialMe.figurine)
@@ -120,7 +123,6 @@ export function GameRoom({
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mobileBoardRef = useRef<HTMLDivElement>(null);
-  const turnPopupClosingRef = useRef(false);
   const expirationRefreshRef = useRef(false);
   const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const setGameRoomHeader = useSetGameRoomHeader();
@@ -147,6 +149,26 @@ export function GameRoom({
       setSnapshot(value);
     });
     socket.on("game:deleted", () => leaveGamePage());
+    socket.on(
+      realtimeEvents.gamePaused,
+      (payload: { reason?: string; currentPeriod?: number }) => {
+        showTimelineAnnouncement(
+          payload.reason === "period_complete"
+            ? `Период ${payload.currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
+            : "Игра поставлена на паузу."
+        );
+      }
+    );
+    socket.on(
+      realtimeEvents.gameResumed,
+      (payload: { currentPeriod?: number; startsNextPeriod?: boolean }) => {
+        showTimelineAnnouncement(
+          payload.startsNextPeriod
+            ? `Начался период ${payload.currentPeriod ?? ""}.`
+            : "Игра продолжена."
+        );
+      }
+    );
     socket.on(realtimeEvents.chatMessage, (message) => {
       setSnapshot((current) => ({
         ...current,
@@ -168,7 +190,12 @@ export function GameRoom({
   }, []);
 
   useEffect(() => {
-    const deadlineAt = snapshot.game.deadlineAt;
+    const deadlineAt = snapshot.game.periodDeadlineAt ?? snapshot.game.deadlineAt;
+    if (snapshot.game.status === "PAUSED") {
+      setRemainingSeconds(snapshot.game.remainingPeriodSeconds ?? 0);
+      expirationRefreshRef.current = false;
+      return;
+    }
     if (snapshot.game.status !== "IN_PROGRESS" || !deadlineAt) {
       setRemainingSeconds(null);
       expirationRefreshRef.current = false;
@@ -185,12 +212,19 @@ export function GameRoom({
 
       expirationRefreshRef.current = true;
       try {
-        const response = await fetch(
-          `${publicApiBaseUrl()}/api/games/${snapshot.game.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (response.ok) {
-          setSnapshot((await response.json()) as GameSnapshot);
+        if (socketRef.current?.connected) {
+          applyActionResult(await emitWithAck("game:timer_sync", {}));
+        } else {
+          const response = await fetch(
+            `${publicApiBaseUrl()}/api/games/${snapshot.game.id}/timer/sync`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          );
+          if (response.ok) {
+            applyActionResult((await response.json()) as GameActionResult);
+          }
         }
       } finally {
         expirationRefreshRef.current = false;
@@ -200,7 +234,20 @@ export function GameRoom({
     void updateTimer();
     const interval = window.setInterval(() => void updateTimer(), 1000);
     return () => window.clearInterval(interval);
-  }, [snapshot.game.deadlineAt, snapshot.game.id, snapshot.game.status, token]);
+  }, [
+    snapshot.game.deadlineAt,
+    snapshot.game.id,
+    snapshot.game.periodDeadlineAt,
+    snapshot.game.remainingPeriodSeconds,
+    snapshot.game.status,
+    token
+  ]);
+
+  useEffect(() => {
+    if (!gameAnnouncement) return;
+    const timeout = window.setTimeout(() => setGameAnnouncement(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [gameAnnouncement]);
 
   const currentPlayer = snapshot.players.find(
     (player) => player.id === snapshot.game.currentPlayerId
@@ -231,6 +278,8 @@ export function GameRoom({
   const canManage =
     isAdmin ||
     (currentUserRole === "HOST" && snapshot.game.createdById === currentUserId);
+  const canPause = canManage && snapshot.game.status === "IN_PROGRESS";
+  const canResume = canManage && snapshot.game.status === "PAUSED";
   const canStart =
     snapshot.game.status === "WAITING" &&
     canManage;
@@ -310,21 +359,33 @@ export function GameRoom({
       code: snapshot.game.code,
       currentRound: snapshot.game.currentRound,
       currentPlayerName: currentPlayer?.user?.displayName ?? null,
+      currentPeriod: snapshot.game.currentPeriod,
+      periodCount: snapshot.game.periodCount,
       remainingSeconds,
+      timelineLoading,
+      startsNextPeriod: snapshot.game.pauseReason === "period_complete",
+      onPause: canPause ? () => void pauseGame() : null,
+      onResume: canResume ? () => void resumeGame() : null,
       onDeleteGame: canManage ? deleteGame : null
     });
 
     return () => setGameRoomHeader(null);
   }, [
     canManage,
+    canPause,
+    canResume,
     connected,
     currentPlayer?.user?.displayName,
     setGameRoomHeader,
     snapshot.game.code,
+    snapshot.game.currentPeriod,
     snapshot.game.currentRound,
+    snapshot.game.pauseReason,
+    snapshot.game.periodCount,
     snapshot.game.status,
     snapshot.game.title,
-    remainingSeconds
+    remainingSeconds,
+    timelineLoading
   ]);
 
   useEffect(() => {
@@ -348,15 +409,9 @@ export function GameRoom({
   useEffect(() => {
     if (canRoll && !pendingAction && !rollingDice) {
       setDiceFaces(Array.from({ length: activeDiceCount }, () => 6));
-      setAnimatedPosition(me?.position ?? null);
       setTurnAnimationPhase("ready");
-      setTurnPopupOrigin(popupOriginFrom(mobileBoardRef.current));
-      turnPopupClosingRef.current = false;
-      setTurnPopupOpen(gameRoomView === "classic" && desktopTurnPopupEnabled());
-    } else if (!rollingDice) {
-      setTurnPopupOpen(false);
     }
-  }, [activeDiceCount, canRoll, gameRoomView, me?.position, pendingAction, rollingDice]);
+  }, [activeDiceCount, canRoll, pendingAction, rollingDice]);
 
   async function startGame() {
     setError(null);
@@ -383,6 +438,46 @@ export function GameRoom({
       return;
     }
     setSnapshot(result.snapshot ?? result);
+  }
+
+  async function pauseGame() {
+    await changeGameTimeline("pause", "game:pause", "Не удалось поставить игру на паузу");
+  }
+
+  async function resumeGame() {
+    await changeGameTimeline("resume", "game:resume", "Не удалось продолжить игру");
+  }
+
+  async function changeGameTimeline(
+    action: "pause" | "resume",
+    socketEvent: string,
+    fallbackMessage: string
+  ) {
+    if (timelineLoading) return;
+    setTimelineLoading(true);
+    setError(null);
+    try {
+      if (socketRef.current?.connected) {
+        applyActionResult(await emitWithAck(socketEvent, {}));
+        return;
+      }
+      const response = await fetch(
+        `${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${action}`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      const result = (await response.json()) as GameActionResult;
+      if (!response.ok) {
+        throw new Error(result.message ?? fallbackMessage);
+      }
+      applyActionResult(result);
+    } catch (event) {
+      setError(event instanceof Error ? event.message : fallbackMessage);
+    } finally {
+      setTimelineLoading(false);
+    }
   }
 
   async function chooseFigurine() {
@@ -518,6 +613,7 @@ export function GameRoom({
   }
 
   function applyActionResult(result: GameActionResult) {
+    announceTimelineEvents(result.events);
     if (result.snapshot?.game?.id) {
       if (result.snapshot.game.status === "CANCELLED") {
         leaveGamePage();
@@ -525,6 +621,38 @@ export function GameRoom({
       }
       setSnapshot(result.snapshot);
     }
+  }
+
+  function announceTimelineEvents(
+    events: Array<{ type: string; payload: Record<string, unknown> }> | undefined
+  ) {
+    const event = events?.find(
+      (candidate) =>
+        candidate.type === realtimeEvents.gamePaused ||
+        candidate.type === realtimeEvents.gameResumed
+    );
+    if (!event) return;
+    const currentPeriod =
+      typeof event.payload.currentPeriod === "number"
+        ? event.payload.currentPeriod
+        : null;
+    if (event.type === realtimeEvents.gamePaused) {
+      showTimelineAnnouncement(
+        event.payload.reason === "period_complete"
+          ? `Период ${currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
+          : "Игра поставлена на паузу."
+      );
+      return;
+    }
+    showTimelineAnnouncement(
+      event.payload.startsNextPeriod
+        ? `Начался период ${currentPeriod ?? ""}.`
+        : "Игра продолжена."
+    );
+  }
+
+  function showTimelineAnnouncement(message: string) {
+    setGameAnnouncement(message.replace(/\s+\./g, "."));
   }
 
   function leaveGamePage() {
@@ -535,11 +663,8 @@ export function GameRoom({
   async function rollDice() {
     if (rollingDice) return;
     setError(null);
-    turnPopupClosingRef.current = false;
-    setTurnPopupOpen(desktopTurnPopupEnabled());
     setRollingDice(true);
     setTurnAnimationPhase("rolling");
-    setAnimatedPosition(me?.position ?? null);
     startDiceAnimation(activeDiceCount);
     const startedAt = Date.now();
 
@@ -557,13 +682,12 @@ export function GameRoom({
       if (move) {
         setTurnAnimationPhase("moving");
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        setAnimatedPosition(move.to);
-        if (!reduceMotion) await wait(popupMoveDuration(move.steps));
+        if (!reduceMotion) await wait(turnMoveDuration(move.steps));
       }
 
       setTurnAnimationPhase("landed");
       await wait(2500);
-      await closeTurnPopup();
+      setTurnTabRequest((current) => current + 1);
     } catch (event) {
       stopDiceAnimation();
       setTurnAnimationPhase("ready");
@@ -573,29 +697,13 @@ export function GameRoom({
     }
   }
 
-  async function closeTurnPopup() {
-    if (turnPopupClosingRef.current) return;
-    if (!turnPopupOpen) {
-      setAnimatedPosition(null);
-      setTurnTabRequest((current) => current + 1);
-      return;
-    }
-    turnPopupClosingRef.current = true;
-    setTurnAnimationPhase("closing");
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduceMotion) await wait(280);
-    setTurnPopupOpen(false);
-    setAnimatedPosition(null);
-    setTurnTabRequest((current) => current + 1);
-  }
-
   async function skipTurn() {
     if (rollingDice) return;
     setError(null);
     try {
       const result = await emitWithAck("turn:skip", {});
       applyActionResult(result);
-      await closeTurnPopup();
+      setTurnTabRequest((current) => current + 1);
     } catch (event) {
       setError(event instanceof Error ? event.message : "Не удалось пропустить ход");
     }
@@ -747,19 +855,36 @@ export function GameRoom({
 
   return (
     <div className="game-room grid w-full min-w-0 max-w-full gap-5">
-      <TurnPopup
-        open={turnPopupOpen}
-        snapshot={snapshot}
-        player={me}
-        animatedPosition={animatedPosition}
-        phase={turnAnimationPhase}
-        origin={turnPopupOrigin}
-        diceValues={diceFaces}
-        rolling={turnAnimationPhase === "rolling"}
-        onRoll={rollDice}
-        onSkip={skipTurn}
-        onDismiss={closeTurnPopup}
-      />
+      {gameAnnouncement ? (
+        <div
+          role="status"
+          aria-live="assertive"
+          className="fixed left-1/2 top-20 z-[70] flex w-[min(92vw,520px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-[0_18px_48px_rgba(5,18,45,.3)]"
+        >
+          <BellRing className="shrink-0 text-action" size={19} aria-hidden="true" />
+          <span>{gameAnnouncement}</span>
+        </div>
+      ) : null}
+      {snapshot.game.status === "PAUSED" ? (
+        <GamePauseBanner
+          currentPeriod={snapshot.game.currentPeriod}
+          periodCount={snapshot.game.periodCount}
+          reason={snapshot.game.pauseReason}
+          remainingSeconds={remainingSeconds ?? snapshot.game.remainingPeriodSeconds ?? 0}
+          canManage={canManage}
+          loading={timelineLoading}
+          onResume={resumeGame}
+        />
+      ) : null}
+      {canRoll && !pendingAction && !rollingDice ? (
+        <MobileRollPrompt
+          diceCount={activeDiceCount}
+          onRoll={() => {
+            setTurnTabRequest((current) => current + 1);
+            void rollDice();
+          }}
+        />
+      ) : null}
       <GameEndPopup
         open={gameEndOpen && snapshot.game.status === "ENDED"}
         winner={winner}
@@ -777,7 +902,8 @@ export function GameRoom({
         onConfirm={chooseFigurine}
         onClose={() => setFigurinePickerOpen(false)}
       />
-      {me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
+      {snapshot.game.status === "IN_PROGRESS" &&
+      me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
           player={me}
           onSellAsset={sellBankruptcyAsset}
@@ -837,11 +963,10 @@ export function GameRoom({
           snapshot={snapshot}
           currentUserId={currentUserId}
           canRoll={canRoll && !pendingAction}
-          rolling={rollingDice}
-          onRoll={rollDice}
+          turnTabRequest={turnTabRequest}
           actions={
             <>
-              <MobileDiceAction
+              <DiceAction
                 canRoll={canRoll && !pendingAction}
                 rolling={rollingDice}
                 phase={turnAnimationPhase}
@@ -934,46 +1059,56 @@ export function GameRoom({
               player.position < 0
           )}
         >
-          <ActionsPanel
-            canChooseDeal={canChooseDeal}
-            onDrawSmallDeal={() => draw("SMALL_DEAL")}
-            onDrawBigDeal={() => draw("BIG_DEAL")}
-            latestCard={latestDealDecisionCard}
-            latestTurnSummary={latestTurnSummary}
-            charityChoice={charityChoice}
-            canAnswerCharity={canAnswerCharity}
-            doodadPaymentChoice={doodadPaymentChoice}
-            canAnswerDoodadPayment={canAnswerDoodadPayment}
-            marketSaleOffer={marketSaleOffer}
-            canAnswerMarketSale={canAnswerMarketSale}
-            currentCashCents={me?.financialState?.cashCents ?? 0}
-            currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
-            waitingStockSellerCount={waitingStockSellerCount}
-            dealQuantity={dealQuantity}
-            setDealQuantity={updateDealQuantity}
-            onBuyLatest={buyLatestDeal}
-            onDeclineLatest={declineLatestDeal}
-            onSellMarketAsset={sellMarketAsset}
-            onDeclineMarketSale={declineMarketSale}
-            onAcceptCharity={acceptCharity}
-            onDeclineCharity={declineCharity}
-            onPayDoodadWithCash={payDoodadWithCash}
-            onPayDoodadWithCredit={payDoodadWithCredit}
-            stockSaleOffer={stockSaleOffer}
-            stockSaleQuantity={stockSaleQuantity}
-            onStockSaleQuantityChange={updateStockSaleQuantity}
-            onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-            onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
-            onSellStock={sellStockFromDeal}
-            onDeclineStockSale={declineStockSale}
-            loanAmount={loanAmount}
-            onLoanDecrease={() => changeLoanAmount(-1000)}
-            onLoanIncrease={() => changeLoanAmount(1000)}
-            onLoanAmountChange={updateLoanAmount}
-            onTakeLoan={takeLoan}
-            canTakeLoan={canTakeLoan}
-            embedded
-          />
+          <>
+            <DiceAction
+              canRoll={canRoll && !pendingAction}
+              rolling={rollingDice}
+              phase={turnAnimationPhase}
+              diceValues={diceFaces}
+              onRoll={rollDice}
+              onSkip={skipTurn}
+            />
+            <ActionsPanel
+              canChooseDeal={canChooseDeal}
+              onDrawSmallDeal={() => draw("SMALL_DEAL")}
+              onDrawBigDeal={() => draw("BIG_DEAL")}
+              latestCard={latestDealDecisionCard}
+              latestTurnSummary={latestTurnSummary}
+              charityChoice={charityChoice}
+              canAnswerCharity={canAnswerCharity}
+              doodadPaymentChoice={doodadPaymentChoice}
+              canAnswerDoodadPayment={canAnswerDoodadPayment}
+              marketSaleOffer={marketSaleOffer}
+              canAnswerMarketSale={canAnswerMarketSale}
+              currentCashCents={me?.financialState?.cashCents ?? 0}
+              currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
+              waitingStockSellerCount={waitingStockSellerCount}
+              dealQuantity={dealQuantity}
+              setDealQuantity={updateDealQuantity}
+              onBuyLatest={buyLatestDeal}
+              onDeclineLatest={declineLatestDeal}
+              onSellMarketAsset={sellMarketAsset}
+              onDeclineMarketSale={declineMarketSale}
+              onAcceptCharity={acceptCharity}
+              onDeclineCharity={declineCharity}
+              onPayDoodadWithCash={payDoodadWithCash}
+              onPayDoodadWithCredit={payDoodadWithCredit}
+              stockSaleOffer={stockSaleOffer}
+              stockSaleQuantity={stockSaleQuantity}
+              onStockSaleQuantityChange={updateStockSaleQuantity}
+              onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
+              onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+              onSellStock={sellStockFromDeal}
+              onDeclineStockSale={declineStockSale}
+              loanAmount={loanAmount}
+              onLoanDecrease={() => changeLoanAmount(-1000)}
+              onLoanIncrease={() => changeLoanAmount(1000)}
+              onLoanAmountChange={updateLoanAmount}
+              onTakeLoan={takeLoan}
+              canTakeLoan={canTakeLoan}
+              embedded
+            />
+          </>
         </DesktopGameBoard>
           </div>
           ) : null}
@@ -996,7 +1131,7 @@ export function GameRoom({
               turnTabRequest={turnTabRequest}
               actions={
                 <>
-                  <MobileDiceAction
+                  <DiceAction
                     canRoll={canRoll && !pendingAction}
                     rolling={rollingDice}
                     phase={turnAnimationPhase}
@@ -1078,6 +1213,78 @@ export function GameRoom({
         </>
       )}
     </div>
+  );
+}
+
+function GamePauseBanner({
+  currentPeriod,
+  periodCount,
+  reason,
+  remainingSeconds,
+  canManage,
+  loading,
+  onResume
+}: {
+  currentPeriod: number;
+  periodCount: number;
+  reason: "manual" | "period_complete" | null;
+  remainingSeconds: number;
+  canManage: boolean;
+  loading: boolean;
+  onResume: () => void;
+}) {
+  const periodComplete = reason === "period_complete";
+  const title = periodComplete
+    ? `Период ${currentPeriod} завершён`
+    : "Игра поставлена на паузу";
+  const description = canManage
+    ? periodComplete
+      ? `Команда может отдохнуть. Когда будете готовы, начните период ${currentPeriod + 1}.`
+      : "Таймер периода остановлен. Продолжите игру, когда команда будет готова."
+    : periodComplete
+      ? `Следующий период начнёт ведущий или администратор. Все игровые действия временно недоступны.`
+      : "Ожидайте, пока ведущий или администратор продолжит игру. Все игровые действия временно недоступны.";
+
+  return (
+    <section
+      role="alert"
+      aria-live="assertive"
+      className="flex flex-col gap-4 rounded-2xl bg-[#fff0df] p-4 text-[#6f330c] shadow-[0_16px_38px_rgba(138,61,10,.14)] sm:flex-row sm:items-center sm:justify-between sm:p-5"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#a84b0d] shadow-[0_8px_22px_rgba(138,61,10,.12)]">
+          <PauseCircle size={23} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-extrabold tracking-[-0.025em]">{title}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#7f431c]">{description}</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+        <span className="rounded-xl bg-white px-3 py-2 text-sm font-extrabold tabular-nums text-ink">
+          {periodComplete
+            ? `Период ${currentPeriod}/${periodCount}`
+            : formatPeriodTime(remainingSeconds)}
+        </span>
+        {canManage ? (
+          <Button
+            type="button"
+            variant="action"
+            className="min-w-0 flex-1 gap-2 sm:flex-none"
+            onClick={onResume}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            <Play size={17} aria-hidden="true" />
+            {loading
+              ? "Продолжаем…"
+              : periodComplete
+                ? `Начать период ${currentPeriod + 1}`
+                : "Продолжить игру"}
+          </Button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -1193,103 +1400,7 @@ function BankruptcyPanel({
   );
 }
 
-function TurnPopup({
-  open,
-  snapshot,
-  player,
-  animatedPosition,
-  phase,
-  origin,
-  diceValues,
-  rolling,
-  onRoll,
-  onSkip,
-  onDismiss
-}: {
-  open: boolean;
-  snapshot: GameSnapshot;
-  player: GamePlayer | undefined;
-  animatedPosition: number | null;
-  phase: TurnAnimationPhase;
-  origin: { x: number; y: number };
-  diceValues: number[];
-  rolling: boolean;
-  onRoll: () => void;
-  onSkip: () => void;
-  onDismiss: () => void;
-}) {
-  if (!open) return null;
-
-  return (
-    <div
-      className={[
-        "fixed inset-0 z-50 grid place-items-center overflow-y-auto overscroll-contain bg-black/30 px-4 py-5",
-        phase === "closing" ? "turn-popup-backdrop-closing" : "turn-popup-backdrop-opening"
-      ].join(" ")}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="turn-popup-title"
-        style={
-          {
-            "--turn-popup-x": `${origin.x}px`,
-            "--turn-popup-y": `${origin.y}px`
-          } as CSSProperties
-        }
-        className={[
-          "max-h-[calc(100dvh-2.5rem)] w-full min-w-0 max-w-xl overflow-x-hidden overflow-y-auto rounded-md border border-line bg-white p-4 text-center shadow-panel sm:p-5 xl:max-w-xs",
-          phase === "closing" ? "turn-popup-panel-closing" : "turn-popup-panel-opening"
-        ].join(" ")}
-      >
-        <h2 id="turn-popup-title" className="text-xl font-semibold">
-          {phase === "moving"
-            ? "Двигаемся по полю"
-            : phase === "landed"
-              ? "Новая клетка"
-              : "Ваш ход!"}
-        </h2>
-        <div className="mt-4 min-w-0 max-w-full overflow-hidden xl:hidden">
-          <PopupBoard
-            snapshot={snapshot}
-            player={player}
-            animatedPosition={animatedPosition}
-            phase={phase}
-          />
-        </div>
-        <div className="mt-4 flex justify-center gap-3">
-          {diceValues.map((diceValue, index) => (
-            <DiceFace key={index} value={diceValue} rolling={rolling} />
-          ))}
-        </div>
-        {phase === "ready" ? (
-          <>
-            <Button className="mt-5 w-full" variant="action" onClick={onRoll}>
-              {diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"}
-            </Button>
-            <button
-              type="button"
-              onClick={onSkip}
-              className="mt-3 text-xs text-neutral-500 underline-offset-4 hover:text-ink hover:underline"
-            >
-              Пропустить ход
-            </button>
-          </>
-        ) : phase === "landed" ? (
-          <Button className="mt-5 w-full" variant="secondary" onClick={onDismiss}>
-            Перейти к ходу
-          </Button>
-        ) : (
-          <p className="mt-4 text-sm text-neutral-500" aria-live="polite">
-            {phase === "rolling" ? "Бросаем кубик..." : "Фишка движется..."}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MobileDiceAction({
+function DiceAction({
   canRoll,
   rolling,
   phase,
@@ -1315,7 +1426,7 @@ function MobileDiceAction({
           : "Ожидайте своего хода";
 
   return (
-    <section className="mb-3 rounded-xl bg-[#fff5ed] p-3 xl:hidden" aria-label="Бросок кубика">
+    <section className="mb-3 rounded-xl bg-[#fff5ed] p-3" aria-label="Бросок кубика">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
@@ -1357,85 +1468,20 @@ function MobileDiceAction({
   );
 }
 
-function PopupBoard({
-  snapshot,
-  player,
-  animatedPosition,
-  phase
-}: {
-  snapshot: GameSnapshot;
-  player: GamePlayer | undefined;
-  animatedPosition: number | null;
-  phase: TurnAnimationPhase;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const previousTargetRef = useRef<number | null>(null);
-  const targetCellIndex = animatedPosition ?? (player && player.position >= 0 ? player.position : 0);
-
-  useEffect(() => {
-    const scroller = scrollRef.current;
-    const target = scroller?.querySelector<HTMLElement>(
-      `[data-popup-board-cell="${targetCellIndex}"]`
-    );
-    if (!scroller || !target) return;
-
-    const previousTarget = previousTargetRef.current;
-    previousTargetRef.current = targetCellIndex;
-    const targetScrollLeft = Math.max(
-      0,
-      Math.min(
-        target.offsetLeft - (scroller.clientWidth - target.clientWidth) / 2,
-        scroller.scrollWidth - scroller.clientWidth
-      )
-    );
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (phase !== "moving" || previousTarget === null || reduceMotion) {
-      scroller.scrollTo({ left: targetScrollLeft, behavior: "auto" });
-      return;
-    }
-
-    const steps = normalizeBoardPosition(targetCellIndex - previousTarget, snapshot.board.length);
-    const duration = popupMoveDuration(steps);
-    const startScrollLeft = scroller.scrollLeft;
-    const distance = targetScrollLeft - startScrollLeft;
-    let animationFrame = 0;
-    let startedAt: number | null = null;
-
-    const animate = (timestamp: number) => {
-      startedAt ??= timestamp;
-      const progress = Math.min(1, (timestamp - startedAt) / duration);
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      scroller.scrollLeft = startScrollLeft + distance * easedProgress;
-      if (progress < 1) animationFrame = window.requestAnimationFrame(animate);
-    };
-
-    animationFrame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [phase, snapshot.board.length, targetCellIndex]);
-
+function MobileRollPrompt({ diceCount, onRoll }: { diceCount: number; onRoll: () => void }) {
   return (
-    <div
-      ref={scrollRef}
-      className="grid w-full min-w-0 max-w-full snap-x snap-mandatory grid-flow-col auto-cols-[clamp(88px,27vw,136px)] gap-2 overflow-x-auto overscroll-x-contain scroll-smooth px-[40%] pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      aria-label="Малый круг"
-    >
-      {snapshot.board.map((cell) => {
-        const players = animatedCellPlayers(snapshot, cell.index, player, animatedPosition);
-        return (
-          <div
-            key={cell.index}
-            data-popup-board-cell={cell.index}
-            className="min-w-0 snap-center"
-          >
-            <BoardCellTile
-              cell={cell}
-              players={players}
-              active={cell.index === targetCellIndex}
-              mobile
-            />
-          </div>
-        );
-      })}
+    <div className="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-sm rounded-xl bg-white p-3 shadow-[0_18px_46px_rgba(63,91,53,.22)] ring-1 ring-[#cad8bd] xl:hidden">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-[#3f5b35]">Ваш ход</div>
+          <p className="mt-0.5 text-xs text-[#65745e]">
+            {diceCount > 1 ? "Доступно два кубика" : "Можно сделать бросок"}
+          </p>
+        </div>
+        <Button className="shrink-0" onClick={onRoll}>
+          Бросить кубик
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1655,21 +1701,8 @@ function normalizeBoardPosition(position: number, boardSize: number) {
   return ((position % boardSize) + boardSize) % boardSize;
 }
 
-function popupMoveDuration(steps: number) {
+function turnMoveDuration(steps: number) {
   return Math.min(1100, Math.max(420, 300 + steps * 110));
-}
-
-function desktopTurnPopupEnabled() {
-  return typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches;
-}
-
-function popupOriginFrom(element: HTMLElement | null) {
-  if (!element || typeof window === "undefined") return { x: 0, y: 0 };
-  const rect = element.getBoundingClientRect();
-  return {
-    x: rect.left + rect.width / 2 - window.innerWidth / 2,
-    y: rect.top + rect.height / 2 - window.innerHeight / 2
-  };
 }
 
 function randomDiceValues(diceCount: number) {
@@ -2341,16 +2374,21 @@ function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
   const compositionTotal = grouped.reduce((sum, [, value]) => sum + value, 0);
 
   return (
-    <div className="rounded-md border border-line bg-surface p-3">
+    <div className="rounded-md bg-surface p-3">
       <div className="text-sm font-semibold">Портфель</div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Metric label="Вложено" value={money(totalCostCents)} />
-        <Metric label="Текущая стоимость" value={money(totalMarketCents)} />
+        <Metric className="bg-white" label="Вложено" value={money(totalCostCents)} />
+        <Metric className="bg-white" label="Текущая стоимость" value={money(totalMarketCents)} />
         <Metric
+          className="bg-white"
           label={resultCents >= 0 ? "Прибыль" : "Убыток"}
           value={money(Math.abs(resultCents))}
         />
-        <Metric label="Cashflow активов" value={`${money(totalCashflowCents)}/мес`} />
+        <Metric
+          className="bg-white"
+          label="Cashflow активов"
+          value={`${money(totalCashflowCents)}/мес`}
+        />
       </div>
       {compositionTotal > 0 ? (
         <>
@@ -2419,14 +2457,6 @@ function MobileBoard({
     selectedPlayer?.track === "RAT_RACE" && selectedPlayer.position >= 0
       ? selectedPlayer.position
       : 0;
-  const outsidePlayers = snapshot.players.filter(
-    (player) =>
-      player.role === "PLAYER" &&
-      player.track === "RAT_RACE" &&
-      player.position < 0
-  );
-  const targetCell = snapshot.board[targetCellIndex];
-
   useEffect(() => {
     const target = scrollRef.current?.querySelector<HTMLElement>(
       `[data-board-cell="${targetCellIndex}"]`
@@ -2490,50 +2520,10 @@ function MobileBoard({
 
   return (
     <div ref={containerRef} className="w-full min-w-0 max-w-full">
-      <Card className="min-w-0 max-w-full overflow-hidden rounded-2xl border-0">
-        <div className="p-3 pb-2">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted">
-                Позиция на поле
-              </div>
-              <div className="mt-1 truncate text-sm font-extrabold">
-                {selectedPlayer?.user?.displayName ?? "Игрок"}
-              </div>
-            </div>
-            <span className="shrink-0 rounded-lg bg-[#e8effe] px-2.5 py-1.5 text-xs font-extrabold text-journey">
-              Клетка {targetCellIndex + 1}
-            </span>
-          </div>
-          <div className="mt-2 flex min-w-0 items-center gap-2 rounded-xl bg-card px-3 py-2.5">
-            <span
-              className={`h-3 w-3 shrink-0 rounded-full ${
-                (boardCellAppearances[targetCell?.type ?? ""] ?? defaultBoardCellAppearance)
-                  .timelineMarker
-              }`}
-              aria-hidden="true"
-            />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-bold">
-                {targetCell?.label ?? "Малый круг"}
-              </div>
-              <div className="mt-0.5 truncate text-[11px] text-muted">
-                {targetCell ? cellTypes[targetCell.type] ?? targetCell.type : "Стартовая позиция"}
-              </div>
-            </div>
-          </div>
-        </div>
-        {outsidePlayers.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1 px-3 pb-2">
-            <span className="mr-1 text-xs text-neutral-500">На старте</span>
-            {outsidePlayers.map((player) => (
-              <PlayerToken key={player.id} player={player} small />
-            ))}
-          </div>
-        ) : null}
+      <div className="min-w-0 max-w-full overflow-hidden rounded-xl bg-card/60">
         <div
           ref={scrollRef}
-          className="grid w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-[46px] overflow-x-auto overscroll-x-contain scroll-smooth border-t border-line/60 bg-card/60 px-[calc(50%_-_23px)] pb-3 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-[46px] overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
@@ -2566,12 +2556,13 @@ function MobileBoard({
                     ].join(" ")}
                   />
                 </div>
-                <div className="mt-1 flex min-h-5 flex-wrap justify-center gap-0.5">
+                <div className="mt-1 flex min-h-7 flex-wrap justify-center gap-0.5">
                   {players.map((player) => (
                     <PlayerToken
                       key={player.id}
                       player={player}
                       small
+                      mobileBoard
                       moving={player.id === animatedOtherPlayer?.playerId}
                     />
                   ))}
@@ -2580,7 +2571,7 @@ function MobileBoard({
             );
           })}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -2668,12 +2659,14 @@ function PlayerToken({
   player,
   small = false,
   moving = false,
-  desktopBoard = false
+  desktopBoard = false,
+  mobileBoard = false
 }: {
   player: GamePlayer;
   small?: boolean;
   moving?: boolean;
   desktopBoard?: boolean;
+  mobileBoard?: boolean;
 }) {
   const title = player.user?.displayName ?? `Игрок ${player.seat ?? ""}`;
   if (player.figurine) {
@@ -2683,16 +2676,19 @@ function PlayerToken({
           "inline-flex shrink-0",
           desktopBoard
             ? "h-10 w-10"
-            : "overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
-          desktopBoard ? "" : small ? "h-5 w-5" : "h-8 w-8",
+            : mobileBoard
+              ? "h-7 w-7"
+              : "overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
+          desktopBoard || mobileBoard ? "" : small ? "h-5 w-5" : "h-8 w-8",
           moving ? "timeline-moving-token" : ""
         ].join(" ")}
+        style={mobileBoard ? { boxShadow: "none" } : undefined}
         title={title}
       >
         <img
           src={figurineImagePath(player.figurine)}
           alt=""
-          className={`h-full w-full ${desktopBoard ? "object-contain" : "object-cover"}`}
+          className={`h-full w-full ${desktopBoard || mobileBoard ? "object-contain" : "object-cover"}`}
         />
       </span>
     );
@@ -2802,21 +2798,6 @@ function latestPlayerMoveEvent(events: GameEvent[], excludedPlayerId: string | u
         Boolean(event.gamePlayer?.id) &&
         event.gamePlayer?.id !== excludedPlayerId
     );
-}
-
-function animatedCellPlayers(
-  snapshot: GameSnapshot,
-  cellIndex: number,
-  movingPlayer: GamePlayer | undefined,
-  animatedPosition: number | null
-) {
-  if (!movingPlayer || animatedPosition === null) return cellPlayers(snapshot, cellIndex);
-
-  const players = cellPlayers(snapshot, cellIndex).filter(
-    (candidate) => candidate.id !== movingPlayer.id
-  );
-  if (cellIndex === animatedPosition) players.push(movingPlayer);
-  return players;
 }
 
 function cellPlayers(snapshot: GameSnapshot, cellIndex: number) {
@@ -2963,7 +2944,7 @@ function MobileGameTabs({
   return (
     <Card className="w-full min-w-0 max-w-full rounded-2xl border-0">
       <div
-        className="grid min-w-0 grid-cols-5 gap-1 border-b border-line/70 bg-card p-2"
+        className="grid min-w-0 grid-cols-5 gap-1.5 bg-[#eef3e8] p-2"
         role="tablist"
         aria-label="Информация об игроке"
       >
@@ -2994,10 +2975,10 @@ function MobileGameTabs({
                 document.getElementById(`mobile-game-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey min-[360px]:text-[10px]",
+                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] min-[360px]:text-[10px]",
                 active
-                  ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
-                  : "bg-transparent text-muted hover:bg-white hover:text-ink"
+                  ? "bg-[#dfe9d4] text-[#3f5b35]"
+                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
               ].join(" ")}
             >
               <span aria-hidden="true">{tab.icon}</span>
@@ -3006,7 +2987,7 @@ function MobileGameTabs({
                 <span
                   className={[
                     "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[8px] leading-4",
-                    active ? "bg-white/20 text-white" : "bg-white text-neutral-600"
+                    active ? "bg-[#718866] text-white" : "bg-white text-[#61715b]"
                   ].join(" ")}
                 >
                   {tab.count}
@@ -3014,7 +2995,7 @@ function MobileGameTabs({
               ) : null}
               {tab.attention ? (
                 <span
-                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-action ring-2 ring-white"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#9d82b8] ring-2 ring-white"
                   aria-label="Требуется действие"
                 />
               ) : null}
@@ -3048,7 +3029,6 @@ function MobileGameTabs({
                   {player.profession?.name}
                 </div>
               </div>
-              <Badge className="shrink-0 bg-surface text-ink">финансы</Badge>
             </div>
             <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
@@ -3106,7 +3086,7 @@ function AssetCard({
   const stock = isStockAsset(asset);
 
   return (
-    <div className="rounded-md border border-line bg-surface p-3">
+    <div className="rounded-md bg-surface p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium">{asset.name}</div>
@@ -3340,7 +3320,7 @@ function CreditList({
               return (
                 <div
                   key={liability.id}
-                  className="grid gap-2 rounded-md border border-line bg-white p-3 sm:grid-cols-[1fr_auto] sm:items-center"
+                  className="grid gap-2 rounded-md bg-surface p-3 sm:grid-cols-[1fr_auto] sm:items-center"
                 >
                   <div>
                     <div className="text-sm font-medium">
@@ -3352,11 +3332,19 @@ function CreditList({
                         ? ` · платеж: ${money(liability.paymentCents)}/мес`
                         : ""}
                     </div>
-                    {canManageLiabilities && !hasEnoughCash ? (
+                    {!canManageLiabilities ? (
+                      <div className="mt-1 text-xs text-neutral-500">
+                        Погашение доступно владельцу финансового отчёта.
+                      </div>
+                    ) : !hasEnoughCash ? (
                       <div className="mt-1 text-xs text-red-700">
                         Недостаточно наличных для закрытия.
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="mt-1 text-xs font-medium text-success">
+                        Кредит можно закрыть полностью.
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="secondary"
@@ -3904,7 +3892,7 @@ function ActionsPanel({
               event.type === realtimeEvents.cardDraw ? (
                 <JournalCardDraw key={event.id} event={event} />
               ) : (
-                <div key={event.id} className="border-l-2 border-neutral-200 pl-3">
+                <div key={event.id}>
                   <GameEventPresentation event={event} titleClassName="font-semibold" />
                 </div>
               )
@@ -3939,11 +3927,12 @@ function ActionsPanel({
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Действия</h2>
       <Button
-        variant="secondary"
-        className="h-8 px-3 text-xs"
+        variant="primary"
+        className="h-9 gap-2 px-3 text-xs"
         onClick={() => setBankOpen((value) => !value)}
         disabled={!canTakeLoan}
       >
+        <Landmark size={15} aria-hidden="true" />
         {bankOpen ? "Скрыть банк" : "Банк"}
       </Button>
     </div>
@@ -4080,9 +4069,9 @@ function MobileActivityPanel({
   const [activeTab, setActiveTab] = useState<"game" | "chat">("game");
 
   return (
-    <section className="min-w-0 lg:hidden">
+    <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-panel lg:hidden">
       <div
-        className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-card p-1.5 shadow-panel"
+        className="grid grid-cols-2 gap-1.5 bg-[#eef3e8] p-2"
         role="tablist"
         aria-label="События партии и чат"
       >
@@ -4094,10 +4083,10 @@ function MobileActivityPanel({
           aria-controls="mobile-activity-panel"
           onClick={() => setActiveTab("game")}
           className={[
-            "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey",
+            "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
             activeTab === "game"
-              ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
-              : "text-muted hover:bg-white hover:text-ink"
+              ? "bg-[#dfe9d4] text-[#3f5b35]"
+              : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
           ].join(" ")}
         >
           <ListRestart size={17} aria-hidden="true" />
@@ -4111,10 +4100,10 @@ function MobileActivityPanel({
           aria-controls="mobile-activity-panel"
           onClick={() => setActiveTab("chat")}
           className={[
-            "relative inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey",
+            "relative inline-flex h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
             activeTab === "chat"
-              ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
-              : "text-muted hover:bg-white hover:text-ink"
+              ? "bg-[#dfe9d4] text-[#3f5b35]"
+              : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
           ].join(" ")}
         >
           <MessageCircle size={17} aria-hidden="true" />
@@ -4123,7 +4112,9 @@ function MobileActivityPanel({
             <span
               className={[
                 "inline-flex min-w-5 justify-center rounded-full px-1 text-[10px] leading-5",
-                activeTab === "chat" ? "bg-white/20 text-white" : "bg-white text-muted"
+                activeTab === "chat"
+                  ? "bg-[#718866] text-white"
+                  : "bg-white text-[#61715b]"
               ].join(" ")}
               aria-label={`${messages.length} сообщений`}
             >
@@ -4136,6 +4127,7 @@ function MobileActivityPanel({
         id="mobile-activity-panel"
         role="tabpanel"
         aria-labelledby={`mobile-activity-tab-${activeTab}`}
+        className="min-w-0"
       >
         {activeTab === "game" ? (
           <EventLog
@@ -4175,29 +4167,39 @@ function EventLog({
   }, [currentUserId, events, onlyMine]);
 
   return (
-    <Card className={compact ? "rounded-2xl border-0" : ""}>
+    <Card className={compact ? "rounded-none border-0 shadow-none" : ""}>
       <CardHeader className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface p-1" role="tablist" aria-label="Информация об игре">
+        <div
+          className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#eef3e8] p-1.5"
+          role="tablist"
+          aria-label="Информация об игре"
+        >
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "events"}
-            className={`rounded px-3 py-2 text-sm font-semibold transition-colors ${
-              activeTab === "events" ? "bg-white text-ink shadow-sm" : "text-neutral-500"
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
+              activeTab === "events"
+                ? "bg-[#dfe9d4] text-[#3f5b35]"
+                : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
             }`}
             onClick={() => setActiveTab("events")}
           >
+            <ListRestart size={16} aria-hidden="true" />
             {compact ? "События" : "Журнал действий"}
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "players"}
-            className={`rounded px-3 py-2 text-sm font-semibold transition-colors ${
-              activeTab === "players" ? "bg-white text-ink shadow-sm" : "text-neutral-500"
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
+              activeTab === "players"
+                ? "bg-[#dfe9d4] text-[#3f5b35]"
+                : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
             }`}
             onClick={() => setActiveTab("players")}
           >
+            <UsersRound size={16} aria-hidden="true" />
             Игроки
           </button>
         </div>
@@ -4356,7 +4358,6 @@ function GameEventHeadline({ event }: { event: GameEvent }) {
     const cell = isRecord(event.payload.cell) ? event.payload.cell : null;
     const cellType = String(cell?.type ?? "");
     const cellLabel = String(cell?.label ?? cellTypes[cellType] ?? "");
-    const appearance = boardCellAppearances[cellType] ?? defaultBoardCellAppearance;
 
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
@@ -4366,7 +4367,7 @@ function GameEventHeadline({ event }: { event: GameEvent }) {
           {compactBoardPosition(from)} → {compactBoardPosition(to)}
         </span>
         {cellLabel ? (
-          <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${appearance.tile}`}>
+          <span className="text-xs font-medium text-neutral-600">
             {cellTypes[cellType] ?? cellLabel}
           </span>
         ) : null}
@@ -4563,7 +4564,9 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
   ]);
 
   return (
-    <div className={`overflow-hidden rounded-lg border ${appearance.container}`}>
+    <div
+      className={`overflow-hidden rounded-lg shadow-[0_8px_20px_rgba(27,57,118,.10)] ${appearance.container}`}
+    >
       <div className="p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
@@ -4622,6 +4625,9 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
 const eventTitles: Record<string, string> = {
   "game:created": "Игра создана",
   "game:started": "Игра запущена",
+  "game:paused": "Игра поставлена на паузу",
+  "game:resumed": "Игра продолжена",
+  "game:period_started": "Начался новый период",
   "game:deleted": "Игра удалена",
   "game:ended": "Игра завершена",
   "player:joined": "Игрок вошел в комнату",
@@ -4787,7 +4793,24 @@ function eventDetails(event: GameEvent) {
     case "game:started":
       return compactDetails([
         numericDetail("Игроков", payload.playerCount),
-        numericDetail("Лимит, мин.", payload.timeLimitMinutes)
+        numericDetail("Лимит, мин.", payload.timeLimitMinutes),
+        numericDetail("Периодов", payload.periodCount)
+      ]);
+    case "game:paused":
+      return compactDetails([
+        textDetail(
+          "Причина",
+          payload.reason === "period_complete"
+            ? "Период завершён"
+            : "Решение ведущего или администратора"
+        ),
+        numericDetail("Период", payload.currentPeriod)
+      ]);
+    case "game:resumed":
+    case "game:period_started":
+      return compactDetails([
+        numericDetail("Период", payload.currentPeriod),
+        numericDetail("Всего периодов", payload.periodCount)
       ]);
     case "game:ended":
       return compactDetails([
@@ -5236,7 +5259,7 @@ function ChatPanel({
   }
 
   return (
-    <Card className={compact ? "rounded-2xl border-0" : ""}>
+    <Card className={compact ? "rounded-none border-0 shadow-none" : ""}>
       {!compact ? (
         <CardHeader>
           <CardTitle>Чат</CardTitle>
@@ -5270,9 +5293,17 @@ function ChatPanel({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  className
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
-    <div className="grid min-w-0 rounded-md border border-line bg-surface p-3">
+    <div className={cn("grid min-w-0 rounded-md bg-surface p-3", className)}>
       <div className="min-h-8 text-xs leading-4 text-neutral-500">{label}</div>
       <div className="mt-1 break-words text-sm font-semibold leading-5">{value}</div>
     </div>
@@ -5335,7 +5366,7 @@ function CashflowEquation({
   const positive = state.monthlyCashflowCents >= 0;
 
   return (
-    <div className={`rounded-md border border-line bg-surface p-3 ${className}`}>
+    <div className={`rounded-md bg-surface p-3 ${className}`}>
       <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
         Как формируется cashflow
       </div>
@@ -5446,7 +5477,7 @@ function FinancialFreedomProgress({
     : `До финансовой свободы не хватает ${money(missingCents)} в месяц`;
 
   return (
-    <div className={`rounded-md border border-line bg-surface px-3 py-2.5 ${className}`}>
+    <div className={`rounded-md bg-surface px-3 py-2.5 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-medium text-neutral-700">Финансовая свобода</span>
         <span className={reached ? "font-semibold text-success" : "font-semibold text-neutral-700"}>
@@ -5613,7 +5644,7 @@ function ExpenseComposition({ player }: { player: GamePlayer }) {
   if (total <= 0) return null;
 
   return (
-    <div className="rounded-md border border-line bg-white p-3">
+    <div className="rounded-md bg-surface p-3">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="font-medium">Структура расходов</span>
         <strong>{money(total)}/мес</strong>
@@ -5698,7 +5729,7 @@ function DebtComposition({
     burdenRatio >= 0.5 ? "danger" : burdenRatio >= 0.3 ? "warning" : "neutral";
 
   return (
-    <div className="mt-3 rounded-md border border-line bg-white p-3">
+    <div className="mt-3 rounded-md bg-surface p-3">
       <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
         <span className="font-medium">Структура долгов</span>
         <div className="text-right">
@@ -5932,4 +5963,14 @@ function effectAmount(effects: unknown, effectType: string) {
     if (!isRecord(effect) || effect.effectType !== effectType) return sum;
     return sum + toNumber(effect.amountCents);
   }, 0);
+}
+
+function formatPeriodTime(totalSeconds: number) {
+  const normalized = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(normalized / 3600);
+  const minutes = Math.floor((normalized % 3600) / 60);
+  const seconds = normalized % 60;
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 }
