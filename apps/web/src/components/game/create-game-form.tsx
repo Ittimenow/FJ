@@ -28,7 +28,6 @@ export function CreateGameForm({ token }: { token: string }) {
         },
         body: JSON.stringify({
           title: String(form.get("title") ?? ""),
-          maxPlayers: Number(form.get("maxPlayers") ?? 6),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
           periodCount: Number(form.get("periodCount") ?? 3)
         })
@@ -64,24 +63,7 @@ export function CreateGameForm({ token }: { token: string }) {
           required
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <label htmlFor="game-max-players" className="mb-2 block text-sm font-extrabold text-ink">
-            Количество игроков
-          </label>
-          <select
-            id="game-max-players"
-            name="maxPlayers"
-            defaultValue="6"
-            className="h-10 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
-          >
-            <option value="2">2 игрока</option>
-            <option value="3">3 игрока</option>
-            <option value="4">4 игрока</option>
-            <option value="5">5 игроков</option>
-            <option value="6">6 игроков</option>
-          </select>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="game-duration" className="mb-2 block text-sm font-extrabold text-ink">
             Длительность

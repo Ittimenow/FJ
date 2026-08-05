@@ -14,3 +14,10 @@ backups
 *.tsbuildinfo
 .game-release-version
 packages/database/prisma/migrations/dev.db
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

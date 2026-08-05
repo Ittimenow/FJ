@@ -18,6 +18,8 @@ import {
   HandCoins,
   Handshake,
   Landmark,
+  LayoutDashboard,
+  MonitorUp,
   MoveRight,
   PauseCircle,
   Play,
@@ -54,6 +56,13 @@ import {
   eventCashChange,
   type CashChange
 } from "@/components/game/game-event-result";
+import {
+  changeStockCostCents,
+  changeStockQuantity,
+  normalizeStockQuantity,
+  stockPurchaseCostCents,
+  stockQuantityForCostCents
+} from "@/components/game/stock-purchase-calculation";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
@@ -119,7 +128,7 @@ export function GameRoom({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
-  const [dealQuantity, setDealQuantity] = useState<number | "">(1);
+  const [dealQuantity, setDealQuantity] = useState<number | "">("");
   const [turnAnimationPhase, setTurnAnimationPhase] = useState<TurnAnimationPhase>("ready");
   const [turnTabRequest, setTurnTabRequest] = useState(0);
   const [rollingDice, setRollingDice] = useState(false);
@@ -298,18 +307,19 @@ export function GameRoom({
     me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
   const isAdmin = currentUserRole === "ADMIN";
   const isSolo = snapshot.game.mode === "SOLO";
+  const roomMembership = snapshot.players.find(
+    (player) => player.userId === currentUserId && player.status === "JOINED"
+  );
   const canManage =
     isAdmin ||
     (isSolo && snapshot.game.createdById === currentUserId) ||
-    (currentUserRole === "HOST" && snapshot.game.createdById === currentUserId);
+    (currentUserRole === "HOST" && snapshot.game.createdById === currentUserId) ||
+    roomMembership?.role === "HOST";
   const canPause = canManage && snapshot.game.status === "IN_PROGRESS";
   const canResume = canManage && snapshot.game.status === "PAUSED";
   const canStart =
     snapshot.game.status === "WAITING" &&
     canManage;
-  const roomMembership = snapshot.players.find(
-    (player) => player.userId === currentUserId && player.status === "JOINED"
-  );
   const canChangeHostParticipation =
     !isSolo &&
     snapshot.game.createdById === currentUserId &&
@@ -443,7 +453,7 @@ export function GameRoom({
   }, [setGameRoomHeader]);
 
   useEffect(() => {
-    setDealQuantity(1);
+    setDealQuantity("");
   }, [latestBuyableCard?.cardId]);
 
   useEffect(() => {
@@ -835,8 +845,10 @@ export function GameRoom({
     try {
       const result = await emitWithAck(realtimeEvents.loanTake, { amountCents: loanAmount });
       applyActionResult(result);
+      return true;
     } catch (event) {
       setError(gameErrorMessage(event, "Не удалось взять кредит"));
+      return false;
     }
   }
 
@@ -879,12 +891,7 @@ export function GameRoom({
   }
 
   function updateDealQuantity(value: number | "") {
-    if (value === "") {
-      setDealQuantity("");
-      return;
-    }
-    const normalized = Math.floor(Number(value));
-    setDealQuantity(Number.isFinite(normalized) ? normalized : "");
+    setDealQuantity(normalizeStockQuantity(value));
   }
 
   function updateStockSaleQuantity(value: number) {
@@ -924,7 +931,36 @@ export function GameRoom({
   );
 
   return (
-    <div className="game-room grid w-full min-w-0 max-w-full gap-5">
+    <div className="game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5">
+      {canManage ? (
+        <nav
+          aria-label="Экраны ведущего"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-[0_12px_32px_rgba(23,36,63,.18)]"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-extrabold">Рабочее место ведущего</div>
+            <p className="mt-0.5 text-xs text-white/70">Наблюдайте за игроками здесь, а игровое поле вынесите на второй экран.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/games/${snapshot.game.id}/host`}
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-extrabold text-ink transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/35"
+            >
+              <LayoutDashboard size={16} aria-hidden="true" />
+              Пульт ведущего
+            </a>
+            <a
+              href={`/games/${snapshot.game.id}/display?view=${gameRoomView === "journey" ? "journey" : "classic"}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-action px-3 text-xs font-extrabold text-ink shadow-[0_8px_20px_rgba(249,143,47,.22)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/25"
+            >
+              <MonitorUp size={16} aria-hidden="true" />
+              Открыть поле
+            </a>
+          </div>
+        </nav>
+      ) : null}
       {gameAnnouncement ? (
         <div
           role="status"
@@ -1168,9 +1204,9 @@ export function GameRoom({
           </div>
           ) : null}
 
-      <div className="grid w-full min-w-0 max-w-full gap-5 xl:hidden">
+      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 xl:hidden">
         {snapshot.game.status !== "WAITING" ? (
-          <div className="grid w-full min-w-0 max-w-full gap-2">
+          <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-2">
             <MobileBoard
               snapshot={snapshot}
               selectedPlayer={selectedPlayer}
@@ -1461,14 +1497,33 @@ function DiceAction({
           : "Ожидайте своего хода";
 
   return (
-    <section className="mb-3 rounded-xl bg-[#fff5ed] p-3" aria-label="Бросок кубика">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+    <section className="mb-3 rounded-xl bg-[#fff5ed] px-2" aria-label="Бросок кубика">
+      <div className="flex h-12 items-center gap-2">
+        <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0">
           <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
-          <p className="mt-1 text-xs text-[#8f5b37]">
-            {diceValues.length > 1 ? "Бонус благотворительности: два кубика" : "Обычный ход: один кубик"}
-          </p>
+          {canRoll && !rolling ? (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="mt-0.5 rounded-md text-xs font-medium text-[#7b3f17] underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
+            >
+              Пропустить ход
+            </button>
+          ) : null}
         </div>
+        <Button
+          className="h-12 min-w-0 flex-1 px-3 text-base text-white"
+          variant="action"
+          onClick={onRoll}
+          disabled={!canRoll || rolling}
+          aria-busy={rolling}
+        >
+          {rolling
+            ? "Бросаем…"
+            : canRoll
+              ? diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"
+              : "Ожидайте ход"}
+        </Button>
         <div className="flex shrink-0 gap-2" aria-live="polite">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="scale-[.58] -m-4">
@@ -1477,28 +1532,6 @@ function DiceAction({
           ))}
         </div>
       </div>
-      <Button
-        className="mt-3 w-full"
-        variant="action"
-        onClick={onRoll}
-        disabled={!canRoll || rolling}
-        aria-busy={rolling}
-      >
-        {rolling
-          ? "Бросаем…"
-          : canRoll
-            ? diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"
-            : "Ожидайте ход"}
-      </Button>
-      {canRoll && !rolling ? (
-        <button
-          type="button"
-          onClick={onSkip}
-          className="mt-2 w-full rounded-lg py-2 text-xs font-medium text-[#7b3f17] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
-        >
-          Пропустить ход
-        </button>
-      ) : null}
     </section>
   );
 }
@@ -3694,19 +3727,30 @@ function ActionsPanel({
   onLoanDecrease: () => void;
   onLoanIncrease: () => void;
   onLoanAmountChange: (value: number) => void;
-  onTakeLoan: () => void;
+  onTakeLoan: () => Promise<boolean>;
   canTakeLoan: boolean;
   activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
   const [bankOpen, setBankOpen] = useState(false);
+  const [stockCostDraft, setStockCostDraft] = useState("");
+  const [stockCostEditing, setStockCostEditing] = useState(false);
+
+  useEffect(() => {
+    setBankOpen(false);
+    setStockCostDraft("");
+    setStockCostEditing(false);
+  }, [latestCard?.cardId]);
+
   const maxStockQuantity =
     latestCard?.isStock && latestCard.priceCents > 0
       ? Math.max(1, Math.floor(currentCashCents / latestCard.priceCents))
       : 1;
   const validDealQuantity = typeof dealQuantity === "number" && dealQuantity >= 1;
   const totalStockCostCents =
-    latestCard?.isStock && validDealQuantity ? latestCard.priceCents * dealQuantity : 0;
+    latestCard?.isStock
+      ? stockPurchaseCostCents(latestCard.priceCents, dealQuantity)
+      : 0;
   const fullDealCostCents = latestCard
     ? latestCard.isStock
       ? totalStockCostCents
@@ -3717,6 +3761,12 @@ function ActionsPanel({
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerCount === 0;
+
+  async function takeLoanAndCloseBank() {
+    const loanTaken = await onTakeLoan();
+    if (loanTaken) setBankOpen(false);
+  }
+
   const content = (
     <>
       {canChooseDeal ? (
@@ -3858,11 +3908,13 @@ function ActionsPanel({
       ) : null}
 
       {latestCard ? (
-        <div className="rounded-md bg-[#f5faf2] p-3">
+        <div className="w-full min-w-0 max-w-full rounded-md bg-[#f5faf2] p-3">
           <div className="text-sm font-medium">Текущая сделка</div>
-            <p className="mt-1 text-sm text-neutral-700">{localizeGameText(latestCard.title)}</p>
+            <p className="mt-1 break-words text-sm text-neutral-700">
+              {localizeGameText(latestCard.title)}
+            </p>
             {latestCard.bodyText ? (
-              <p className="mt-2 text-sm leading-6 text-neutral-700">
+              <p className="mt-2 break-words text-sm leading-6 text-neutral-700">
                 {localizeGameText(latestCard.bodyText)}
               </p>
             ) : null}
@@ -3885,97 +3937,145 @@ function ActionsPanel({
               ) : null}
             </div>
             {latestCard.isStock ? (
-              <div className="mt-3 rounded-md border border-line bg-white p-3">
-                <div className="text-sm font-medium">Количество акций</div>
-                <div
-                  className={[
-                    "mt-2 grid items-center",
-                    embedded
-                      ? "grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] gap-1"
-                      : "grid-cols-[auto_auto_1fr_auto_auto] gap-2"
-                  ].join(" ")}
-                >
-                  <Button
-                    variant="secondary"
-                    className={embedded ? "px-2" : "px-3"}
-                    onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 50))}
-                  >
-                    &lt;&lt;
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className={embedded ? "px-2" : "px-3"}
-                    onClick={() => setDealQuantity(Math.max(1, (dealQuantity || 0) - 1))}
-                  >
-                    &lt;
-                  </Button>
-                  <Input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={dealQuantity}
-                    onChange={(event) =>
-                      setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
-                    }
-                    onBlur={() => {
-                      if (!validDealQuantity) setDealQuantity(1);
-                    }}
-                    className="text-center font-semibold"
-                  />
-                  <Button
-                    variant="secondary"
-                    className={embedded ? "px-2" : "px-3"}
-                    onClick={() => setDealQuantity((dealQuantity || 0) + 1)}
-                  >
-                    &gt;
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className={embedded ? "px-2" : "px-3"}
-                    onClick={() => setDealQuantity((dealQuantity || 0) + 50)}
-                  >
-                    &gt;&gt;
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-neutral-500">
-                  На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит.
-                </p>
-                <div className="mt-3 rounded-md bg-surface p-3 text-sm">
+              <div className="mt-3 rounded-md bg-surface p-3 text-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                     Расчёт стоимости
                   </div>
-                  <div
-                    className={[
-                      "mt-2 grid items-stretch gap-1.5 text-center",
-                      embedded ? "grid-cols-1" : "grid-cols-[1fr_auto_1.2fr_auto_1.4fr]"
-                    ].join(" ")}
-                  >
-                    <div className="rounded bg-white px-2 py-2">
-                      <div className="text-[10px] text-neutral-500">Количество</div>
-                      <strong>{validDealQuantity ? dealQuantity : "—"}</strong>
-                    </div>
-                    <span
-                      className={["self-center text-neutral-400", embedded ? "hidden" : ""].join(" ")}
-                      aria-hidden="true"
-                    >
-                      ×
-                    </span>
-                    <div className="rounded bg-white px-2 py-2">
-                      <div className="text-[10px] text-neutral-500">Цена</div>
-                      <strong>{money(latestCard.priceCents)}</strong>
-                    </div>
-                    <span
-                      className={["self-center text-neutral-400", embedded ? "hidden" : ""].join(" ")}
-                      aria-hidden="true"
-                    >
-                      =
-                    </span>
-                    <div className="rounded bg-[#f5faf2] px-2 py-2">
-                      <div className="text-[10px] text-neutral-500">Стоимость</div>
-                      <strong>{money(totalStockCostCents)}</strong>
-                    </div>
+                  <div className="text-xs text-neutral-500">
+                    Цена акции: <strong className="text-neutral-700">{money(latestCard.priceCents)}</strong>
                   </div>
                 </div>
+
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-[repeat(3,minmax(0,.7fr))_minmax(5rem,2fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
+                    {[-100, -20, -1].map((step) => (
+                      <Button
+                        key={step}
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, step))}
+                        disabled={!validDealQuantity}
+                        aria-label={`Уменьшить количество на ${Math.abs(step)}`}
+                        title={`−${Math.abs(step)}`}
+                      >
+                        {step === -100 ? "<<<" : step === -20 ? "<<" : "<"}
+                      </Button>
+                    ))}
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      value={dealQuantity}
+                      placeholder="Количество"
+                      aria-label="Количество акций"
+                      onChange={(event) =>
+                        setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
+                      }
+                      className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
+                    />
+                    {[1, 20, 100].map((step) => (
+                      <Button
+                        key={step}
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, step))}
+                        aria-label={`Увеличить количество на ${step}`}
+                        title={`+${step}`}
+                      >
+                        {step === 100 ? ">>>" : step === 20 ? ">>" : ">"}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-[repeat(3,minmax(0,.7fr))_minmax(5rem,2fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
+                    {[-100_000, -20_000, -100].map((stepCents) => (
+                      <Button
+                        key={stepCents}
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        onClick={() =>
+                          setDealQuantity(
+                            changeStockCostCents(
+                              dealQuantity,
+                              latestCard.priceCents,
+                              stepCents
+                            )
+                          )
+                        }
+                        disabled={!validDealQuantity}
+                        aria-label={`Уменьшить стоимость на ${money(Math.abs(stepCents))}`}
+                        title={`−${money(Math.abs(stepCents))}`}
+                      >
+                        {stepCents === -100_000 ? "<<<" : stepCents === -20_000 ? "<<" : "<"}
+                      </Button>
+                    ))}
+                    <Input
+                      type="number"
+                      min={latestCard.priceCents / 100}
+                      step={1}
+                      inputMode="decimal"
+                      value={
+                        stockCostEditing
+                          ? stockCostDraft
+                          : validDealQuantity
+                            ? totalStockCostCents / 100
+                            : ""
+                      }
+                      placeholder="Стоимость"
+                      aria-label="Стоимость покупки акций в долларах"
+                      onFocus={() => {
+                        setStockCostEditing(true);
+                        setStockCostDraft(
+                          validDealQuantity ? String(totalStockCostCents / 100) : ""
+                        );
+                      }}
+                      onChange={(event) => {
+                        setStockCostDraft(event.target.value);
+                        setDealQuantity(
+                          event.target.value === ""
+                            ? ""
+                            : stockQuantityForCostCents(
+                                latestCard.priceCents,
+                                Math.round(Number(event.target.value) * 100)
+                              )
+                        )
+                      }}
+                      onBlur={() => {
+                        setStockCostEditing(false);
+                        setStockCostDraft(
+                          validDealQuantity ? String(totalStockCostCents / 100) : ""
+                        );
+                      }}
+                      className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
+                    />
+                    {[100, 20_000, 100_000].map((stepCents) => (
+                      <Button
+                        key={stepCents}
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        onClick={() =>
+                          setDealQuantity(
+                            changeStockCostCents(
+                              dealQuantity,
+                              latestCard.priceCents,
+                              stepCents
+                            )
+                          )
+                        }
+                        aria-label={`Увеличить стоимость на ${money(stepCents)}`}
+                        title={`+${money(stepCents)}`}
+                      >
+                        {stepCents === 100_000 ? ">>>" : stepCents === 20_000 ? ">>" : ">"}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="mt-2 text-xs text-neutral-500">
+                  На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит.
+                </p>
               </div>
             ) : null}
             {fullDealCostCents > 0 && (!latestCard.isStock || validDealQuantity) ? (
@@ -3991,17 +4091,33 @@ function ActionsPanel({
                 Ожидаем решение по продаже от игроков: {waitingStockSellerCount}.
               </p>
             ) : null}
-            <div className={["mt-3 grid gap-2", embedded ? "grid-cols-1" : "sm:grid-cols-3"].join(" ")}>
+            <div
+              className={[
+                "mt-3 grid w-full min-w-0 gap-2",
+                embedded ? "grid-cols-1" : "sm:grid-cols-3"
+              ].join(" ")}
+            >
               <Button
+                className="w-full min-w-0"
                 onClick={onBuyLatest}
                 disabled={!canResolveLatestDeal || (Boolean(latestCard?.isStock) && !validDealQuantity)}
               >
                 Купить
               </Button>
-              <Button variant="secondary" onClick={() => setBankOpen(true)} disabled={!canTakeLoan}>
+              <Button
+                className="w-full min-w-0"
+                variant="secondary"
+                onClick={() => setBankOpen(true)}
+                disabled={!canTakeLoan}
+              >
                 Взять кредит
               </Button>
-              <Button variant="secondary" onClick={onDeclineLatest} disabled={!canResolveLatestDeal}>
+              <Button
+                className="w-full min-w-0"
+                variant="secondary"
+                onClick={onDeclineLatest}
+                disabled={!canResolveLatestDeal}
+              >
                 Отказаться
               </Button>
             </div>
@@ -4018,7 +4134,7 @@ function ActionsPanel({
             onLoanDecrease={onLoanDecrease}
             onLoanIncrease={onLoanIncrease}
             onLoanAmountChange={onLoanAmountChange}
-            onTakeLoan={onTakeLoan}
+            onTakeLoan={() => void takeLoanAndCloseBank()}
             canTakeLoan={canTakeLoan}
           />
         </div>
@@ -4043,7 +4159,7 @@ function ActionsPanel({
 
   if (embedded) {
     return (
-      <section className="grid gap-3">
+      <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
         {header}
         {content}
         {activityFeed ? (
@@ -5698,10 +5814,16 @@ function FundingProgress({
     : `${label}: не хватает ${money(missingCents)}`;
 
   return (
-    <div className={`rounded-md border border-line bg-white p-3 ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-neutral-700">{label}</span>
-        <span className={enough ? "font-semibold text-success" : "font-semibold text-amber-700"}>
+    <div
+      className={`w-full min-w-0 max-w-full rounded-md border border-line bg-white p-3 ${className}`}
+    >
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="min-w-0 break-words font-medium text-neutral-700">{label}</span>
+        <span
+          className={`min-w-0 break-words ${
+            enough ? "font-semibold text-success" : "font-semibold text-amber-700"
+          }`}
+        >
           {enough ? "Денег хватает" : "Нужен кредит"}
         </span>
       </div>
@@ -5712,11 +5834,11 @@ function FundingProgress({
         label={progressLabel}
         tone={enough ? "success" : "warning"}
       />
-      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-600">
-        <span>
+      <div className="mt-2 flex min-w-0 flex-wrap justify-between gap-2 text-xs text-neutral-600">
+        <span className="min-w-0 break-words">
           Наличные: <strong>{money(available)}</strong>
         </span>
-        <span>
+        <span className="min-w-0 break-words">
           Нужно: <strong>{money(requiredCents)}</strong>
         </span>
       </div>

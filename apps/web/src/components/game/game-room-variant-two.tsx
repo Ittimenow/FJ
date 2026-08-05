@@ -96,7 +96,10 @@ export function GameRoomVariantTwo({
   ];
 
   return (
-    <section className="journey-game-view grid min-w-0 gap-4" aria-label="Игровое поле, вариант 2">
+    <section
+      className="journey-game-view grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4"
+      aria-label="Игровое поле, вариант 2"
+    >
       <div
         className="grid grid-cols-3 gap-1.5 rounded-xl bg-[#eef3e8] p-1.5 shadow-[0_10px_24px_rgba(83,109,69,.14)] xl:hidden"
         role="tablist"
@@ -151,7 +154,7 @@ export function GameRoomVariantTwo({
         })}
       </div>
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[250px_minmax(0,1fr)_300px]">
+      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[250px_minmax(0,1fr)_300px]">
         <aside
           id="journey-mobile-panel-finance"
           role="tabpanel"

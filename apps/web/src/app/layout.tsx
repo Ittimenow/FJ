@@ -5,6 +5,10 @@ import { YandexMetrikaConsent } from "@/components/analytics/yandex-metrika-cons
 import { publicSiteMetadataBase } from "@/lib/site";
 import "./globals.css";
 
+const socialTitle = "Финансовое путешествие — финансовая онлайн-игра";
+const socialDescription =
+  "Создайте комнату для 2–6 участников или начните одиночную партию с виртуальными соперниками. Принимайте решения и управляйте денежным потоком.";
+
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["cyrillic", "latin"]
@@ -23,26 +27,26 @@ export const metadata: Metadata = {
   description:
     "Создавайте игровые комнаты для 2–6 участников, управляйте доходами и расходами, оценивайте сделки и развивайте финансовое мышление.",
   openGraph: {
-    title: "Финансовое путешествие",
-    description:
-      "Онлайн-игра, где каждое решение меняет ваш денежный поток и маршрут.",
+    title: socialTitle,
+    description: socialDescription,
+    url: "/",
     siteName: "Финансовое путешествие",
     locale: "ru_RU",
     type: "website",
     images: [
       {
-        url: "/financial-journey-board.png",
-        width: 1586,
-        height: 992,
+        url: "/social-preview-v2.png",
+        width: 1200,
+        height: 630,
         alt: "Изометрический игровой маршрут «Финансовое путешествие»"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Финансовое путешествие",
-    description: "Онлайн-игра для развития финансового мышления.",
-    images: ["/financial-journey-board.png"]
+    title: socialTitle,
+    description: socialDescription,
+    images: ["/social-preview-v2.png"]
   },
   icons: {
     icon: "/favicon.svg",

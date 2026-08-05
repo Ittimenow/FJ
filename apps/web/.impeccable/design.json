@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-31T00:00:00+03:00",
+  "generatedAt": "2026-08-05T00:00:00+03:00",
   "title": "Design System: Финансовое путешествие",
   "extensions": {
     "colorMeta": {
@@ -159,7 +159,7 @@
       "refersTo": "button-light",
       "description": "Спокойное альтернативное действие.",
       "html": "<button class=\"ds-btn-light\">ВОЙТИ ПО КОДУ</button>",
-      "css": ".ds-btn-light { min-height: 52px; padding: 0 23px; border: 1px solid #dfcebb; border-radius: 15px; background: #fff9f1; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font: 800 14px Manrope,Arial,sans-serif; cursor: pointer; transition: transform 180ms ease, background 180ms ease; } .ds-btn-light:hover { background: #fff; transform: translateY(-2px); } .ds-btn-light:focus-visible { outline: 3px solid #f98f2f; outline-offset: 4px; }"
+      "css": ".ds-btn-light { min-height: 52px; padding: 0 23px; border: 0; border-radius: 15px; background: #fff9f1; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font: 800 14px Manrope,Arial,sans-serif; cursor: pointer; transition: transform 180ms ease, background 180ms ease; } .ds-btn-light:hover { background: #fff; transform: translateY(-2px); } .ds-btn-light:focus-visible { outline: 3px solid #f98f2f; outline-offset: 4px; }"
     },
     {
       "name": "Поле ввода",
@@ -175,7 +175,7 @@
       "refersTo": "card-route",
       "description": "Карточка направления портала с явным статусом и следующим шагом.",
       "html": "<article class=\"ds-route-card\"><div class=\"ds-route-icon\">●●●</div><span class=\"ds-status\">ДОСТУПНО</span><p class=\"ds-eyebrow\">У МЕНЯ ЕСТЬ КОМАНДА</p><h3>Играть со своей командой</h3><p>Создайте комнату и отправьте участникам код приглашения.</p><button>Создать комнату <span>→</span></button></article>",
-      "css": ".ds-route-card { display: grid; min-height: 360px; padding: 24px; gap: 14px; border: 1px solid #dfcebb; border-radius: 26px; background: #fff; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font-family: Manrope,Arial,sans-serif; transition: transform 200ms ease, box-shadow 200ms ease; } .ds-route-card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px rgba(27,57,118,.16); } .ds-route-card:focus-within { outline: 3px solid #f98f2f; outline-offset: 4px; } .ds-route-icon { display:grid; width:62px; height:62px; place-items:center; border-radius:19px; background:#e8effe; color:#2967df; font-weight:900; } .ds-status { justify-self:end; padding:6px 9px; border-radius:8px; background:#eaf3e0; color:#426018; font-size:9px; font-weight:850; } .ds-eyebrow { color:#2967df; font-size:10px; font-weight:850; letter-spacing:.08em; } .ds-route-card h3 { margin:0; font-size:24px; line-height:1.15; } .ds-route-card p { margin:0; color:#657597; line-height:1.65; } .ds-route-card button { align-self:end; display:flex; justify-content:space-between; min-height:48px; padding:0; border:0; border-bottom:1px solid #dfcebb; background:transparent; color:#2967df; font-weight:850; cursor:pointer; }"
+      "css": ".ds-route-card { display: grid; min-height: 360px; padding: 24px; gap: 14px; border: 0; border-radius: 26px; background: #fff; color: #17243f; box-shadow: 0 20px 45px rgba(27,57,118,.10), 0 4px 10px rgba(27,57,118,.06); font-family: Manrope,Arial,sans-serif; transition: transform 200ms ease, box-shadow 200ms ease; } .ds-route-card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px rgba(27,57,118,.16); } .ds-route-card:focus-within { outline: 3px solid #f98f2f; outline-offset: 4px; } .ds-route-icon { display:grid; width:62px; height:62px; place-items:center; border-radius:19px; background:#e8effe; color:#2967df; font-weight:900; } .ds-status { justify-self:end; padding:6px 9px; border-radius:8px; background:#eaf3e0; color:#426018; font-size:9px; font-weight:850; } .ds-eyebrow { color:#2967df; font-size:10px; font-weight:850; letter-spacing:.08em; } .ds-route-card h3 { margin:0; font-size:24px; line-height:1.15; } .ds-route-card p { margin:0; color:#657597; line-height:1.65; } .ds-route-card button { align-self:end; display:flex; justify-content:space-between; min-height:48px; padding:0 16px; border:0; border-radius:12px; background:#e8effe; color:#2967df; font-weight:850; cursor:pointer; }"
     },
     {
       "name": "Статус",
@@ -191,7 +191,7 @@
       "refersTo": "navigation",
       "description": "Тёплая плавающая навигация с оранжевым указателем.",
       "html": "<nav class=\"ds-nav\"><a href=\"#game\">Об игре</a><a href=\"#features\">Возможности</a><a href=\"#hosts\">Ведущим</a></nav>",
-      "css": ".ds-nav { display:flex; gap:27px; padding:14px 24px; border:1px solid rgba(223,206,187,.72); border-radius:20px; background:rgba(255,249,241,.92); box-shadow:0 12px 34px rgba(27,57,118,.08); font:750 12px Manrope,Arial,sans-serif; } .ds-nav a { position:relative; padding:12px 0; color:#17243f; text-decoration:none; } .ds-nav a::after { position:absolute; right:0; bottom:6px; left:0; height:2px; background:#f98f2f; content:''; transform:scaleX(0); transition:transform 180ms ease; } .ds-nav a:hover::after, .ds-nav a:focus-visible::after { transform:scaleX(1); } .ds-nav a:focus-visible { outline:3px solid #f98f2f; outline-offset:4px; }"
+      "css": ".ds-nav { display:flex; gap:27px; padding:14px 24px; border:0; border-radius:20px; background:rgba(255,249,241,.92); box-shadow:0 12px 34px rgba(27,57,118,.08); font:750 12px Manrope,Arial,sans-serif; } .ds-nav a { position:relative; padding:12px 0; color:#17243f; text-decoration:none; } .ds-nav a::after { position:absolute; right:0; bottom:6px; left:0; height:2px; background:#f98f2f; content:''; transform:scaleX(0); transition:transform 180ms ease; } .ds-nav a:hover::after, .ds-nav a:focus-visible::after { transform:scaleX(1); } .ds-nav a:focus-visible { outline:3px solid #f98f2f; outline-offset:4px; }"
     }
   ],
   "narrative": {
@@ -230,12 +230,18 @@
         "name": "The Soft Lift Rule",
         "body": "Глубина должна ощущаться как мягко поднятый игровой материал, а не как жёсткая чёрная тень.",
         "section": "elevation"
+      },
+      {
+        "name": "The Depth Before Stroke Rule",
+        "body": "По умолчанию объекты не получают обводку: разделяйте кнопки, плашки, карточки и панели цветной или тональной заливкой, мягкой глубиной и интервалами. Контур допустим только для заметного клавиатурного фокуса, ошибок, полей ввода и случаев, когда без него страдают доступность или читаемость.",
+        "section": "elevation"
       }
     ],
     "dos": [
       "Do использовать тёплый пергамент как общий холст портала и будущую основу игровых экранов.",
       "Do сохранять за оранжевым смысл действия, а за синим — смысл пути, навигации и основного акцента.",
       "Do поддерживать достаточный контраст, текстовые статусы и заметную клавиатурную фокусировку.",
+      "Do разделять кнопки, плашки, карточки и панели цветом, тональной заливкой, мягкой глубиной и интервалами вместо декоративной обводки.",
       "Do адаптировать плотность рабочих экранов, сохраняя палитру, типографику, форму и глубину лендинга.",
       "Do отдельно исследовать и утвердить семантическую палитру типов игровых карточек."
     ],
@@ -243,6 +249,7 @@
       "Don't назначать цвета категориям игровых карточек до отдельной проработки их семантики и доступности.",
       "Don't возвращать холодную серо-белую служебную эстетику как основную визуальную систему приложения.",
       "Don't использовать оранжевый как случайное украшение или одновременно для нескольких противоречивых смыслов.",
+      "Don't обводить объекты по умолчанию; сохранять контуры только для фокуса, ошибок, полей ввода, доступности и необходимого визуального разделения.",
       "Don't превращать каждый контейнер в одинаково тяжёлую карточку с одинаковой тенью.",
       "Don't полагаться только на цвет для статуса, ошибки, типа карточки или текущего хода."
     ]
