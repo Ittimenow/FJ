@@ -5,9 +5,14 @@ import { Server } from "socket.io";
 @Injectable()
 export class GamesRealtimeService {
   private server: Server | null = null;
+  private afterAction: ((gameId: string) => void) | null = null;
 
   bindServer(server: Server) {
     this.server = server;
+  }
+
+  registerAfterAction(listener: (gameId: string) => void) {
+    this.afterAction = listener;
   }
 
   broadcastSnapshot(gameId: string, snapshot: unknown) {
@@ -25,11 +30,13 @@ export class GamesRealtimeService {
       events: Array<{ type: string; payload: Record<string, unknown> }>;
     }
   ) {
-    if (!this.server) return;
-    for (const event of result.events) {
-      if (event.type === realtimeEvents.stateUpdate) continue;
-      this.server.to(gameId).emit(event.type, event.payload);
+    if (this.server) {
+      for (const event of result.events) {
+        if (event.type === realtimeEvents.stateUpdate) continue;
+        this.server.to(gameId).emit(event.type, event.payload);
+      }
+      this.broadcastSnapshot(gameId, result.snapshot);
     }
-    this.broadcastSnapshot(gameId, result.snapshot);
+    this.afterAction?.(gameId);
   }
 }

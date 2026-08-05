@@ -45,16 +45,16 @@ export const ratRaceBoard: BoardCell<RatRaceCellType>[] = [
 ];
 
 export const fastTrackBoard: BoardCell<FastTrackCellType>[] = [
-  { index: 0, type: "cashflow_day", label: "Cashflow Day" },
-  { index: 1, type: "fast_track", label: "Fast Track Deal" },
-  { index: 2, type: "dream", label: "Dream" },
-  { index: 3, type: "fast_track", label: "Fast Track Deal" },
-  { index: 4, type: "cashflow_day", label: "Cashflow Day" },
-  { index: 5, type: "dream", label: "Dream" },
-  { index: 6, type: "fast_track", label: "Fast Track Deal" },
-  { index: 7, type: "dream", label: "Dream" },
-  { index: 8, type: "cashflow_day", label: "Cashflow Day" },
-  { index: 9, type: "fast_track", label: "Fast Track Deal" },
-  { index: 10, type: "dream", label: "Dream" },
-  { index: 11, type: "fast_track", label: "Fast Track Deal" }
+  { index: 0, type: "cashflow_day", label: "День денежного потока" },
+  { index: 1, type: "fast_track", label: "Сделка Скоростной дорожки" },
+  { index: 2, type: "dream", label: "Мечта" },
+  { index: 3, type: "fast_track", label: "Сделка Скоростной дорожки" },
+  { index: 4, type: "cashflow_day", label: "День денежного потока" },
+  { index: 5, type: "dream", label: "Мечта" },
+  { index: 6, type: "fast_track", label: "Сделка Скоростной дорожки" },
+  { index: 7, type: "dream", label: "Мечта" },
+  { index: 8, type: "cashflow_day", label: "День денежного потока" },
+  { index: 9, type: "fast_track", label: "Сделка Скоростной дорожки" },
+  { index: 10, type: "dream", label: "Мечта" },
+  { index: 11, type: "fast_track", label: "Сделка Скоростной дорожки" }
 ];

@@ -6,19 +6,23 @@ import {
   type FigurineId
 } from "@cashflow/shared";
 import {
-  ArrowUp,
+  Banknote,
   BellRing,
+  Bot,
   BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
   Circle,
   CircleDot,
   Dices,
+  HandCoins,
+  Handshake,
   Landmark,
-  ListRestart,
+  MoveRight,
   PauseCircle,
   Play,
   ReceiptText,
+  Trophy,
   UserRound,
   UsersRound
 } from "lucide-react";
@@ -44,10 +48,17 @@ import {
   type GameRoomView
 } from "@/components/game/game-room-variant-two";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
+import {
+  cashChangeExpression,
+  compactPlayerActionDetails,
+  eventCashChange,
+  type CashChange
+} from "@/components/game/game-event-result";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import { money, shortDate } from "@/lib/format";
-import { gameStatusLabel } from "@/lib/game-labels";
+import { gamePlayerName } from "@/lib/game-player";
+import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
 import { cn } from "@/lib/utils";
 import type {
   FinancialState,
@@ -70,6 +81,16 @@ type UserSearchResult = {
   displayName: string;
   email: string;
 };
+
+function gameErrorMessage(error: unknown, fallback: string) {
+  const message =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : "";
+  return /[А-Яа-яЁё]/u.test(message) ? message : fallback;
+}
 
 export function GameRoom({
   initialSnapshot,
@@ -174,7 +195,9 @@ export function GameRoom({
         chatMessages: [...current.chatMessages, message]
       }));
     });
-    socket.on("connect_error", (event) => setError(event.message));
+    socket.on("connect_error", () =>
+      setError("Не удалось подключиться к игре. Проверьте соединение и обновите страницу.")
+    );
 
     return () => {
       socket.disconnect();
@@ -274,8 +297,10 @@ export function GameRoom({
     currentPlayer?.userId === currentUserId &&
     me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
   const isAdmin = currentUserRole === "ADMIN";
+  const isSolo = snapshot.game.mode === "SOLO";
   const canManage =
     isAdmin ||
+    (isSolo && snapshot.game.createdById === currentUserId) ||
     (currentUserRole === "HOST" && snapshot.game.createdById === currentUserId);
   const canPause = canManage && snapshot.game.status === "IN_PROGRESS";
   const canResume = canManage && snapshot.game.status === "PAUSED";
@@ -286,6 +311,7 @@ export function GameRoom({
     (player) => player.userId === currentUserId && player.status === "JOINED"
   );
   const canChangeHostParticipation =
+    !isSolo &&
     snapshot.game.createdById === currentUserId &&
     (currentUserRole === "HOST" || currentUserRole === "ADMIN");
   const pendingAction = snapshot.game.pendingAction;
@@ -332,11 +358,29 @@ export function GameRoom({
     () => stockSaleOfferForPlayer(pendingAction, me),
     [me, pendingAction]
   );
-  const latestTurnSummary = useMemo(
-    () => latestPlayerActionSummary(snapshot.events, me?.id),
-    [me?.id, snapshot.events]
-  );
-
+  const unresolvedBotStockSeller =
+    pendingAction?.type === "stock_sale_window"
+      ? gamePlayers.find(
+          (player) =>
+            player.controller === "BOT" &&
+            pendingAction.sellerGamePlayerIds.includes(player.id) &&
+            !pendingAction.resolvedGamePlayerIds.includes(player.id)
+        )
+      : null;
+  const botWaitingForMe =
+    pendingAction?.type === "stock_sale_window" &&
+    Boolean(
+      me &&
+        pendingAction.sellerGamePlayerIds.includes(me.id) &&
+        !pendingAction.resolvedGamePlayerIds.includes(me.id)
+    );
+  const botTurnMessage = unresolvedBotStockSeller
+    ? `${gamePlayerName(unresolvedBotStockSeller)} оценивает предложение по акциям.`
+    : snapshot.game.status === "IN_PROGRESS" && currentPlayer?.controller === "BOT"
+      ? botWaitingForMe
+        ? `${gamePlayerName(currentPlayer)} ожидает вашего решения по продаже акций.`
+        : `${gamePlayerName(currentPlayer)} обдумывает ход.`
+      : null;
   useEffect(() => {
     if (snapshot.game.status !== "WAITING" || !me) {
       setFigurinePickerOpen(false);
@@ -358,8 +402,9 @@ export function GameRoom({
       status: snapshot.game.status,
       connected,
       code: snapshot.game.code,
+      isSolo,
       currentRound: snapshot.game.currentRound,
-      currentPlayerName: currentPlayer?.user?.displayName ?? null,
+      currentPlayerName: currentPlayer ? gamePlayerName(currentPlayer) : null,
       currentPeriod: snapshot.game.currentPeriod,
       periodCount: snapshot.game.periodCount,
       remainingSeconds,
@@ -376,8 +421,9 @@ export function GameRoom({
     canPause,
     canResume,
     connected,
-    currentPlayer?.user?.displayName,
+    currentPlayer,
     currentUserId,
+    isSolo,
     setGameRoomHeader,
     snapshot.game.code,
     snapshot.game.id,
@@ -428,7 +474,7 @@ export function GameRoom({
         const result = await emitWithAck("game:start", {});
         applyActionResult(result);
       } catch (event) {
-        setError(event instanceof Error ? event.message : "Не удалось начать партию");
+        setError(gameErrorMessage(event, "Не удалось начать партию"));
       }
       return;
     }
@@ -442,7 +488,7 @@ export function GameRoom({
     );
     const result = await response.json();
     if (!response.ok) {
-      setError(result.message ?? "Не удалось начать партию");
+      setError(gameErrorMessage(result.message, "Не удалось начать партию"));
       return;
     }
     setSnapshot(result.snapshot ?? result);
@@ -482,7 +528,7 @@ export function GameRoom({
       }
       applyActionResult(result);
     } catch (event) {
-      setError(event instanceof Error ? event.message : fallbackMessage);
+      setError(gameErrorMessage(event, fallbackMessage));
     } finally {
       setTimelineLoading(false);
     }
@@ -507,7 +553,7 @@ export function GameRoom({
       const result = await response.json();
       if (!response.ok) {
         throw new Error(
-          result.message === "Figurine is already taken"
+          result.message === "Эту фигурку уже выбрал другой игрок"
             ? "Эту фигурку уже выбрал другой игрок"
             : result.message ?? "Не удалось выбрать фигурку"
         );
@@ -515,7 +561,7 @@ export function GameRoom({
       setSnapshot(result.snapshot ?? result);
       setFigurinePickerOpen(false);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось выбрать фигурку");
+      setError(gameErrorMessage(event, "Не удалось выбрать фигурку"));
     } finally {
       setFigurineSaving(false);
     }
@@ -536,7 +582,7 @@ export function GameRoom({
     );
     const result = await response.json();
     if (!response.ok) {
-      setError(result.message ?? "Не удалось добавить пользователя");
+      setError(gameErrorMessage(result.message, "Не удалось добавить пользователя"));
       return;
     }
     setSnapshot(result.snapshot ?? result);
@@ -559,7 +605,9 @@ export function GameRoom({
       );
       const result = await response.json();
       if (!response.ok) {
-        setError(result.message ?? "Не удалось изменить участие ведущего");
+        setError(
+          gameErrorMessage(result.message, "Не удалось изменить участие ведущего")
+        );
         return;
       }
       setSnapshot(result.snapshot ?? result);
@@ -575,7 +623,7 @@ export function GameRoom({
         await emitWithAck("game:delete", {});
         leaveGamePage();
       } catch (event) {
-        setError(event instanceof Error ? event.message : "Не удалось удалить игру");
+        setError(gameErrorMessage(event, "Не удалось удалить игру"));
       }
       return;
     }
@@ -586,7 +634,7 @@ export function GameRoom({
     });
     const result = await response.json();
     if (!response.ok) {
-      setError(result.message ?? "Не удалось удалить игру");
+      setError(gameErrorMessage(result.message, "Не удалось удалить игру"));
       return;
     }
     leaveGamePage();
@@ -604,7 +652,7 @@ export function GameRoom({
     return new Promise<GameActionResult>((resolve, reject) => {
       const socket = socketRef.current;
       if (!socket?.connected) {
-        reject(new Error("Realtime-соединение не активно"));
+        reject(new Error("Соединение с игрой неактивно"));
         return;
       }
       socket.emit(
@@ -699,7 +747,7 @@ export function GameRoom({
     } catch (event) {
       stopDiceAnimation();
       setTurnAnimationPhase("ready");
-      setError(event instanceof Error ? event.message : "Не удалось бросить кубик");
+      setError(gameErrorMessage(event, "Не удалось бросить кубик"));
     } finally {
       setRollingDice(false);
     }
@@ -713,7 +761,7 @@ export function GameRoom({
       applyActionResult(result);
       setTurnTabRequest((current) => current + 1);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось пропустить ход");
+      setError(gameErrorMessage(event, "Не удалось пропустить ход"));
     }
   }
 
@@ -778,7 +826,7 @@ export function GameRoom({
       });
       applyActionResult(result);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось закрыть кредит");
+      setError(gameErrorMessage(event, "Не удалось закрыть кредит"));
     }
   }
 
@@ -788,7 +836,7 @@ export function GameRoom({
       const result = await emitWithAck(realtimeEvents.loanTake, { amountCents: loanAmount });
       applyActionResult(result);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось взять кредит");
+      setError(gameErrorMessage(event, "Не удалось взять кредит"));
     }
   }
 
@@ -798,7 +846,7 @@ export function GameRoom({
       const result = await emitWithAck("bankruptcy:asset_sell", { assetId, quantity });
       applyActionResult(result);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось продать актив банку");
+      setError(gameErrorMessage(event, "Не удалось продать актив банку"));
     }
   }
 
@@ -814,7 +862,7 @@ export function GameRoom({
       });
       applyActionResult(result);
     } catch (event) {
-      setError(event instanceof Error ? event.message : "Не удалось погасить долг");
+      setError(gameErrorMessage(event, "Не удалось погасить долг"));
     }
   }
 
@@ -861,6 +909,20 @@ export function GameRoom({
     diceIntervalRef.current = null;
   }
 
+  const renderTurnFeed = () => (
+    <GameTurnFeed
+      gameId={snapshot.game.id}
+      token={token}
+      events={snapshot.events}
+      players={gamePlayers}
+      currentUserId={currentUserId}
+      currentGamePlayerId={me?.id ?? null}
+      currentTurnPlayer={currentPlayer}
+      currentTurnIndex={snapshot.game.currentTurnIndex}
+      gameStatus={snapshot.game.status}
+    />
+  );
+
   return (
     <div className="game-room grid w-full min-w-0 max-w-full gap-5">
       {gameAnnouncement ? (
@@ -871,6 +933,18 @@ export function GameRoom({
         >
           <BellRing className="shrink-0 text-action" size={19} aria-hidden="true" />
           <span>{gameAnnouncement}</span>
+        </div>
+      ) : null}
+      {botTurnMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 rounded-2xl bg-[#f4f0ff] px-4 py-3 text-sm font-bold text-[#513393] shadow-[0_10px_28px_rgba(118,85,199,.12)]"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#7655c7] shadow-[0_5px_14px_rgba(118,85,199,.14)]">
+            <Bot size={18} aria-hidden="true" />
+          </span>
+          <span>{botTurnMessage}</span>
         </div>
       ) : null}
       {snapshot.game.status === "PAUSED" ? (
@@ -935,14 +1009,19 @@ export function GameRoom({
       {snapshot.game.status === "ENDED" ? (
         <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium md:hidden">
           {winner
-            ? `Победитель: ${winner.user?.displayName ?? "Игрок"}`
-            : "Партия завершена по времени"}
+            ? `Победитель: ${gamePlayerName(winner)}`
+            : gameEndReasonText(
+                typeof gameEndEvent?.payload.reason === "string"
+                  ? gameEndEvent.payload.reason
+                  : null
+              )}
         </div>
       ) : null}
 
       {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
           snapshot={snapshot}
+          isSolo={isSolo}
           canManage={canManage}
           canStart={canStart}
           startDisabledReason={startDisabledReason}
@@ -980,7 +1059,6 @@ export function GameRoom({
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
               onDrawBigDeal={() => draw("BIG_DEAL")}
               latestCard={latestDealDecisionCard}
-              latestTurnSummary={latestTurnSummary}
               charityChoice={charityChoice}
               canAnswerCharity={canAnswerCharity}
               doodadPaymentChoice={doodadPaymentChoice}
@@ -1013,27 +1091,10 @@ export function GameRoom({
               onLoanAmountChange={updateLoanAmount}
               onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
-              activityFeed={
-                <div className="xl:hidden">
-                  <MobileActionFeed
-                    gameId={snapshot.game.id}
-                    token={token}
-                    events={snapshot.events}
-                    currentUserId={currentUserId}
-                  />
-                </div>
-              }
+              activityFeed={renderTurnFeed()}
                 embedded
               />
             </>
-          }
-          activity={
-            <EventLog
-              events={snapshot.events}
-              currentUserId={currentUserId}
-              players={gamePlayers}
-              currentPlayerId={snapshot.game.currentPlayerId}
-            />
           }
         />
       ) : (
@@ -1043,6 +1104,7 @@ export function GameRoom({
         <DesktopGameBoard
           snapshot={snapshot}
           selectedPlayer={selectedPlayer}
+          players={gamePlayers}
           canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
           onCloseLiability={closeLiability}
           outsidePlayers={snapshot.players.filter(
@@ -1066,7 +1128,6 @@ export function GameRoom({
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
               onDrawBigDeal={() => draw("BIG_DEAL")}
               latestCard={latestDealDecisionCard}
-              latestTurnSummary={latestTurnSummary}
               charityChoice={charityChoice}
               canAnswerCharity={canAnswerCharity}
               doodadPaymentChoice={doodadPaymentChoice}
@@ -1099,6 +1160,7 @@ export function GameRoom({
               onLoanAmountChange={updateLoanAmount}
               onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
+              activityFeed={renderTurnFeed()}
               embedded
             />
           </>
@@ -1139,7 +1201,6 @@ export function GameRoom({
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
                   onDrawBigDeal={() => draw("BIG_DEAL")}
                   latestCard={latestDealDecisionCard}
-                  latestTurnSummary={latestTurnSummary}
                   charityChoice={charityChoice}
                   canAnswerCharity={canAnswerCharity}
                   doodadPaymentChoice={doodadPaymentChoice}
@@ -1172,16 +1233,7 @@ export function GameRoom({
                   onLoanAmountChange={updateLoanAmount}
                   onTakeLoan={takeLoan}
                   canTakeLoan={canTakeLoan}
-                  activityFeed={
-                    <div className="lg:hidden">
-                      <MobileActionFeed
-                        gameId={snapshot.game.id}
-                        token={token}
-                        events={snapshot.events}
-                        currentUserId={currentUserId}
-                      />
-                    </div>
-                  }
+                  activityFeed={renderTurnFeed()}
                     embedded
                   />
                 </>
@@ -1191,16 +1243,6 @@ export function GameRoom({
         ) : null}
       </div>
 
-      {snapshot.game.status !== "WAITING" ? (
-      <div className="hidden lg:block">
-        <EventLog
-          events={snapshot.events}
-          currentUserId={currentUserId}
-          players={gamePlayers}
-          currentPlayerId={snapshot.game.currentPlayerId}
-        />
-      </div>
-      ) : null}
         </>
       )}
     </div>
@@ -1340,10 +1382,12 @@ function BankruptcyPanel({
                 </p>
               ) : player.assets.map((asset) => (
                 <div key={asset.id} className="rounded-md border border-line p-3">
-                  <div className="text-sm font-medium">{asset.name}</div>
+                  <div className="text-sm font-medium">{localizeGameText(asset.name)}</div>
                   <div className="mt-1 text-xs text-neutral-500">
                     Количество: {asset.quantity} · выплата: {money(Math.floor(asset.downPaymentCents / 2))}
-                    {asset.cashflowCents !== 0 ? ` · cashflow: ${money(asset.cashflowCents)}` : ""}
+                    {asset.cashflowCents !== 0
+                      ? ` · денежный поток: ${money(asset.cashflowCents)}`
+                      : ""}
                   </div>
                   <Button
                     className="mt-2 h-8 px-3 text-xs"
@@ -1368,7 +1412,7 @@ function BankruptcyPanel({
               ) : player.liabilities.map((liability) => (
                 <div key={liability.id} className="rounded-md border border-line p-3">
                   <div className="text-sm font-medium">
-                    {liabilityLabels[liability.type] ?? liability.name}
+                    {liabilityLabels[liability.type] ?? localizeGameText(liability.name)}
                   </div>
                   <div className="mt-1 text-xs text-neutral-500">
                     Остаток: {money(liability.balanceCents)} · платёж: {money(liability.paymentCents)}/мес
@@ -1495,10 +1539,8 @@ function GameEndPopup({
   const winnerState = winner?.financialState;
   const playerState = player?.financialState;
   const description = winner
-    ? `${winner.user?.displayName ?? "Игрок"} достиг финансовой свободы`
-    : reason === "all_players_bankrupt"
-      ? "Все игроки выбыли из-за банкротства"
-      : "Время партии истекло — победителя нет";
+    ? `${gamePlayerName(winner)} достиг финансовой свободы`
+    : gameEndReasonText(reason);
 
   return (
     <div className="app-shell-overlay fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/50 px-4 py-8">
@@ -1510,7 +1552,9 @@ function GameEndPopup({
         className="app-shell-overlay-panel app-shell-overlay-scroll w-full max-w-xl rounded-md border border-line bg-white p-5 shadow-panel sm:p-6"
       >
         <div className="text-center">
-          <div className="text-4xl" aria-hidden="true">🏆</div>
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#fff0df] text-[#c0560c]">
+            <Trophy size={28} aria-hidden="true" />
+          </span>
           <h2 id="game-end-title" className="mt-3 text-2xl font-semibold">
             Игра окончена
           </h2>
@@ -1541,6 +1585,13 @@ function GameEndPopup({
   );
 }
 
+function gameEndReasonText(reason: string | null) {
+  if (reason === "human_bankrupt") return "Вы выбыли из-за банкротства — одиночная партия завершена";
+  if (reason === "bots_eliminated") return "Все виртуальные соперники выбыли — вы победили";
+  if (reason === "all_players_bankrupt") return "Все игроки выбыли из-за банкротства";
+  return "Время партии истекло — победителя нет";
+}
+
 function StockSalePanel({
   offer,
   quantity,
@@ -1565,7 +1616,7 @@ function StockSalePanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium">Продажа акций</div>
-          <p className="mt-1 text-sm text-neutral-600">{offer.title}</p>
+          <p className="mt-1 text-sm text-neutral-600">{localizeGameText(offer.title)}</p>
         </div>
       </div>
 
@@ -1836,7 +1887,7 @@ function HostPanel({
             <div className="relative min-w-0">
               <Input
                 value={query}
-                placeholder="Имя, фамилия или email"
+                placeholder="Имя, фамилия или электронная почта"
                 autoComplete="off"
                 role="combobox"
                 aria-label="Поиск пользователя"
@@ -1910,6 +1961,7 @@ function HostPanel({
 
 function WaitingRoomOverview({
   snapshot,
+  isSolo,
   canManage,
   canStart,
   startDisabledReason,
@@ -1925,6 +1977,7 @@ function WaitingRoomOverview({
   onChooseFigurine
 }: {
   snapshot: GameSnapshot;
+  isSolo: boolean;
   canManage: boolean;
   canStart: boolean;
   startDisabledReason: string | null;
@@ -1953,10 +2006,12 @@ function WaitingRoomOverview({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">
-              Соберите команду
+              {isSolo ? "Ваши виртуальные соперники готовы" : "Соберите команду"}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужна своя фигурка.
+              {isSolo
+                ? "Проверьте состав партии и выберите свою фигурку. Вы сделаете первый ход."
+                : "Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужна своя фигурка."}
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8effe] px-3 py-2 text-sm font-extrabold text-journey">
@@ -1975,10 +2030,12 @@ function WaitingRoomOverview({
                   <PlayerToken player={player} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-extrabold">
-                      {player.user?.displayName ?? gameRoles[player.role] ?? "Участник"}
+                      {player.controller === "BOT"
+                        ? `${gamePlayerName(player)} · бот`
+                        : player.user?.displayName ?? player.guestName ?? gameRoles[player.role] ?? "Участник"}
                     </div>
                     <div className="mt-0.5 text-xs text-muted">
-                      {gameRoles[player.role] ?? humanizeToken(player.role)}
+                      {gameRoles[player.role] ?? "Участник"}
                       {player.seat ? ` · место ${player.seat}` : ""}
                     </div>
                   </div>
@@ -2021,7 +2078,7 @@ function WaitingRoomOverview({
             </Button>
           </div>
         ) : null}
-        {canManage ? (
+        {canManage && !isSolo ? (
           <HostPanel
             code={code}
             gameId={snapshot.game.id}
@@ -2090,6 +2147,7 @@ function LobbyCheck({ complete, label }: { complete: boolean; label: string }) {
 function DesktopGameBoard({
   snapshot,
   selectedPlayer,
+  players,
   canManageLiabilities,
   onCloseLiability,
   outsidePlayers,
@@ -2097,6 +2155,7 @@ function DesktopGameBoard({
 }: {
   snapshot: GameSnapshot;
   selectedPlayer: GamePlayer | undefined;
+  players: GamePlayer[];
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
   outsidePlayers: GamePlayer[];
@@ -2124,6 +2183,8 @@ function DesktopGameBoard({
         >
           <DesktopFinancialPanel
             player={selectedPlayer}
+            players={players}
+            currentPlayerId={snapshot.game.currentPlayerId}
             canManageLiabilities={canManageLiabilities}
             onCloseLiability={onCloseLiability}
             outsidePlayers={outsidePlayers}
@@ -2141,11 +2202,15 @@ type DesktopFinancialTab = "player" | "assets" | "expenses" | "liabilities";
 
 function DesktopFinancialPanel({
   player,
+  players,
+  currentPlayerId,
   canManageLiabilities,
   onCloseLiability,
   outsidePlayers
 }: {
   player: GamePlayer | undefined;
+  players: GamePlayer[];
+  currentPlayerId: string | null;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
   outsidePlayers: GamePlayer[];
@@ -2178,7 +2243,7 @@ function DesktopFinancialPanel({
   return (
     <div className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-xl bg-white shadow-panel">
       <div
-        className="grid grid-cols-4 gap-1 border-b border-line/70 bg-card p-2"
+        className="grid grid-cols-4 gap-1.5 bg-[#eef3e8] p-2"
         role="tablist"
         aria-label="Информация об игроке"
       >
@@ -2211,19 +2276,19 @@ function DesktopFinancialPanel({
                 document.getElementById(`desktop-game-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative flex h-10 min-w-0 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium transition",
+                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
                 active
-                  ? "bg-journey text-white shadow-[0_7px_16px_rgba(41,103,223,.2)]"
-                  : "bg-transparent text-ink hover:bg-white"
+                  ? "bg-[#dfe9d4] text-[#3f5b35]"
+                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
               ].join(" ")}
             >
               <span aria-hidden="true">{tab.icon}</span>
-              <span className="truncate">{tab.label}</span>
+              <span className="w-full truncate text-center">{tab.label}</span>
               {tab.count !== undefined ? (
                 <span
                   className={[
-                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[9px] leading-4",
-                    active ? "bg-white/20 text-white" : "bg-neutral-100 text-neutral-600"
+                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[8px] leading-4",
+                    active ? "bg-[#718866] text-white" : "bg-white text-[#61715b]"
                   ].join(" ")}
                 >
                   {tab.count}
@@ -2243,12 +2308,15 @@ function DesktopFinancialPanel({
         {activeTab === "player" ? (
           <div>
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {player.user?.displayName ?? "Игрок"}
-                </h2>
-                <div className="mt-1 text-sm text-neutral-500">
-                  {player.profession?.name}
+              <div className="flex min-w-0 items-center gap-3">
+                <PlayerIdentityMark player={player} />
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold">
+                    {gamePlayerName(player)}
+                  </h2>
+                  <div className="mt-1 truncate text-sm text-neutral-500">
+                    {player.profession?.name}
+                  </div>
                 </div>
               </div>
               <Badge className="bg-surface text-ink">финансовый отчёт</Badge>
@@ -2274,6 +2342,11 @@ function DesktopFinancialPanel({
                 ))}
               </div>
             ) : null}
+            <OtherPlayersList
+              className="mt-4 border-t border-line/70 pt-4"
+              players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}
+              currentPlayerId={currentPlayerId}
+            />
           </div>
         ) : null}
 
@@ -2377,7 +2450,7 @@ function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
         />
         <Metric
           className="bg-white"
-          label="Cashflow активов"
+          label="Денежный поток активов"
           value={`${money(totalCashflowCents)}/мес`}
         />
       </div>
@@ -2393,7 +2466,7 @@ function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
                 key={category}
                 className={portfolioSegmentClasses[category] ?? "bg-neutral-400"}
                 style={{ width: `${(value / compositionTotal) * 100}%` }}
-                title={`${portfolioCategoryLabels[category] ?? category}: ${money(value)}`}
+                title={`${portfolioCategoryLabels[category] ?? "Другие активы"}: ${money(value)}`}
               />
             ))}
           </div>
@@ -2405,7 +2478,7 @@ function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
                   aria-hidden="true"
                 />
                 <span className="text-neutral-600">
-                  {portfolioCategoryLabels[category] ?? category}
+                  {portfolioCategoryLabels[category] ?? "Другие активы"}
                 </span>
                 <strong>{Math.round((value / compositionTotal) * 100)}%</strong>
               </div>
@@ -2525,7 +2598,7 @@ function MobileBoard({
                 key={cell.index}
                 data-board-cell={cell.index}
                 className="relative min-w-0 snap-center text-center"
-                aria-label={`Клетка ${cell.index + 1}: ${cell.label}`}
+                aria-label={`Клетка ${cell.index + 1}: ${localizeGameText(cell.label)}`}
               >
                 <div
                   className={[
@@ -2632,7 +2705,8 @@ function BoardCellTile({
             </span>
           ) : (
             <span className="inline-block leading-tight">
-              {cellTypes[cell.type] ?? cell.type}
+              {cellTypes[cell.type] ??
+                (cell.label ? localizeGameText(cell.label) : "Игровая клетка")}
             </span>
           )}
         </Badge>
@@ -2659,27 +2733,27 @@ function PlayerToken({
   desktopBoard?: boolean;
   mobileBoard?: boolean;
 }) {
-  const title = player.user?.displayName ?? `Игрок ${player.seat ?? ""}`;
+  const title = gamePlayerName(player);
   if (player.figurine) {
     return (
       <span
         className={[
           "inline-flex shrink-0",
           desktopBoard
-            ? "h-10 w-10"
+            ? "h-12 w-12"
             : mobileBoard
-              ? "h-7 w-7"
-              : "overflow-hidden rounded-full border-2 border-white bg-white shadow-sm",
-          desktopBoard || mobileBoard ? "" : small ? "h-5 w-5" : "h-8 w-8",
+              ? "h-9 w-9"
+              : small
+                ? "h-7 w-7"
+                : "h-10 w-10",
           moving ? "timeline-moving-token" : ""
         ].join(" ")}
-        style={mobileBoard ? { boxShadow: "none" } : undefined}
         title={title}
       >
         <img
           src={figurineImagePath(player.figurine)}
           alt=""
-          className={`h-full w-full ${desktopBoard || mobileBoard ? "object-contain" : "object-cover"}`}
+          className="h-full w-full object-contain"
         />
       </span>
     );
@@ -2696,6 +2770,53 @@ function PlayerToken({
       title={title}
     >
       {player.seat}
+    </span>
+  );
+}
+
+function PlayerIdentityMark({
+  player,
+  size = "md"
+}: {
+  player: GamePlayer;
+  size?: "sm" | "md";
+}) {
+  const name = gamePlayerName(player);
+  const figurine = player.figurine ?? player.user?.figurine;
+  const avatarUrl = player.user?.avatarUrl;
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const sizeClass = figurine
+    ? size === "sm"
+      ? "h-10 w-10"
+      : "h-12 w-12"
+    : size === "sm"
+      ? "h-9 w-9 text-xs"
+      : "h-11 w-11 text-sm";
+
+  return (
+    <span
+      className={[
+        "grid shrink-0 place-items-center",
+        figurine
+          ? ""
+          : "overflow-hidden rounded-full bg-journey font-extrabold text-white shadow-[0_5px_14px_rgba(27,57,118,.18)]",
+        sizeClass
+      ].join(" ")}
+      title={name}
+    >
+      {figurine ? (
+        <img src={figurineImagePath(figurine)} alt="" className="h-full w-full object-contain" />
+      ) : avatarUrl ? (
+        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initials
+      )}
+      <span className="sr-only">Игрок {name}</span>
     </span>
   );
 }
@@ -2738,7 +2859,7 @@ function FigurineDialog({
             повторяются.
           </p>
         </div>
-        <div className="app-shell-overlay-scroll min-h-0 p-4 sm:p-6">
+        <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <FigurinePicker
             value={value}
             taken={taken}
@@ -2809,54 +2930,60 @@ function ringCellStyle(index: number): CSSProperties {
   return {};
 }
 
-function PlayersGrid({
+function OtherPlayersList({
   players,
-  currentPlayerId
+  currentPlayerId,
+  className = ""
 }: {
   players: GamePlayer[];
   currentPlayerId: string | null;
+  className?: string;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {players.map((player) => {
-        const state = player.financialState;
-        const trackLabel =
-          player.track === "FAST_TRACK" ? "⚡ Быстрый круг" : "🐀 Крысиные бега";
+    <section className={className} aria-label="Остальные игроки">
+      <h3 className="text-sm font-semibold">Остальные игроки</h3>
+      {players.length === 0 ? (
+        <p className="mt-2 text-sm text-neutral-500">Других игроков пока нет.</p>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {players.map((otherPlayer) => {
+            const state = otherPlayer.financialState;
+            const trackLabel =
+              otherPlayer.track === "FAST_TRACK" ? "Быстрый круг" : "Крысиные бега";
 
-        return (
-          <div
-            key={player.id}
-            className="rounded-md border border-line bg-surface p-3"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-medium">
-                {player.user?.displayName ?? player.role}
-              </div>
-              {currentPlayerId === player.id ? (
-                <Badge className="bg-green-100 text-success">ход</Badge>
-              ) : null}
-            </div>
-            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500">
-              {player.seat ? <span>Место {player.seat}</span> : null}
-              <span>{gameRoles[player.role] ?? humanizeToken(player.role)}</span>
-              <span>{trackLabel}</span>
-            </div>
-            <div className="mt-2 text-sm">
-              {player.profession?.name ?? "Профессия не выдана"}
-            </div>
-            {state ? (
-              <>
-                <PlayerStatusBadges state={state} />
-                <PlayerFreedomMini
-                  passiveIncomeCents={state.passiveIncomeCents}
-                  totalExpensesCents={state.totalExpensesCents}
-                />
-              </>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
+            return (
+              <li key={otherPlayer.id} className="rounded-md bg-surface p-3">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5">
+                  <PlayerIdentityMark player={otherPlayer} size="sm" />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">
+                      {gamePlayerName(otherPlayer)}
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-neutral-500">
+                      {otherPlayer.profession?.name ?? "Профессия не выдана"}
+                    </div>
+                  </div>
+                  {currentPlayerId === otherPlayer.id ? (
+                    <Badge className="bg-green-100 text-success">ходит</Badge>
+                  ) : null}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500">
+                  {otherPlayer.seat ? <span>Место {otherPlayer.seat}</span> : null}
+                  <span>{trackLabel}</span>
+                  {state ? <span>Поток {money(state.monthlyCashflowCents)}/мес</span> : null}
+                </div>
+                {state ? (
+                  <PlayerFreedomMini
+                    passiveIncomeCents={state.passiveIncomeCents}
+                    totalExpensesCents={state.totalExpensesCents}
+                  />
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -3018,12 +3145,15 @@ function MobileGameTabs({
         {activeTab === "player" && player && state ? (
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">
-                  {player.user?.displayName ?? "Игрок"}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-neutral-500">
-                  {player.profession?.name}
+              <div className="flex min-w-0 items-center gap-2.5">
+                <PlayerIdentityMark player={player} size="sm" />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">
+                    {gamePlayerName(player)}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-neutral-500">
+                    {player.profession?.name}
+                  </div>
                 </div>
               </div>
             </div>
@@ -3041,14 +3171,11 @@ function MobileGameTabs({
               totalExpensesCents={state.totalExpensesCents}
             />
             <CashflowEquation state={state} />
-            <section className="border-t border-line/70 pt-3" aria-labelledby="mobile-players-title">
-              <h3 id="mobile-players-title" className="text-sm font-semibold">
-                Игроки
-              </h3>
-              <div className="mt-3">
-                <PlayersGrid players={players} currentPlayerId={currentPlayerId} />
-              </div>
-            </section>
+            <OtherPlayersList
+              className="border-t border-line/70 pt-3"
+              players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}
+              currentPlayerId={currentPlayerId}
+            />
           </div>
         ) : null}
 
@@ -3094,7 +3221,7 @@ function AssetCard({
     <div className="rounded-md bg-surface p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium">{asset.name}</div>
+          <div className="text-sm font-medium">{localizeGameText(asset.name)}</div>
           {asset.symbol ? (
             <div className="mt-1 text-xs text-neutral-500">{asset.symbol}</div>
           ) : null}
@@ -3131,7 +3258,7 @@ function AssetCashflowBar({
   if (cashflowCents === 0) {
     return (
       <div className="mt-3 inline-flex rounded-full bg-neutral-200 px-2 py-1 text-xs text-neutral-600">
-        Без ежемесячного cashflow
+        Без ежемесячного денежного потока
       </div>
     );
   }
@@ -3141,7 +3268,7 @@ function AssetCashflowBar({
     <div className="mt-3">
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className={positive ? "text-success" : "text-red-700"}>
-          {positive ? "Вклад в cashflow" : "Снижение cashflow"}
+          {positive ? "Вклад в денежный поток" : "Снижение денежного потока"}
         </span>
         <strong>{money(cashflowCents)}/мес</strong>
       </div>
@@ -3149,7 +3276,7 @@ function AssetCashflowBar({
         className="mt-1.5"
         value={Math.abs(cashflowCents)}
         max={Math.max(1, maxAbsCashflowCents)}
-        label={`${positive ? "Вклад" : "Снижение"} cashflow ${money(Math.abs(cashflowCents))} в месяц`}
+        label={`${positive ? "Вклад" : "Снижение"} денежного потока ${money(Math.abs(cashflowCents))} в месяц`}
         tone={positive ? "success" : "danger"}
       />
     </div>
@@ -3279,7 +3406,7 @@ function LoanPreview({
           </div>
         </div>
         <div>
-          <div className="text-xs text-neutral-500">Cashflow после</div>
+          <div className="text-xs text-neutral-500">Денежный поток после</div>
           <div
             className={`mt-0.5 font-semibold ${
               cashflowAfterCents >= 0 ? "text-success" : "text-red-700"
@@ -3329,7 +3456,7 @@ function CreditList({
                 >
                   <div>
                     <div className="text-sm font-medium">
-                      {liabilityLabels[liability.type] ?? liability.name}
+                      {liabilityLabels[liability.type] ?? localizeGameText(liability.name)}
                     </div>
                     <div className="mt-1 text-xs text-neutral-500">
                       Остаток: {money(liability.balanceCents)}
@@ -3498,7 +3625,6 @@ function ActionsPanel({
   onDrawSmallDeal,
   onDrawBigDeal,
   latestCard,
-  latestTurnSummary,
   charityChoice,
   canAnswerCharity,
   doodadPaymentChoice,
@@ -3538,7 +3664,6 @@ function ActionsPanel({
   onDrawSmallDeal: () => void;
   onDrawBigDeal: () => void;
   latestCard: ReturnType<typeof latestDealCard>;
-  latestTurnSummary: ReturnType<typeof latestPlayerActionSummary>;
   charityChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "charity_choice" }> | null;
   canAnswerCharity: boolean;
   doodadPaymentChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "doodad_payment_choice" }> | null;
@@ -3592,14 +3717,6 @@ function ActionsPanel({
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerCount === 0;
-  const hasCurrentAction =
-    canChooseDeal ||
-    Boolean(stockSaleOffer) ||
-    Boolean(marketSaleOffer) ||
-    Boolean(charityChoice) ||
-    Boolean(doodadPaymentChoice) ||
-    Boolean(latestCard);
-
   const content = (
     <>
       {canChooseDeal ? (
@@ -3632,10 +3749,10 @@ function ActionsPanel({
         <div className="rounded-md bg-[#f5f6fc] p-3">
           <div className="text-sm font-medium">Предложение рынка</div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
-            {marketSaleOffer.title}
+            {localizeGameText(marketSaleOffer.title)}
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-            <div>Актив: {marketSaleOffer.assetName}</div>
+            <div>Актив: {localizeGameText(marketSaleOffer.assetName)}</div>
             <div>
               Цена продажи: <strong>{money(marketSaleOffer.salePriceCents)}</strong>
             </div>
@@ -3713,7 +3830,7 @@ function ActionsPanel({
         <div className="rounded-md bg-[#fff4f7] p-3">
           <div className="text-sm font-medium">Выбор оплаты</div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
-            {doodadPaymentChoice.title}
+            {localizeGameText(doodadPaymentChoice.title)}
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
             <div>
@@ -3740,18 +3857,14 @@ function ActionsPanel({
         </div>
       ) : null}
 
-      <div className={[
-        "rounded-md p-3",
-        latestCard ? "bg-[#f5faf2]" : "bg-surface"
-      ].join(" ")}>
-        <div className="text-sm font-medium">
-          {latestCard ? "Текущая сделка" : "Последняя сделка"}
-        </div>
-        {latestCard ? (
-          <>
-            <p className="mt-1 text-sm text-neutral-700">{latestCard.title}</p>
+      {latestCard ? (
+        <div className="rounded-md bg-[#f5faf2] p-3">
+          <div className="text-sm font-medium">Текущая сделка</div>
+            <p className="mt-1 text-sm text-neutral-700">{localizeGameText(latestCard.title)}</p>
             {latestCard.bodyText ? (
-              <p className="mt-2 text-sm leading-6 text-neutral-700">{latestCard.bodyText}</p>
+              <p className="mt-2 text-sm leading-6 text-neutral-700">
+                {localizeGameText(latestCard.bodyText)}
+              </p>
             ) : null}
             <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
               {latestCard.priceCents > 0 ? (
@@ -3892,25 +4005,8 @@ function ActionsPanel({
                 Отказаться
               </Button>
             </div>
-          </>
-        ) : !hasCurrentAction && latestTurnSummary ? (
-          <div className="mt-3 space-y-3">
-            {latestTurnSummary.map((event) =>
-              event.type === realtimeEvents.cardDraw ? (
-                <JournalCardDraw key={event.id} event={event} />
-              ) : (
-                <div key={event.id}>
-                  <GameEventPresentation event={event} titleClassName="font-semibold" />
-                </div>
-              )
-            )}
-          </div>
-        ) : hasCurrentAction ? (
-          <p className="mt-1 text-sm text-neutral-600">Ожидается действие выше.</p>
-        ) : (
-          <p className="mt-1 text-sm text-neutral-600">Нет данных о прошлом ходе.</p>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       {bankOpen ? (
         <div className="rounded-md border border-line bg-white p-3">
@@ -3982,6 +4078,7 @@ type JournalEntry =
       kind: "turn";
       id: string;
       events: GameEvent[];
+      complete: boolean;
     };
 
 const turnStartEventTypes = new Set([
@@ -3998,16 +4095,25 @@ const turnEndingStateReasons = new Set([
   "time_limit_reached"
 ]);
 
+const nonGameplayPlayerEventTypes = new Set([
+  "player:joined",
+  "player:added",
+  "player:removed",
+  "player:role_changed",
+  "player:figurine_selected"
+]);
+
 function journalEntries(events: GameEvent[]) {
   const entries: JournalEntry[] = [];
   let activeTurn: GameEvent[] | null = null;
 
-  const finishActiveTurn = () => {
+  const finishActiveTurn = (complete = false) => {
     if (!activeTurn || activeTurn.length === 0) return;
     entries.push({
       kind: "turn",
       id: `turn-${activeTurn[0]?.id ?? activeTurn[0]?.sequence ?? entries.length}`,
-      events: activeTurn
+      events: activeTurn,
+      complete
     });
     activeTurn = null;
   };
@@ -4016,7 +4122,22 @@ function journalEntries(events: GameEvent[]) {
     (left, right) => left.sequence - right.sequence
   )) {
     if (turnStartEventTypes.has(event.type)) {
-      finishActiveTurn();
+      const activePlayerId = activeTurn?.find((activeEvent) => activeEvent.gamePlayer?.id)
+        ?.gamePlayer?.id;
+      const activeHasTurnStart = activeTurn?.some((activeEvent) =>
+        turnStartEventTypes.has(activeEvent.type)
+      );
+      if (
+        activeTurn &&
+        !activeHasTurnStart &&
+        activePlayerId &&
+        activePlayerId === event.gamePlayer?.id
+      ) {
+        activeTurn.push(event);
+        continue;
+      }
+
+      finishActiveTurn(true);
       activeTurn = [event];
       continue;
     }
@@ -4024,14 +4145,35 @@ function journalEntries(events: GameEvent[]) {
     if (event.type === realtimeEvents.stateUpdate) {
       if (activeTurn) {
         activeTurn.push(event);
-        if (isTurnEndingStateEvent(event)) finishActiveTurn();
+        if (isTurnEndingStateEvent(event)) finishActiveTurn(true);
       }
       continue;
     }
 
     if (activeTurn) {
+      const activeHasTurnStart = activeTurn.some((activeEvent) =>
+        turnStartEventTypes.has(activeEvent.type)
+      );
+      const activePlayerId = activeTurn.find((activeEvent) => activeEvent.gamePlayer?.id)
+        ?.gamePlayer?.id;
+      if (
+        !activeHasTurnStart &&
+        isPlayerGameplayEvent(event) &&
+        activePlayerId &&
+        activePlayerId !== event.gamePlayer?.id
+      ) {
+        finishActiveTurn(true);
+        activeTurn = [event];
+        continue;
+      }
+
       activeTurn.push(event);
-      if (event.type === realtimeEvents.gameEnded) finishActiveTurn();
+      if (event.type === realtimeEvents.gameEnded) finishActiveTurn(true);
+      continue;
+    }
+
+    if (isPlayerGameplayEvent(event)) {
+      activeTurn = [event];
       continue;
     }
 
@@ -4040,6 +4182,10 @@ function journalEntries(events: GameEvent[]) {
 
   finishActiveTurn();
   return entries;
+}
+
+function isPlayerGameplayEvent(event: GameEvent) {
+  return Boolean(event.gamePlayer?.id) && !nonGameplayPlayerEventTypes.has(event.type);
 }
 
 function isTurnEndingStateEvent(event: GameEvent) {
@@ -4054,7 +4200,10 @@ function journalEntrySequence(entry: JournalEntry) {
 
 function journalEntryActor(entry: JournalEntry) {
   if (entry.kind === "event") return entry.event.actor;
-  return entry.events.find((event) => turnStartEventTypes.has(event.type))?.actor;
+  return (
+    entry.events.find((event) => turnStartEventTypes.has(event.type))?.actor ??
+    entry.events.find((event) => event.actor)?.actor
+  );
 }
 
 function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
@@ -4066,16 +4215,44 @@ function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
     : `#${firstSequence}–${lastSequence}`;
 }
 
-function MobileActionFeed({
+type TurnJournalEntry = Extract<JournalEntry, { kind: "turn" }>;
+
+function journalEntryGamePlayerId(entry: TurnJournalEntry) {
+  return (
+    entry.events.find((event) => turnStartEventTypes.has(event.type))?.gamePlayer?.id ??
+    entry.events.find((event) => event.gamePlayer?.id)?.gamePlayer?.id ??
+    null
+  );
+}
+
+function isJournalTurnComplete(entry: TurnJournalEntry) {
+  return entry.complete || entry.events.some(
+    (event) =>
+      (event.type === realtimeEvents.stateUpdate && isTurnEndingStateEvent(event)) ||
+      event.type === realtimeEvents.gameEnded
+  );
+}
+
+function GameTurnFeed({
   gameId,
   token,
   events,
-  currentUserId
+  players,
+  currentUserId,
+  currentGamePlayerId,
+  currentTurnPlayer,
+  currentTurnIndex,
+  gameStatus
 }: {
   gameId: string;
   token: string;
   events: GameEvent[];
+  players: GamePlayer[];
   currentUserId: string;
+  currentGamePlayerId: string | null;
+  currentTurnPlayer: GamePlayer | undefined;
+  currentTurnIndex: number;
+  gameStatus: GameSnapshot["game"]["status"];
 }) {
   const [historyEvents, setHistoryEvents] = useState(events);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -4100,21 +4277,37 @@ function MobileActionFeed({
     setVisibleCount(10);
   }, [onlyMine]);
 
-  const turns = useMemo(
-    () =>
-      journalEntries(historyEvents)
-        .filter((entry): entry is Extract<JournalEntry, { kind: "turn" }> => entry.kind === "turn")
-        .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
-        .filter((entry) => !onlyMine || journalEntryActor(entry)?.id === currentUserId),
-    [currentUserId, historyEvents, onlyMine]
+  const turns = useMemo(() => {
+    const historyTurns = journalEntries(historyEvents)
+      .filter((entry): entry is TurnJournalEntry => entry.kind === "turn")
+      .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left));
+
+    return historyTurns.filter((entry) => {
+      if (!onlyMine) return true;
+      const gamePlayerId = journalEntryGamePlayerId(entry);
+      return gamePlayerId
+        ? gamePlayerId === currentGamePlayerId
+        : journalEntryActor(entry)?.id === currentUserId;
+    });
+  }, [currentGamePlayerId, currentUserId, historyEvents, onlyMine]);
+  const hasOpenCurrentTurn = turns.some(
+    (entry) =>
+      !isJournalTurnComplete(entry) &&
+      journalEntryGamePlayerId(entry) === currentTurnPlayer?.id
   );
-  const visibleTurns = turns.slice(0, visibleCount);
+  const showPendingTurn =
+    (gameStatus === "IN_PROGRESS" || gameStatus === "PAUSED") &&
+    Boolean(currentTurnPlayer) &&
+    !hasOpenCurrentTurn &&
+    (!onlyMine || currentTurnPlayer?.id === currentGamePlayerId);
+  const totalVisibleItems = turns.length + (showPendingTurn ? 1 : 0);
+  const visibleTurns = turns.slice(0, Math.max(0, visibleCount - (showPendingTurn ? 1 : 0)));
   const canLoadArchive = !replayLoaded && events.length >= 80;
-  const hasMore = visibleCount < turns.length || canLoadArchive;
+  const hasMore = visibleCount < totalVisibleItems || canLoadArchive;
 
   async function loadMore() {
     setLoadError(null);
-    if (visibleCount < turns.length) {
+    if (visibleCount < totalVisibleItems) {
       setVisibleCount((count) => count + 10);
       return;
     }
@@ -4138,12 +4331,10 @@ function MobileActionFeed({
   }
 
   return (
-    <section aria-labelledby="mobile-action-feed-title">
+    <section aria-label="Лента ходов">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 id="mobile-action-feed-title" className="text-base font-extrabold">
-            Лента ходов
-          </h3>
+          <h3 className="text-base font-extrabold">Лента ходов</h3>
           <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
         </div>
         <Button
@@ -4156,13 +4347,40 @@ function MobileActionFeed({
         </Button>
       </div>
 
-      <div className="mt-3 space-y-3" role="feed" aria-live="polite" aria-busy={loadingMore}>
-        {visibleTurns.length === 0 ? (
+      <div
+        className="mt-3 space-y-3"
+        role="feed"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-busy={loadingMore}
+      >
+        {showPendingTurn && currentTurnPlayer ? (
+          <TurnJournalCard
+            key={`current-turn-${currentTurnIndex}-${currentTurnPlayer.id}`}
+            entry={null}
+            player={currentTurnPlayer}
+            pendingSequence={currentTurnIndex + 1}
+          />
+        ) : null}
+        {visibleTurns.length === 0 && !showPendingTurn ? (
           <p className="rounded-xl bg-surface p-3 text-sm text-muted">
             {onlyMine ? "Ваших ходов пока нет." : "Ходов пока нет."}
           </p>
         ) : (
-          visibleTurns.map((entry) => <TurnJournalCard key={entry.id} entry={entry} />)
+          visibleTurns.map((entry) => {
+            const gamePlayerId = journalEntryGamePlayerId(entry);
+            const actor = journalEntryActor(entry);
+            const player =
+              players.find((candidate) => candidate.id === gamePlayerId) ??
+              players.find((candidate) => candidate.userId === actor?.id);
+            const entryKey =
+              player &&
+              !isJournalTurnComplete(entry) &&
+              player.id === currentTurnPlayer?.id
+                ? `current-turn-${currentTurnIndex}-${player.id}`
+                : entry.id;
+            return <TurnJournalCard key={entryKey} entry={entry} player={player} />;
+          })
         )}
       </div>
 
@@ -4182,18 +4400,6 @@ function MobileActionFeed({
           {loadingMore ? "Загружаем…" : "Показать ещё"}
         </Button>
       ) : null}
-
-      {visibleCount > 10 ? (
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-20 right-4 z-40 grid h-12 w-12 place-items-center rounded-xl bg-journey text-white shadow-[0_14px_34px_rgba(41,103,223,.3)] transition hover:-translate-y-0.5 hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30 md:right-6"
-          aria-label="Вернуться к началу страницы"
-          title="Наверх"
-        >
-          <ArrowUp size={20} aria-hidden="true" />
-        </button>
-      ) : null}
     </section>
   );
 }
@@ -4205,229 +4411,80 @@ function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
 }
 
 function TurnJournalCard({
-  entry
+  entry,
+  player,
+  pendingSequence
 }: {
-  entry: Extract<JournalEntry, { kind: "turn" }>;
+  entry: TurnJournalEntry | null;
+  player: GamePlayer | undefined;
+  pendingSequence?: number;
 }) {
-  const actor = journalEntryActor(entry);
-  const firstEvent = entry.events[0];
-  const lastEvent = entry.events[entry.events.length - 1];
-  const visibleTurnEvents = entry.events.filter(
-    (event) => event.type !== realtimeEvents.stateUpdate
-  );
+  const actor = entry ? journalEntryActor(entry) : null;
+  const firstEvent = entry?.events[0];
+  const lastEvent = entry?.events[entry.events.length - 1];
+  const visibleTurnEvents = (entry?.events ?? [])
+    .filter((event) => event.type !== realtimeEvents.stateUpdate)
+    .reverse();
+  const complete = entry ? isJournalTurnComplete(entry) : false;
+  const playerName = player ? gamePlayerName(player) : actor?.displayName ?? "Игрок";
+  const eventTime = firstEvent?.createdAt ?? lastEvent?.createdAt;
 
   return (
-    <article className="rounded-xl bg-surface p-3" aria-label={`Ход игрока ${actor?.displayName ?? "Система"}`}>
+    <article
+      className="rounded-xl bg-surface p-3"
+      aria-label={`Ход игрока ${playerName}, ${complete ? "завершён" : "в процессе"}`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-extrabold">Ход игрока</div>
-          <div className="mt-1 text-xs text-muted">
-            {actor?.displayName ?? "Система"} · {shortDate(firstEvent?.createdAt ?? lastEvent?.createdAt ?? "")}
+        <div className="flex min-w-0 items-center gap-2.5">
+          {player ? <PlayerIdentityMark player={player} /> : null}
+          <div className="min-w-0">
+            <div className="text-sm font-extrabold">Ход игрока</div>
+            <div className="mt-0.5 truncate text-xs text-muted">
+              {playerName}{eventTime ? ` · ${shortDate(eventTime)}` : ""}
+            </div>
           </div>
         </div>
-        <span className="shrink-0 text-xs text-muted">{turnSequenceLabel(entry)}</span>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className="text-xs text-muted">
+            {entry ? turnSequenceLabel(entry) : `Ход ${pendingSequence ?? "—"}`}
+          </span>
+          <span
+            className={[
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold",
+              complete ? "bg-green-100 text-success" : "bg-[#e8effe] text-[#174397]"
+            ].join(" ")}
+          >
+            {complete ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleDot size={12} aria-hidden="true" />}
+            {complete ? "Завершён" : "В процессе"}
+          </span>
+        </div>
       </div>
-      <div className="mt-3 space-y-3">
-        {visibleTurnEvents.map((event) =>
-          event.type === realtimeEvents.cardDraw ? (
-            <JournalCardDraw key={event.id} event={event} />
-          ) : (
-            <div key={event.id} className="text-sm">
-              <GameEventPresentation event={event} />
-            </div>
-          )
-        )}
-      </div>
+      {visibleTurnEvents.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {visibleTurnEvents.map((event) =>
+            event.type === realtimeEvents.cardDraw ? (
+              <JournalCardDraw key={event.id} event={event} />
+            ) : (
+              <div key={event.id} className="text-sm">
+                <GameEventPresentation event={event} />
+              </div>
+            )
+          )}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted">Ожидаем действие игрока.</p>
+      )}
     </article>
   );
 }
 
-function EventLog({
-  events,
-  currentUserId,
-  players,
-  currentPlayerId,
-  compact = false
-}: {
-  events: GameEvent[];
-  currentUserId: string;
-  players: GamePlayer[];
-  currentPlayerId: string | null;
-  compact?: boolean;
-}) {
-  const [onlyMine, setOnlyMine] = useState(false);
-  const [activeTab, setActiveTab] = useState<"events" | "players">("events");
-  const visibleEntries = useMemo(() => {
-    return journalEntries(events)
-      .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
-      .filter(
-        (entry) =>
-          !onlyMine ||
-          (entry.kind === "turn" && journalEntryActor(entry)?.id === currentUserId)
-      );
-  }, [currentUserId, events, onlyMine]);
-
-  return (
-    <Card className={compact ? "rounded-none border-0 shadow-none" : ""}>
-      <CardHeader className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        {compact ? (
-          <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-base font-semibold">Журнал действий</h2>
-              <p className="mt-0.5 text-xs text-neutral-500">Новые действия появляются сверху.</p>
-            </div>
-            <Button
-              variant={onlyMine ? "primary" : "secondary"}
-              className="h-9 px-3"
-              onClick={() => setOnlyMine((value) => !value)}
-            >
-              {onlyMine ? "Показать всех" : "Только мои"}
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div
-              className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#eef3e8] p-1.5"
-              role="tablist"
-              aria-label="Информация об игре"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "events"}
-                className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
-                  activeTab === "events"
-                    ? "bg-[#dfe9d4] text-[#3f5b35]"
-                    : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-                }`}
-                onClick={() => setActiveTab("events")}
-              >
-                <ListRestart size={16} aria-hidden="true" />
-                Журнал действий
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "players"}
-                className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] ${
-                  activeTab === "players"
-                    ? "bg-[#dfe9d4] text-[#3f5b35]"
-                    : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
-                }`}
-                onClick={() => setActiveTab("players")}
-              >
-                <UsersRound size={16} aria-hidden="true" />
-                Игроки
-              </button>
-            </div>
-            {activeTab === "events" ? (
-              <Button
-                variant={onlyMine ? "primary" : "secondary"}
-                className="h-9 self-start px-3"
-                onClick={() => setOnlyMine((value) => !value)}
-              >
-                {onlyMine ? "Показать всех" : "Только мои"}
-              </Button>
-            ) : null}
-          </>
-        )}
-      </CardHeader>
-      <CardContent className={compact ? "p-3" : ""}>
-        {activeTab === "events" ? (
-          <div
-            className={cn(
-              "space-y-3 overflow-y-auto pr-1",
-              compact ? "max-h-[42dvh]" : "max-h-[28rem] sm:max-h-96"
-            )}
-            role={compact ? "log" : "tabpanel"}
-            aria-live={compact ? "polite" : undefined}
-            aria-relevant={compact ? "additions text" : undefined}
-            tabIndex={0}
-          >
-            <p className="text-xs text-neutral-500">Сначала показаны последние действия.</p>
-            {visibleEntries.length === 0 ? (
-              <p className="text-sm text-neutral-600">
-                {onlyMine ? "Ваших действий пока нет." : "Событий пока нет."}
-              </p>
-            ) : (
-              visibleEntries.map((entry) => {
-                if (entry.kind === "turn") {
-                  const actor = journalEntryActor(entry);
-                  const firstEvent = entry.events[0];
-                  const lastEvent = entry.events[entry.events.length - 1];
-                  const visibleTurnEvents = entry.events.filter(
-                    (event) => event.type !== realtimeEvents.stateUpdate
-                  );
-
-                  return (
-                    <div key={entry.id} className="rounded-md border border-line bg-surface p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold">Ход игрока</div>
-                          <div className="mt-1 text-xs text-neutral-500">
-                            {actor?.displayName ?? "Система"} ·{" "}
-                            {shortDate(firstEvent?.createdAt ?? lastEvent?.createdAt ?? "")}
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-xs text-neutral-500">
-                          {turnSequenceLabel(entry)}
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-3">
-                        {visibleTurnEvents.map((event) => {
-                          if (event.type === realtimeEvents.cardDraw) {
-                            return <JournalCardDraw key={event.id} event={event} />;
-                          }
-
-                          return (
-                            <div
-                              key={event.id}
-                              className="border-l-2 border-neutral-200 pl-3 text-sm"
-                            >
-                              <GameEventPresentation event={event} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                }
-
-                const event = entry.event;
-
-                return (
-                  <div key={entry.id} className="rounded-md border border-line bg-surface p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <GameEventPresentation event={event} titleClassName="font-semibold" />
-                        <div className="mt-1 text-xs text-neutral-500">
-                          {event.actor?.displayName ?? "Система"} · {shortDate(event.createdAt)}
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-xs text-neutral-500">#{event.sequence}</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        ) : (
-          <div role="tabpanel">
-            <PlayersGrid players={players} currentPlayerId={currentPlayerId} />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-const eventTitleIcons: Record<string, string> = {
-  "loan:take": "🏦",
-  "loan:repay": "🏦",
-  "paycheck:receive": "💵",
-  "deal:buy": "🤝",
-  "deal:sell": "💰"
-};
+const eventTitleIcons = {
+  "loan:take": Landmark,
+  "loan:repay": Landmark,
+  "paycheck:receive": Banknote,
+  "deal:buy": Handshake,
+  "deal:sell": HandCoins
+} as const;
 
 function GameEventPresentation({
   event,
@@ -4473,7 +4530,7 @@ function GameEventHeadline({ event }: { event: GameEvent }) {
 
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <span aria-hidden="true" className="text-base">🎲</span>
+        <Dices size={16} className="shrink-0 text-journey" aria-hidden="true" />
         <span className="sr-only">Бросок кубика: </span>
         <span>{expression}</span>
       </span>
@@ -4489,24 +4546,24 @@ function GameEventHeadline({ event }: { event: GameEvent }) {
 
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <span aria-hidden="true" className="text-base">➡️</span>
+        <MoveRight size={16} className="shrink-0 text-journey" aria-hidden="true" />
         <span className="sr-only">Перемещение по полю: </span>
         <span>
           {compactBoardPosition(from)} → {compactBoardPosition(to)}
         </span>
         {cellLabel ? (
           <span className="text-xs font-medium text-neutral-600">
-            {cellTypes[cellType] ?? cellLabel}
+            {cellTypes[cellType] ?? localizeGameText(cellLabel || "Игровая клетка")}
           </span>
         ) : null}
       </span>
     );
   }
 
-  const icon = eventTitleIcons[event.type];
+  const EventIcon = eventTitleIcons[event.type as keyof typeof eventTitleIcons];
   return (
     <span className="inline-flex items-center gap-2">
-      {icon ? <span aria-hidden="true" className="text-base">{icon}</span> : null}
+      {EventIcon ? <EventIcon size={16} className="shrink-0 text-journey" aria-hidden="true" /> : null}
       <span>{eventTitle(event.type)}</span>
     </span>
   );
@@ -4522,6 +4579,8 @@ function compactEventDetails(event: GameEvent) {
     ]);
   }
   if (event.type === realtimeEvents.playerMove) return [];
+  const playerActionDetails = compactPlayerActionDetails(event);
+  if (playerActionDetails !== null) return playerActionDetails;
   const details = eventDetails(event);
   if (!eventCashChange(event)) return details;
   const redundantCashPrefixes = [
@@ -4541,69 +4600,36 @@ function compactEventDetails(event: GameEvent) {
   );
 }
 
-type CashChange = {
-  beforeCents: number | null;
-  afterCents: number | null;
-  deltaCents: number;
-};
-
-function eventCashChange(event: GameEvent): CashChange | null {
-  const before = optionalPayloadNumber(event.payload, "beforeCashCents");
-  const after = optionalPayloadNumber(event.payload, "afterCashCents");
-  if (before !== null && after !== null) {
-    return { beforeCents: before, afterCents: after, deltaCents: after - before };
-  }
-
-  let delta: number | null = null;
-  if (event.type === realtimeEvents.loanTake) {
-    delta = optionalPayloadNumber(event.payload, "amountCents");
-  } else if (event.type === "card:cash_delta") {
-    delta = optionalPayloadNumber(event.payload, "amountCents");
-  } else if (event.type === "bankruptcy:asset_sold") {
-    delta = optionalPayloadNumber(event.payload, "proceedsCents");
-  } else if (event.type === "bankruptcy:debt_repaid") {
-    const amount = optionalPayloadNumber(event.payload, "amountCents");
-    delta = amount === null ? null : -Math.abs(amount);
-  } else if (event.type === "doodad:paid") {
-    const amount = optionalPayloadNumber(event.payload, "amountCents");
-    delta = amount === null ? null : -Math.abs(amount);
-  } else if (
-    event.type === "doodad:payment_resolved" &&
-    event.payload.method === "cash"
-  ) {
-    const amount = optionalPayloadNumber(event.payload, "cashPriceCents");
-    delta = amount === null ? null : -Math.abs(amount);
-  }
-
-  return delta === null
-    ? null
-    : { beforeCents: null, afterCents: null, deltaCents: delta };
-}
-
-function optionalPayloadNumber(payload: Record<string, unknown>, key: string) {
-  const value = payload[key];
-  if (value === null || value === undefined || value === "") return null;
-  const number = toNumber(value);
-  return Number.isFinite(number) ? number : null;
-}
-
 function CashChangeVisualization({ change }: { change: CashChange }) {
   const positive = change.deltaCents >= 0;
-  const deltaLabel = `${positive ? "+" : "−"}${money(Math.abs(change.deltaCents))}`;
+  const expression = cashChangeExpression(change);
 
   return (
     <div className="mt-1.5 inline-flex flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
-      <span aria-hidden="true">💵</span>
-      {change.beforeCents !== null && change.afterCents !== null ? (
+      <Banknote size={16} className="shrink-0 text-success" aria-hidden="true" />
+      {expression.kind === "equation" ? (
         <>
-          <strong>{money(change.beforeCents)}</strong>
+          <strong>{expression.result}</strong>
           <span className="text-neutral-400" aria-hidden="true">→</span>
-          <strong>{money(change.afterCents)}</strong>
+          <strong
+            className={expression.changedOperand === "first" ? "text-success" : undefined}
+          >
+            {expression.firstOperand}
+          </strong>
+          <strong className={positive ? "text-success" : "text-red-700"}>
+            {expression.operator}
+          </strong>
+          <strong
+            className={expression.changedOperand === "second" ? "text-red-700" : undefined}
+          >
+            {expression.secondOperand}
+          </strong>
         </>
-      ) : null}
-      <strong className={positive ? "text-success" : "text-red-700"}>
-        {deltaLabel}
-      </strong>
+      ) : (
+        <strong className={positive ? "text-success" : "text-red-700"}>
+          {expression.value}
+        </strong>
+      )}
     </div>
   );
 }
@@ -4614,9 +4640,10 @@ function compactBoardPosition(value: number) {
 }
 
 function MoneyBoldText({ text }: { text: string }) {
+  const localizedText = localizeGameText(text);
   const currencyPattern = /(-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$)/gu;
   const currencyPartPattern = /^-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$$/u;
-  const parts = text.split(currencyPattern);
+  const parts = localizedText.split(currencyPattern);
 
   return (
     <>
@@ -4688,7 +4715,7 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
   const financialDetails = compactDetails([
     metaMoneyDetail("Цена", payload.meta, "price"),
     metaMoneyDetail("Первоначальный взнос", payload.meta, "down_payment"),
-    metaMoneyDetail("Cashflow", payload.meta, "cashflow_monthly", "/мес")
+    metaMoneyDetail("Денежный поток", payload.meta, "cashflow_monthly", "/мес")
   ]);
 
   return (
@@ -4696,11 +4723,10 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
       className={`overflow-hidden rounded-lg shadow-[0_8px_20px_rgba(27,57,118,.10)] ${appearance.container}`}
     >
       <div className="p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
-            {cardTypes[cardType] ?? humanizeToken(cardType)}
+            {cardTypes[cardType] ?? "Карточка"}
           </span>
-          <span className="text-xs font-medium text-neutral-500">Получена карточка</span>
         </div>
         <div className="mt-2 text-base font-semibold text-neutral-900">{title}</div>
       </div>
@@ -4758,6 +4784,7 @@ const eventTitles: Record<string, string> = {
   "game:period_started": "Начался новый период",
   "game:deleted": "Игра удалена",
   "game:ended": "Игра завершена",
+  "bot:decision": "Решение бота",
   "player:joined": "Игрок вошел в комнату",
   "player:added": "Игрок добавлен ведущим",
   "player:roll_dice": "Бросок кубика",
@@ -4831,9 +4858,15 @@ const cardTypes: Record<string, string> = {
   SMALL_DEAL: "Малая сделка",
   BIG_DEAL: "Крупная сделка",
   MARKET: "Рынок",
-  DOODAD: "Doodad",
+  DOODAD: "Всякая всячина",
   FAST_TRACK: "Быстрый круг",
   DREAM: "Мечта"
+};
+
+const cardConditionLabels: Record<string, string> = {
+  has_children: "есть дети",
+  has_rental_realestate: "есть арендная недвижимость",
+  has_8_plex: "есть 8-квартирный дом"
 };
 
 const gameRoles: Record<string, string> = {
@@ -4906,7 +4939,7 @@ const boardCellAppearances: Record<string, BoardCellAppearance> = {
 };
 
 function eventTitle(type: string) {
-  return eventTitles[type] ?? humanizeToken(type);
+  return eventTitles[type] ?? "Игровое событие";
 }
 
 function eventDetails(event: GameEvent) {
@@ -4948,10 +4981,19 @@ function eventDetails(event: GameEvent) {
             ? "Пассивный доход превысил расходы"
             : payload.reason === "time_limit"
               ? "Истёк лимит времени"
-              : payload.reason
+              : payload.reason === "human_bankrupt"
+                ? "Человек выбыл из одиночной партии"
+                : payload.reason === "bots_eliminated"
+                  ? "Все боты выбыли"
+                  : payload.reason
         ),
         moneyDetail("Пассивный доход", payload.passiveIncomeCents, "/мес"),
         moneyDetail("Расходы", payload.totalExpensesCents, "/мес")
+      ]);
+    case "bot:decision":
+      return compactDetails([
+        textDetail("Решение", botActionLabel(String(payload.action ?? ""))),
+        textDetail("Почему", payload.reason)
       ]);
     case "game:deleted":
       return compactDetails([textDetail("Предыдущий статус", payload.previousStatus)]);
@@ -5003,13 +5045,21 @@ function eventDetails(event: GameEvent) {
     case "card:condition_not_met":
       return compactDetails([
         textDetail("Карточка", payload.title),
-        textDetail("Условия", Array.isArray(payload.conditions) ? payload.conditions.join(", ") : null)
+        textDetail(
+          "Условия",
+          Array.isArray(payload.conditions)
+            ? payload.conditions
+                .map((condition) => cardConditionLabels[String(condition)])
+                .filter(Boolean)
+                .join(", ")
+            : null
+        )
       ]);
     case "card:no_matching_assets":
       return compactDetails([
         textDetail("Карточка", payload.title),
         textDetail("Тикер", payload.symbol),
-        textDetail("Эффект", humanizeToken(payload.effectType))
+        textDetail("Эффект", stockEffectLabel(String(payload.effectType ?? "")))
       ]);
     case "card:stock_quantity_changed":
       return compactDetails([
@@ -5055,11 +5105,11 @@ function eventDetails(event: GameEvent) {
         moneyDetail("Наличными было", payload.beforeCashCents),
         moneyDetail("Актив", payload.downPaymentCents),
         moneyDetail("После покупки актива осталось", payload.afterCashCents),
-        moneyDetail("Cashflow", payload.cashflowCents, "/мес")
+        moneyDetail("Денежный поток", payload.cashflowCents, "/мес")
       ]);
     case "deal:decline":
       return compactDetails([
-        textDetail("Тип", cardTypes[String(payload.cardType)] ?? humanizeToken(payload.cardType)),
+        textDetail("Тип", cardTypes[String(payload.cardType)] ?? "Карточка"),
         numericDetail("Карточка", payload.cardId)
       ]);
     case "market:sale_offer":
@@ -5115,7 +5165,10 @@ function eventDetails(event: GameEvent) {
       ]);
     case "bankruptcy:debt_repaid":
       return compactDetails([
-        textDetail("Тип долга", humanizeToken(String(payload.liabilityType ?? ""))),
+        textDetail(
+          "Тип долга",
+          liabilityLabels[String(payload.liabilityType)] ?? "Другой долг"
+        ),
         moneyDetail("Погашено", payload.amountCents),
         moneyDetail("Остаток", payload.balanceCents),
         moneyDetail("Новый платёж", payload.paymentCents, "/мес")
@@ -5125,7 +5178,9 @@ function eventDetails(event: GameEvent) {
         textDetail(
           "Сокращённые долги",
           Array.isArray(payload.liabilityTypes)
-            ? payload.liabilityTypes.map((type) => humanizeToken(String(type))).join(", ")
+            ? payload.liabilityTypes
+                .map((type) => liabilityLabels[String(type)] ?? "другой долг")
+                .join(", ")
             : null
         )
       ]);
@@ -5174,7 +5229,7 @@ function eventDetails(event: GameEvent) {
       ]);
     case "doodad:paid":
       return compactDetails([
-        textDetail("Doodad", payload.title),
+        textDetail("Всякая всячина", payload.title),
         moneyDetail("Расход", payload.amountCents)
       ]);
     case "player:escaped_rat_race":
@@ -5193,13 +5248,13 @@ function eventDetails(event: GameEvent) {
 
 function cardDetails(payload: Record<string, unknown>) {
   return compactDetails([
-    textDetail("Тип", cardTypes[String(payload.cardType)] ?? humanizeToken(payload.cardType)),
+    textDetail("Тип", cardTypes[String(payload.cardType)] ?? "Карточка"),
     textDetail("Карточка", payload.title),
     textDetail("Текст", payload.bodyText),
     ...cardEffectDetails(payload.effects),
     metaMoneyDetail("Цена", payload.meta, "price"),
     metaMoneyDetail("Первоначальный взнос", payload.meta, "down_payment"),
-    metaMoneyDetail("Cashflow", payload.meta, "cashflow_monthly", "/мес")
+    metaMoneyDetail("Денежный поток", payload.meta, "cashflow_monthly", "/мес")
   ]);
 }
 
@@ -5217,7 +5272,7 @@ function cardEffectDetails(value: unknown) {
     }
     if (effectType === "cashflow_delta" || effectType === "cashflow.adjust") {
       if (amount === 0) return [];
-      return [moneyDetail("Изменение cashflow", amount, "/мес")];
+      return [moneyDetail("Изменение денежного потока", amount, "/мес")];
     }
     if (effectType === "liability.create") {
       if (amount === 0) return [];
@@ -5242,7 +5297,7 @@ function cardEffectDetails(value: unknown) {
     }
     if (amount === 0) return [];
 
-    return [moneyDetail(humanizeToken(effectType), amount)];
+    return [moneyDetail("Эффект карточки", amount)];
   });
 }
 
@@ -5261,7 +5316,7 @@ function stockEffectLabel(effectType: string) {
   if (effectType === "stock_split" || effectType === "asset.quantity.multiply") return "дробление";
   if (effectType === "stock_reverse_split" || effectType === "asset.quantity.divide") return "уменьшение";
   if (effectType === "stock_wipeout" || effectType === "asset.wipeout") return "обнуление";
-  return humanizeToken(effectType);
+  return "Изменение актива";
 }
 
 function moveDetail(payload: Record<string, unknown>) {
@@ -5288,13 +5343,13 @@ function cellDetail(value: unknown) {
   if (!isRecord(value)) return null;
   const type = String(value.type ?? "");
   const label = String(value.label ?? "");
-  return `Клетка: ${cellTypes[type] ?? (label || humanizeToken(type))}`;
+  return `Клетка: ${cellTypes[type] ?? (label || "Игровая клетка")}`;
 }
 
 function roleDetail(value: unknown) {
   const role = String(value ?? "");
   if (!role) return null;
-  return `Роль: ${gameRoles[role] ?? humanizeToken(role)}`;
+  return `Роль: ${gameRoles[role] ?? "Участник"}`;
 }
 
 function textDetail(label: string, value: unknown) {
@@ -5330,14 +5385,31 @@ function metaMoneyDetail(
 function translateReason(value: unknown) {
   const reason = String(value ?? "");
   if (!reason) return null;
-  return eventReasons[reason] ?? humanizeToken(reason);
+  return eventReasons[reason] ?? "причина не указана";
 }
 
-function fallbackPayloadDetails(payload: Record<string, unknown>) {
-  return Object.entries(payload)
-    .slice(0, 4)
-    .map(([key, value]) => textDetail(humanizeToken(key), value))
-    .filter((value): value is string => Boolean(value));
+function botActionLabel(action: string) {
+  const labels: Record<string, string> = {
+    draw: "выбрать карточку сделки",
+    buy: "купить сделку",
+    take_loan: "взять кредит для сделки",
+    repay_loan: "погасить часть кредита",
+    decline_deal: "отказаться от сделки",
+    sell_stock: "продать акции",
+    decline_stock: "сохранить акции",
+    sell_market: "принять предложение рынка",
+    decline_market: "отказаться от предложения рынка",
+    accept_charity: "принять благотворительность",
+    decline_charity: "отказаться от благотворительности",
+    pay_doodad: "выбрать способ оплаты расхода",
+    sell_bankruptcy_asset: "продать актив при банкротстве",
+    repay_bankruptcy_debt: "погасить долг при банкротстве"
+  };
+  return labels[action] ?? "выполнить допустимое действие";
+}
+
+function fallbackPayloadDetails(_payload: Record<string, unknown>) {
+  return [];
 }
 
 function compactDetails(values: Array<string | null>) {
@@ -5346,7 +5418,7 @@ function compactDetails(values: Array<string | null>) {
 
 function toText(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return localizeGameText(value);
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return null;
 }
@@ -5359,13 +5431,6 @@ function toNumber(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function humanizeToken(value: unknown) {
-  return String(value ?? "")
-    .replace(/[_:]+/g, " ")
-    .trim()
-    .replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function Metric({
@@ -5443,7 +5508,7 @@ function CashflowEquation({
   return (
     <div className={`rounded-md bg-surface p-3 ${className}`}>
       <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        Как формируется cashflow
+        Как формируется денежный поток
       </div>
       <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-center">
         <div className="min-w-0">
@@ -5461,7 +5526,7 @@ function CashflowEquation({
         </div>
         <span className="text-neutral-400" aria-hidden="true">=</span>
         <div className="min-w-0">
-          <div className="text-xs text-neutral-500">Cashflow</div>
+          <div className="text-xs text-neutral-500">Денежный поток</div>
           <div
             className={`mt-0.5 break-words text-sm font-semibold ${
               positive ? "text-success" : "text-red-700"
@@ -5678,7 +5743,7 @@ function BankruptcyRecoveryProgress({
   return (
     <div className="rounded-md border border-red-200 bg-red-50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-red-900">Восстановление cashflow</span>
+        <span className="font-medium text-red-900">Восстановление денежного потока</span>
         <strong className={recovered ? "text-success" : "text-red-800"}>
           {recovered ? "Восстановлен" : `−${money(deficitCents)}/мес`}
         </strong>
@@ -5779,7 +5844,7 @@ function DebtComposition({
     liabilities.reduce((items, liability) => {
       const current = items.get(liability.type) ?? {
         type: liability.type,
-        label: liabilityLabels[liability.type] ?? liability.name,
+        label: liabilityLabels[liability.type] ?? localizeGameText(liability.name),
         balanceCents: 0,
         paymentCents: 0
       };
@@ -5966,8 +6031,8 @@ function latestDealCard(
 
   return {
     cardId: Number(event.payload.id),
-    title,
-    bodyText,
+    title: localizeGameText(title),
+    bodyText: localizeGameText(bodyText),
     priceCents,
     downPaymentCents,
     cashflowCents: cashflowDelta || metaCents(meta, "cashflow_monthly"),
@@ -5996,24 +6061,6 @@ function stockSaleOfferForPlayer(
     salePriceCents: pendingAction.salePriceCents,
     quantity
   };
-}
-
-function latestPlayerActionSummary(events: GameEvent[], gamePlayerId: string | undefined) {
-  if (!gamePlayerId) return null;
-
-  const turn = journalEntries(events)
-    .filter((entry): entry is Extract<JournalEntry, { kind: "turn" }> => entry.kind === "turn")
-    .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left))
-    .find((entry) =>
-      entry.events.some(
-        (event) =>
-          turnStartEventTypes.has(event.type) && event.gamePlayer?.id === gamePlayerId
-      )
-    );
-
-  return (
-    turn?.events.filter((event) => event.type !== realtimeEvents.stateUpdate) ?? null
-  );
 }
 
 function stockPriceCents(meta: Record<string, unknown>, text: string) {

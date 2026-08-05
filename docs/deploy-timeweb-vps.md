@@ -143,6 +143,7 @@ docker compose --env-file .env.vps -f docker-compose.vps.yml up -d --build
 
 - `prisma generate`;
 - `prisma db push`;
+- проверку соответствия реальной базы схеме Prisma;
 - seed профессий и карточек, если справочники пустые.
 
 Проверка:

@@ -15,6 +15,16 @@ enum GameStatus {
   CANCELLED
 }
 
+enum GameMode {
+  MULTIPLAYER
+  SOLO
+}
+
+enum PlayerController {
+  HUMAN
+  BOT
+}
+
 enum SystemRole {
   USER
   HOST
@@ -158,6 +168,7 @@ model Game {
   code             String     @unique
   title            String
   status           GameStatus @default(WAITING)
+  mode             GameMode   @default(MULTIPLAYER)
   maxPlayers       Int        @default(6) @map("max_players")
   currentTurnIndex Int        @default(0) @map("current_turn_index")
   currentRound     Int        @default(1) @map("current_round")
@@ -167,6 +178,8 @@ model Game {
   endedAt          DateTime?  @map("ended_at")
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
+  botLeaseToken    String?    @map("bot_lease_token")
+  botLeaseUntil    DateTime?  @map("bot_lease_until")
 
   createdBy    User?             @relation("CreatedGames", fields: [createdById], references: [id], onDelete: SetNull)
   players      GamePlayer[]
@@ -174,6 +187,7 @@ model Game {
   chatMessages GameChatMessage[]
 
   @@index([status])
+  @@index([mode, status])
   @@index([createdById])
   @@map("games")
 }
@@ -183,6 +197,8 @@ model GamePlayer {
   gameId            String           @map("game_id") @db.Uuid
   userId            String?          @map("user_id") @db.Uuid
   guestName         String?          @map("guest_name")
+  controller        PlayerController @default(HUMAN)
+  botStrategy       String?          @map("bot_strategy")
   role              GameRole         @default(PLAYER)
   status            GamePlayerStatus @default(JOINED)
   seat              Int?
@@ -209,6 +225,7 @@ model GamePlayer {
   @@unique([gameId, seat])
   @@unique([gameId, figurine])
   @@index([gameId, role, status])
+  @@index([gameId, controller, status])
   @@index([professionId])
   @@map("game_players")
 }

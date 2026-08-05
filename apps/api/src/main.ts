@@ -2,12 +2,17 @@ import "reflect-metadata";
 import { Logger, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { RedisIoAdapter } from "./config/redis-io.adapter";
 
 async function bootstrap() {
   const logger = new Logger("Bootstrap");
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false
+  });
+  app.useBodyParser("json", { limit: "256kb" });
+  app.useBodyParser("urlencoded", { extended: true, limit: "256kb" });
   const config = app.get(ConfigService);
   const webOrigin =
     config.get<string>("WEB_ORIGIN") ??

@@ -12,8 +12,10 @@ import {
   BoardTrack,
   CardType,
   GamePlayerStatus,
+  GameMode,
   GameRole,
   GameStatus,
+  PlayerController,
   Prisma,
   SystemRole
 } from "@prisma/client";
@@ -26,7 +28,8 @@ import {
   ratRaceBoard,
   realtimeEvents,
   rollDie,
-  isFigurineId
+  isFigurineId,
+  figurines
 } from "@cashflow/shared";
 import { randomInt } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
@@ -36,6 +39,7 @@ import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy
 import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
+import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
@@ -48,6 +52,19 @@ import {
 import { isRentalRealEstateAsset, marketSalePriceForUnits } from "./market-sale";
 
 type Tx = Prisma.TransactionClient;
+
+const cardTypeLabels: Record<CardType, string> = {
+  SMALL_DEAL: "малая сделка",
+  BIG_DEAL: "крупная сделка",
+  MARKET: "рынок",
+  DOODAD: "всякая всячина",
+  FAST_TRACK: "сделка Скоростной дорожки",
+  DREAM: "мечта"
+};
+
+function cardTypeLabel(cardType: CardType) {
+  return cardTypeLabels[cardType];
+}
 
 interface PendingEvent {
   type: string;
@@ -161,9 +178,17 @@ const playerColors = [
   "#3f3f46"
 ];
 
+const botActorPrefix = "bot:";
+const botNames = ["Марина", "Алексей", "София"];
+const preferredBotFigurines = ["robot", "detective", "owl"];
+
 @Injectable()
 export class GamesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  botActorId(gamePlayerId: string) {
+    return `${botActorPrefix}${gamePlayerId}`;
+  }
 
   async createGame(userId: string, dto: CreateGameDto) {
     await this.ensureHostOrAdmin(userId);
@@ -173,6 +198,7 @@ export class GamesService {
       data: {
         code,
         title: dto.title?.trim() || "Новая партия",
+        mode: GameMode.MULTIPLAYER,
         maxPlayers: dto.maxPlayers ?? 6,
         settings: {
           timeLimitMinutes: dto.timeLimitMinutes ?? 90,
@@ -199,6 +225,94 @@ export class GamesService {
         type: "game:created",
         sequence: 1,
         payload: toSerializable({ code: game.code, title: game.title })
+      }
+    });
+
+    return this.getGame(game.id, userId);
+  }
+
+  async createSoloGame(userId: string, dto: CreateSoloGameDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { status: true, figurine: true }
+    });
+    if (user.status !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException("Одиночная игра доступна только активным пользователям");
+    }
+
+    const botCount = dto.botCount;
+    const code = await this.generateGameCode();
+    const occupiedFigurines = new Set<string>();
+    if (user.figurine && isFigurineId(user.figurine)) {
+      occupiedFigurines.add(user.figurine);
+    }
+    const availableFigurines = figurines
+      .map((figurine) => figurine.id)
+      .filter((figurine) => !occupiedFigurines.has(figurine));
+    const botFigurines = preferredBotFigurines.slice(0, botCount).map((preferred, index) => {
+      const figurine = !occupiedFigurines.has(preferred)
+        ? preferred
+        : availableFigurines.find((candidate) => !occupiedFigurines.has(candidate));
+      if (!figurine) {
+        throw new BadRequestException("Не хватает свободных фигурок для ботов");
+      }
+      occupiedFigurines.add(figurine);
+      return { figurine, index };
+    });
+
+    const game = await this.prisma.game.create({
+      data: {
+        code,
+        title: dto.title?.trim() || "Одиночное путешествие",
+        mode: GameMode.SOLO,
+        maxPlayers: botCount + 1,
+        settings: {
+          timeLimitMinutes: dto.timeLimitMinutes ?? 90,
+          periodCount: 1
+        },
+        createdById: userId,
+        players: {
+          create: [
+            {
+              userId,
+              role: GameRole.PLAYER,
+              controller: PlayerController.HUMAN,
+              seat: 1,
+              color: playerColors[0] ?? null,
+              figurine: user.figurine && isFigurineId(user.figurine)
+                ? user.figurine
+                : null,
+              isReady: Boolean(user.figurine && isFigurineId(user.figurine)),
+              position: -1
+            },
+            ...botFigurines.map(({ figurine, index }) => ({
+              guestName: botNames[index] ?? `Бот ${index + 1}`,
+              role: GameRole.PLAYER,
+              controller: PlayerController.BOT,
+              botStrategy: "balanced_v1",
+              seat: index + 2,
+              color: playerColors[index + 1] ?? null,
+              figurine,
+              isReady: true,
+              position: -1
+            }))
+          ]
+        }
+      }
+    });
+
+    await this.prisma.gameEvent.create({
+      data: {
+        gameId: game.id,
+        actorUserId: userId,
+        type: "game:created",
+        sequence: 1,
+        payload: toSerializable({
+          code: game.code,
+          title: game.title,
+          mode: GameMode.SOLO,
+          botCount
+        })
       }
     });
 
@@ -236,6 +350,7 @@ export class GamesService {
       this.prisma.game.findMany({
         where: {
           status: GameStatus.WAITING,
+          mode: GameMode.MULTIPLAYER,
           ...(canSeeAll
             ? {}
             : {
@@ -268,7 +383,7 @@ export class GamesService {
 
   async joinGame(userId: string, dto: JoinGameDto) {
     const codeOrId = dto.codeOrId.trim();
-    if (!codeOrId) throw new BadRequestException("Game code is required");
+    if (!codeOrId) throw new BadRequestException("Укажите код игры");
     const normalizedCode = codeOrId.replace(/\s+/g, "").toUpperCase();
     const gameSearch: Prisma.GameWhereInput[] = [{ code: normalizedCode }];
     if (isUuid(codeOrId)) {
@@ -281,9 +396,12 @@ export class GamesService {
       },
       include: { players: true }
     });
-    if (!game) throw new NotFoundException("Game not found");
+    if (!game) throw new NotFoundException("Игра не найдена");
+    if (game.mode === GameMode.SOLO) {
+      throw new ForbiddenException("К одиночной партии нельзя присоединиться по коду");
+    }
     if (game.status !== GameStatus.WAITING) {
-      throw new BadRequestException("Only waiting games can be joined");
+      throw new BadRequestException("Присоединиться можно только до начала игры");
     }
 
     const existing = game.players.find((player) => player.userId === userId);
@@ -294,7 +412,7 @@ export class GamesService {
       (player) => player.role === GameRole.PLAYER
     );
     if (role === "PLAYER" && currentPlayers.length >= game.maxPlayers) {
-      throw new BadRequestException("Game is full");
+      throw new BadRequestException("В игре нет свободных мест");
     }
 
     const occupiedSeats = new Set(
@@ -339,10 +457,10 @@ export class GamesService {
 
   async addUserToGame(gameId: string, actorUserId: string, dto: AddGameUserDto) {
     if (!dto.userId && !dto.email) {
-      throw new BadRequestException("userId or email is required");
+      throw new BadRequestException("Укажите пользователя или его электронную почту");
     }
     if (dto.role === GameRole.HOST) {
-      throw new BadRequestException("HOST role is assigned only to game creator");
+      throw new BadRequestException("Роль ведущего доступна только создателю игры");
     }
 
     await this.ensureCanManageGame(gameId, actorUserId);
@@ -360,15 +478,18 @@ export class GamesService {
       where: targetWhere,
       select: { id: true, email: true, displayName: true }
     });
-    if (!targetUser) throw new NotFoundException("Active user not found");
+    if (!targetUser) throw new NotFoundException("Активный пользователь не найден");
 
     await this.prisma.$transaction(async (tx) => {
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: { players: true }
       });
+      if (game.mode === GameMode.SOLO) {
+        throw new BadRequestException("В одиночную партию нельзя добавлять участников");
+      }
       if (game.status !== GameStatus.WAITING) {
-        throw new BadRequestException("Users can be added only before game start");
+        throw new BadRequestException("Добавлять участников можно только до начала игры");
       }
 
       const existing = game.players.find(
@@ -380,7 +501,7 @@ export class GamesService {
         (player) => player.role === GameRole.PLAYER
       );
       if (dto.role === GameRole.PLAYER && currentPlayers.length >= game.maxPlayers) {
-        throw new BadRequestException("Game is full");
+        throw new BadRequestException("В игре нет свободных мест");
       }
 
       const occupiedSeats = new Set(
@@ -444,8 +565,9 @@ export class GamesService {
 
     const game = await this.prisma.game.findUniqueOrThrow({
       where: { id: gameId },
-      select: { players: { select: { userId: true } } }
+      select: { mode: true, players: { select: { userId: true } } }
     });
+    if (game.mode === GameMode.SOLO) return [];
     const existingUserIds = game.players
       .map((player) => player.userId)
       .filter((userId): userId is string => Boolean(userId));
@@ -513,13 +635,13 @@ export class GamesService {
       });
 
       if (game.status !== GameStatus.WAITING) {
-        throw new BadRequestException("Game is already started");
+        throw new BadRequestException("Игра уже началась");
       }
       if (game.players.length < 2) {
-        throw new BadRequestException("At least two players are required");
+        throw new BadRequestException("Для начала игры нужно не менее двух игроков");
       }
       if (game.players.some((player) => !player.figurine)) {
-        throw new BadRequestException("All players must choose a figurine");
+        throw new BadRequestException("Все игроки должны выбрать фигурки");
       }
 
       const professions = await tx.profession.findMany({
@@ -527,7 +649,7 @@ export class GamesService {
         orderBy: { id: "asc" }
       });
       if (professions.length < game.players.length) {
-        throw new BadRequestException("Not enough professions. Run db:seed.");
+        throw new BadRequestException("Не хватает профессий для всех игроков. Обратитесь к администратору.");
       }
 
       const shuffledProfessions = [...professions].sort(() => Math.random() - 0.5);
@@ -598,7 +720,7 @@ export class GamesService {
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
       if (game.status === GameStatus.PAUSED) return;
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new BadRequestException("Only an active game can be paused");
+        throw new BadRequestException("Поставить на паузу можно только идущую игру");
       }
 
       const now = new Date();
@@ -637,7 +759,7 @@ export class GamesService {
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
       if (game.status === GameStatus.IN_PROGRESS) return;
       if (game.status !== GameStatus.PAUSED) {
-        throw new BadRequestException("Only a paused game can be resumed");
+        throw new BadRequestException("Продолжить можно только игру на паузе");
       }
 
       const resumed = resumeGameTimeline(game.settings, game.startedAt, new Date());
@@ -685,7 +807,7 @@ export class GamesService {
 
   async chooseFigurine(gameId: string, userId: string, figurine: string) {
     if (!isFigurineId(figurine)) {
-      throw new BadRequestException("Unknown figurine");
+      throw new BadRequestException("Такая фигурка недоступна");
     }
 
     const membership = await this.prisma.gamePlayer.findFirst({
@@ -697,9 +819,9 @@ export class GamesService {
       },
       include: { game: { select: { status: true } } }
     });
-    if (!membership) throw new ForbiddenException("Player membership is required");
+    if (!membership) throw new ForbiddenException("Вы не участвуете в этой игре");
     if (membership.game.status !== GameStatus.WAITING) {
-      throw new BadRequestException("Figurine can be changed only before game start");
+      throw new BadRequestException("Изменить фигурку можно только до начала игры");
     }
 
     try {
@@ -725,7 +847,7 @@ export class GamesService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
       ) {
-        throw new ConflictException("Figurine is already taken");
+        throw new ConflictException("Эту фигурку уже выбрал другой игрок");
       }
       throw error;
     }
@@ -748,19 +870,22 @@ export class GamesService {
         where: { id: gameId },
         include: { players: true }
       });
+      if (game.mode === GameMode.SOLO) {
+        throw new BadRequestException("В одиночной партии участие владельца фиксировано");
+      }
       if (game.createdById !== userId) {
-        throw new ForbiddenException("Only game creator can change host participation");
+        throw new ForbiddenException("Только создатель игры может изменить своё участие");
       }
       if (game.status !== GameStatus.WAITING) {
-        throw new BadRequestException("Participation can be changed only before game start");
+        throw new BadRequestException("Изменить участие можно только до начала игры");
       }
 
       const host = game.players.find((player) => player.userId === userId);
-      if (!host) throw new ForbiddenException("Game creator is not in this game");
+      if (!host) throw new ForbiddenException("Создатель игры не найден среди участников");
       const nextRole = participates ? GameRole.PLAYER : GameRole.HOST;
       if (host.role === nextRole) return;
       if (host.role !== GameRole.HOST && host.role !== GameRole.PLAYER) {
-        throw new BadRequestException("Game creator has an unsupported room role");
+        throw new BadRequestException("У создателя игры недопустимая роль");
       }
 
       let seat: number | null = null;
@@ -770,7 +895,7 @@ export class GamesService {
           (player) => player.role === GameRole.PLAYER && player.status === "JOINED"
         );
         if (currentPlayers.length >= game.maxPlayers) {
-          throw new BadRequestException("Game is full");
+          throw new BadRequestException("В игре нет свободных мест");
         }
         const occupiedSeats = new Set(
           currentPlayers
@@ -827,28 +952,28 @@ export class GamesService {
         }
       });
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new BadRequestException("Game is not in progress");
+        throw new BadRequestException("Игра сейчас не идёт");
       }
       if (this.pendingAction(game.settings)) {
-        throw new BadRequestException("Current player must finish pending action");
+        throw new BadRequestException("Текущий игрок должен завершить обязательное действие");
       }
       if (game.players.length === 0) {
-        throw new BadRequestException("No active players");
+        throw new BadRequestException("В игре нет активных игроков");
       }
 
       const activeIndex = game.currentTurnIndex % game.players.length;
       const currentPlayer = game.players[activeIndex];
-      if (!currentPlayer || currentPlayer.userId !== userId) {
-        throw new ForbiddenException("It is not your turn");
+      if (!currentPlayer || !this.playerControlledBy(currentPlayer, userId)) {
+        throw new ForbiddenException("Сейчас ход другого игрока");
       }
       if (!currentPlayer.financialState) {
-        throw new BadRequestException("Financial state is not initialized");
+        throw new BadRequestException("Финансовый отчёт ещё не подготовлен");
       }
 
       if (
         currentPlayer.financialState.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
       ) {
-        throw new BadRequestException("Complete the bankruptcy procedure before rolling");
+        throw new BadRequestException("Завершите процедуру банкротства перед броском кубика");
       }
 
       if (currentPlayer.financialState.bankruptcyTurns > 0) {
@@ -1050,24 +1175,24 @@ export class GamesService {
         }
       });
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new BadRequestException("Game is not in progress");
+        throw new BadRequestException("Игра сейчас не идёт");
       }
       if (this.pendingAction(game.settings)) {
-        throw new BadRequestException("Current player must finish pending action");
+        throw new BadRequestException("Текущий игрок должен завершить обязательное действие");
       }
       if (game.players.length === 0) {
-        throw new BadRequestException("No active players");
+        throw new BadRequestException("В игре нет активных игроков");
       }
 
       const activeIndex = game.currentTurnIndex % game.players.length;
       const currentPlayer = game.players[activeIndex];
-      if (!currentPlayer || currentPlayer.userId !== userId) {
-        throw new ForbiddenException("It is not your turn");
+      if (!currentPlayer || !this.playerControlledBy(currentPlayer, userId)) {
+        throw new ForbiddenException("Сейчас ход другого игрока");
       }
       if (
         currentPlayer.financialState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
       ) {
-        throw new BadRequestException("Complete the bankruptcy procedure before skipping");
+        throw new BadRequestException("Завершите процедуру банкротства перед пропуском хода");
       }
 
       await tx.gamePlayer.update({
@@ -1119,12 +1244,12 @@ export class GamesService {
           pending?.type !== "choose_deal" ||
           pending.gamePlayerId !== player.id
         ) {
-          throw new ForbiddenException("Choose a deal only during your deal turn");
+          throw new ForbiddenException("Выбрать сделку можно только на клетке «Возможность»");
         }
       } else if (!currentPlayer || currentPlayer.id !== player.id) {
-        throw new ForbiddenException("Draw a card only during your turn");
+        throw new ForbiddenException("Взять карточку можно только в свой ход");
       } else if (pending) {
-        throw new BadRequestException("Current player must finish pending action");
+        throw new BadRequestException("Текущий игрок должен завершить обязательное действие");
       }
 
       const draw = await this.drawCardFromDeck(
@@ -1301,23 +1426,23 @@ export class GamesService {
         pending.gamePlayerId !== player.id ||
         pending.cardId !== dto.cardId
       ) {
-        throw new ForbiddenException("This deal is not available now");
+        throw new ForbiddenException("Эта сделка сейчас недоступна");
       }
       if (pending.type === "stock_sale_window" && !this.stockSaleWindowResolved(pending)) {
-        throw new BadRequestException("Other players must resolve stock sale first");
+        throw new BadRequestException("Сначала остальные игроки должны решить, продавать ли акции");
       }
       const card = await tx.card.findUnique({
         where: { id: dto.cardId },
         include: { meta: true, effects: true, conditions: true }
       });
-      if (!card) throw new NotFoundException("Card not found");
+      if (!card) throw new NotFoundException("Карточка не найдена");
       const buyableCardTypes: CardType[] = [
         CardType.SMALL_DEAL,
         CardType.BIG_DEAL,
         CardType.FAST_TRACK
       ];
       if (!buyableCardTypes.includes(card.cardType)) {
-        throw new BadRequestException("This card is not buyable");
+        throw new BadRequestException("Эту карточку нельзя купить");
       }
       const networkMarketingCard = this.networkMarketingCard(card);
       if (networkMarketingCard) {
@@ -1349,7 +1474,7 @@ export class GamesService {
         return;
       }
       if (this.hasAutomaticCardEffects(card)) {
-        throw new BadRequestException("This card resolves automatically");
+        throw new BadRequestException("Эта карточка применяется автоматически");
       }
 
       const state = await tx.playerFinancialState.findUniqueOrThrow({
@@ -1381,7 +1506,7 @@ export class GamesService {
       const afterCashCents = beforeCashCents - totalDownPayment;
 
       if (state.cashCents < totalDownPayment) {
-        throw new BadRequestException("Not enough cash for down payment");
+        throw new BadRequestException("Не хватает наличных на первоначальный взнос");
       }
 
       await tx.playerFinancialState.update({
@@ -1467,10 +1592,10 @@ export class GamesService {
         (pending?.type !== "deal_card_drawn" && pending?.type !== "stock_sale_window") ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No deal is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет сделки, требующей вашего решения");
       }
       if (pending.type === "stock_sale_window" && !this.stockSaleWindowResolved(pending)) {
-        throw new BadRequestException("Other players must resolve stock sale first");
+        throw new BadRequestException("Сначала остальные игроки должны решить, продавать ли акции");
       }
 
       await tx.game.update({
@@ -1507,21 +1632,21 @@ export class GamesService {
         where: { id: gameId }
       });
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new ForbiddenException("Stock sales are available only during an active game");
+        throw new ForbiddenException("Продавать акции можно только во время игры");
       }
       const pending = this.pendingAction(game.settings);
       if (pending?.type !== "stock_sale_window") {
-        throw new ForbiddenException("No stock sale is available now");
+        throw new ForbiddenException("Сейчас нет доступного предложения о продаже акций");
       }
       if (!pending.sellerGamePlayerIds.includes(player.id)) {
-        throw new ForbiddenException("You do not have a stock sale offer for this card");
+        throw new ForbiddenException("Эта карточка не даёт вам права продать акции");
       }
       if (pending.resolvedGamePlayerIds.includes(player.id)) {
-        throw new BadRequestException("You have already resolved this stock sale");
+        throw new BadRequestException("Вы уже приняли решение по этой продаже акций");
       }
       const saleQuantity = Math.floor(quantity);
       if (!Number.isInteger(saleQuantity) || saleQuantity < 1) {
-        throw new BadRequestException("Quantity must be a positive integer");
+        throw new BadRequestException("Количество должно быть целым числом больше нуля");
       }
 
       const symbol = pending.symbol.toLowerCase();
@@ -1538,7 +1663,7 @@ export class GamesService {
       );
       const availableQuantity = stockAssets.reduce((sum, asset) => sum + asset.quantity, 0);
       if (availableQuantity < saleQuantity) {
-        throw new BadRequestException("Not enough shares to sell");
+        throw new BadRequestException("Не хватает акций для продажи");
       }
 
       const state = await tx.playerFinancialState.findUniqueOrThrow({
@@ -1653,17 +1778,17 @@ export class GamesService {
         where: { id: gameId }
       });
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new ForbiddenException("Stock sales are available only during an active game");
+        throw new ForbiddenException("Продавать акции можно только во время игры");
       }
       const pending = this.pendingAction(game.settings);
       if (pending?.type !== "stock_sale_window") {
-        throw new ForbiddenException("No stock sale is available now");
+        throw new ForbiddenException("Сейчас нет доступного предложения о продаже акций");
       }
       if (!pending.sellerGamePlayerIds.includes(player.id)) {
-        throw new ForbiddenException("You do not have a stock sale offer for this card");
+        throw new ForbiddenException("Эта карточка не даёт вам права продать акции");
       }
       if (pending.resolvedGamePlayerIds.includes(player.id)) {
-        throw new BadRequestException("You have already resolved this stock sale");
+        throw new BadRequestException("Вы уже приняли решение по этой продаже акций");
       }
 
       await tx.game.update({
@@ -1720,7 +1845,7 @@ export class GamesService {
         pending?.type !== "market_sale" ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No market sale is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет предложения рынка, требующего вашего решения");
       }
 
       const [state, asset] = await Promise.all([
@@ -1735,11 +1860,11 @@ export class GamesService {
           }
         })
       ]);
-      if (!asset) throw new NotFoundException("Asset not found");
+      if (!asset) throw new NotFoundException("Актив не найден");
 
       const proceeds = BigInt(pending.proceedsCents);
       if (proceeds < 0n && state.cashCents < proceeds * -1n) {
-        throw new BadRequestException("Not enough cash to close this sale");
+        throw new BadRequestException("Не хватает наличных для завершения продажи");
       }
 
       await tx.playerFinancialState.update({
@@ -1822,7 +1947,7 @@ export class GamesService {
         pending?.type !== "market_sale" ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No market sale is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет предложения рынка, требующего вашего решения");
       }
 
       await tx.game.update({
@@ -1878,7 +2003,7 @@ export class GamesService {
         pending?.type !== "charity_choice" ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No charity choice is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет выбора благотворительности, требующего вашего решения");
       }
 
       const state = await tx.playerFinancialState.findUniqueOrThrow({
@@ -1886,7 +2011,7 @@ export class GamesService {
       });
       const donation = BigInt(pending.donationCents);
       if (state.cashCents < donation) {
-        throw new BadRequestException("Not enough cash for charity");
+        throw new BadRequestException("Не хватает наличных для благотворительности");
       }
 
       const updatedState = await tx.playerFinancialState.update({
@@ -1949,7 +2074,7 @@ export class GamesService {
         pending?.type !== "charity_choice" ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No charity choice is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет выбора благотворительности, требующего вашего решения");
       }
 
       await tx.game.update({
@@ -2005,7 +2130,7 @@ export class GamesService {
         pending?.type !== "doodad_payment_choice" ||
         pending.gamePlayerId !== player.id
       ) {
-        throw new ForbiddenException("No doodad payment choice is waiting for your decision");
+        throw new ForbiddenException("Сейчас нет выбора оплаты «Всякой всячины»");
       }
 
       if (method === "cash") {
@@ -2065,17 +2190,17 @@ export class GamesService {
         select: { bankruptcyStatus: true }
       });
       if (bankruptcyState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
-        throw new BadRequestException("New loans are not available during bankruptcy");
+        throw new BadRequestException("Во время банкротства нельзя брать новые кредиты");
       }
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId }
       });
       if (game.status !== GameStatus.IN_PROGRESS) {
-        throw new ForbiddenException("Loans are available only during an active game");
+        throw new ForbiddenException("Кредиты доступны только во время игры");
       }
       const amount = BigInt(dto.amountCents);
       if (dto.amountCents < 1000 || dto.amountCents % 1000 !== 0) {
-        throw new BadRequestException("Loan amount must be a multiple of 1000");
+        throw new BadRequestException("Сумма кредита должна быть кратна 1 000");
       }
       const payment = amount / 10n;
 
@@ -2125,11 +2250,11 @@ export class GamesService {
         where: { gamePlayerId: player.id }
       });
       if (state.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
-        throw new BadRequestException("Use the bankruptcy debt repayment action");
+        throw new BadRequestException("Погасите долг через действия в разделе банкротства");
       }
       const amount = BigInt(dto.amountCents);
       if (state.cashCents < amount) {
-        throw new BadRequestException("Not enough cash to repay loan");
+        throw new BadRequestException("Не хватает наличных для погашения кредита");
       }
 
       const liability = dto.liabilityId
@@ -2141,7 +2266,7 @@ export class GamesService {
             orderBy: { createdAt: "asc" }
           });
 
-      if (!liability) throw new NotFoundException("Loan not found");
+      if (!liability) throw new NotFoundException("Кредит не найден");
       const repayAmount = amount > liability.balanceCents ? liability.balanceCents : amount;
       const newBalance = liability.balanceCents - repayAmount;
       const newPayment =
@@ -2215,15 +2340,15 @@ export class GamesService {
         where: { gamePlayerId: player.id }
       });
       if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) {
-        throw new BadRequestException("Player is not in bankruptcy liquidation");
+        throw new BadRequestException("Игрок сейчас не проходит процедуру банкротства");
       }
 
       const asset = await tx.playerAsset.findFirst({
         where: { id: dto.assetId, gamePlayerId: player.id, status: AssetStatus.ACTIVE }
       });
-      if (!asset) throw new NotFoundException("Active asset not found");
+      if (!asset) throw new NotFoundException("Актив игрока не найден");
       if (dto.quantity > asset.quantity) {
-        throw new BadRequestException("Sale quantity exceeds asset quantity");
+        throw new BadRequestException("Нельзя продать больше единиц, чем есть в активе");
       }
 
       const proceeds = proportionalAmount(
@@ -2305,19 +2430,19 @@ export class GamesService {
         where: { gamePlayerId: player.id }
       });
       if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) {
-        throw new BadRequestException("Player is not in bankruptcy liquidation");
+        throw new BadRequestException("Игрок сейчас не проходит процедуру банкротства");
       }
       const liability = await tx.playerLiability.findFirst({
         where: { id: dto.liabilityId, gamePlayerId: player.id }
       });
-      if (!liability) throw new NotFoundException("Liability not found");
+      if (!liability) throw new NotFoundException("Долг не найден");
 
       const requested = BigInt(dto.amountCents);
       const amount = bigintMin(
         requested,
         bigintMin(state.cashCents, liability.balanceCents)
       );
-      if (amount <= 0n) throw new BadRequestException("No cash available for debt repayment");
+      if (amount <= 0n) throw new BadRequestException("Нет наличных для погашения долга");
       const newBalance = liability.balanceCents - amount;
       const newPayment = newBalance === 0n
         ? 0n
@@ -2372,6 +2497,35 @@ export class GamesService {
     });
 
     return toSerializable(message);
+  }
+
+  async recordBotDecision(
+    gameId: string,
+    gamePlayerId: string,
+    decision: { action: string; reason: string }
+  ) {
+    const player = await this.prisma.gamePlayer.findFirst({
+      where: {
+        id: gamePlayerId,
+        gameId,
+        controller: PlayerController.BOT
+      },
+      select: { id: true }
+    });
+    if (!player) throw new ForbiddenException("Системный игрок не найден");
+    const event: PendingEvent = {
+      type: "bot:decision",
+      gamePlayerId,
+      payload: {
+        strategy: "balanced_v1",
+        action: decision.action,
+        reason: decision.reason
+      }
+    };
+    await this.prisma.$transaction((tx) =>
+      this.appendEvents(tx, gameId, this.botActorId(gamePlayerId), [event])
+    );
+    return this.actionResult(gameId, [event]);
   }
 
   async replay(gameId: string, userId: string) {
@@ -3727,12 +3881,12 @@ export class GamesService {
 
     const playerBeforeElimination = await tx.gamePlayer.findUniqueOrThrow({
       where: { id: gamePlayerId },
-      select: { gameId: true }
+      select: { gameId: true, controller: true }
     });
     const [game, activePlayers] = await Promise.all([
       tx.game.findUniqueOrThrow({
         where: { id: playerBeforeElimination.gameId },
-        select: { currentTurnIndex: true }
+        select: { currentTurnIndex: true, mode: true, settings: true }
       }),
       tx.gamePlayer.findMany({
         where: {
@@ -3774,17 +3928,40 @@ export class GamesService {
       payload: { monthlyCashflowCents: cents(state.monthlyCashflowCents) }
     });
 
-    const remainingPlayers = await tx.gamePlayer.count({
-      where: { gameId: player.gameId, role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }
+    const remainingPlayers = await tx.gamePlayer.findMany({
+      where: {
+        gameId: player.gameId,
+        role: GameRole.PLAYER,
+        status: GamePlayerStatus.JOINED
+      },
+      select: { id: true, controller: true }
     });
-    if (remainingPlayers === 0) {
+    const soloHumanEliminated =
+      game.mode === GameMode.SOLO &&
+      playerBeforeElimination.controller === PlayerController.HUMAN;
+    const soloBotsEliminated =
+      game.mode === GameMode.SOLO &&
+      remainingPlayers.some((candidate) => candidate.controller === PlayerController.HUMAN) &&
+      remainingPlayers.every((candidate) => candidate.controller !== PlayerController.BOT);
+    if (remainingPlayers.length === 0 || soloHumanEliminated || soloBotsEliminated) {
       await tx.game.update({
         where: { id: player.gameId },
-        data: { status: GameStatus.ENDED, endedAt: new Date(), currentTurnIndex: 0 }
+        data: {
+          status: GameStatus.ENDED,
+          endedAt: new Date(),
+          currentTurnIndex: 0,
+          settings: this.settingsWithPending(game.settings, null)
+        }
       });
       emittedEvents.push({
         type: realtimeEvents.gameEnded,
-        payload: { reason: "all_players_bankrupt" }
+        payload: {
+          reason: soloHumanEliminated
+            ? "human_bankrupt"
+            : soloBotsEliminated
+              ? "bots_eliminated"
+              : "all_players_bankrupt"
+        }
       });
     }
     return state;
@@ -3931,14 +4108,14 @@ export class GamesService {
       };
     }
     if (deck.drawPile.length === 0) {
-      throw new BadRequestException(`No cards found for ${cardType}`);
+      throw new BadRequestException(`Не найдены карточки типа ${cardTypeLabel(cardType)}`);
     }
 
     const reshuffled = this.normalizedDeck(cardDecks[cardType]).drawPile.length === 0;
     const deckPosition = deck.deckSize - deck.drawPile.length + 1;
     const cardId = deck.drawPile[0];
     if (!cardId) {
-      throw new BadRequestException(`No cards found for ${cardType}`);
+      throw new BadRequestException(`Не найдены карточки типа ${cardTypeLabel(cardType)}`);
     }
     const drawPile = deck.drawPile.slice(1);
     const nextDeck: CardDeckState = {
@@ -3964,7 +4141,7 @@ export class GamesService {
       include: { meta: true, effects: true, conditions: true }
     });
     if (!card || card.cardType !== cardType || !card.isActive) {
-      throw new BadRequestException(`No cards found for ${cardType}`);
+      throw new BadRequestException(`Не найдены карточки типа ${cardTypeLabel(cardType)}`);
     }
 
     return {
@@ -4405,35 +4582,64 @@ export class GamesService {
     return this.syncGameTimelineIfNeeded(gameId);
   }
 
+  private botGamePlayerId(actorId: string) {
+    return actorId.startsWith(botActorPrefix)
+      ? actorId.slice(botActorPrefix.length)
+      : null;
+  }
+
+  private humanActorUserId(actorId: string) {
+    return this.botGamePlayerId(actorId) ? null : actorId;
+  }
+
+  private playerControlledBy(
+    player: { id: string; userId: string | null; controller: PlayerController },
+    actorId: string
+  ) {
+    const botGamePlayerId = this.botGamePlayerId(actorId);
+    return botGamePlayerId
+      ? player.controller === PlayerController.BOT && player.id === botGamePlayerId
+      : player.controller === PlayerController.HUMAN && player.userId === actorId;
+  }
+
   private async requirePlayer(
     tx: Tx,
     gameId: string,
     userId: string,
     allowLiquidation = false
   ) {
+    const botGamePlayerId = this.botGamePlayerId(userId);
     const player = await tx.gamePlayer.findFirst({
-      where: {
-        gameId,
-        userId,
-        status: "JOINED"
-      },
+      where: botGamePlayerId
+        ? {
+            id: botGamePlayerId,
+            gameId,
+            controller: PlayerController.BOT,
+            status: "JOINED"
+          }
+        : {
+            gameId,
+            userId,
+            controller: PlayerController.HUMAN,
+            status: "JOINED"
+          },
       include: {
         financialState: true,
         game: { select: { status: true } }
       }
     });
-    if (!player) throw new ForbiddenException("You are not in this game");
+    if (!player) throw new ForbiddenException("Вы не участвуете в этой игре");
     if (player.role !== GameRole.PLAYER) {
-      throw new ForbiddenException("Only players can perform this action");
+      throw new ForbiddenException("Это действие доступно только игрокам");
     }
     if (player.game.status !== GameStatus.IN_PROGRESS) {
-      throw new BadRequestException("Game is paused or not in progress");
+      throw new BadRequestException("Игра на паузе или ещё не началась");
     }
     if (
       !allowLiquidation &&
       player.financialState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
     ) {
-      throw new BadRequestException("Complete the bankruptcy procedure first");
+      throw new BadRequestException("Сначала завершите процедуру банкротства");
     }
     return player;
   }
@@ -4449,7 +4655,7 @@ export class GamesService {
     if (!player && (await this.canManageGame(gameId, userId))) {
       return null;
     }
-    if (!player) throw new ForbiddenException("You are not in this game");
+    if (!player) throw new ForbiddenException("Вы не участвуете в этой игре");
     return player;
   }
 
@@ -4458,19 +4664,24 @@ export class GamesService {
       where: { id: gameId },
       include: { players: true }
     });
-    if (!game) throw new NotFoundException("Game not found");
+    if (!game) throw new NotFoundException("Игра не найдена");
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, status: true }
     });
     const admin = user.role === SystemRole.ADMIN;
+    const soloCreator =
+      game.mode === GameMode.SOLO && game.createdById === userId;
     const hostCreator =
       user.role === SystemRole.HOST && game.createdById === userId;
     const gameHost = game.players.some(
       (player) => player.userId === userId && player.role === GameRole.HOST
     );
-    if (user.status !== AccountStatus.ACTIVE || (!admin && !hostCreator && !gameHost)) {
-      throw new ForbiddenException("Only game host or admin can manage game");
+    if (
+      user.status !== AccountStatus.ACTIVE ||
+      (!admin && !soloCreator && !hostCreator && !gameHost)
+    ) {
+      throw new ForbiddenException("Управлять игрой могут только ведущий или администратор");
     }
     return game;
   }
@@ -4484,7 +4695,7 @@ export class GamesService {
       user.status !== AccountStatus.ACTIVE ||
       (user.role !== SystemRole.HOST && user.role !== SystemRole.ADMIN)
     ) {
-      throw new ForbiddenException("Only host or admin can create games");
+      throw new ForbiddenException("Создавать игры могут только ведущий или администратор");
     }
   }
 
@@ -4500,6 +4711,7 @@ export class GamesService {
     });
     if (!user || user.status !== AccountStatus.ACTIVE) return false;
     if (user.role === SystemRole.ADMIN) return true;
+    if (game.mode === GameMode.SOLO && game.createdById === userId) return true;
     return (
       user.role === SystemRole.HOST &&
       (game.createdById === userId ||
@@ -4516,6 +4728,9 @@ export class GamesService {
     events: PendingEvent[]
   ) {
     if (events.length === 0) return;
+    const persistedActorUserId = actorUserId
+      ? this.humanActorUserId(actorUserId)
+      : null;
     let sequence =
       (await tx.gameEvent.count({
         where: { gameId }
@@ -4526,7 +4741,7 @@ export class GamesService {
     for (const event of events) {
       const data: Prisma.GameEventUncheckedCreateInput = {
         gameId,
-        actorUserId,
+          actorUserId: persistedActorUserId,
         gamePlayerId: event.gamePlayerId ?? null,
         type: event.type,
         sequence,
@@ -4640,6 +4855,7 @@ export class GamesService {
         code: game.code,
         title: game.title,
         status: game.status,
+        mode: game.mode,
         maxPlayers: game.maxPlayers,
         currentTurnIndex: game.currentTurnIndex,
         currentRound: game.currentRound,

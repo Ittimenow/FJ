@@ -57,7 +57,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_min',
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_max', '30') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '5') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0004_акция-pop1-entertainment-co', 'Акции POP1 выросли до $20', 'Назначен новый директор кинотеатра. Ранее он работал руководителем проектов по развитию. Закончил MBA. 5 раз играл в Cashflow 101. Хорошие перспективы.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0004_акция-pop1-entertainment-co', 'Акции POP1 выросли до $20', 'Назначен новый директор кинотеатра. Ранее он работал руководителем проектов по развитию. Закончил магистратуру по управлению бизнесом. 5 раз играл в «Денежный поток 101». Хорошие перспективы.
 
 Только вы можете купить любое количество акций по этой цене. Но каждый может продать по этой цене.
 
@@ -73,7 +73,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_min',
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_max', '30') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '20') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0005_акция-pop1-entertainment-co', 'Акции POP1 на максимуме: $30', 'Наконец-то открылся кинотеатр по прокату фильмов старого производства с качеством и звуком Dolby Surround. Полный аншлаг.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0005_акция-pop1-entertainment-co', 'Акции POP1 на максимуме: $30', 'Наконец-то открылся кинотеатр по прокату фильмов старого производства с качественным объёмным звуком. Полный аншлаг.
 
 Только вы можете купить любое количество акций по этой цене. Но каждый может продать по этой цене.
 
@@ -89,7 +89,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_min',
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price_max', '30') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '30') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0006_акция-pop1-entertainment-co', 'Акции POP1 выросли до $20', 'Недавнее слияние сети по продаже DVD сулит хорошие перспективы.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0006_акция-pop1-entertainment-co', 'Акции POP1 выросли до $20', 'Недавнее слияние сети по продаже видеодисков сулит хорошие перспективы.
 
 Только вы можете купить любое количество акций по этой цене. Но каждый может продать по этой цене.
 
@@ -543,7 +543,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '40
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0036_возможность-3m', '3M дом: $35,000, +$220/мес', 'Реконструкция здания в деловой части города. Планируется создание Бизнес-центра «Богатый Папа».
 
-Займите деньги, если нужно, но купите! 3M 132% ROI, может быть продан от $65 000 до$135 000
+Займите деньги, если нужно, но купите! 3M 132% доходности на вложения, может быть продан от $65 000 до$135 000
 
 Цена $35 000 Закладная $33 000
 
@@ -596,7 +596,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0039_у-вас-появилась-великолепная', '3M дом: $45,000, +$250/мес', 'У вас появилась великолепная возможность! - 3М Продается помещение на 1 этаже в центре города. После переоформления и переоборудования его в офис можно удачно сдать в аренду.
 
-Займите деньги, если нужно, но купите! 3M 150% ROI, может быть продан от $65 000 до$135 000
+Займите деньги, если нужно, но купите! 3M 150% доходности на вложения, может быть продан от $65 000 до$135 000
 
 Цена $45 000 Закладная $43 000
 
@@ -613,7 +613,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0040_коттедж-на-продажу-2у', '2У коттедж: $40,000, +$140/мес', 'Родители продают коттедж в кондоминиуме Университетского городка. Спрос на жилье здесь огромный.
 
-Используйте сами или продайте другому игроку. 42% ROI, может быть продан от $45 000 до $65 000
+Используйте сами или продайте другому игроку. 42% доходности на вложения, может быть продан от $45 000 до $65 000
 
 Цена $40 000 Закладная $36 000
 
@@ -630,7 +630,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0041_коттедж-на-продажу-2у', '2У коттедж: $50,000, +$100/мес', 'Неплохой домик выставлен на продажу. Хозяйка выходит замуж и уезжает. Район непривлекательный, дому требуется основательный ремонт.
 
-Используйте сами или продайте другому игроку. 24% ROI, может быть продан от $45 000 до $65 000
+Используйте сами или продайте другому игроку. 24% доходности на вложения, может быть продан от $45 000 до $65 000
 
 Цена $50 000 Закладная $45 000
 
@@ -647,7 +647,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0042_коттедж-на-продажу-2у', '2У коттедж: $60,000, -$100/мес', 'Прекрасный «интеллектуальный дом». Напичкан электроникой, требующей ухода. Охрана. Все системы автономны. Бывший владелец коммерсант – переезжает.
 
-Используйте сами или продайте другому игроку. -24% ROI, может быть продан от $45 000 до $65 000
+Используйте сами или продайте другому игроку. -24% доходности на вложения, может быть продан от $45 000 до $65 000
 
 Цена $60 000 Закладная $55 000
 
@@ -664,7 +664,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0043_банк-продает-дом-по-закладной-близко-к-месту', '2У коттедж: $40,000, +$220/мес', 'Коттедж на продажу – 2У. Банк продает дом по закладной. Близко к месту работы и магазинам. Сделайте предложение – банк может частично профинансировать.
 
-Используйте сами или продайте другому игроку. 53% ROI, может быть продан от $45 000 до $65 000
+Используйте сами или продайте другому игроку. 53% доходности на вложения, может быть продан от $45 000 до $65 000
 
 Цена $40 000 Закладная $35 000
 
@@ -681,7 +681,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0044_в-молодой-семье-родился-3-ребенок-и-они-хотели', '2У коттедж: $55,000, +$160/мес', 'Коттедж на продажу – 2У. В молодой семье родился 3 ребенок, и они хотели бы переехать в более просторный дом.
 
-Используйте сами или продайте другому игроку. 38% ROI, может быть продан от $45 000 до $65 000
+Используйте сами или продайте другому игроку. 38% доходности на вложения, может быть продан от $45 000 до $65 000
 
 Цена $55 000 Закладная $50 000
 
@@ -698,7 +698,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0045_хороший-2-х-этажный-коттедж-выставлен-на', '3M коттедж: $65,000, +$160/мес', 'Коттедж на продажу – 3M. Хороший 2-х этажный коттедж выставлен на продажу из-за неожиданного отъезда хозяина за границу.
 
-Используйте сами или продайте другому игроку. 38% ROI, может быть продан от $65 000 до $135 000
+Используйте сами или продайте другому игроку. 38% доходности на вложения, может быть продан от $65 000 до $135 000
 
 Цена $65 000 Закладная $60 000
 
@@ -715,7 +715,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0046_коттедж-на-продажу-3m', '3M дом: $50,000, +$100/мес', 'Родители и молодая семья хотят разъехаться. Если поспешить с предложением, то можно в будущем продать этот дом подороже.
 
-Используйте сами или продайте другому игроку. 40% ROI, может быть продан от $65 000 до $135 000
+Используйте сами или продайте другому игроку. 40% доходности на вложения, может быть продан от $65 000 до $135 000
 
 Цена $50 000 Закладная $47 000
 
@@ -732,7 +732,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0047_коттедж-на-продажу-3m', '3M дом: $50,000, -$100/мес', 'В южной части страны освободился особняк. Но никто не хочет его покупать. Сейчас вы можете забрать его бесплатно, но охрана потребует некоторых средств.
 
-Используйте сами или продайте другому игроку. ? ? % ROI, может быть продан от $65 000 до $135 000
+Используйте сами или продайте другому игроку. ? ? % доходности на вложения, может быть продан от $65 000 до $135 000
 
 Цена $50 000 Закладная $50 000
 
@@ -749,7 +749,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0048_коттедж-на-продажу-3m', '3M дом: $50,000, +$220/мес', 'Дом продается из-за общего снижения цен на недвижимость в этом районе – построена Северная ТЭЦ.
 
-Используйте сами или продайте другому игроку. 60% ROI, может быть продан от $65 000 до $135 000
+Используйте сами или продайте другому игроку. 60% доходности на вложения, может быть продан от $65 000 до $135 000
 
 Цена $50 000 Закладная $46 000
 
@@ -766,7 +766,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0049_коттедж-на-продажу-3m', '3M дом: $50,000, +$100/мес', 'В результате криминальной разборки погиб хозяин роскошного коттеджа. В течение 6 месяцев наследники так и не объявились. Как выморочное имущество дом может быть передан вам без первоначального взноса.
 
-Используйте сами или продайте другому игроку. ? ? % ROI, может быть продан от $65 000 до $135 000
+Используйте сами или продайте другому игроку. ? ? % доходности на вложения, может быть продан от $65 000 до $135 000
 
 Цена $50 000 Закладная $50 000
 
@@ -781,9 +781,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', 0);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 100);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0050_новая-компания-part-time', 'Part Time: финансовое обучение - $5,000', 'Новая компания Part Time Интересная идея о создании компании по разработке новых программ для обучения людей финансовой грамотности. Никаких прибылей долгое время не ожидается.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0050_новая-компания-part-time', 'Парт Тайм: финансовое обучение - $5,000', 'Новая компания Парт Тайм Интересная идея о создании компании по разработке новых программ для обучения людей финансовой грамотности. Никаких прибылей долгое время не ожидается.
 
-Используйте сами или продайте другому игроку. 0% ROI, может быть продан за? ? , или что-то еще.
+Используйте сами или продайте другому игроку. 0% доходности на вложения, может быть продан за? ? , или что-то еще.
 
 Цена $5 000 Пассив $0
 
@@ -797,11 +797,11 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -5000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 0);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0051_новая-компания-part-time', 'Part Time: циркониевые браслеты - $3,000', 'Новая компания Part Time Изобретен новый способ изготовления циркониевых браслетов. Вы можете стать учредителем новой компании по их производству и продаже. Вряд-ли вы
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0051_новая-компания-part-time', 'Парт Тайм: циркониевые браслеты - $3,000', 'Новая компания Парт Тайм Изобретен новый способ изготовления циркониевых браслетов. Вы можете стать учредителем новой компании по их производству и продаже. Вряд-ли вы
 
 получите прибыль в первые годы.
 
-Используйте сами или продайте другому игроку. 0% ROI, может быть продан за? ? , или что-то еще.
+Используйте сами или продайте другому игроку. 0% доходности на вложения, может быть продан за? ? , или что-то еще.
 
 Цена $3 000 Пассив $0
 
@@ -824,7 +824,7 @@ INSERT INTO card_conditions (card_id, cond_type) VALUES (@cid, 'has_rental_reale
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0053_жена-вашего-брата-потеряла-работу-они-не-в', 'Займ брату под залог дома: $5,000', 'Жена вашего брата потеряла работу. Они не в состоянии сделать очередной платеж за дом по ипотеке. Через 3 месяца их выселят, а дом отберут. Брат умоляет дать ему взаймы $5 000. Обещает вернуть $10 000, как только его жена найдет хорошую работу.
 
-Используйте сами или продайте другому игроку. 0% ROI
+Используйте сами или продайте другому игроку. 0% доходности на вложения
 
 Цена $5 000 Пассив $0
 
@@ -840,7 +840,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0054_он-обещает-вернуть-буквально-через-3-4-месяца-в', 'Редкая золотая монета: $3,000', 'Он обещает вернуть буквально через 3-4 месяца. В крайнем случае, он готов оставить в залог 10 золотых монет царской чеканки по смешной цене $300 за штуку.
 
-Используйте сами или продайте другому игроку. 0% ROI, в будущем возможна продажа за? ?
+Используйте сами или продайте другому игроку. 0% доходности на вложения, в будущем возможна продажа за? ?
 
 Цена $3 000 Пассив $0
 
@@ -856,7 +856,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0055_10-гектаров-земли', '10 га земли: $5,000', 'Земли выведены из сельскохозяйственного оборота. Ни дорог, ни инфраструктуры. Дико и тихо.
 
-Используйте сами или продайте другому игроку. 0% ROI, в будущем может быть продано за? ? .
+Используйте сами или продайте другому игроку. 0% доходности на вложения, в будущем может быть продано за? ? .
 
 Цена $5 000 Закладная $0
 
@@ -873,7 +873,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0056_редкая-золотая-монета', 'Редкая золотая монета: $500', 'Необычная монета XIV века. Испанские Королевские колонии в Новом Свете. В хорошем состоянии. Только одна из восьми существующих в мире. Продавец просит за нее $500.
 
-Используйте сами или продайте другому игроку. ? ? % ROI, может быть продана от $0 000 до $4 000.
+Используйте сами или продайте другому игроку. ? ? % доходности на вложения, может быть продана от $0 000 до $4 000.
 
 Цена $500 Пассив $0
 
@@ -1165,7 +1165,7 @@ SET @cid = LAST_INSERT_ID();
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0091_10-гектаров-земли', '10 га земли: $6,000', 'Земли выведены из сельскохозяйственного оборота. Ни дорог, ни инфраструктуры. Дико и тихо.
 
-Используйте сами или продайте другому игроку. 0% ROI, в будущем может быть продано за? ? .
+Используйте сами или продайте другому игроку. 0% доходности на вложения, в будущем может быть продано за? ? .
 
 Цена $6 000 Закладная $0
 
@@ -1182,7 +1182,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('small_deal', 'small_deal_0092_редкая-золотая-монета', 'Редкая золотая монета: $400', 'Необычная монета XIV века. Испанские Королевские колонии в Новом Свете. В хорошем состоянии. Только одна из восьми существующих в мире. Продавец просит за нее $400.
 
-Используйте сами или продайте другому игроку. ? ? % ROI, может быть продана от $0 000 до $4 000.
+Используйте сами или продайте другому игроку. ? ? % доходности на вложения, может быть продана от $0 000 до $4 000.
 
 Цена $400 Пассив $0
 
@@ -1280,7 +1280,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'sto
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0100_дом-для-продажи-3m', '3M дом: $65,000, +$150/мес', 'Бизнесмен ликвидирует свой 3/2 дом, так как для поддержки своего бизнеса ему нужен наличный капитал. Сейчас его занимают счастливые арендаторы.
 
-Можете использовать это сами или продать другим 26% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим 26% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $65 000 Ипотечный кредит: $58 000
 
@@ -1297,7 +1297,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0101_дом-для-продажи-3m', '3M дом: $70,000, +$300/мес', 'Тренер по шейпингу должен продать свой 3/2 дом, так как не может позволить себе такие взносы при новой зарплате. Территория отдается.
 
-Можете использовать это сами или продать другим. 40% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим. 40% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $70 000 Ипотечный кредит: $61 000
 
@@ -1314,7 +1314,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0102_дом-для-продажи-3m', '3M дом: $75,000, +$300/мес', '3/2 дом с выходом на поле с гольфом отдают в поисках более высоких вложений. Хорошая рента и низкие затраты.
 
-Можете использовать это сами или отдать другим. 51% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или отдать другим. 51% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $75 000 Ипотечный кредит: $68 000
 
@@ -1331,7 +1331,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0103_дом-для-продажи-3m', '3M дом: $67,000, +$400/мес', 'Торговец переезжает в другой город, поэтому отдает 3/2 дом в хорошие руки. Несколько условий смогли повысить арендную плату с пожилых арендаторов.
 
-Можете использовать это сами или отдать другим. 40% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или отдать другим. 40% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $67 000 Ипотечный кредит: $55 000
 
@@ -1348,7 +1348,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0104_дом-для-продажи-3m', '3M дом: $125,000, -$100/мес', 'Милый 3/2 домик с открытым бассейном и полностью используемой плодородной поверхностью, обворожительный вид на озеро. Хорошая школа.
 
-Можете использовать это сами или продать другим -6% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим -6% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $125 000 Ипотечный кредит: $105 000
 
@@ -1365,7 +1365,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0105_дом-для-продажи-3m', 'Расход по недвижимости: $20,000', 'Супруги развелись и теперь продают 3/2 дом на территории, которая полностью принадлежит владельцу дома. Через 5 месяцев рядом построят рынок.
 
-Можете использовать это сами или продать другим 30% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим 30% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $70 000Ипотечный кредит: $50 000
 
@@ -1380,7 +1380,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0106_хороший-инвестиционный-потенциал-в-этом-32', '3M дом: $65,000, +$300/мес', 'Хороший инвестиционный потенциал в этом 3/2 домике если, Вы сможете оплатить взнос. Положительный денежный поток приносит прибыль каждую неделю.
 
-Можете использовать это сами или продать другим 45% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим 45% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $65 000 Ипотечный кредит: $57 000
 
@@ -1397,7 +1397,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0107_расширенный-32-дом-с-собственным-полем-для', '3M дом: $115,000, -$100/мес', 'Расширенный 3/2 дом с собственным полем для гольфа, отсутствуют наследники хозяина. Автокар для гольфа в придачу.
 
-Можете использовать это сами или продать другим -12% РОИ, может стоить от $65 000 до $135 000
+Можете использовать это сами или продать другим -12% доходности на вложения, может стоить от $65 000 до $135 000
 
 Цена: $115 000 Ипотечный кредит: $105 000
 
@@ -1419,9 +1419,9 @@ SET @cid = LAST_INSERT_ID();
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'conditional_cash_delta', -2000);
 INSERT INTO card_conditions (card_id, cond_type) VALUES (@cid, 'has_8_plex');
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0109_продажа-двух-квартирного-дома-duplex', 'Duplex: $45,000, +$320/мес', 'Duplex Внимание совладельцам и инвесторам в 2 кв. доме Собственники имеют проблемы с оплатой, жилье срочно требуется продать.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0109_продажа-двух-квартирного-дома-duplex', 'Двухквартирный дом: $45,000, +$320/мес', 'Двухквартирный дом Внимание совладельцам и инвесторам в 2 кв. доме Собственники имеют проблемы с оплатой, жилье срочно требуется продать.
 
-Можете использовать это сами или продать другим 48% РОИ, может стоить от $50 000 до $80 000
+Можете использовать это сами или продать другим 48% доходности на вложения, может стоить от $50 000 до $80 000
 
 Цена: $45 000 Ипотечный кредит: $37 000
 
@@ -1436,9 +1436,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -8000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 320);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0110_card', 'Duplex: $50,000, +$240/мес', 'Продажа двух-квартирного дома Duplex Семья переезжает в другой штат и продает прекрасный 2-кв. фамильный дом. Фамильное кладбище, очень ухоженный сад, большой земельный участок.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0110_card', 'Двухквартирный дом: $50,000, +$240/мес', 'Продажа двух-квартирного дома Двухквартирный дом Семья переезжает в другой штат и продает прекрасный 2-кв. фамильный дом. Фамильное кладбище, очень ухоженный сад, большой земельный участок.
 
-Можете использовать это сами или продать другим 36% РОИ, может стоить от $50 000 до $70 000
+Можете использовать это сами или продать другим 36% доходности на вложения, может стоить от $50 000 до $70 000
 
 Цена: $50 000 Ипотечный кредит: $42 000
 
@@ -1453,9 +1453,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -8000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 240);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0111_продажа-двух-квартирного-дома-duplex', 'Duplex: $60,000, +$300/мес', 'Duplex Хороший ухоженный 2-кв. домик в приятной территории, доступный первоначальный взнос. Замечательное и удачное вложение для правильных покупателей.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0111_продажа-двух-квартирного-дома-duplex', 'Двухквартирный дом: $60,000, +$300/мес', 'Двухквартирный дом Хороший ухоженный 2-кв. домик в приятной территории, доступный первоначальный взнос. Замечательное и удачное вложение для правильных покупателей.
 
-Можете использовать это сами или продать другим 36% РОИ, может стоить от $50 000 до $80 000
+Можете использовать это сами или продать другим 36% доходности на вложения, может стоить от $50 000 до $80 000
 
 Цена: $60 000 Ипотечный кредит: $54 000
 
@@ -1470,9 +1470,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -6000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 300);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0112_продажа-двух-квартирного-дома-duplex', 'Duplex: $70,000, +$140/мес', 'Duplex Этот 2-квартирный дом лучший в округе! С чувством гордости предлагаем уединение защищенность Вам и даже Вашим внукам.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0112_продажа-двух-квартирного-дома-duplex', 'Двухквартирный дом: $70,000, +$140/мес', 'Двухквартирный дом Этот 2-квартирный дом лучший в округе! С чувством гордости предлагаем уединение защищенность Вам и даже Вашим внукам.
 
-Можете использовать это сами или продать другим 24% РОИ, может стоить от $50 000 до $80 000
+Можете использовать это сами или продать другим 24% доходности на вложения, может стоить от $50 000 до $80 000
 
 Цена: $70 000 Ипотечный кредит: $63 000
 
@@ -1487,9 +1487,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -7000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 140);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0113_продажа-двух-квартирного-дома-duplex', 'Duplex: $60,000, +$400/мес', 'Duplex Хозяину приходится продавать свой дом, чтобы оплатить счет за операцию в больнице. Два арендатора, все документы готовы. Это хорошая и удачная инвестиция.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0113_продажа-двух-квартирного-дома-duplex', 'Двухквартирный дом: $60,000, +$400/мес', 'Двухквартирный дом Хозяину приходится продавать свой дом, чтобы оплатить счет за операцию в больнице. Два арендатора, все документы готовы. Это хорошая и удачная инвестиция.
 
-Можете использовать это сами или продать другим 40% РОИ, может стоить от $50 000 до $80 000
+Можете использовать это сами или продать другим 40% доходности на вложения, может стоить от $50 000 до $80 000
 
 Цена: $60 000 Ипотечный кредит: $48 000
 
@@ -1504,9 +1504,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -12000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 400);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0114_продажа-4х-квартирного-дома-4-plex', '4-Plex: $100,000, +$800/мес', '4-квартирный дом с хорошими соседями. Полностью занят арендаторами. Сделан ремонт. Требуется лишь первоначальный платеж и немного терпения.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0114_продажа-4х-квартирного-дома-4-plex', '4-квартирный дом: $100,000, +$800/мес', '4-квартирный дом с хорошими соседями. Полностью занят арендаторами. Сделан ремонт. Требуется лишь первоначальный платеж и немного терпения.
 
-Можете использовать это сами или продать другим 48% РОИ, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 48% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $100 000 Ипотечный кредит: $80 000
 
@@ -1521,9 +1521,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -20000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 800);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0115_этот-дом-продается-собственником-переезжающим', '4-Plex: $140,000, +$2,000/мес', 'Этот 4-квартирный дом продается собственником, переезжающим в другой город. Арендаторы готовы продлить договор аренды.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0115_этот-дом-продается-собственником-переезжающим', '4-квартирный дом: $140,000, +$2,000/мес', 'Этот 4-квартирный дом продается собственником, переезжающим в другой город. Арендаторы готовы продлить договор аренды.
 
-Можете использовать это сами или продать другим 75% РОИ, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 75% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $140 000 Ипотечный кредит: $108 000
 
@@ -1538,9 +1538,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -32000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 2000);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0116_довольно', '4-Plex: $90,000, +$500/мес', 'Довольно старый 4-квартирный дом рядом с автотрассой. Владелец переезжает в более тихое место. Цена быстрой продажи.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0116_довольно', '4-квартирный дом: $90,000, +$500/мес', 'Довольно старый 4-квартирный дом рядом с автотрассой. Владелец переезжает в более тихое место. Цена быстрой продажи.
 
-Можете использовать это сами или продать другим 40% РОИ, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 40% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $90 000 Ипотечный кредит: $75 000
 
@@ -1555,9 +1555,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -15000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 500);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0117_форсированная-продажа-4-х-квартирного-дома', '4-Plex: $80,000, +$750/мес', 'Форсированная продажа 4-квартирного дома. Бывший владелец, находясь в очень тяжелых финансовых условиях, годами не платил налоги.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0117_форсированная-продажа-4-х-квартирного-дома', '4-квартирный дом: $80,000, +$750/мес', 'Форсированная продажа 4-квартирного дома. Бывший владелец, находясь в очень тяжелых финансовых условиях, годами не платил налоги.
 
-Можете использовать это сами или продать другим 56% РОИ, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 56% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $80 000 Ипотечный кредит: $64 000
 
@@ -1572,9 +1572,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -16000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 750);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0118_продажа-4х-квартирного-дома-4-plex', '4-Plex: $80,000, +$400/мес', 'Бывший владелец дома не смог трижды выплатить платежи по ипотеке и теперь вынужден продавать дом за бесценок.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0118_продажа-4х-квартирного-дома-4-plex', '4-квартирный дом: $80,000, +$400/мес', 'Бывший владелец дома не смог трижды выплатить платежи по ипотеке и теперь вынужден продавать дом за бесценок.
 
-Можете использовать это сами или продать другим 24% ROI, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 24% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $80 000 Ипотечный кредит: $60 000
 
@@ -1589,9 +1589,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -20000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 400);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0119_продажа-4х-квартирного-дома-4-plex', '4-Plex: $125,000, +$600/мес', 'Прекрасный 4-квартирный дом с замечательными соседями. Постоянные арендаторы, положительный денежный поток. Никаких проблем.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0119_продажа-4х-квартирного-дома-4-plex', '4-квартирный дом: $125,000, +$600/мес', 'Прекрасный 4-квартирный дом с замечательными соседями. Постоянные арендаторы, положительный денежный поток. Никаких проблем.
 
-Можете использовать это сами или продать другим 48% РОИ, может стоить от $100 000 до $140 000
+Можете использовать это сами или продать другим 48% доходности на вложения, может стоить от $100 000 до $140 000
 
 Цена: $125 000 Ипотечный кредит: $110 000
 
@@ -1606,9 +1606,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -15000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 600);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0120_продажа-8-квартирного-дома-8-plex', '8-Plex: $200,000, +$1,600/мес', 'Собственник влез в долги и теперь вынужден продавать свой замечательный дом. Он также требует внесения 20% задатка наличными.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0120_продажа-8-квартирного-дома-8-plex', '8-квартирный дом: $200,000, +$1,600/мес', 'Собственник влез в долги и теперь вынужден продавать свой замечательный дом. Он также требует внесения 20% задатка наличными.
 
-Можете использовать это сами или продать другим 48% ROI, может стоить от $200 000 до $280 000
+Можете использовать это сами или продать другим 48% доходности на вложения, может стоить от $200 000 до $280 000
 
 Цена: $200 000 Ипотечный кредит: $160 000
 
@@ -1623,9 +1623,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 1600);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0121_продажа-8-квартирного-дома-8-plex', '8-Plex: $220,000, +$1,700/мес', 'Владелец реинвестирует свой капитал в более крупную недвижимость и предлагает свой дом приемлемой цене. Финансирование сделки имеется.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0121_продажа-8-квартирного-дома-8-plex', '8-квартирный дом: $220,000, +$1,700/мес', 'Владелец реинвестирует свой капитал в более крупную недвижимость и предлагает свой дом приемлемой цене. Финансирование сделки имеется.
 
-Можете использовать это сами или продать другим 51% ROI, может стоить от $200 000 до $280 000
+Можете использовать это сами или продать другим 51% доходности на вложения, может стоить от $200 000 до $280 000
 
 Цена: $220 000 Ипотечный кредит: $180 000
 
@@ -1640,26 +1640,9 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 1700);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122_продажа-8-квартирного-дома-8-plex', '8-Plex: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122_продажа-8-квартирного-дома-8-plex', '8-квартирный дом: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
 
-Можете использовать это сами или продать другим 29% ROI, может стоить от $200 000 до $280 000
-
-Цена: $240 000 Ипотечный кредит: $200 000
-
-Денежный поток: +$950
-
-Первоначальный взнос: $40 000', 'realestate', NULL);
-SET @cid = LAST_INSERT_ID();
-INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '240000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
-INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '200000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
-INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '40000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
-INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_monthly', '950') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
-INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
-INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 950);
-
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122b_продажа-8-квартирного-дома-8-plex', '8-Plex: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
-
-Можете использовать это сами или продать другим 29% ROI, может стоить от $200 000 до $280 000
+Можете использовать это сами или продать другим 29% доходности на вложения, может стоить от $200 000 до $280 000
 
 Цена: $240 000 Ипотечный кредит: $200 000
 
@@ -1674,9 +1657,26 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 950);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0123_продажа-8-квартирного-дома-8-plex', '8-Plex: $160,000, +$1,700/мес', 'Предпринимателю срочно потребовались деньги для спасения своего бизнеса. Это хорошо растущая в цене недвижимость. Отличная возможность для смышленых.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0122b_продажа-8-квартирного-дома-8-plex', '8-квартирный дом: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
 
-Можете использовать это сами или продать другим 64% ROI, может стоить от $200 000 до $280 000
+Можете использовать это сами или продать другим 29% доходности на вложения, может стоить от $200 000 до $280 000
+
+Цена: $240 000 Ипотечный кредит: $200 000
+
+Денежный поток: +$950
+
+Первоначальный взнос: $40 000', 'realestate', NULL);
+SET @cid = LAST_INSERT_ID();
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '240000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'mortgage', '200000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'down_payment', '40000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_monthly', '950') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
+INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -40000);
+INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 950);
+
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0123_продажа-8-квартирного-дома-8-plex', '8-квартирный дом: $160,000, +$1,700/мес', 'Предпринимателю срочно потребовались деньги для спасения своего бизнеса. Это хорошо растущая в цене недвижимость. Отличная возможность для смышленых.
+
+Можете использовать это сами или продать другим 64% доходности на вложения, может стоить от $200 000 до $280 000
 
 Цена: $160 000 Ипотечный кредит: $128 000
 
@@ -1693,7 +1693,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0124_свободная', 'Свободная земля: $20,000', 'Свободная земля в зоне, примыкающей автотрассе, ведущей в аэропорт. Возможно будущем хорошее вознаграждение за риск, если зона станет коммерческой.
 
-Можете использовать это сами или продать другим 0% ROI, может стоить? ?
+Можете использовать это сами или продать другим 0% доходности на вложения, может стоить? ?
 
 Цена: $20 000 Ипотечный кредит: $0
 
@@ -1710,7 +1710,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0125_12-квартирный-элитный-дом-продается-вдовой', '12-квартирный дом: $350,000, +$2,400/мес', '12 квартирный элитный дом продается вдовой бывшего собственника. Длинный список желающих снять жилье в этом районе.
 
-Можете использовать это сами или продать другим 58% ROI, может стоить от $300 000 до $480 000
+Можете использовать это сами или продать другим 58% доходности на вложения, может стоить от $300 000 до $480 000
 
 Цена: $350 000 Ипотечный кредит: $300 000
 
@@ -1727,7 +1727,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0126_24-квартирный-элитный-дом-в-царском-селе', '24-квартирный дом: $550,000, +$2,800/мес', '24 квартирный элитный дом в «Царском селе» можно выкупить, если поспешить с предложением. Много желающих купить или снять жилье в этом районе. Приличный денежный поток.
 
-Можете использовать это сами или продать другим 67% ROI, может стоить от $600 000 до $960 000
+Можете использовать это сами или продать другим 67% доходности на вложения, может стоить от $600 000 до $960 000
 
 Цена: $550 000 Ипотечный кредит: $500 000
 
@@ -1744,7 +1744,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0127_апартаменты-на-продажу', '24-квартирные апартаменты: $575,000, +$3,400/мес', '2 здания элитного жилья, в общей сложности 24 квартиры. Недвижимость находится в доверительном управлении. Эксклюзивное предложение.
 
-Можете использовать это сами или продать другим 54% ROI, может стоить от $600 000 до $960 000
+Можете использовать это сами или продать другим 54% доходности на вложения, может стоить от $600 000 до $960 000
 
 Цена: $575 000 Ипотечный кредит: $500 000
 
@@ -1761,7 +1761,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0128_60-квартирные-апартаменты', '60-квартирные апартаменты: $1,200,000, +$11,000/мес', '60-квартирный комплекс элитного жилья распродается пенсионным фондом. Внешнее управление.
 
-Можете использовать это сами или продать другим 66% ROI, может стоить от $1 500 000 до $2 700 000
+Можете использовать это сами или продать другим 66% доходности на вложения, может стоить от $1 500 000 до $2 700 000
 
 Цена: $1 200 000 Ипотечный кредит: $1 000 000
 
@@ -1778,7 +1778,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0129_бизнес-на-продажу', 'Магазин автозапчастей: $150,000, +$2,500/мес', 'Магазин автозапчастей продается разорившимся владельцем. Какие-то проблемы с «крышей». Магазин стоит на трассе.
 
-Можете использовать это сами или продать другим 100% ROI, других желающих на покупку что-то не видно.
+Можете использовать это сами или продать другим 100% доходности на вложения, других желающих на покупку что-то не видно.
 
 Цена: $150 000 Ипотечный кредит: $120 000
 
@@ -1795,7 +1795,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0130_бизнес-на-продажу', 'Торговая точка на Горбушке: $100,000, +$1,600/мес', 'Горячая точка на «Горбушке» может быть куплена, если не тянуть с принятием решения. Старому владельцу нужно замазать обвинения в продаже пиратских дисков. Если вы сами не боитесь этого,
 
-Можете использовать это сами или продать другим 96% ROI, других желающих на покупку что-то не видно.
+Можете использовать это сами или продать другим 96% доходности на вложения, других желающих на покупку что-то не видно.
 
 Цена: $100 000 Ипотечный кредит: $80 000
 
@@ -1810,7 +1810,7 @@ INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'cashflow_mo
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cash_delta', -20000);
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 1600);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0131_автомойка-на-продажу', 'Автомойка: $100,000, +$1,600/мес', 'Можете использовать это сами или продать другим 36% ROI, может стоить в 12-25 раз больше, чем текущий денежный поток.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0131_автомойка-на-продажу', 'Автомойка: $100,000, +$1,600/мес', 'Можете использовать это сами или продать другим 36% доходности на вложения, может стоить в 12-25 раз больше, чем текущий денежный поток.
 
 Цена: $100 000 Ипотечный кредит: $80 000
 
@@ -1827,7 +1827,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0132_бизнес-на-продажу', 'Салон-парикмахерская: $200,000, +$2,700/мес', 'Успешно работающий салон-парикмахерская продается из-за неожиданной смерти хозяйки. Дочь хочет избавиться от наследуемого имущества как можно быстрей.
 
-Можете использовать это сами или продать другим 81% ROI, других желающих на покупку что-то не видно.
+Можете использовать это сами или продать другим 81% доходности на вложения, других желающих на покупку что-то не видно.
 
 Цена: $200 000 Ипотечный кредит: $160 000
 
@@ -1844,7 +1844,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0133_мастерская-по-ремонту-бытовой-техники-есть', 'Мастерская бытовой техники: $125,000, +$1,800/мес', 'Мастерская по ремонту бытовой техники. Есть оборудование, помещения, но слабое управление.
 
-Можете использовать это сами или продать другим 86% ROI, других желающих на покупку что-то не видно.
+Можете использовать это сами или продать другим 86% доходности на вложения, других желающих на покупку что-то не видно.
 
 Цена: $125 000 Ипотечный кредит: $100 000
 
@@ -1861,7 +1861,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0134_продается', 'Компания по производству пиццы: $500,000, +$5,000/мес', 'Продается компания по производству пиццы. Недалеко от колледжа.
 
-Можете использовать это сами или продать другим 60% ROI, может быть продана от $520 000 до $800 000
+Можете использовать это сами или продать другим 60% доходности на вложения, может быть продана от $520 000 до $800 000
 
 Цена: $500 000 Ипотечный кредит: $400 000
 
@@ -1878,7 +1878,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0135_салон', 'Салон красоты: $150,000, +$1,000/мес', 'Салон красоты. Шейпинг-центр. Только для состоятельных клиентов.
 
-Можете использовать это сами или продать другим 40% ROI, может быть продана от $100 000 до $300 000
+Можете использовать это сами или продать другим 40% доходности на вложения, может быть продана от $100 000 до $300 000
 
 Цена: $150 000 Ипотечный кредит: $120 000
 
@@ -1895,7 +1895,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0136_партнерство', 'Партнерство: стоматология - $25,000, +$1,000/мес', 'Успешный врач-стоматолог расширяет офис клинику. Он предлагает вам быть его партнером бизнесе и внести соответствующую часть капитала.
 
-Можете использовать это сами или продать другим 48% ROI, собственник может в будущем выкупить вашу долю за $50 000 до $75 000
+Можете использовать это сами или продать другим 48% доходности на вложения, собственник может в будущем выкупить вашу долю за $50 000 до $75 000
 
 Цена: $25 000 Ипотечный кредит: $0
 
@@ -1912,7 +1912,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0137_партнерство', 'Партнерство: автосервис - $30,000, +$1,500/мес', 'Владелец автосервиса удваивает количество ремонтных мастерских. Для этого требуются деньги и он предлагает вам стать совладельцем бизнеса, внеся долю в капитале.
 
-Можете использовать это сами или продать другим 60% ROI, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
+Можете использовать это сами или продать другим 60% доходности на вложения, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
 
 Цена: $30 000 Ипотечный кредит: $0
 
@@ -1929,7 +1929,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0138_партнерство', 'Дом: $20,000, +$800/мес', 'Открывается новое дело: доставка горячей пиццы на дом или в офисы. Инициатор ищет деньги и может рассматривать вас как соучредителя новой фирмы.
 
-Можете использовать это сами или продать другим 48% ROI, собственник может в будущем выкупить вашу долю за $40 000 - $60 000
+Можете использовать это сами или продать другим 48% доходности на вложения, собственник может в будущем выкупить вашу долю за $40 000 - $60 000
 
 Цена: $20 000 Ипотечный кредит: $0
 
@@ -1946,7 +1946,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0139_партнерство', 'Партнерство: строительство - $30,000, +$1,000/мес', 'Вам предлагается стать соучредителем строительной компании. Для закупки инструмента, машин и материалов нужно внести долю в капитале, равную $30 000.
 
-Можете использовать это сами или продать другим 40% ROI, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
+Можете использовать это сами или продать другим 40% доходности на вложения, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
 
 Цена: $30 000 Ипотечный кредит: $0
 
@@ -1970,7 +1970,7 @@ INSERT INTO card_conditions (card_id, cond_type) VALUES (@cid, 'has_rental_reale
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0141_розничная-сеть-по-продаже', 'Шашлычная: $50,000, +$800/мес', 'шашлыков Вам предлагается купить долю в этом бизнесе.
 
-Можете использовать это сами или продать другим 19% ROI, может в будущем быть продана за $35 000 - $150 000
+Можете использовать это сами или продать другим 19% доходности на вложения, может в будущем быть продана за $35 000 - $150 000
 
 Цена: $50 000 Ипотечный кредит: $0
 
@@ -1994,7 +1994,7 @@ INSERT INTO card_conditions (card_id, cond_type) VALUES (@cid, 'has_rental_reale
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0143_владелец', 'Партнерство: автосервис - $30,000, +$1,500/мес', 'Владелец автосервиса удваивает количество ремонтных мастерских. Для этого требуются деньги и он предлагает вам стать совладельцем бизнеса, внеся долю в капитале.
 
-Можете использовать это сами или продать другим 60% ROI, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
+Можете использовать это сами или продать другим 60% доходности на вложения, собственник может в будущем выкупить вашу долю за $60 000 - $90 000
 
 Цена: $30 000 Ипотечный кредит: $0
 
@@ -2011,7 +2011,7 @@ INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cas
 
 INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('big_deal', 'big_deal_0144_собственник-инвестор-предлагает-свой-дом-по', 'Дом: $240,000, +$950/мес', 'Собственник-инвестор предлагает свой дом по достаточно высокой стоимости. Но дом роскошный: газон, бассейн, чудесный вид.
 
-Можете использовать это сами или продать другим 29% ROI, может стоить от $200 000 до $280 000
+Можете использовать это сами или продать другим 29% доходности на вложения, может стоить от $200 000 до $280 000
 
 Цена: $240 000 Ипотечный кредит: $200 000
 
@@ -2092,13 +2092,13 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '100000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0157_расширение-малого-бизнеса', 'Малый бизнес: cashflow +$400/мес', 'Малый бизнес, который вы основали, стал дистрибьютором ведущей компании отрасли. Ваши прибыли возросли на 150%. Конечно, это принесло много проблем и занимает гораздо больше времени, но зато увеличивает ваш
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0157_расширение-малого-бизнеса', 'Малый бизнес: денежный поток +$400/мес', 'Малый бизнес, который вы основали, стал дистрибьютором ведущей компании отрасли. Ваши прибыли возросли на 150%. Конечно, это принесло много проблем и занимает гораздо больше времени, но зато увеличивает ваш
 
 денежный поток на $400. Каждый, кто основал свой собственный бизнес, получает теперь на $400 больше в каждом таком бизнесе.', 'market', NULL);
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_effects (card_id, effect_type, amount_cents) VALUES (@cid, 'cashflow_delta', 400);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0158_расширение-малого-бизнеса', 'Малый бизнес: cashflow +$250/мес', 'Малый бизнес, который вы основали, выиграл приз за внедрение Инноваций. Множество публикаций об этом удвоили количества ваших клиентов. Конечно, это было непросто и заняло много времени, но зато увеличило ваш денежный поток на $250.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0158_расширение-малого-бизнеса', 'Малый бизнес: денежный поток +$250/мес', 'Малый бизнес, который вы основали, выиграл приз за внедрение Инноваций. Множество публикаций об этом удвоили количества ваших клиентов. Конечно, это было непросто и заняло много времени, но зато увеличило ваш денежный поток на $250.
 
 Каждый, кто основал свой собственный бизнес, получает теперь на $250 больше в каждом таком бизнесе.', 'market', NULL);
 SET @cid = LAST_INSERT_ID();
@@ -2211,7 +2211,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 Если вы готовы продать на этих условиях, то ваш денежный поток уменьшится на $500 до тех пор,', 'market', NULL);
 SET @cid = LAST_INSERT_ID();
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0173_покупатель-plex', 'Рынок: покупатель Plex за $25,000/блок', 'Предлагается $25,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0173_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $25,000/блок', 'Предлагается $25,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2219,7 +2219,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '25000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0174_покупатель-plex', 'Рынок: покупатель Plex за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0174_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2227,7 +2227,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '30000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0175_пока-вы-не-наскребете-100000', 'Рынок: покупатель Plex за $40,000/блок', 'пока вы не наскребете $100,000. Покупатель Plex
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0175_пока-вы-не-наскребете-100000', 'Рынок: покупатель многоквартирного дома за $40,000/блок', 'пока вы не наскребете $100,000. Покупатель многоквартирного дома
 
 Предлагается $40,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
@@ -2237,7 +2237,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '40000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0176_покупатель-plex', 'Рынок: покупатель Plex за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0176_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2245,7 +2245,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '35000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0177_покупатель-plex', 'Рынок: покупатель Plex за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0177_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2253,7 +2253,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '30000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0178_покупатель-plex', 'Рынок: покупатель Plex за $25,000/блок', 'Предлагается $25,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0178_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $25,000/блок', 'Предлагается $25,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2261,7 +2261,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '25000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0179_покупатель-plex', 'Рынок: покупатель Plex за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0179_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2269,7 +2269,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '30000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0180_покупатель-plex', 'Рынок: покупатель Plex за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0180_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: 2, 4 или 8-квартирных домов.
 
 Каждый может продать по этой цене.
 
@@ -2277,7 +2277,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '35000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0181_покупатель-plex', 'Рынок: покупатель Plex за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: Duplex, 4-Plex или 8-Plex.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0181_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $35,000/блок', 'Предлагается $35,000 за каждый блок в любой комбинации: Двухквартирный дом, 4-квартирный дом или 8-квартирный дом.
 
 Каждый может продать по этой цене.
 
@@ -2285,7 +2285,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '35000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0182_покупатель-plex', 'Рынок: покупатель Plex за $40,000/блок', 'Предлагается $40,000 за каждый блок в любой комбинации: Duplex, 4-Plex или 8-Plex.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0182_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $40,000/блок', 'Предлагается $40,000 за каждый блок в любой комбинации: Двухквартирный дом, 4-квартирный дом или 8-квартирный дом.
 
 Каждый может продать по этой цене.
 
@@ -2325,7 +2325,7 @@ INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VAL
 SET @cid = LAST_INSERT_ID();
 INSERT INTO card_meta (card_id, meta_key, meta_value) VALUES (@cid, 'price', '45000') ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value);
 
-INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0187_покупатель-plex', 'Рынок: покупатель Plex за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: Duplex, 4-Plex или 8-Plex.
+INSERT INTO cards (card_type, slug, title, body_text, category, subcategory) VALUES ('market', 'market_0187_покупатель-plex', 'Рынок: покупатель многоквартирного дома за $30,000/блок', 'Предлагается $30,000 за каждый блок в любой комбинации: Двухквартирный дом, 4-квартирный дом или 8-квартирный дом.
 
 Каждый может продать по этой цене.
 

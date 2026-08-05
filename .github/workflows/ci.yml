@@ -47,7 +47,9 @@ jobs:
       - run: npm run changes:check
       - run: npm run db:generate
       - run: npm run db:push
+      - run: npm run db:verify
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
   deploy:

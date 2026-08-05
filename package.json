@@ -22,6 +22,7 @@
     "db:generate": "npm run prisma:generate --workspace=@cashflow/database",
     "db:migrate": "npm run prisma:migrate --workspace=@cashflow/database",
     "db:push": "npm run prisma:push --workspace=@cashflow/database",
+    "db:verify": "npm run prisma:verify --workspace=@cashflow/database",
     "db:seed": "npm run prisma:seed --workspace=@cashflow/database",
     "db:sync-cities": "npm run prisma:sync-cities --workspace=@cashflow/database",
     "db:sync-cards": "npm run prisma:sync-cards --workspace=@cashflow/database"

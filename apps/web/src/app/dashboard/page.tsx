@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, History, UsersRound } from "lucide-react";
+import { ArrowRight, Bot, Clock3, History, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateGameForm } from "@/components/game/create-game-form";
+import { CreateSoloGameForm } from "@/components/game/create-solo-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
@@ -90,8 +91,8 @@ export default async function DashboardPage() {
                     title="Активных партий пока нет"
                     description={
                       canCreateGames
-                        ? "Создайте комнату справа — после этого здесь появится быстрый переход в лобби."
-                        : "Введите код приглашения справа или выберите доступную комнату ниже."
+                        ? "Начните игру с ботами или создайте командную комнату справа."
+                        : "Начните игру с ботами, введите код приглашения или выберите комнату ниже."
                     }
                   />
                 ) : (
@@ -102,29 +103,37 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border-0">
-              <CardHeader>
-                <CardTitle className="text-xl">
-                  {canCreateGames ? "Подготовить новую партию" : "Присоединиться к партии"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {canCreateGames ? (
-                  <CreateGameForm token={session.accessToken} />
-                ) : (
-                  <p className="text-sm leading-6 text-muted">
-                    Создавать комнаты может ведущий. Вы можете войти в готовую комнату по приглашению.
-                  </p>
-                )}
-                <div className={canCreateGames ? "mt-6 border-t border-line pt-5" : "mt-5"}>
-                  <h3 className="text-base font-extrabold">Войти в готовую комнату</h3>
-                  <p className="mb-4 mt-1 text-sm leading-6 text-muted">
-                    Используйте код, который прислал ведущий.
-                  </p>
-                  <JoinGameForm token={session.accessToken} />
-                </div>
-              </CardContent>
-            </Card>
+            <div className="grid min-w-0 gap-4">
+              <Card className="rounded-2xl border-0 bg-[#fbf9ff]">
+                <CardContent className="pt-6">
+                  <CreateSoloGameForm token={session.accessToken} />
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border-0">
+                <CardHeader>
+                  <CardTitle className="text-xl">
+                    {canCreateGames ? "Подготовить командную партию" : "Присоединиться к партии"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {canCreateGames ? (
+                    <CreateGameForm token={session.accessToken} />
+                  ) : (
+                    <p className="text-sm leading-6 text-muted">
+                      Создавать командные комнаты может ведущий. В готовую комнату можно войти по приглашению.
+                    </p>
+                  )}
+                  <div className={canCreateGames ? "mt-6 border-t border-line pt-5" : "mt-5"}>
+                    <h3 className="text-base font-extrabold">Войти в готовую комнату</h3>
+                    <p className="mb-4 mt-1 text-sm leading-6 text-muted">
+                      Используйте код, который прислал ведущий.
+                    </p>
+                    <JoinGameForm token={session.accessToken} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </section>
 
           <section className="rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6">
@@ -145,7 +154,7 @@ export default async function DashboardPage() {
                 <Metric label="Партий" value={profile.stats.gamesPlayed} />
                 <Metric label="Побед" value={profile.stats.wins} />
                 <Metric label="Выходов" value={profile.stats.escapedRatRace} />
-                <Metric label="Средний cashflow" value={money(profile.stats.averageMonthlyCashflowCents)} />
+                <Metric label="Средний денежный поток" value={money(profile.stats.averageMonthlyCashflowCents)} />
               </dl>
             </div>
           </section>
@@ -186,7 +195,7 @@ export default async function DashboardPage() {
               {profile.history.length === 0 ? (
                 <EmptyGamesMessage
                   title="История пока пуста"
-                  description="Завершённые партии появятся здесь вместе с профессией и итоговым cashflow."
+                  description="Завершённые партии появятся здесь вместе с профессией и итоговым денежным потоком."
                 />
               ) : (
                 <>
@@ -202,7 +211,7 @@ export default async function DashboardPage() {
                           <th className="pb-3 font-bold">Партия</th>
                           <th className="pb-3 font-bold">Статус</th>
                           <th className="pb-3 font-bold">Профессия</th>
-                          <th className="pb-3 font-bold">Cashflow</th>
+                          <th className="pb-3 font-bold">Денежный поток</th>
                           <th className="pb-3 font-bold">Результат</th>
                           <th className="pb-3 font-bold">Дата</th>
                         </tr>
@@ -214,7 +223,9 @@ export default async function DashboardPage() {
                               <Link className="font-extrabold text-journey hover:text-[#1f56c8]" href={`/games/${item.gameId}`}>
                                 {item.title}
                               </Link>
-                              <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
+                              <div className={`mt-1 text-xs text-muted ${item.gameMode === "SOLO" ? "font-bold" : "font-mono"}`}>
+                                {item.gameMode === "SOLO" ? "С ботами" : item.code}
+                              </div>
                             </td>
                             <td className="py-4 pr-4">{gameStatusLabel(item.status)}</td>
                             <td className="py-4 pr-4">{item.profession ?? "—"}</td>
@@ -278,15 +289,17 @@ function GameCard({
             {game.title}
           </Link>
           <div className="mt-1 font-mono text-xs font-bold tracking-[0.04em] text-muted">
-            {game.code}
+            {game.mode === "SOLO" ? "Одиночная партия" : game.code}
           </div>
         </div>
         <Badge className={gameStatusBadgeClass(game.status)}>{gameStatusLabel(game.status)}</Badge>
       </div>
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted">
         <span className="inline-flex items-center gap-1.5">
-          <UsersRound size={14} aria-hidden="true" />
-          {players.length}/{game.maxPlayers} игроков
+          {game.mode === "SOLO" ? <Bot size={14} aria-hidden="true" /> : <UsersRound size={14} aria-hidden="true" />}
+          {game.mode === "SOLO"
+            ? `${players.filter((player) => player.controller === "BOT").length} ботов`
+            : `${players.length}/${game.maxPlayers} игроков`}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock3 size={14} aria-hidden="true" />
@@ -294,12 +307,12 @@ function GameCard({
         </span>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
-        {showInvite && waiting ? <RoomInviteActions code={game.code} /> : <span />}
+        {showInvite && waiting && game.mode === "MULTIPLAYER" ? <RoomInviteActions code={game.code} /> : <span />}
         <Link
           href={`/games/${game.id}`}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-journey px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(41,103,223,.2)] transition hover:-translate-y-0.5 hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
         >
-          {waiting ? "Открыть лобби" : "Продолжить"}
+          {waiting ? (game.mode === "SOLO" ? "Подготовиться" : "Открыть лобби") : "Продолжить"}
           <ArrowRight size={15} aria-hidden="true" />
         </Link>
       </div>
@@ -318,7 +331,9 @@ function HistoryCard({ item }: { item: ProfileResponse["history"][number] }) {
           >
             {item.title}
           </Link>
-          <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
+          <div className={`mt-1 text-xs text-muted ${item.gameMode === "SOLO" ? "font-bold" : "font-mono"}`}>
+            {item.gameMode === "SOLO" ? "С ботами" : item.code}
+          </div>
         </div>
         <Badge className={gameStatusBadgeClass(item.status)}>{gameStatusLabel(item.status)}</Badge>
       </div>
@@ -328,7 +343,7 @@ function HistoryCard({ item }: { item: ProfileResponse["history"][number] }) {
           <dd className="mt-1 break-words font-medium text-ink">{item.profession ?? "—"}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-xs font-bold text-muted">Cashflow</dt>
+          <dt className="text-xs font-bold text-muted">Денежный поток</dt>
           <dd className="mt-1 break-words font-extrabold text-ink">{money(item.monthlyCashflowCents)}</dd>
         </div>
         <div className="min-w-0">
@@ -368,7 +383,8 @@ function gameStatusBadgeClass(status: string) {
 }
 
 function historyResult(item: ProfileResponse["history"][number]) {
-  if (item.wonAt) return "Победа";
+  if (item.outcome === "WIN" || item.wonAt) return "Победа";
+  if (item.outcome === "LOSS") return "Поражение";
   if (item.escapedRatRaceAt) return "Вышел из крысиных бегов";
   if (item.endedAt) return "Партия завершена";
   return "В процессе";

@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckCircle2, KeyRound, LayoutGrid, LogOut, Map, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, KeyRound, LayoutGrid, LogOut, Map, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
-import { FigurinePicker } from "@/components/figurine-picker";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { CityCombobox, type CityOption } from "@/components/auth/city-combobox";
+import { normalizeTelegramChannel, validateTelegramChannel } from "@/components/auth/auth-validation";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,9 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       profile.user.gameExperience != null ? Number(profile.user.gameExperience) : null,
     avatarUrl: profile.user.avatarUrl,
     figurine: profile.user.figurine,
-    gameRoomView: profile.user.gameRoomView
+    gameRoomView: profile.user.gameRoomView,
+    telegramChannel: profile.user.telegramChannel ?? "",
+    city: profile.user.city
   }));
   const [displayName, setDisplayName] = useState(profile.user.displayName);
   const [gender, setGender] = useState(profile.user.gender ?? "");
@@ -63,8 +66,13 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   const [gameRoomView, setGameRoomView] = useState<"classic" | "journey">(
     profile.user.gameRoomView
   );
+  const [telegramChannel, setTelegramChannel] = useState(profile.user.telegramChannel ?? "");
+  const [city, setCity] = useState<CityOption | null>(profile.user.city);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileChangeVersion, setProfileChangeVersion] = useState(0);
+  const immediateSaveRef = useRef(false);
+  const failedSaveVersionRef = useRef<number | null>(null);
 
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -83,14 +91,18 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   const currentAvatarUrl = avatarPending === undefined ? savedProfile.avatarUrl : avatarPending;
   const computedAge = calcAge(birthDate || null);
   const normalizedDisplayName = displayName.trim();
+  const normalizedTelegramChannel = normalizeTelegramChannel(telegramChannel);
   const normalizedGameExperience = gameExperience === "" ? null : Number(gameExperience);
   const displayNameValid = normalizedDisplayName.length > 0;
+  const telegramError = validateTelegramChannel(normalizedTelegramChannel);
+  const cityValid = city !== null;
   const gameExperienceValid =
     normalizedGameExperience === null ||
     (Number.isInteger(normalizedGameExperience) &&
       normalizedGameExperience >= 0 &&
       normalizedGameExperience <= 100);
-  const profileFormValid = displayNameValid && gameExperienceValid;
+  const profileFormValid =
+    displayNameValid && gameExperienceValid && telegramError === null && cityValid;
   const hasAvatarChanges =
     avatarPending !== undefined && avatarPending !== savedProfile.avatarUrl;
   const hasProfileChanges =
@@ -100,30 +112,61 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     birthDate !== savedProfile.birthDate ||
     normalizedGameExperience !== savedProfile.gameExperience ||
     figurine !== savedProfile.figurine ||
-    gameRoomView !== savedProfile.gameRoomView;
-  const visibleProfileMsg =
-    profileMsg?.ok && hasProfileChanges ? null : profileMsg;
+    gameRoomView !== savedProfile.gameRoomView ||
+    normalizedTelegramChannel !== savedProfile.telegramChannel ||
+    city?.id !== savedProfile.city?.id;
+  const visibleProfileMsg = profileMsg?.ok && hasProfileChanges ? null : profileMsg;
   const passwordsMatch = newPassword === confirmPassword;
   const passwordFormValid =
     currentPassword.length > 0 && newPassword.length >= 8 && passwordsMatch;
 
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function markProfileChanged(immediate = false) {
+    if (immediate) immediateSaveRef.current = true;
+    failedSaveVersionRef.current = null;
+    setProfileMsg(null);
+    setProfileChangeVersion((version) => version + 1);
+  }
+
+  useEffect(() => {
+    if (!hasProfileChanges || profileLoading || !profileFormValid) return;
+    if (failedSaveVersionRef.current === profileChangeVersion) return;
+
+    const delay = immediateSaveRef.current ? 0 : 700;
+    immediateSaveRef.current = false;
+    const timeout = window.setTimeout(() => {
+      void saveProfile(profileChangeVersion);
+    }, delay);
+
+    return () => window.clearTimeout(timeout);
+  }, [hasProfileChanges, profileChangeVersion, profileFormValid, profileLoading]);
+
+  async function saveProfile(changeVersion: number) {
     if (!hasProfileChanges || profileLoading) return;
     if (!profileFormValid) {
-      setProfileMsg({
-        ok: false,
-        text: "Проверьте имя и опыт игры перед сохранением."
-      });
       return;
     }
+
+    const snapshot = {
+      displayName: normalizedDisplayName,
+      gender,
+      birthDate,
+      gameExperience: normalizedGameExperience,
+      avatarPending,
+      figurine,
+      gameRoomView,
+      telegramChannel: normalizedTelegramChannel,
+      city
+    };
+    const savedBefore = savedProfile;
+    const avatarChanged =
+      snapshot.avatarPending !== undefined && snapshot.avatarPending !== savedBefore.avatarUrl;
 
     setProfileLoading(true);
     setProfileMsg(null);
 
     try {
-      if (hasAvatarChanges) {
-        if (avatarPending === null) {
+      if (avatarChanged) {
+        if (snapshot.avatarPending === null) {
           const response = await fetch(`${publicApiBaseUrl()}/api/users/me/avatar`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` }
@@ -131,14 +174,14 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
           if (!response.ok) {
             throw new Error(await responseMessage(response, "Не удалось удалить фотографию"));
           }
-        } else if (avatarPending) {
+        } else if (snapshot.avatarPending) {
           const response = await fetch(`${publicApiBaseUrl()}/api/users/me/avatar`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ avatarDataUrl: avatarPending })
+            body: JSON.stringify({ avatarDataUrl: snapshot.avatarPending })
           });
           if (!response.ok) {
             throw new Error(await responseMessage(response, "Не удалось загрузить фотографию"));
@@ -147,16 +190,26 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       }
 
       const body: Record<string, unknown> = {};
-      if (normalizedDisplayName !== savedProfile.displayName) {
-        body.displayName = normalizedDisplayName;
+      if (snapshot.displayName !== savedBefore.displayName) {
+        body.displayName = snapshot.displayName;
       }
-      if (gender !== savedProfile.gender) body.gender = gender || null;
-      if (birthDate !== savedProfile.birthDate) body.birthDate = birthDate || null;
-      if (normalizedGameExperience !== savedProfile.gameExperience) {
-        body.gameExperience = normalizedGameExperience;
+      if (snapshot.gender !== savedBefore.gender) body.gender = snapshot.gender || null;
+      if (snapshot.birthDate !== savedBefore.birthDate) {
+        body.birthDate = snapshot.birthDate || null;
       }
-      if (figurine !== savedProfile.figurine) body.figurine = figurine;
-      if (gameRoomView !== savedProfile.gameRoomView) body.gameRoomView = gameRoomView;
+      if (snapshot.gameExperience !== savedBefore.gameExperience) {
+        body.gameExperience = snapshot.gameExperience;
+      }
+      if (snapshot.figurine !== savedBefore.figurine) body.figurine = snapshot.figurine;
+      if (snapshot.gameRoomView !== savedBefore.gameRoomView) {
+        body.gameRoomView = snapshot.gameRoomView;
+      }
+      if (snapshot.telegramChannel !== savedBefore.telegramChannel) {
+        body.telegramChannel = snapshot.telegramChannel;
+      }
+      if (snapshot.city?.id !== savedBefore.city?.id && snapshot.city) {
+        body.cityId = snapshot.city.id;
+      }
 
       if (Object.keys(body).length > 0) {
         const response = await fetch(`${publicApiBaseUrl()}/api/users/me`, {
@@ -172,23 +225,42 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         }
       }
 
-      const nextAvatarUrl = hasAvatarChanges
-        ? avatarPending ?? null
-        : savedProfile.avatarUrl;
+      const nextAvatarUrl = avatarChanged
+        ? snapshot.avatarPending ?? null
+        : savedBefore.avatarUrl;
       setSavedProfile({
-        displayName: normalizedDisplayName,
-        gender,
-        birthDate,
-        gameExperience: normalizedGameExperience,
+        displayName: snapshot.displayName,
+        gender: snapshot.gender,
+        birthDate: snapshot.birthDate,
+        gameExperience: snapshot.gameExperience,
         avatarUrl: nextAvatarUrl,
-        figurine,
-        gameRoomView
+        figurine: snapshot.figurine,
+        gameRoomView: snapshot.gameRoomView,
+        telegramChannel: snapshot.telegramChannel,
+        city: snapshot.city
       });
-      setDisplayName(normalizedDisplayName);
-      setAvatarPending(undefined);
+      setDisplayName((current) =>
+        current.trim() === snapshot.displayName ? snapshot.displayName : current
+      );
+      setTelegramChannel((current) =>
+        normalizeTelegramChannel(current) === snapshot.telegramChannel
+          ? snapshot.telegramChannel
+          : current
+      );
+      setAvatarPending((current) =>
+        current === snapshot.avatarPending ? undefined : current
+      );
       setProfileMsg({ ok: true, text: "Изменения сохранены" });
-      router.refresh();
+      failedSaveVersionRef.current = null;
+      if (
+        avatarChanged ||
+        snapshot.figurine !== savedBefore.figurine ||
+        snapshot.displayName !== savedBefore.displayName
+      ) {
+        router.refresh();
+      }
     } catch (error) {
+      failedSaveVersionRef.current = changeVersion;
       setProfileMsg({
         ok: false,
         text: error instanceof Error ? error.message : "Не удалось сохранить изменения"
@@ -196,19 +268,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     } finally {
       setProfileLoading(false);
     }
-  }
-
-  function discardProfileChanges() {
-    setDisplayName(savedProfile.displayName);
-    setGender(savedProfile.gender);
-    setBirthDate(savedProfile.birthDate);
-    setGameExperience(
-      savedProfile.gameExperience === null ? "" : String(savedProfile.gameExperience)
-    );
-    setAvatarPending(undefined);
-    setFigurine(savedProfile.figurine);
-    setGameRoomView(savedProfile.gameRoomView);
-    setProfileMsg(null);
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
@@ -296,20 +355,12 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   }
 
   return (
-    <div className="grid gap-5 sm:gap-6">
-      <form
-        id="profile-form"
-        className="grid items-start gap-5 lg:grid-cols-[320px_minmax(0,1fr)] lg:gap-6"
-        onSubmit={saveProfile}
-        aria-busy={profileLoading}
-      >
-        <aside className="rounded-2xl bg-ink p-5 text-white shadow-panel lg:sticky lg:top-28 sm:p-6">
+    <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="contents lg:order-1 lg:sticky lg:top-28 lg:grid lg:gap-4">
+        <aside className="order-1 rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6">
           <h2 className="text-2xl font-extrabold tracking-[-0.03em]">
             Так вас увидят игроки
           </h2>
-          <p className="mt-2 text-sm leading-6 text-white/65">
-            Фигурка имеет приоритет над фотографией. Если её снять, снова появится фото или инициалы.
-          </p>
 
           <div className="mt-6">
             <AvatarPicker
@@ -317,7 +368,15 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               avatarColor={avatarColor}
               initials={initials}
               figurine={figurine}
-              onAvatarChange={setAvatarPending}
+              onAvatarChange={(dataUrl) => {
+                setAvatarPending(dataUrl);
+                if (dataUrl) setFigurine(null);
+                markProfileChanged(true);
+              }}
+              onFigurineChange={(figurineId) => {
+                setFigurine(figurineId);
+                markProfileChanged(true);
+              }}
             />
           </div>
 
@@ -337,76 +396,50 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
           </div>
         </aside>
 
-        <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-panel">
-          <div className="flex flex-col gap-4 border-b border-line/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <section className="order-3 rounded-2xl bg-white p-4 shadow-panel" aria-label="Текущий сеанс">
+          <div className="flex items-start gap-3">
+            <LogOut className="mt-0.5 shrink-0 text-muted" size={20} aria-hidden="true" />
+            <div className="min-w-0">
+              <h2 className="font-extrabold">Текущий сеанс</h2>
+              <p className="mt-1 text-sm leading-6 text-muted">
+                Изменения профиля сохраняются автоматически.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-4 w-full"
+            disabled={signOutLoading}
+            onClick={() => void endSession()}
+          >
+            {signOutLoading ? "Выходим..." : "Выйти из аккаунта"}
+          </Button>
+        </section>
+      </div>
+
+      <div className="order-2 grid min-w-0 gap-5 sm:gap-6">
+        <form
+          id="profile-form"
+          className="min-w-0"
+          onSubmit={(event) => event.preventDefault()}
+          aria-busy={profileLoading}
+        >
+          <section className="min-w-0 rounded-2xl bg-white shadow-panel">
+          <div className="border-b border-line/70 p-5 sm:p-6">
             <div>
               <h2 className="text-2xl font-extrabold tracking-[-0.03em]">Профиль игрока</h2>
               <ProfileStatus
                 message={visibleProfileMsg}
                 hasChanges={hasProfileChanges}
+                loading={profileLoading}
+                valid={profileFormValid}
               />
             </div>
-            <SaveProfileButton
-              loading={profileLoading}
-              disabled={!hasProfileChanges || !profileFormValid}
-            />
           </div>
 
           <div className="p-5 sm:p-6">
-            <section aria-labelledby="figurine-heading">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="max-w-xl">
-                  <h3 id="figurine-heading" className="text-lg font-extrabold">
-                    Любимая фигурка
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted">
-                    Она будет показываться в профиле и использоваться как предпочтительный выбор в новых партиях.
-                  </p>
-                </div>
-                {figurine ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="h-9 shrink-0 px-3 text-xs"
-                    onClick={() => setFigurine(null)}
-                  >
-                    Показывать фото
-                  </Button>
-                ) : null}
-              </div>
-              <div className="mt-4 rounded-2xl bg-card p-3 sm:p-4">
-                <FigurinePicker value={figurine} onChange={setFigurine} />
-              </div>
-            </section>
-
-            <section className="mt-7 border-t border-line/70 pt-7" aria-labelledby="game-board-heading">
-              <div className="max-w-xl">
-                <h3 id="game-board-heading" className="text-lg font-extrabold">
-                  Дизайн игрового поля
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-muted">
-                  Выбранный вариант будет открываться во всех ваших партиях.
-                </p>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Дизайн игрового поля">
-                <GameBoardChoice
-                  value="classic"
-                  label="Поле 1"
-                  description="Классическое круговое поле"
-                  selected={gameRoomView === "classic"}
-                  onSelect={setGameRoomView}
-                />
-                <GameBoardChoice
-                  value="journey"
-                  label="Поле 2"
-                  description="Карта финансового путешествия"
-                  selected={gameRoomView === "journey"}
-                  onSelect={setGameRoomView}
-                />
-              </div>
-            </section>
-
-            <section className="mt-7 border-t border-line/70 pt-7" aria-labelledby="personal-heading">
+            <section aria-labelledby="personal-heading">
               <div className="flex items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8effe] text-journey" aria-hidden="true">
                   <UserRound size={19} />
@@ -416,7 +449,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                     Персональные данные
                   </h3>
                   <p className="mt-0.5 text-sm text-muted">
-                    Необязательные данные помогают ведущему лучше узнать команду.
+                    Контактные и дополнительные данные вашего игрового профиля.
                   </p>
                 </div>
               </div>
@@ -429,7 +462,10 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                   <Input
                     id="profile-name"
                     value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
+                    onChange={(event) => {
+                      setDisplayName(event.target.value);
+                      markProfileChanged();
+                    }}
                     required
                     maxLength={80}
                     autoComplete="name"
@@ -460,13 +496,54 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                 </div>
 
                 <div className="space-y-2">
+                  <label htmlFor="profile-telegram" className="text-sm font-extrabold text-ink">
+                    Telegram
+                  </label>
+                  <Input
+                    id="profile-telegram"
+                    value={telegramChannel}
+                    onChange={(event) => {
+                      setTelegramChannel(event.target.value);
+                      markProfileChanged();
+                    }}
+                    placeholder="@username"
+                    required
+                    maxLength={33}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={Boolean(telegramError)}
+                    aria-describedby="profile-telegram-hint"
+                    className="h-12"
+                  />
+                  <p
+                    id="profile-telegram-hint"
+                    className={`text-xs ${telegramError ? "text-red-700" : "text-muted"}`}
+                  >
+                    {telegramError ?? "Имя пользователя из 5–32 латинских букв, цифр или подчёркиваний."}
+                  </p>
+                </div>
+
+                <CityCombobox
+                  inputId="profile-city"
+                  initialValue={savedProfile.city}
+                  error={cityValid ? undefined : "Выберите город из списка."}
+                  onChange={(value) => {
+                    setCity(value);
+                    markProfileChanged(true);
+                  }}
+                />
+
+                <div className="space-y-2">
                   <label htmlFor="profile-gender" className="text-sm font-extrabold text-ink">
                     Пол <span className="font-normal text-muted">(необязательно)</span>
                   </label>
                   <select
                     id="profile-gender"
                     value={gender}
-                    onChange={(event) => setGender(event.target.value)}
+                    onChange={(event) => {
+                      setGender(event.target.value);
+                      markProfileChanged(true);
+                    }}
                     className="h-12 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
                   >
                     <option value="">Не указан</option>
@@ -484,7 +561,10 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                       id="profile-birth-date"
                       type="date"
                       value={birthDate}
-                      onChange={(event) => setBirthDate(event.target.value)}
+                      onChange={(event) => {
+                        setBirthDate(event.target.value);
+                        markProfileChanged(true);
+                      }}
                       max={new Date().toISOString().slice(0, 10)}
                       className="h-12 min-w-0"
                     />
@@ -508,7 +588,10 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                     max={100}
                     step={1}
                     value={gameExperience}
-                    onChange={(event) => setGameExperience(event.target.value)}
+                    onChange={(event) => {
+                      setGameExperience(event.target.value);
+                      markProfileChanged();
+                    }}
                     placeholder="Например, 2"
                     aria-invalid={!gameExperienceValid}
                     aria-describedby="profile-experience-hint"
@@ -525,28 +608,53 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                 </div>
               </div>
             </section>
-          </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-line/70 bg-card/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <Button
-              type="button"
-              variant="ghost"
-              className="sm:justify-start"
-              disabled={!hasProfileChanges || profileLoading}
-              onClick={discardProfileChanges}
+            <section
+              className="mt-7 border-t border-line/70 pt-7"
+              aria-labelledby="game-board-heading"
             >
-              Отменить изменения
-            </Button>
-            <SaveProfileButton
-              loading={profileLoading}
-              disabled={!hasProfileChanges || !profileFormValid}
-              className="sm:min-w-52"
-            />
+              <div className="max-w-xl">
+                <h3 id="game-board-heading" className="text-lg font-extrabold">
+                  Дизайн игрового поля
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  Выбранный вариант будет открываться во всех ваших партиях.
+                </p>
+              </div>
+              <div
+                className="mt-4 grid gap-3 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="Дизайн игрового поля"
+              >
+                <GameBoardChoice
+                  value="classic"
+                  label="Поле 1"
+                  description="Классическое круговое поле"
+                  selected={gameRoomView === "classic"}
+                  onSelect={(value) => {
+                    setGameRoomView(value);
+                    markProfileChanged(true);
+                  }}
+                />
+                <GameBoardChoice
+                  value="journey"
+                  label="Поле 2"
+                  badge="Бета"
+                  description="Карта финансового путешествия"
+                  selected={gameRoomView === "journey"}
+                  onSelect={(value) => {
+                    setGameRoomView(value);
+                    markProfileChanged(true);
+                  }}
+                />
+              </div>
+            </section>
           </div>
-        </section>
-      </form>
 
-      <section className="overflow-hidden rounded-2xl bg-white shadow-panel" aria-labelledby="security-heading">
+          </section>
+        </form>
+
+        <section className="overflow-hidden rounded-2xl bg-white shadow-panel" aria-labelledby="security-heading">
         <div className="flex items-start gap-3 border-b border-line/70 p-5 sm:p-6">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e8effe] text-journey" aria-hidden="true">
             <ShieldCheck size={21} />
@@ -556,7 +664,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               Безопасность аккаунта
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted">
-              Управляйте паролем и текущим сеансом отдельно от игрового профиля.
+              Управляйте паролем и удалением аккаунта отдельно от игрового профиля.
             </p>
           </div>
         </div>
@@ -686,26 +794,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
             )}
           </div>
 
-          <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div className="flex items-start gap-3">
-              <LogOut className="mt-0.5 shrink-0 text-muted" size={20} aria-hidden="true" />
-              <div>
-                <h3 className="font-extrabold">Текущий сеанс</h3>
-                <p className="mt-1 text-sm leading-6 text-muted">
-                  Вы вернётесь на страницу входа. Несохранённые изменения профиля будут потеряны.
-                </p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              className="shrink-0"
-              disabled={signOutLoading}
-              onClick={() => void endSession()}
-            >
-              {signOutLoading ? "Выходим..." : "Выйти из аккаунта"}
-            </Button>
-          </div>
           <div className="p-5 sm:p-6">
             {!deleteOpen ? (
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -736,7 +824,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
             )}
           </div>
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
@@ -744,12 +833,14 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
 function GameBoardChoice({
   value,
   label,
+  badge,
   description,
   selected,
   onSelect
 }: {
   value: "classic" | "journey";
   label: string;
+  badge?: string;
   description: string;
   selected: boolean;
   onSelect: (value: "classic" | "journey") => void;
@@ -786,7 +877,14 @@ function GameBoardChoice({
           <Icon size={19} aria-hidden="true" />
         </span>
         <span className="min-w-0">
-          <span className="block font-extrabold">{label}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-extrabold">{label}</span>
+            {badge ? (
+              <span className="rounded-md bg-[#e8effe] px-2 py-0.5 text-[10px] font-extrabold text-journey">
+                {badge}
+              </span>
+            ) : null}
+          </span>
           <span className="mt-0.5 block text-xs text-muted">{description}</span>
         </span>
         {selected ? <CheckCircle2 className="ml-auto shrink-0 text-journey" size={20} aria-hidden="true" /> : null}
@@ -795,34 +893,16 @@ function GameBoardChoice({
   );
 }
 
-function SaveProfileButton({
-  loading,
-  disabled,
-  className = ""
-}: {
-  loading: boolean;
-  disabled: boolean;
-  className?: string;
-}) {
-  return (
-    <Button
-      type="submit"
-      variant="action"
-      disabled={loading || disabled}
-      className={`shrink-0 ${className}`}
-    >
-      <Save className="mr-2" size={16} aria-hidden="true" />
-      {loading ? "Сохраняем..." : "Сохранить изменения"}
-    </Button>
-  );
-}
-
 function ProfileStatus({
   message,
-  hasChanges
+  hasChanges,
+  loading,
+  valid
 }: {
   message: { ok: boolean; text: string } | null;
   hasChanges: boolean;
+  loading: boolean;
+  valid: boolean;
 }) {
   if (message) {
     return (
@@ -836,9 +916,25 @@ function ProfileStatus({
     );
   }
 
+  if (loading) {
+    return (
+      <p className="mt-1 text-sm font-bold text-journey" role="status">
+        Сохраняем изменения…
+      </p>
+    );
+  }
+
+  if (hasChanges && !valid) {
+    return (
+      <p className="mt-1 text-sm font-bold text-red-700" role="status">
+        Исправьте отмеченные поля — после этого изменения сохранятся автоматически
+      </p>
+    );
+  }
+
   return (
-    <p className={`mt-1 text-sm ${hasChanges ? "font-bold text-warning" : "text-muted"}`}>
-      {hasChanges ? "Есть несохранённые изменения" : "Все изменения сохранены"}
+    <p className={`mt-1 text-sm ${hasChanges ? "font-bold text-journey" : "text-muted"}`}>
+      {hasChanges ? "Изменения сохранятся автоматически" : "Все изменения сохранены"}
     </p>
   );
 }

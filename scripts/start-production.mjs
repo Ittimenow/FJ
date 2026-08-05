@@ -167,7 +167,9 @@ async function setupDatabaseIfNeeded() {
     return;
   }
   if (process.env.DATABASE_AUTO_SETUP === "false") {
-    log("DATABASE_AUTO_SETUP=false, skipping database setup.");
+    log("DATABASE_AUTO_SETUP=false, skipping automatic database changes.");
+    log("Verifying database schema.");
+    await run(npmCommand, ["run", "db:verify"]);
     return;
   }
 
@@ -185,9 +187,17 @@ async function setupDatabaseIfNeeded() {
     "prisma:prepare-registration-details",
     "--workspace=@cashflow/database"
   ]);
+  await run(npmCommand, [
+    "run",
+    "prisma:prepare-solo-bots",
+    "--workspace=@cashflow/database"
+  ]);
 
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);
+
+  log("Verifying database schema.");
+  await run(npmCommand, ["run", "db:verify"]);
 
   log("Synchronizing Russian cities.");
   await run(npmCommand, ["run", "db:sync-cities"]);

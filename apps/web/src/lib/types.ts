@@ -10,6 +10,12 @@ export interface ProfileResponse {
     birthDate: string | null;
     gameExperience: number | null;
     gameRoomView: "classic" | "journey";
+    telegramChannel: string | null;
+    city: {
+      id: string;
+      name: string;
+      region: string;
+    } | null;
     role: "USER" | "HOST" | "ADMIN";
     status: "ACTIVE" | "BLOCKED" | "DELETED";
     createdAt: string;
@@ -33,6 +39,8 @@ export interface ProfileResponse {
     wonAt: string | null;
     escapedRatRaceAt: string | null;
     monthlyCashflowCents: number;
+    gameMode: "MULTIPLAYER" | "SOLO";
+    outcome: "WIN" | "LOSS" | null;
   }>;
 }
 
@@ -46,12 +54,15 @@ export interface GameListItem {
   code: string;
   title: string;
   status: string;
+  mode: "MULTIPLAYER" | "SOLO";
   maxPlayers: number;
   createdAt: string;
   players: Array<{
     id: string;
     role: string;
     seat: number | null;
+    guestName: string | null;
+    controller: "HUMAN" | "BOT";
     user: {
       id: string;
       displayName: string;
@@ -66,6 +77,7 @@ export interface GameSnapshot {
     code: string;
     title: string;
     status: "WAITING" | "IN_PROGRESS" | "PAUSED" | "ENDED" | "CANCELLED";
+    mode: "MULTIPLAYER" | "SOLO";
     maxPlayers: number;
     currentTurnIndex: number;
     currentRound: number;
@@ -96,6 +108,9 @@ export interface GameSnapshot {
 export interface GamePlayer {
   id: string;
   userId: string | null;
+  guestName: string | null;
+  controller: "HUMAN" | "BOT";
+  botStrategy: string | null;
   role: string;
   status: string;
   seat: number | null;

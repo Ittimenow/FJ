@@ -35,6 +35,8 @@ import {
   useState
 } from "react";
 import { money } from "@/lib/format";
+import { gamePlayerName } from "@/lib/game-player";
+import { localizeGameText } from "@/lib/game-labels";
 import type { GamePlayer, GameSnapshot } from "@/lib/types";
 
 export type GameRoomView = "classic" | "journey";
@@ -45,7 +47,6 @@ type VariantTwoProps = {
   canRoll: boolean;
   turnTabRequest: number;
   actions: ReactNode;
-  activity: ReactNode;
 };
 
 type CompactSection = "board" | "finance" | "actions";
@@ -55,8 +56,7 @@ export function GameRoomVariantTwo({
   currentUserId,
   canRoll,
   turnTabRequest,
-  actions,
-  activity
+  actions
 }: VariantTwoProps) {
   const players = snapshot.players.filter(
     (player) => player.role === "PLAYER" && player.status === "JOINED"
@@ -190,7 +190,7 @@ export function GameRoomVariantTwo({
           role="tabpanel"
           aria-labelledby="journey-mobile-tab-actions"
           className={[
-            "min-w-0 space-y-3 xl:block",
+            "min-w-0 space-y-3 xl:block xl:max-h-[42rem] xl:overflow-y-auto xl:pr-1",
             compactSection === "actions" ? "block" : "hidden"
           ].join(" ")}
         >
@@ -206,9 +206,6 @@ export function GameRoomVariantTwo({
         </aside>
       </div>
 
-      <div className="hidden min-w-0 xl:block">
-        {activity}
-      </div>
     </section>
   );
 }
@@ -251,7 +248,7 @@ function JourneyPlayers({
                 <span className="min-w-0">
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-xs font-extrabold">
-                      {player.user?.displayName ?? "Игрок"}
+                      {gamePlayerName(player)}
                     </span>
                     <PlayerEffectMarks player={player} />
                     {current ? (
@@ -358,7 +355,7 @@ function JourneyFinance({ player }: { player: GamePlayer | undefined }) {
   return (
     <section className="rounded-2xl bg-white p-4 shadow-panel">
       <h2 className="text-sm font-extrabold">
-        Финансы: {player.user?.displayName ?? "игрок"}
+        Финансы: {gamePlayerName(player)}
       </h2>
       <dl className="mt-3 space-y-2.5">
         {rows.map((row) => {
@@ -446,7 +443,7 @@ function JourneyLiabilities({ player }: { player: GamePlayer | undefined }) {
           {player.liabilities.map((liability) => (
             <li key={liability.id} className="rounded-xl bg-card p-3 text-xs">
               <div className="flex items-start justify-between gap-3">
-                <span className="font-bold">{liability.name}</span>
+                <span className="font-bold">{localizeGameText(liability.name)}</span>
                 <strong className="shrink-0 tabular-nums">{money(liability.balanceCents)}</strong>
               </div>
               {liability.paymentCents > 0 ? (
@@ -594,7 +591,7 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
                   boardCellTones[cell.type] ?? boardCellTones.deal
                 ].join(" ")}
                 style={{ left: `${x}%`, top: `${y}%` }}
-                title={`${cell.index === 0 ? "Старт" : `Клетка ${cell.index}`}: ${cell.label}`}
+                title={`${cell.index === 0 ? "Старт" : `Клетка ${cell.index}`}: ${localizeGameText(cell.label)}`}
               >
                 {cell.index === 0 ? (
                   <span className="text-xs font-black uppercase">Старт</span>
@@ -603,7 +600,7 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
                 ) : (
                   <CellIcon size={17} aria-hidden="true" />
                 )}
-                <span className="sr-only">{cell.label}</span>
+                <span className="sr-only">{localizeGameText(cell.label)}</span>
                 {cellPlayers.length > 0 ? (
                   <span className="absolute -bottom-4 left-1/2 flex -translate-x-1/2 -space-x-2">
                     {cellPlayers.map((player) => (
@@ -692,7 +689,7 @@ function JourneyHint({
   const pending = snapshot.game.pendingAction;
   const me = snapshot.players.find((player) => player.userId === currentUserId);
   let text = currentPlayer
-    ? `Сейчас действует ${currentPlayer.user?.displayName ?? "игрок"}. Изменения появятся у всех участников автоматически.`
+    ? `Сейчас действует ${gamePlayerName(currentPlayer)}. Изменения появятся у всех участников автоматически.`
     : "Ожидаем следующего игрока.";
 
   if (snapshot.game.status === "ENDED") {
@@ -719,12 +716,20 @@ function JourneyHint({
 }
 
 function ProfileMark({ player }: { player: GamePlayer }) {
-  const profileFigurine = player.user?.figurine;
+  const profileFigurine = player.figurine ?? player.user?.figurine;
   const avatarUrl = player.user?.avatarUrl;
-  const name = player.user?.displayName ?? "Игрок";
+  const name = gamePlayerName(player);
   const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-journey text-xs font-black text-white shadow-[0_4px_10px_rgba(23,36,63,.22)]" title={`Профиль: ${name}`}>
+    <span
+      className={[
+        "grid shrink-0 place-items-center",
+        profileFigurine
+          ? "h-10 w-10"
+          : "h-9 w-9 overflow-hidden rounded-full bg-journey text-xs font-black text-white shadow-[0_4px_10px_rgba(23,36,63,.22)]"
+      ].join(" ")}
+      title={`Профиль: ${name}`}
+    >
       {profileFigurine ? (
         <img src={figurineImagePath(profileFigurine)} alt="" className="h-full w-full object-contain" />
       ) : avatarUrl ? (
@@ -744,13 +749,19 @@ function PlayerMark({
   size: "xs" | "sm" | "md";
   current?: boolean;
 }) {
-  const sizeClass = {
-    xs: "h-5 w-5 text-xs",
-    sm: "h-7 w-7 text-xs",
-    md: "h-9 w-9 text-xs"
-  }[size];
   const figurine = player.figurine ?? player.user?.figurine;
-  const name = player.user?.displayName ?? "Игрок";
+  const sizeClass = figurine
+    ? {
+        xs: "h-6 w-6",
+        sm: "h-8 w-8",
+        md: "h-10 w-10"
+      }[size]
+    : {
+        xs: "h-5 w-5 text-xs",
+        sm: "h-7 w-7 text-xs",
+        md: "h-9 w-9 text-xs"
+      }[size];
+  const name = gamePlayerName(player);
   const initials = name
     .split(/\s+/)
     .slice(0, 2)
@@ -761,9 +772,12 @@ function PlayerMark({
   return (
     <span
       className={[
-        "grid shrink-0 place-items-center rounded-full bg-journey font-black text-white shadow-[0_4px_10px_rgba(23,36,63,.22)]",
+        "grid shrink-0 place-items-center",
+        figurine
+          ? ""
+          : "rounded-full bg-journey font-black text-white shadow-[0_4px_10px_rgba(23,36,63,.22)]",
         sizeClass,
-        current ? "ring-2 ring-action ring-offset-2" : ""
+        current ? (figurine ? "relative z-10 scale-110" : "ring-2 ring-action ring-offset-2") : ""
       ].join(" ")}
       title={name}
     >

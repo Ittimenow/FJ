@@ -316,6 +316,9 @@ try {
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"], { env: localEnv });
 
+  log("Verifying database schema.");
+  await run(npmCommand, ["run", "db:verify"], { env: localEnv });
+
   await seedReferenceDataIfNeeded();
 
   const apiPortFree = await isPortOpen(4000);

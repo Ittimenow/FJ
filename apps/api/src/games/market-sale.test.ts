@@ -43,14 +43,14 @@ test("seed data preserves original real-estate cards", () => {
   const cards = seed.split(/(?=INSERT INTO cards )/);
   const matchingCards = (title: string) => cards.filter((card) => card.includes(`'${title}'`));
 
-  assert.equal(matchingCards("8-Plex: $240,000, +$950/мес").length, 2);
+  assert.equal(matchingCards("8-квартирный дом: $240,000, +$950/мес").length, 2);
 
-  const plex220 = matchingCards("8-Plex: $220,000, +$1,700/мес")[0] ?? "";
+  const plex220 = matchingCards("8-квартирный дом: $220,000, +$1,700/мес")[0] ?? "";
   assert.match(plex220, /'down_payment', '40000'/);
   assert.match(plex220, /'cash_delta', -40000/);
 
-  assert.equal(matchingCards("4-Plex: $140,000, +$2,000/мес").length, 1);
-  assert.equal(matchingCards("4-Plex: $90,000, +$500/мес").length, 1);
+  assert.equal(matchingCards("4-квартирный дом: $140,000, +$2,000/мес").length, 1);
+  assert.equal(matchingCards("4-квартирный дом: $90,000, +$500/мес").length, 1);
   assert.equal(matchingCards("24-квартирные апартаменты: $575,000, +$3,400/мес").length, 1);
 
   const apartments60 =
@@ -71,7 +71,7 @@ test("seed data preserves original small-deal classifications and finances", () 
   assert.match(matchingCard("2У коттедж: $40,000, +$220/мес"), /'mortgage', '35000'/);
   assert.match(matchingCard("2У коттедж: $55,000, +$160/мес"), /'mortgage', '50000'/);
   assert.match(matchingCard("3M коттедж: $65,000, +$160/мес"), /'mortgage', '60000'/);
-  assert.match(matchingCard("Part Time: финансовое обучение - $5,000"), /'business', NULL\)/);
+  assert.match(matchingCard("Парт Тайм: финансовое обучение - $5,000"), /'business', NULL\)/);
   assert.match(matchingCard("Займ брату под залог дома: $5,000"), /'loan', NULL\)/);
   assert.match(matchingCard("10 га земли: $5,000"), /'land', NULL\)/);
   assert.match(matchingCard("Редкая золотая монета: $500"), /'collectible', NULL\)/);

@@ -281,7 +281,7 @@ function AdminDashboard({
             <Metric label="Побед" value={profile.stats.wins} />
             <Metric label="Выходов из крысиных бегов" value={profile.stats.escapedRatRace} />
             <Metric
-              label="Средний cashflow"
+              label="Средний денежный поток"
               value={money(profile.stats.averageMonthlyCashflowCents)}
             />
           </dl>
@@ -936,7 +936,7 @@ function HistoryTable({ history }: { history: ProfileResponse["history"] }) {
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div><dt className="text-xs text-muted">Результат</dt><dd className="mt-1 font-bold">{gameResult(item)}</dd></div>
-              <div><dt className="text-xs text-muted">Cashflow</dt><dd className="mt-1 font-bold">{money(item.monthlyCashflowCents)}</dd></div>
+              <div><dt className="text-xs text-muted">Денежный поток</dt><dd className="mt-1 font-bold">{money(item.monthlyCashflowCents)}</dd></div>
               <div><dt className="text-xs text-muted">Профессия</dt><dd className="mt-1 font-bold">{item.profession ?? "—"}</dd></div>
               <div><dt className="text-xs text-muted">Дата</dt><dd className="mt-1 font-bold">{shortDate(item.joinedAt)}</dd></div>
             </dl>
@@ -951,7 +951,7 @@ function HistoryTable({ history }: { history: ProfileResponse["history"] }) {
             <th className="pb-3 font-bold">Статус</th>
             <th className="pb-3 font-bold">Результат</th>
             <th className="pb-3 font-bold">Профессия</th>
-            <th className="pb-3 font-bold">Cashflow</th>
+            <th className="pb-3 font-bold">Денежный поток</th>
             <th className="pb-3 font-bold">Дата</th>
           </tr>
         </thead>
@@ -997,7 +997,9 @@ function AdminGameRow({ game }: { game: GameListItem }) {
       <div>
         <div className="font-extrabold">{game.title}</div>
         <div className="mt-1 text-xs text-muted">
-          {game.code} · {players.length}/{game.maxPlayers} игроков
+          {game.mode === "SOLO"
+            ? `С ботами · ${players.filter((player) => player.controller === "BOT").length} соперников`
+            : `${game.code} · ${players.length}/${game.maxPlayers} игроков`}
         </div>
       </div>
       <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">{gameStatusLabel(game.status)}</Badge>

@@ -3,7 +3,7 @@ import {
   Injectable,
   UnauthorizedException
 } from "@nestjs/common";
-import { isFigurineId } from "@cashflow/shared";
+import { isFigurineId, realtimeEvents } from "@cashflow/shared";
 import { AccountStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
@@ -34,6 +34,8 @@ export class UsersService {
         birthDate: true,
         gameExperience: true,
         gameRoomView: true,
+        telegramChannel: true,
+        city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true,
         createdAt: true
@@ -44,7 +46,15 @@ export class UsersService {
       this.prisma.gamePlayer.findMany({
         where: { userId, game: { status: { not: "CANCELLED" } } },
         include: {
-          game: true,
+          game: {
+            include: {
+              events: {
+                where: { type: realtimeEvents.gameEnded },
+                orderBy: { sequence: "desc" },
+                take: 1
+              }
+            }
+          },
           profession: { select: { name: true } },
           financialState: true
         },
@@ -56,7 +66,10 @@ export class UsersService {
       })
     ]);
 
-    const wins = states.filter((s) => s.wonAt).length;
+    const survivalWins = history.filter(
+      (player) => gameEndReason(player.game.events[0]?.payload) === "bots_eliminated"
+    ).length;
+    const wins = states.filter((s) => s.wonAt).length + survivalWins;
     const escaped = states.filter((s) => s.escapedRatRaceAt).length;
     const avgCashflow =
       states.length === 0
@@ -82,25 +95,47 @@ export class UsersService {
         averageMonthlyCashflowCents: avgCashflow,
         averagePassiveIncomeCents: avgPassive
       },
-      history: history.map((player) => ({
-        gameId: player.gameId,
-        title: player.game.title,
-        code: player.game.code,
-        status: player.game.status,
-        role: player.role,
-        profession: player.profession?.name ?? null,
-        joinedAt: player.joinedAt,
-        endedAt: player.game.endedAt,
-        wonAt: player.financialState?.wonAt ?? null,
-        escapedRatRaceAt: player.financialState?.escapedRatRaceAt ?? null,
-        monthlyCashflowCents: player.financialState?.monthlyCashflowCents ?? 0
-      }))
+      history: history.map((player) => {
+        const gameEndPayload = player.game.events[0]?.payload;
+        const endReason = gameEndReason(gameEndPayload);
+        const winnerGamePlayerId = gameEndWinnerId(gameEndPayload);
+        return {
+          gameId: player.gameId,
+          title: player.game.title,
+          code: player.game.code,
+          status: player.game.status,
+          role: player.role,
+          profession: player.profession?.name ?? null,
+          joinedAt: player.joinedAt,
+          endedAt: player.game.endedAt,
+          wonAt: player.financialState?.wonAt ?? null,
+          escapedRatRaceAt: player.financialState?.escapedRatRaceAt ?? null,
+          monthlyCashflowCents: player.financialState?.monthlyCashflowCents ?? 0,
+          gameMode: player.game.mode,
+          outcome: player.financialState?.wonAt || endReason === "bots_eliminated"
+            ? "WIN"
+            : endReason === "human_bankrupt" ||
+                (player.game.mode === "SOLO" &&
+                  endReason === "financial_freedom" &&
+                  winnerGamePlayerId !== null &&
+                  winnerGamePlayerId !== player.id)
+              ? "LOSS"
+              : null
+        };
+      })
     });
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     if (dto.figurine != null && !isFigurineId(dto.figurine)) {
       throw new BadRequestException("Unknown figurine");
+    }
+    if (dto.cityId !== undefined) {
+      const city = await this.prisma.city.findUnique({
+        where: { id: dto.cityId },
+        select: { id: true }
+      });
+      if (!city) throw new BadRequestException("Выберите город из списка.");
     }
 
     const user = await this.prisma.user.update({
@@ -115,7 +150,9 @@ export class UsersService {
           gameExperience: dto.gameExperience
         }),
         ...(dto.figurine !== undefined && { figurine: dto.figurine || null }),
-        ...(dto.gameRoomView !== undefined && { gameRoomView: dto.gameRoomView })
+        ...(dto.gameRoomView !== undefined && { gameRoomView: dto.gameRoomView }),
+        ...(dto.telegramChannel !== undefined && { telegramChannel: dto.telegramChannel }),
+        ...(dto.cityId !== undefined && { cityId: dto.cityId })
       },
       select: {
         id: true,
@@ -128,6 +165,8 @@ export class UsersService {
         birthDate: true,
         gameExperience: true,
         gameRoomView: true,
+        telegramChannel: true,
+        city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true
       }
@@ -137,7 +176,7 @@ export class UsersService {
 
   async updateAvatar(userId: string, avatarDataUrl: string) {
     if (!avatarDataUrl.startsWith("data:image/")) {
-      throw new BadRequestException("Invalid avatar format");
+      throw new BadRequestException("Неподдерживаемый формат фотографии");
     }
     return this.prisma.user.update({
       where: { id: userId },
@@ -222,4 +261,16 @@ export class UsersService {
 
     return { ok: true };
   }
+}
+
+function gameEndReason(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const reason = (payload as Record<string, unknown>).reason;
+  return typeof reason === "string" ? reason : null;
+}
+
+function gameEndWinnerId(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const winnerGamePlayerId = (payload as Record<string, unknown>).winnerGamePlayerId;
+  return typeof winnerGamePlayerId === "string" ? winnerGamePlayerId : null;
 }

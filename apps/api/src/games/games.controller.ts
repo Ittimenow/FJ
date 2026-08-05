@@ -11,6 +11,7 @@ import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
+import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
@@ -38,6 +39,14 @@ export class GamesController {
     @Body() dto: CreateGameDto
   ) {
     return this.games.createGame(user.userId, dto);
+  }
+
+  @Post("solo")
+  createSolo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateSoloGameDto
+  ) {
+    return this.games.createSoloGame(user.userId, dto);
   }
 
   @Post("join")

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   CircleDot,
   Clock3,
   MessageCircle,
@@ -35,6 +36,7 @@ export interface GameRoomHeaderState {
   status: string;
   connected: boolean;
   code: string;
+  isSolo: boolean;
   currentRound: number;
   currentPlayerName: string | null;
   currentPeriod: number;
@@ -136,7 +138,14 @@ export function GameRoomHeaderSlot() {
                 <span className="hidden max-w-44 truncate font-bold text-ink xl:inline">
                   {state.title}
                 </span>
-                <RoomInviteActions code={state.code} />
+                {state.isSolo ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eee8ff] px-2.5 py-2 font-extrabold text-[#6443b4]">
+                    <Bot size={14} aria-hidden="true" />
+                    С ботами
+                  </span>
+                ) : (
+                  <RoomInviteActions code={state.code} />
+                )}
                 <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink lg:inline">
                   {gameStatusLabel(state.status)}
                 </span>

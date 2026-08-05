@@ -14,19 +14,26 @@ export interface CityOption {
 
 export function CityCombobox({
   error,
+  initialValue = null,
+  inputId = "register-city",
   onChange
 }: {
   error?: string | undefined;
+  initialValue?: CityOption | null;
+  inputId?: string;
   onChange: (city: CityOption | null) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<CityOption | null>(null);
+  const [query, setQuery] = useState(initialValue?.name ?? "");
+  const [selected, setSelected] = useState<CityOption | null>(initialValue);
   const [results, setResults] = useState<CityOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const resultsId = `${inputId}-results`;
+  const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
 
   useEffect(() => {
     const normalizedQuery = query.trim();
@@ -84,23 +91,23 @@ export function CityCombobox({
         if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false);
       }}
     >
-      <label htmlFor="register-city" className="mb-2 block text-sm font-extrabold text-ink">
+      <label htmlFor={inputId} className="mb-2 block text-sm font-extrabold text-ink">
         Город
       </label>
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted" size={18} aria-hidden="true" />
         <Input
-          id="register-city"
+          id={inputId}
           value={query}
           placeholder="Начните вводить название"
           autoComplete="off"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={open && !selected}
-          aria-controls="register-city-results"
-          aria-activedescendant={activeIndex >= 0 ? `register-city-option-${activeIndex}` : undefined}
+          aria-controls={resultsId}
+          aria-activedescendant={activeIndex >= 0 ? `${inputId}-option-${activeIndex}` : undefined}
           aria-invalid={Boolean(error)}
-          aria-describedby={`register-city-hint${error ? " register-city-error" : ""}`}
+          aria-describedby={`${hintId}${error ? ` ${errorId}` : ""}`}
           onFocus={() => {
             if (query.trim() && !selected) setOpen(true);
           }}
@@ -142,7 +149,7 @@ export function CityCombobox({
         ) : null}
         {open && !selected ? (
           <div
-            id="register-city-results"
+            id={resultsId}
             role="listbox"
             aria-label="Города России"
             className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-64 overflow-y-auto rounded-xl bg-white p-1.5 shadow-[0_20px_45px_rgba(27,57,118,.16),0_4px_10px_rgba(27,57,118,.08)]"
@@ -155,7 +162,7 @@ export function CityCombobox({
             {results.map((city, index) => (
               <button
                 key={city.id}
-                id={`register-city-option-${index}`}
+                id={`${inputId}-option-${index}`}
                 type="button"
                 role="option"
                 aria-selected={index === activeIndex}
@@ -172,10 +179,10 @@ export function CityCombobox({
         ) : null}
       </div>
       <input type="hidden" name="cityId" value={selected?.id ?? ""} />
-      <FieldHint id="register-city-hint">
+      <FieldHint id={hintId}>
         Выберите город из справочника — свободный текст не сохранится.
       </FieldHint>
-      <FieldError id="register-city-error">{error}</FieldError>
+      <FieldError id={errorId}>{error}</FieldError>
     </div>
   );
 }

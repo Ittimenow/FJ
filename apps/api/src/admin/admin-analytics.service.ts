@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { GameStatus, Prisma } from "@prisma/client";
+import { GameMode, GameStatus, Prisma } from "@prisma/client";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -25,6 +25,7 @@ export class AdminAnalyticsService {
         code: true,
         title: true,
         status: true,
+        mode: true,
         maxPlayers: true,
         currentRound: true,
         startedAt: true,
@@ -37,6 +38,8 @@ export class AdminAnalyticsService {
             id: true,
             userId: true,
             guestName: true,
+            controller: true,
+            botStrategy: true,
             role: true,
             status: true,
             seat: true,
@@ -107,6 +110,8 @@ export class AdminAnalyticsService {
         userId: player.userId,
         displayName: player.user?.displayName ?? player.guestName,
         guestName: player.guestName,
+        controller: player.controller,
+        botStrategy: player.botStrategy,
         role: player.role,
         status: player.status,
         seat: player.seat,
@@ -140,6 +145,8 @@ export class AdminAnalyticsService {
             id: true,
             userId: true,
             guestName: true,
+            controller: true,
+            botStrategy: true,
             seat: true,
             role: true,
             user: { select: { id: true, displayName: true } }
@@ -170,6 +177,8 @@ export class AdminAnalyticsService {
               displayName:
                 event.gamePlayer.user?.displayName ?? event.gamePlayer.guestName,
               guestName: event.gamePlayer.guestName,
+              controller: event.gamePlayer.controller,
+              botStrategy: event.gamePlayer.botStrategy,
               seat: event.gamePlayer.seat,
               role: event.gamePlayer.role
             }
@@ -191,7 +200,7 @@ export class AdminAnalyticsService {
     const lines: string[] = [
       this.line({
         kind: "export_meta",
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: new Date(),
         filters: {
           from: query.from ?? null,
@@ -259,6 +268,7 @@ export class AdminAnalyticsService {
     code: string;
     title: string;
     status: GameStatus;
+    mode: GameMode;
     maxPlayers: number;
     currentRound: number;
     startedAt: Date | null;
@@ -270,6 +280,8 @@ export class AdminAnalyticsService {
       id: string;
       userId: string | null;
       guestName: string | null;
+      controller: string;
+      botStrategy: string | null;
       role: string;
       status: string;
       seat: number | null;
@@ -292,6 +304,7 @@ export class AdminAnalyticsService {
       code: game.code,
       title: game.title,
       status: game.status,
+      mode: game.mode,
       maxPlayers: game.maxPlayers,
       currentRound: game.currentRound,
       createdAt: game.createdAt,
@@ -314,6 +327,8 @@ export class AdminAnalyticsService {
         userId: player.userId,
         displayName: player.user?.displayName ?? player.guestName,
         guestName: player.guestName,
+        controller: player.controller,
+        botStrategy: player.botStrategy,
         status: player.status,
         seat: player.seat,
         joinedAt: player.joinedAt,

@@ -6,6 +6,7 @@ import { validate } from "class-validator";
 import { RegisterDto } from "./dto/register.dto";
 import { registrationSystemRole } from "./auth.service";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { UpdateProfileDto } from "../users/dto/update-profile.dto";
 import { PERSONAL_DATA_CONSENT_VERSION } from "@cashflow/shared";
 import { SystemRole } from "@prisma/client";
 
@@ -59,6 +60,23 @@ test("DTO регистрации принимает аккаунт ведуще�
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
   });
   assert.deepEqual(await validate(dto), []);
+});
+
+test("DTO профиля нормализует Telegram и проверяет город", async () => {
+  const dto = plainToInstance(UpdateProfileDto, {
+    telegramChannel: "  Example_Channel ",
+    cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad"
+  });
+  assert.deepEqual(await validate(dto), []);
+  assert.equal(dto.telegramChannel, "@example_channel");
+
+  const invalid = plainToInstance(UpdateProfileDto, {
+    telegramChannel: "@неверно",
+    cityId: "wrong"
+  });
+  const messages = (await validate(invalid)).flatMap((error) => Object.values(error.constraints ?? {}));
+  assert.ok(messages.includes("Введите Telegram-имя из 5–32 латинских букв, цифр или подчёркиваний."));
+  assert.ok(messages.includes("Выберите город из списка."));
 });
 
 test("выбор типа аккаунта преобразуется в безопасную системную роль", () => {
