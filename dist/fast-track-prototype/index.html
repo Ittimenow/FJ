@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Скоростная дорожка — Поле 1 и Поле 2</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!--
+      THESIS: 48 финансовых решений образуют один читаемый маршрут; прототип отказывается от безымянных одинаковых клеток.
+      OWN-WORLD: тёплое игровое полотно, путевой синий, оранжевое действие и четыре устойчивых типа клеток с буквенным кодом.
+      STORY: ведущий сравнивает два поля, выбирает клетку и мгновенно понимает цену, поток, правило и состояние владения.
+      FIRST VIEWPORT: переключатель полей и легенда находятся над большим игровым маршрутом; выбранная клетка раскрывается в центральной панели.
+      FORM: точное расширение существующей игровой системы, заданное пользователем; concept seed не применялся.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <header class="prototype-header">
+      <div class="header-copy">
+        <p class="prototype-status">Изолированный прототип · данные и цвета не подключены к игре</p>
+        <h1>Скоростная дорожка</h1>
+        <p class="header-summary">
+          Все 48 ячеек в проверенной последовательности. Выберите клетку, чтобы увидеть
+          стоимость, денежный поток и правило.
+        </p>
+      </div>
+
+      <div class="view-switcher" role="group" aria-label="Вариант игрового поля">
+        <button class="view-button is-active" type="button" data-view="classic" aria-pressed="true">
+          <span class="view-number">1</span>
+          <span><strong>Поле 1</strong><small>Единый маршрут · 48 клеток</small></span>
+        </button>
+        <button class="view-button" type="button" data-view="journey" aria-pressed="false">
+          <span class="view-number">2</span>
+          <span><strong>Поле 2</strong><small>Маршрутное кольцо</small></span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="control-strip" aria-label="Легенда и сценарий прототипа">
+        <div class="legend" aria-label="Типы клеток">
+          <span class="legend-item type-business"><b>Б</b> Бизнес</span>
+          <span class="legend-item type-dream"><b>М</b> Мечта</span>
+          <span class="legend-item type-expense"><b>Ф</b> Расход</span>
+          <span class="legend-item type-positive"><b>О</b> Положительный эффект</span>
+        </div>
+        <div class="scenario-note">
+          <span class="scenario-dot" aria-hidden="true"></span>
+          Демонстрационный ход: игрок находится на клетке 24
+        </div>
+      </section>
+
+      <section class="board-shell" aria-label="Предпросмотр Скоростной дорожки">
+        <div class="board-scroll" tabindex="0" aria-label="Игровое поле; область можно прокручивать">
+          <div id="classic-board" class="board board-classic" aria-label="Поле 1, единый маршрут">
+            <svg class="classic-route" viewBox="0 0 1380 960" aria-hidden="true">
+              <path class="classic-route-line" d="M 690 212 H 228 V 752 H 492 V 892 H 116 Q 80 892 80 856 V 104 Q 80 68 116 68 H 1264 Q 1300 68 1300 104 V 856 Q 1300 892 1264 892 H 888 V 752 H 1152 V 212 H 690"></path>
+              <text class="classic-start-label" x="656" y="166">СТАРТ</text>
+              <text class="classic-transition-label classic-transition-out" x="466" y="824">11–12</text>
+              <text class="classic-transition-label classic-transition-return" x="862" y="824">37–38</text>
+            </svg>
+          </div>
+          <div id="journey-board" class="board board-journey" aria-label="Поле 2" hidden>
+            <svg class="journey-route" viewBox="0 0 1200 760" aria-hidden="true">
+              <ellipse cx="600" cy="380" rx="528" ry="310"></ellipse>
+              <path d="M 580 706 L 600 724 L 620 706" class="route-arrow"></path>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="mobile-detail" aria-label="Выбранная клетка на узком экране">
+        <div id="mobile-detail-content"></div>
+      </section>
+
+      <div id="cell-detail-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+      <section class="prototype-notes" aria-labelledby="notes-title">
+        <h2 id="notes-title">Что проверяет прототип</h2>
+        <div class="notes-layout">
+          <p>
+            Оба поля используют один каталог и одинаковые состояния. Цвет никогда не работает
+            один: каждая клетка показывает номер, буквенный код и доступное название типа.
+          </p>
+          <ul>
+            <li>текущая позиция и несколько фигурок;</li>
+            <li>купленный бизнес и закрытая возможность;</li>
+            <li>целевая мечта и её удорожание;</li>
+            <li>стоимость, денежный поток, ROI и условия броска.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <template id="detail-template">
+      <article class="cell-detail">
+        <div class="detail-heading">
+          <span class="detail-code"></span>
+          <div>
+            <span class="detail-type"></span>
+            <h2 class="detail-title"></h2>
+          </div>
+        </div>
+        <dl class="detail-metrics">
+        </dl>
+        <p class="detail-rule"></p>
+        <div class="detail-state"></div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

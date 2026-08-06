@@ -8,11 +8,12 @@
     "build": "next build",
     "start": "next start",
     "pretest": "npm run build --workspace=@cashflow/shared",
-    "test": "node --import tsx --test src/components/auth/*.test.ts src/components/analytics/*.test.ts src/components/game/*.test.ts",
+    "test": "node --import tsx --test src/components/auth/*.test.ts src/components/analytics/*.test.ts src/components/game/*.test.ts src/lib/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cashflow/shared": "*",
+    "@sentry/nextjs": "^10.69.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "^15.0.3",

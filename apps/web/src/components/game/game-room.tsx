@@ -2,6 +2,7 @@
 
 import {
   figurineImagePath,
+  isBabyGiftWindowOpen,
   realtimeEvents,
   type FigurineId
 } from "@cashflow/shared";
@@ -13,19 +14,28 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  CircleAlert,
   CircleDot,
+  CircleOff,
   Dices,
+  Gift,
   HandCoins,
   Handshake,
+  Hourglass,
   Landmark,
   LayoutDashboard,
   MonitorUp,
+  Minus,
   MoveRight,
   PauseCircle,
   Play,
+  Plus,
   ReceiptText,
+  ShieldCheck,
+  Send,
   Trophy,
   UserRound,
+  UserX,
   UsersRound
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -57,6 +67,11 @@ import {
   type CashChange
 } from "@/components/game/game-event-result";
 import {
+  gameEndPresentation,
+  type GameEndIcon,
+  type GameEndTone
+} from "@/components/game/game-end-result";
+import {
   changeStockCostCents,
   changeStockQuantity,
   normalizeStockQuantity,
@@ -65,6 +80,15 @@ import {
 } from "@/components/game/stock-purchase-calculation";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
+import {
+  checkConnection as runConnectionCheck,
+  initialConnectionDiagnostics,
+  phaseFromConnectError,
+  phaseFromDisconnect,
+  reportConnectionIssue,
+  socketOptions,
+  type ConnectionDiagnostics
+} from "@/lib/connection-health";
 import { money, shortDate } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
 import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
@@ -125,7 +149,9 @@ export function GameRoom({
   const initialPreferredFigurine = initialMe?.user?.figurine;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [gameRoomView] = useState<GameRoomView>(initialMe?.user?.gameRoomView ?? "classic");
-  const [connected, setConnected] = useState(false);
+  const [connection, setConnection] = useState<ConnectionDiagnostics>(
+    initialConnectionDiagnostics
+  );
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
   const [dealQuantity, setDealQuantity] = useState<number | "">("");
@@ -153,22 +179,46 @@ export function GameRoom({
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mobileBoardRef = useRef<HTMLDivElement>(null);
   const expirationRefreshRef = useRef(false);
+  const lastDiagnosticReportRef = useRef(0);
   const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
     const socket = io(`${publicSocketBaseUrl()}/games`, {
-      auth: { token },
-      path: publicSocketPath(),
-      transports: ["websocket"]
+      ...socketOptions(token),
+      path: publicSocketPath()
     });
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      setConnected(true);
+      setConnection((current) => ({
+        ...current,
+        phase: "connected",
+        lastConnectedAt: new Date().toISOString(),
+        lastDisconnectReason: null,
+        reconnectAttempt: 0
+      }));
       socket.emit("game:join", { gameId: initialSnapshot.game.id });
+      void refreshConnection(socket);
     });
-    socket.on("disconnect", () => setConnected(false));
+    socket.io.on("reconnect_attempt", (attempt) => {
+      setConnection((current) => ({
+        ...current,
+        phase: navigator.onLine ? "reconnecting" : "offline",
+        reconnectAttempt: attempt
+      }));
+    });
+    socket.on("disconnect", (reason) => {
+      setConnection((current) => {
+        const next = {
+          ...current,
+          phase: phaseFromDisconnect(reason, navigator.onLine),
+          lastDisconnectReason: reason
+        };
+        reportConnectionOnce("socket_disconnect", `Игровой канал отключён: ${reason}`, next);
+        return next;
+      });
+    });
     socket.on(realtimeEvents.stateUpdate, (value: GameSnapshot) => {
       if (!value?.game?.id) return;
       if (value.game.status === "CANCELLED") {
@@ -204,15 +254,42 @@ export function GameRoom({
         chatMessages: [...current.chatMessages, message]
       }));
     });
-    socket.on("connect_error", () =>
-      setError("Не удалось подключиться к игре. Проверьте соединение и обновите страницу.")
-    );
+    socket.on("connect_error", (caught) => {
+      const phase = phaseFromConnectError(caught, navigator.onLine);
+      setConnection((current) => {
+        const next = {
+          ...current,
+          phase,
+          lastDisconnectReason: caught.message
+        };
+        reportConnectionOnce("socket_connect_error", caught.message, next);
+        return next;
+      });
+      setError(
+        phase === "session_expired"
+          ? "Сессия истекла. Войдите в аккаунт заново."
+          : "Игровой сервер пока недоступен. Переподключение выполняется автоматически."
+      );
+    });
+    const handleOffline = () => {
+      setConnection((current) => ({ ...current, phase: "offline" }));
+    };
+    const handleOnline = () => {
+      setConnection((current) => ({ ...current, phase: "reconnecting" }));
+      socket.connect();
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
 
     return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
       socket.disconnect();
       socketRef.current = null;
     };
   }, [initialSnapshot.game.id, token, router]);
+
+  const connected = connection.phase === "connected";
 
   useEffect(() => {
     return () => {
@@ -411,6 +488,7 @@ export function GameRoom({
       title: snapshot.game.title,
       status: snapshot.game.status,
       connected,
+      connection,
       code: snapshot.game.code,
       isSolo,
       currentRound: snapshot.game.currentRound,
@@ -424,13 +502,15 @@ export function GameRoom({
       onSendChat: (body) => emit("chat:send", { body }),
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
-      onDeleteGame: canManage ? deleteGame : null
+      onDeleteGame: canManage ? deleteGame : null,
+      onCheckConnection: () => void refreshConnection()
     });
   }, [
     canManage,
     canPause,
     canResume,
     connected,
+    connection,
     currentPlayer,
     currentUserId,
     isSolo,
@@ -665,16 +745,51 @@ export function GameRoom({
         reject(new Error("Соединение с игрой неактивно"));
         return;
       }
-      socket.emit(
+      socket.timeout(10_000).emit(
         event,
         {
           gameId: snapshot.game.id,
           ...payload
         },
-        (result: GameActionResult) => {
-          resolve(result);
+        (timeoutError: Error | null, result?: GameActionResult) => {
+          if (timeoutError) {
+            const message = `Команда ${event} не получила ответ за 10 секунд`;
+            void reportConnectionIssue({
+              token,
+              gameId: snapshot.game.id,
+              kind: "socket_timeout",
+              message,
+              diagnostics: connection
+            });
+            reject(new Error("Сервер долго не отвечает. Проверьте соединение и повторите действие."));
+            return;
+          }
+          resolve(result ?? {});
         }
       );
+    });
+  }
+
+  async function refreshConnection(socket = socketRef.current) {
+    setConnection((current) => ({ ...current, checking: true }));
+    const result = await runConnectionCheck(socket);
+    setConnection((current) => ({ ...current, ...result, checking: false }));
+  }
+
+  function reportConnectionOnce(
+    kind: "socket_connect_error" | "socket_disconnect",
+    message: string,
+    diagnostics: ConnectionDiagnostics
+  ) {
+    const now = Date.now();
+    if (now - lastDiagnosticReportRef.current < 60_000) return;
+    lastDiagnosticReportRef.current = now;
+    void reportConnectionIssue({
+      token,
+      gameId: initialSnapshot.game.id,
+      kind,
+      message,
+      diagnostics
     });
   }
 
@@ -819,6 +934,38 @@ export function GameRoom({
     emit("charity:decline", {});
   }
 
+  async function sendBabyGift(birthEventId: string, amountCents: number) {
+    setError(null);
+    try {
+      if (socketRef.current?.connected) {
+        const result = await emitWithAck("baby:gift", { birthEventId, amountCents });
+        applyActionResult(result);
+        return;
+      }
+
+      const response = await fetch(
+        `${publicApiBaseUrl()}/api/games/${snapshot.game.id}/baby-gifts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ birthEventId, amountCents })
+        }
+      );
+      const result = (await response.json()) as GameActionResult & { message?: string };
+      if (!response.ok) {
+        throw new Error(result.message ?? "Не удалось отправить поздравление");
+      }
+      applyActionResult(result);
+    } catch (event) {
+      const message = gameErrorMessage(event, "Не удалось отправить поздравление");
+      setError(message);
+      throw new Error(message);
+    }
+  }
+
   function payDoodadWithCash() {
     emit("doodad:pay_cash", {});
   }
@@ -927,6 +1074,7 @@ export function GameRoom({
       currentTurnPlayer={currentPlayer}
       currentTurnIndex={snapshot.game.currentTurnIndex}
       gameStatus={snapshot.game.status}
+      onSendBabyGift={sendBabyGift}
     />
   );
 
@@ -1375,12 +1523,12 @@ function BankruptcyPanel({
   );
 
   return (
-    <div className="app-shell-overlay fixed inset-0 z-[60] overflow-y-auto bg-black/50 px-4 py-8">
+    <div className="bankruptcy-overlay fixed inset-0 z-[60] bg-black/50">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="bankruptcy-title"
-        className="app-shell-overlay-panel app-shell-overlay-scroll mx-auto w-full max-w-3xl rounded-md border border-red-300 bg-white p-5 shadow-panel"
+        className="bankruptcy-dialog mx-auto w-full max-w-5xl rounded-2xl bg-white p-4 shadow-[0_34px_90px_rgba(5,18,45,.35)] sm:p-5"
       >
         <h2 id="bankruptcy-title" className="text-xl font-semibold text-red-800">
           Объявлено банкротство
@@ -1571,58 +1719,185 @@ function GameEndPopup({
 
   const winnerState = winner?.financialState;
   const playerState = player?.financialState;
-  const description = winner
-    ? `${gamePlayerName(winner)} достиг финансовой свободы`
-    : gameEndReasonText(reason);
+  const featuredPlayer = winner ?? player;
+  const featuredState = featuredPlayer?.financialState;
+  const playerIsWinner = Boolean(winner && player && winner.id === player.id);
+  const presentation = gameEndPresentation({
+    reason,
+    winnerName: winner ? gamePlayerName(winner) : null
+  });
+  const EndIcon = gameEndIcons[presentation.icon];
 
   return (
-    <div className="app-shell-overlay fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/50 px-4 py-8">
+    <div className="game-end-overlay fixed inset-0 z-[70] bg-black/55">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="game-end-title"
         aria-describedby="game-end-description"
-        className="app-shell-overlay-panel app-shell-overlay-scroll w-full max-w-xl rounded-md border border-line bg-white p-5 shadow-panel sm:p-6"
+        className="game-end-dialog flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[#fff9f1] shadow-[0_34px_90px_rgba(5,18,45,.35)]"
       >
-        <div className="text-center">
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#fff0df] text-[#c0560c]">
-            <Trophy size={28} aria-hidden="true" />
-          </span>
-          <h2 id="game-end-title" className="mt-3 text-2xl font-semibold">
-            Игра окончена
-          </h2>
-          <p id="game-end-description" className="mt-2 text-sm text-neutral-600">
-            {description}
-          </p>
+        <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+          <div className="text-center">
+            <span
+              className={`mx-auto grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_22px_rgba(27,57,118,.14)] ${gameEndToneClasses[presentation.tone]}`}
+            >
+              <EndIcon size={25} aria-hidden="true" />
+            </span>
+            <h2
+              id="game-end-title"
+              className="mt-3 text-2xl font-extrabold tracking-[-0.025em] text-ink sm:text-3xl"
+            >
+              {presentation.title}
+            </h2>
+            <p id="game-end-description" className="mx-auto mt-2 max-w-lg text-sm text-[#657597]">
+              {presentation.description}
+            </p>
+          </div>
+
+          {featuredPlayer ? (
+            <div className="mt-5 flex flex-col items-center text-center">
+              <PlayerIdentityMark player={featuredPlayer} size="lg" />
+              <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.025em] text-ink sm:text-3xl">
+                {gamePlayerName(featuredPlayer)}
+              </h3>
+              <p className="mt-1 text-base font-semibold text-[#657597]">
+                {featuredPlayer.profession?.name ?? "Профессия не выдана"}
+              </p>
+            </div>
+          ) : null}
+
+          {featuredState ? (
+            <section className="mt-6" aria-labelledby="featured-financial-result">
+              <h3 id="featured-financial-result" className="text-lg font-extrabold text-ink">
+                {winner ? "Финансовый итог победителя" : "Ваш финансовый итог"}
+              </h3>
+              <GameEndFinancialMetrics state={featuredState} />
+              <GameEndAssets assets={featuredPlayer?.assets ?? []} />
+            </section>
+          ) : null}
+
+          {playerState && winnerState && !playerIsWinner ? (
+            <section className="mt-6 rounded-xl bg-white p-4 shadow-[0_14px_36px_rgba(27,57,118,.09)]">
+              <h3 className="font-extrabold text-ink">Ваш результат</h3>
+              <ResultFinancialComparison state={playerState} showCash />
+            </section>
+          ) : null}
         </div>
 
-        {winnerState ? (
-          <section className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4">
-            <h3 className="font-semibold text-emerald-900">Результат победителя</h3>
-            <ResultFinancialComparison state={winnerState} />
-          </section>
-        ) : null}
-
-        {playerState ? (
-          <section className="mt-4 rounded-md border border-line bg-surface p-4">
-            <h3 className="font-semibold">Ваш результат</h3>
-            <ResultFinancialComparison state={playerState} showCash />
-          </section>
-        ) : null}
-
-        <Button className="mt-5 w-full" onClick={onClose}>
-          {playerState ? "Посмотреть свои результаты" : "Закрыть"}
-        </Button>
+        <div className="shrink-0 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(27,57,118,.10)] sm:px-6 sm:pb-5 sm:pt-4">
+          <Button className="min-h-[52px] w-full" onClick={onClose}>
+            {playerState ? "Посмотреть свои результаты" : "Закрыть"}
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
+const gameEndIcons: Record<GameEndIcon, typeof Trophy> = {
+  trophy: Trophy,
+  "shield-check": ShieldCheck,
+  hourglass: Hourglass,
+  "user-x": UserX,
+  "circle-off": CircleOff,
+  "circle-alert": CircleAlert
+};
+
+const gameEndToneClasses: Record<GameEndTone, string> = {
+  victory: "bg-[#fff0df] text-[#c0560c]",
+  survival: "bg-[#edf6e9] text-[#3f5b35]",
+  timeout: "bg-[#eaf0fd] text-[#1b3976]",
+  danger: "bg-[#fff0eb] text-[#9d3c22]",
+  neutral: "bg-[#eef1f6] text-[#52617e]"
+};
+
+function GameEndFinancialMetrics({ state }: { state: FinancialState }) {
+  const metrics = [
+    {
+      label: "Пассивный доход",
+      value: `${money(state.passiveIncomeCents)}/мес`,
+      className: "bg-[#edf6e9] text-[#3f5b35]"
+    },
+    {
+      label: "Расходы",
+      value: `${money(state.totalExpensesCents)}/мес`,
+      className: "bg-[#fff0eb] text-[#9d3c22]"
+    },
+    {
+      label: "Осталось наличных",
+      value: money(state.cashCents),
+      className: "bg-[#eaf0fd] text-[#1b3976]"
+    },
+    {
+      label: "Денежный поток",
+      value: `${money(state.monthlyCashflowCents)}/мес`,
+      className:
+        state.monthlyCashflowCents >= 0
+          ? "bg-[#e8f5ef] text-[#216547]"
+          : "bg-[#fff0eb] text-[#9d3c22]"
+    }
+  ];
+
+  return (
+    <dl className="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
+      {metrics.map((metric) => (
+        <div key={metric.label} className={`min-w-0 rounded-xl p-3 sm:p-4 ${metric.className}`}>
+          <dt className="text-xs font-bold leading-4 opacity-80">{metric.label}</dt>
+          <dd className="mt-1 break-words text-base font-extrabold leading-5 sm:text-lg">
+            {metric.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function GameEndAssets({ assets }: { assets: GamePlayer["assets"] }) {
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-extrabold text-ink">Активы</h3>
+        <span className="text-sm font-bold text-[#657597]">
+          {assets.length === 0 ? "Нет активов" : `${assets.length} шт.`}
+        </span>
+      </div>
+
+      {assets.length === 0 ? (
+        <p className="mt-2 rounded-xl bg-white px-4 py-3 text-sm text-[#657597]">
+          К завершению партии активов не осталось.
+        </p>
+      ) : (
+        <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+          {assets.map((asset) => (
+            <li
+              key={asset.id}
+              className="flex min-w-0 items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-[0_8px_22px_rgba(27,57,118,.07)]"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#eef3e8] text-[#3f5b35]">
+                <BriefcaseBusiness size={17} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-extrabold text-ink" title={asset.name}>
+                  {asset.name}
+                </span>
+                <span className="mt-0.5 block text-xs font-semibold text-[#657597]">
+                  {asset.quantity > 1 ? `${asset.quantity} шт. · ` : ""}
+                  {asset.cashflowCents === 0
+                    ? "без денежного потока"
+                    : `${money(asset.cashflowCents)}/мес`}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function gameEndReasonText(reason: string | null) {
-  if (reason === "human_bankrupt") return "Вы выбыли из-за банкротства — одиночная партия завершена";
-  if (reason === "bots_eliminated") return "Все виртуальные соперники выбыли — вы победили";
-  if (reason === "all_players_bankrupt") return "Все игроки выбыли из-за банкротства";
-  return "Время партии истекло — победителя нет";
+  return gameEndPresentation({ reason }).description;
 }
 
 function StockSalePanel({
@@ -2049,7 +2324,9 @@ function WaitingRoomOverview({
           </div>
           <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8effe] px-3 py-2 text-sm font-extrabold text-journey">
             <UsersRound size={16} aria-hidden="true" />
-            {gamePlayers.length}/{snapshot.game.maxPlayers} игроков
+            {isSolo && snapshot.game.maxPlayers
+              ? `${gamePlayers.length}/${snapshot.game.maxPlayers} игроков`
+              : `${gamePlayers.length} игроков`}
           </span>
         </div>
 
@@ -2812,7 +3089,7 @@ function PlayerIdentityMark({
   size = "md"
 }: {
   player: GamePlayer;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }) {
   const name = gamePlayerName(player);
   const figurine = player.figurine ?? player.user?.figurine;
@@ -2824,12 +3101,16 @@ function PlayerIdentityMark({
     .join("")
     .toUpperCase();
   const sizeClass = figurine
-    ? size === "sm"
-      ? "h-10 w-10"
-      : "h-12 w-12"
-    : size === "sm"
-      ? "h-9 w-9 text-xs"
-      : "h-11 w-11 text-sm";
+    ? size === "lg"
+      ? "h-24 w-24"
+      : size === "sm"
+        ? "h-10 w-10"
+        : "h-12 w-12"
+    : size === "lg"
+      ? "h-20 w-20 text-xl"
+      : size === "sm"
+        ? "h-9 w-9 text-xs"
+        : "h-11 w-11 text-sm";
 
   return (
     <span
@@ -4358,7 +4639,8 @@ function GameTurnFeed({
   currentGamePlayerId,
   currentTurnPlayer,
   currentTurnIndex,
-  gameStatus
+  gameStatus,
+  onSendBabyGift
 }: {
   gameId: string;
   token: string;
@@ -4369,6 +4651,7 @@ function GameTurnFeed({
   currentTurnPlayer: GamePlayer | undefined;
   currentTurnIndex: number;
   gameStatus: GameSnapshot["game"]["status"];
+  onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
 }) {
   const [historyEvents, setHistoryEvents] = useState(events);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -4376,6 +4659,12 @@ function GameTurnFeed({
   const [replayLoaded, setReplayLoaded] = useState(events.length < 80);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [newEventSequenceFloor, setNewEventSequenceFloor] = useState<number | null>(null);
+  const [enteringPendingTurnIndex, setEnteringPendingTurnIndex] = useState<number | null>(null);
+  const latestRealtimeSequenceRef = useRef(
+    events.reduce((latest, event) => Math.max(latest, event.sequence), 0)
+  );
+  const previousTurnIndexRef = useRef(currentTurnIndex);
 
   useEffect(() => {
     setHistoryEvents(events);
@@ -4383,6 +4672,13 @@ function GameTurnFeed({
     setOnlyMine(false);
     setReplayLoaded(events.length < 80);
     setLoadError(null);
+    setNewEventSequenceFloor(null);
+    setEnteringPendingTurnIndex(null);
+    latestRealtimeSequenceRef.current = events.reduce(
+      (latest, event) => Math.max(latest, event.sequence),
+      0
+    );
+    previousTurnIndexRef.current = currentTurnIndex;
   }, [gameId]);
 
   useEffect(() => {
@@ -4390,7 +4686,33 @@ function GameTurnFeed({
   }, [events]);
 
   useEffect(() => {
+    const latestSequence = events.reduce(
+      (latest, event) => Math.max(latest, event.sequence),
+      0
+    );
+    const previousSequence = latestRealtimeSequenceRef.current;
+    if (latestSequence <= previousSequence) return;
+
+    latestRealtimeSequenceRef.current = latestSequence;
+    setNewEventSequenceFloor((current) => current ?? previousSequence);
+    const resetTimer = window.setTimeout(() => setNewEventSequenceFloor(null), 600);
+    return () => window.clearTimeout(resetTimer);
+  }, [events]);
+
+  useEffect(() => {
+    const previousTurnIndex = previousTurnIndexRef.current;
+    previousTurnIndexRef.current = currentTurnIndex;
+    if (currentTurnIndex === previousTurnIndex) return;
+
+    setEnteringPendingTurnIndex(currentTurnIndex);
+    const resetTimer = window.setTimeout(() => setEnteringPendingTurnIndex(null), 600);
+    return () => window.clearTimeout(resetTimer);
+  }, [currentTurnIndex]);
+
+  useEffect(() => {
     setVisibleCount(10);
+    setNewEventSequenceFloor(null);
+    setEnteringPendingTurnIndex(null);
   }, [onlyMine]);
 
   const turns = useMemo(() => {
@@ -4406,6 +4728,7 @@ function GameTurnFeed({
         : journalEntryActor(entry)?.id === currentUserId;
     });
   }, [currentGamePlayerId, currentUserId, historyEvents, onlyMine]);
+  const viewingPlayer = players.find((player) => player.id === currentGamePlayerId);
   const hasOpenCurrentTurn = turns.some(
     (entry) =>
       !isJournalTurnComplete(entry) &&
@@ -4423,6 +4746,8 @@ function GameTurnFeed({
 
   async function loadMore() {
     setLoadError(null);
+    setNewEventSequenceFloor(null);
+    setEnteringPendingTurnIndex(null);
     if (visibleCount < totalVisibleItems) {
       setVisibleCount((count) => count + 10);
       return;
@@ -4447,7 +4772,7 @@ function GameTurnFeed({
   }
 
   return (
-    <section aria-label="Лента ходов">
+    <section className="w-full min-w-0 max-w-full" aria-label="Лента ходов">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-base font-extrabold">Лента ходов</h3>
@@ -4464,19 +4789,26 @@ function GameTurnFeed({
       </div>
 
       <div
-        className="mt-3 space-y-3"
+        className="mt-3 w-full min-w-0 max-w-full space-y-3"
         role="feed"
         aria-live="polite"
         aria-relevant="additions text"
         aria-busy={loadingMore}
       >
         {showPendingTurn && currentTurnPlayer ? (
-          <TurnJournalCard
-            key={`current-turn-${currentTurnIndex}-${currentTurnPlayer.id}`}
-            entry={null}
-            player={currentTurnPlayer}
-            pendingSequence={currentTurnIndex + 1}
-          />
+          <JournalMotionItem animate={enteringPendingTurnIndex === currentTurnIndex}>
+            <TurnJournalCard
+              key={`current-turn-${currentTurnIndex}-${currentTurnPlayer.id}`}
+              entry={null}
+              player={currentTurnPlayer}
+              pendingSequence={currentTurnIndex + 1}
+              allEvents={historyEvents}
+              currentGamePlayerId={currentGamePlayerId}
+              currentGamePlayer={viewingPlayer}
+              gameStatus={gameStatus}
+              onSendBabyGift={onSendBabyGift}
+            />
+          </JournalMotionItem>
         ) : null}
         {visibleTurns.length === 0 && !showPendingTurn ? (
           <p className="rounded-xl bg-surface p-3 text-sm text-muted">
@@ -4495,7 +4827,25 @@ function GameTurnFeed({
               player.id === currentTurnPlayer?.id
                 ? `current-turn-${currentTurnIndex}-${player.id}`
                 : entry.id;
-            return <TurnJournalCard key={entryKey} entry={entry} player={player} />;
+            const animateCard = Boolean(
+              newEventSequenceFloor !== null &&
+              entry.events[0] &&
+              entry.events[0].sequence > newEventSequenceFloor
+            );
+            return (
+              <JournalMotionItem key={entryKey} animate={animateCard}>
+                <TurnJournalCard
+                  entry={entry}
+                  player={player}
+                  newEventSequenceFloor={animateCard ? null : newEventSequenceFloor}
+                  allEvents={historyEvents}
+                  currentGamePlayerId={currentGamePlayerId}
+                  currentGamePlayer={viewingPlayer}
+                  gameStatus={gameStatus}
+                  onSendBabyGift={onSendBabyGift}
+                />
+              </JournalMotionItem>
+            );
           })
         )}
       </div>
@@ -4520,6 +4870,20 @@ function GameTurnFeed({
   );
 }
 
+function JournalMotionItem({
+  animate,
+  children
+}: {
+  animate: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn("turn-feed-motion-item", animate && "turn-feed-motion-item--enter")}>
+      <div className="turn-feed-motion-item__inner">{children}</div>
+    </div>
+  );
+}
+
 function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
   const eventsById = new Map(current.map((event) => [event.id, event]));
   for (const event of incoming) eventsById.set(event.id, event);
@@ -4529,17 +4893,33 @@ function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
 function TurnJournalCard({
   entry,
   player,
-  pendingSequence
+  pendingSequence,
+  newEventSequenceFloor = null,
+  allEvents,
+  currentGamePlayerId,
+  currentGamePlayer,
+  gameStatus,
+  onSendBabyGift
 }: {
   entry: TurnJournalEntry | null;
   player: GamePlayer | undefined;
   pendingSequence?: number;
+  newEventSequenceFloor?: number | null;
+  allEvents: GameEvent[];
+  currentGamePlayerId: string | null;
+  currentGamePlayer: GamePlayer | undefined;
+  gameStatus: GameSnapshot["game"]["status"];
+  onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
 }) {
   const actor = entry ? journalEntryActor(entry) : null;
   const firstEvent = entry?.events[0];
   const lastEvent = entry?.events[entry.events.length - 1];
   const visibleTurnEvents = (entry?.events ?? [])
-    .filter((event) => event.type !== realtimeEvents.stateUpdate)
+    .filter(
+      (event) =>
+        event.type !== realtimeEvents.stateUpdate &&
+        event.type !== realtimeEvents.babyGift
+    )
     .reverse();
   const complete = entry ? isJournalTurnComplete(entry) : false;
   const playerName = player ? gamePlayerName(player) : actor?.displayName ?? "Игрок";
@@ -4547,7 +4927,7 @@ function TurnJournalCard({
 
   return (
     <article
-      className="rounded-xl bg-surface p-3"
+      className="w-full min-w-0 max-w-full rounded-xl bg-surface p-3 [overflow-wrap:anywhere]"
       aria-label={`Ход игрока ${playerName}, ${complete ? "завершён" : "в процессе"}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -4576,21 +4956,282 @@ function TurnJournalCard({
         </div>
       </div>
       {visibleTurnEvents.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {visibleTurnEvents.map((event) =>
-            event.type === realtimeEvents.cardDraw ? (
-              <JournalCardDraw key={event.id} event={event} />
-            ) : (
-              <div key={event.id} className="text-sm">
-                <GameEventPresentation event={event} />
-              </div>
-            )
-          )}
+        <div className="mt-3 min-w-0 max-w-full space-y-3">
+          {visibleTurnEvents.map((event) => {
+            const content =
+              event.type === realtimeEvents.cardDraw ? (
+                <JournalCardDraw event={event} />
+              ) : event.type === "player:baby" ? (
+                <BabyJournalEvent
+                  event={event}
+                  allEvents={allEvents}
+                  recipient={player}
+                  currentGamePlayerId={currentGamePlayerId}
+                  currentGamePlayer={currentGamePlayer}
+                  gameStatus={gameStatus}
+                  onSendBabyGift={onSendBabyGift}
+                />
+              ) : (
+                <div className="text-sm">
+                  <GameEventPresentation event={event} />
+                </div>
+              );
+            return (
+              <JournalMotionItem
+                key={event.id}
+                animate={Boolean(
+                  newEventSequenceFloor !== null &&
+                  event.sequence > newEventSequenceFloor
+                )}
+              >
+                {content}
+              </JournalMotionItem>
+            );
+          })}
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted">Ожидаем действие игрока.</p>
       )}
     </article>
+  );
+}
+
+function BabyJournalEvent({
+  event,
+  allEvents,
+  recipient,
+  currentGamePlayerId,
+  currentGamePlayer,
+  gameStatus,
+  onSendBabyGift
+}: {
+  event: GameEvent;
+  allEvents: GameEvent[];
+  recipient: GamePlayer | undefined;
+  currentGamePlayerId: string | null;
+  currentGamePlayer: GamePlayer | undefined;
+  gameStatus: GameSnapshot["game"]["status"];
+  onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
+}) {
+  const gifts = allEvents.filter(
+    (candidate) =>
+      candidate.type === realtimeEvents.babyGift &&
+      candidate.payload.birthEventId === event.id
+  );
+  const alreadyGifted = gifts.some(
+    (gift) => gift.payload.senderGamePlayerId === currentGamePlayerId
+  );
+  const windowOpen = isBabyGiftWindowOpen(allEvents, event.sequence);
+  const isRecipient = event.gamePlayer?.id === currentGamePlayerId;
+  const isActiveParticipant =
+    Boolean(currentGamePlayerId) &&
+    currentGamePlayer?.controller === "HUMAN" &&
+    currentGamePlayer.status === "JOINED";
+  const currentCashCents = currentGamePlayer?.financialState?.cashCents ?? 0;
+  const showAction =
+    isActiveParticipant &&
+    !isRecipient &&
+    !alreadyGifted &&
+    windowOpen &&
+    gameStatus !== "ENDED" &&
+    gameStatus !== "CANCELLED";
+
+  return (
+    <div className="min-w-0 rounded-xl bg-[#fff8df] p-3 text-sm shadow-[0_6px_18px_rgba(125,90,16,.08)]">
+      <div className="flex items-start gap-2.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#9b6a0b] shadow-[0_5px_14px_rgba(125,90,16,.12)]">
+          <Gift size={18} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <GameEventPresentation event={event} titleClassName="font-extrabold text-[#6f4c0d]" />
+          {recipient ? (
+            <p className="mt-1 text-xs text-[#735f35]">
+              Поздравления получает {gamePlayerName(recipient)}.
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {gifts.length > 0 ? (
+        <div className="mt-3 space-y-1.5" aria-label="Полученные поздравления">
+          {gifts.map((gift) => (
+            <div
+              key={gift.id}
+              className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2"
+            >
+              <span className="min-w-0 truncate text-xs font-bold text-[#5d4a27]">
+                {gift.actor?.displayName ?? "Игрок"}
+              </span>
+              <strong className="shrink-0 text-sm text-success">
+                +{money(toNumber(gift.payload.amountCents))}
+              </strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {showAction ? (
+        <BabyGiftComposer
+          birthEventId={event.id}
+          currentCashCents={currentCashCents}
+          gameStatus={gameStatus}
+          onSend={onSendBabyGift}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function BabyGiftComposer({
+  birthEventId,
+  currentCashCents,
+  gameStatus,
+  onSend
+}: {
+  birthEventId: string;
+  currentCashCents: number;
+  gameStatus: GameSnapshot["game"]["status"];
+  onSend: (birthEventId: string, amountCents: number) => Promise<void>;
+}) {
+  const initialAmount = Math.min(100, Math.max(0, currentCashCents));
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState<number | "">(initialAmount || "");
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const normalizedAmount = amount === "" ? 0 : Math.max(0, Math.floor(amount));
+  const validAmount =
+    normalizedAmount > 0 && normalizedAmount <= currentCashCents;
+  const remainingCashCents = Math.max(0, currentCashCents - normalizedAmount);
+  const gamePaused = gameStatus === "PAUSED";
+
+  useEffect(() => {
+    setAmount((current) => {
+      if (current === "") return currentCashCents > 0 ? Math.min(100, currentCashCents) : "";
+      return Math.min(current, currentCashCents) || "";
+    });
+  }, [currentCashCents]);
+
+  function changeAmount(delta: number) {
+    setLocalError(null);
+    setAmount((current) => {
+      const base = current === "" ? 0 : current;
+      const next = Math.max(1, base + delta);
+      return Math.min(next, currentCashCents);
+    });
+  }
+
+  async function submitGift() {
+    if (!validAmount || submitting || gamePaused) return;
+    setSubmitting(true);
+    setLocalError(null);
+    try {
+      await onSend(birthEventId, normalizedAmount);
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error ? caught.message : "Не удалось отправить поздравление"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-3">
+        <Button
+          type="button"
+          variant="action"
+          className="h-10 gap-2 px-3"
+          onClick={() => setOpen(true)}
+          disabled={currentCashCents <= 0 || gamePaused}
+          title={
+            gamePaused
+              ? "Поздравить можно после продолжения игры"
+              : currentCashCents <= 0
+                ? "Для поздравления нужны наличные"
+                : undefined
+          }
+        >
+          <Gift size={16} aria-hidden="true" />
+          Поздравить
+        </Button>
+        {currentCashCents <= 0 ? (
+          <p className="mt-1.5 text-xs text-[#735f35]">Для поздравления нужны наличные.</p>
+        ) : gamePaused ? (
+          <p className="mt-1.5 text-xs text-[#735f35]">Действие станет доступно после продолжения игры.</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3" aria-label="Сумма поздравления">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-11 w-11 shrink-0 px-0"
+          onClick={() => changeAmount(-100)}
+          disabled={submitting || normalizedAmount <= 1}
+          aria-label="Уменьшить сумму поздравления на 100 долларов"
+          title="Уменьшить на 100"
+        >
+          <Minus size={17} aria-hidden="true" />
+        </Button>
+        <Input
+          className="min-w-[120px] flex-1 font-bold"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={currentCashCents}
+          step={1}
+          value={amount}
+          onChange={(changeEvent) => {
+            setLocalError(null);
+            const value = changeEvent.target.value;
+            setAmount(value === "" ? "" : Math.max(0, Math.floor(Number(value))));
+          }}
+          aria-label="Сумма поздравления в долларах"
+          aria-invalid={!validAmount}
+          disabled={submitting || gamePaused}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-11 w-11 shrink-0 px-0"
+          onClick={() => changeAmount(100)}
+          disabled={submitting || normalizedAmount >= currentCashCents}
+          aria-label="Увеличить сумму поздравления на 100 долларов"
+          title="Увеличить на 100"
+        >
+          <Plus size={17} aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant="action"
+          className="h-11 min-w-[118px] gap-2 px-3"
+          onClick={() => void submitGift()}
+          disabled={!validAmount || submitting || gamePaused}
+        >
+          <Send size={16} aria-hidden="true" />
+          {submitting ? "Отправляем…" : "Отправить"}
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-[#5d4a27]">
+        <span>Кнопки меняют сумму на {money(100)}, в поле можно указать любую целую сумму.</span>
+        <strong aria-live="polite">После поздравления останется {money(remainingCashCents)}</strong>
+      </div>
+      {!validAmount && amount !== "" ? (
+        <p className="mt-1.5 text-xs font-medium text-red-700" role="alert">
+          Сумма должна быть от {money(1)} до {money(currentCashCents)}.
+        </p>
+      ) : null}
+      {localError ? (
+        <p className="mt-1.5 text-xs font-medium text-red-700" role="alert">
+          {localError}. Проверьте сумму и попробуйте ещё раз.
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -4613,7 +5254,7 @@ function GameEventPresentation({
   const details = compactEventDetails(event);
 
   return (
-    <div className="text-sm">
+    <div className="min-w-0 max-w-full text-sm">
       <div className={`text-neutral-800 ${titleClassName}`}>
         <GameEventHeadline event={event} />
       </div>
@@ -4721,7 +5362,7 @@ function CashChangeVisualization({ change }: { change: CashChange }) {
   const expression = cashChangeExpression(change);
 
   return (
-    <div className="mt-1.5 inline-flex flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm">
+    <div className="mt-1.5 inline-flex max-w-full min-w-0 flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm [overflow-wrap:anywhere]">
       <Banknote size={16} className="shrink-0 text-success" aria-hidden="true" />
       {expression.kind === "equation" ? (
         <>
@@ -4836,7 +5477,7 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
 
   return (
     <div
-      className={`overflow-hidden rounded-lg shadow-[0_8px_20px_rgba(27,57,118,.10)] ${appearance.container}`}
+      className={`w-full min-w-0 max-w-full overflow-hidden rounded-lg shadow-[0_8px_20px_rgba(27,57,118,.10)] [overflow-wrap:anywhere] ${appearance.container}`}
     >
       <div className="p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -4906,6 +5547,7 @@ const eventTitles: Record<string, string> = {
   "player:roll_dice": "Бросок кубика",
   "player:move": "Перемещение по полю",
   "player:baby": "Рождение ребенка",
+  "player:baby_gift": "Поздравление с рождением ребёнка",
   "player:downsized": "Потеря работы",
   "player:charity": "Благотворительность",
   "player:charity_choice_required": "Выбор благотворительности",

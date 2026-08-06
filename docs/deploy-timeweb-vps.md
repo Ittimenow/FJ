@@ -165,8 +165,47 @@ curl https://fj.example.com/healthz
 Ожидаемый ответ:
 
 ```json
-{"status":"ok","error":null}
+{"status":"ok","error":null,"latencyMs":12,"api":{"status":"ok"}}
 ```
+
+Публичный `/healthz` проверяет не только процесс приложения, но также API и
+подключение к базе данных. Для раздельной диагностики доступны:
+
+```bash
+curl https://fj.example.com/backend/api/health/live
+curl https://fj.example.com/backend/api/health/ready
+curl 'https://fj.example.com/backend/socket.io/?EIO=4&transport=polling'
+```
+
+Последний запрос проверяет доступность транспорта Socket.IO. Ответ начинается
+с параметров сессии, если прокси и игровой канал работают.
+
+## Мониторинг и журнал ошибок
+
+Администратор видит встроенный журнал сгруппированных ошибок и задержки
+операций в разделе `Кабинет → Мониторинг`. Метрики хранятся в памяти за
+последние 15 минут, а ошибки сохраняются в PostgreSQL и могут быть отмечены как
+решённые.
+
+Workflow `Production uptime` каждые пять минут проверяет публичный health-check
+и транспорт Socket.IO. Неуспешная проверка отображается как упавший GitHub
+Actions run; уведомления о таких запусках настраиваются в GitHub.
+
+Для внешнего error tracking можно дополнительно задать в `.env.vps`:
+
+```env
+SENTRY_DSN=https://PUBLIC_KEY@example.ingest.sentry.io/PROJECT_ID
+NEXT_PUBLIC_SENTRY_DSN=https://PUBLIC_KEY@example.ingest.sentry.io/PROJECT_ID
+SENTRY_ENVIRONMENT=production
+NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.1
+NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+`NEXT_PUBLIC_SENTRY_DSN` передаётся в клиентскую сборку и не является секретом.
+Для загрузки source maps во время сборки дополнительно используются
+`SENTRY_AUTH_TOKEN`, `SENTRY_ORG` и `SENTRY_PROJECT`; эти значения не следует
+сохранять в репозитории.
 
 ## Обновление проекта
 

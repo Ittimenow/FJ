@@ -1,0 +1,32 @@
+name: Production uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      PRODUCTION_URL: https://gamefj.ru
+    steps:
+      - name: Check application, API and database
+        run: |
+          curl --fail --silent --show-error --max-time 15 \
+            "${PRODUCTION_URL}/healthz" \
+            | grep -q '"status":"ok"'
+
+      - name: Check Socket.IO transport
+        run: |
+          curl --fail --silent --show-error --max-time 15 \
+            "${PRODUCTION_URL}/backend/socket.io/?EIO=4&transport=polling" \
+            | grep -q '^0{'

@@ -12,12 +12,15 @@ import {
 import { realtimeEvents } from "@cashflow/shared";
 import { Server, Socket } from "socket.io";
 import { BuyDealDto } from "./dto/buy-deal.dto";
+import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
+import { MetricsService } from "../monitoring/metrics.service";
+import { MonitoringService } from "../monitoring/monitoring.service";
 
 interface SocketUser {
   sub: string;
@@ -53,26 +56,51 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
   constructor(
     private readonly jwt: JwtService,
     private readonly games: GamesService,
-    private readonly realtime: GamesRealtimeService
+    private readonly realtime: GamesRealtimeService,
+    private readonly metrics: MetricsService,
+    private readonly monitoring: MonitoringService
   ) {}
 
   afterInit(server: Server) {
     this.realtime.bindServer(server);
+    server.use(async (client, next) => {
+      const startedAt = performance.now();
+      try {
+        const token = this.extractToken(client);
+        const payload = await this.jwt.verifyAsync<SocketUser>(token);
+        client.data.user = {
+          userId: payload.sub,
+          email: payload.email,
+          displayName: payload.displayName
+        };
+        this.metrics.record("socket authenticate", performance.now() - startedAt);
+        next();
+      } catch (caught) {
+        const error = caught instanceof Error ? caught : new Error(String(caught));
+        const code = /expired/i.test(error.message) ? "SESSION_EXPIRED" : "AUTH_FAILED";
+        this.metrics.record("socket authenticate", performance.now() - startedAt, "error");
+        void this.monitoring.recordIssue({
+          source: "socket",
+          kind: code.toLowerCase(),
+          message: `Socket authentication failed: ${error.message}`,
+          severity: "warning"
+        });
+        const connectionError = new Error(
+          code === "SESSION_EXPIRED" ? "Сессия истекла" : "Не удалось авторизовать соединение"
+        ) as Error & { data?: { code: string } };
+        connectionError.data = { code };
+        next(connectionError);
+      }
+    });
   }
 
-  async handleConnection(client: Socket) {
-    try {
-      const token = this.extractToken(client);
-      const payload = await this.jwt.verifyAsync<SocketUser>(token);
-      client.data.user = {
-        userId: payload.sub,
-        email: payload.email,
-        displayName: payload.displayName
-      };
-    } catch (error) {
-      this.logger.warn(`Socket auth failed: ${(error as Error).message}`);
-      client.disconnect(true);
-    }
+  handleConnection(client: Socket) {
+    this.logger.log(`Socket connected: ${client.id}`);
+  }
+
+  @SubscribeMessage("diagnostics:ping")
+  diagnosticsPing() {
+    return { status: "ok", serverTime: new Date().toISOString() };
   }
 
   @SubscribeMessage("game:join")
@@ -251,6 +279,20 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     @MessageBody() body: { gameId: string }
   ) {
     const result = await this.games.declineCharity(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("baby:gift")
+  async sendBabyGift(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & BabyGiftDto
+  ) {
+    const result = await this.games.sendBabyGift(
+      body.gameId,
+      this.userId(client),
+      { birthEventId: body.birthEventId, amountCents: body.amountCents }
+    );
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }

@@ -172,6 +172,8 @@ export function eventHeadline(event: GameEvent) {
       return "Отказ от продажи";
     case "player:baby":
       return "В семье появился ребёнок";
+    case "player:baby_gift":
+      return "Отправлено поздравление с рождением ребёнка";
     case "player:downsized":
       return "Игрок потерял работу";
     case "player:charity":

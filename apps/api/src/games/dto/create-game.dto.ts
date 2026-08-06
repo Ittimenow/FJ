@@ -10,13 +10,6 @@ export class CreateGameDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(2)
-  @Max(6)
-  maxPlayers?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
   @Min(15)
   @Max(240)
   timeLimitMinutes?: number;

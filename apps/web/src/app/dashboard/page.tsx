@@ -299,7 +299,7 @@ function GameCard({
           {game.mode === "SOLO" ? <Bot size={14} aria-hidden="true" /> : <UsersRound size={14} aria-hidden="true" />}
           {game.mode === "SOLO"
             ? `${players.filter((player) => player.controller === "BOT").length} ботов`
-            : `${players.length}/${game.maxPlayers} игроков`}
+            : `${players.length} игроков`}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock3 size={14} aria-hidden="true" />

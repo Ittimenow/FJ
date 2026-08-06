@@ -269,7 +269,7 @@ export class AdminAnalyticsService {
     title: string;
     status: GameStatus;
     mode: GameMode;
-    maxPlayers: number;
+    maxPlayers: number | null;
     currentRound: number;
     startedAt: Date | null;
     endedAt: Date | null;

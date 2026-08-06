@@ -35,6 +35,7 @@ import {
 } from "@/components/game/game-display";
 import { formatGameTime, useLiveGame, useRemainingSeconds } from "@/components/game/use-live-game";
 import { publicApiBaseUrl } from "@/lib/api";
+import { connectionPresentation } from "@/lib/connection-health";
 import { money, shortDate } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
 import { gameStatusLabel } from "@/lib/game-labels";
@@ -49,7 +50,8 @@ export function HostControlRoom({
   initialSnapshot: GameSnapshot;
   token: string;
 }) {
-  const { snapshot, connected, loading, error, changeTimeline } = useLiveGame(initialSnapshot, token);
+  const { snapshot, connection, loading, error, changeTimeline } = useLiveGame(initialSnapshot, token);
+  const connectionStatus = connectionPresentation(connection.phase);
   const remaining = useRemainingSeconds(snapshot);
   const players = snapshot.players.filter((player) => player.role === "PLAYER");
   const currentPlayer = players.find((player) => player.id === snapshot.game.currentPlayerId);
@@ -134,8 +136,8 @@ export function HostControlRoom({
             <HostStatus icon={<Clock3 size={14} />} label={formatGameTime(remaining)} tabular />
             <HostStatus
               icon={<CircleDot size={13} />}
-              label={connected ? "На связи" : "Нет связи"}
-              tone={connected ? "success" : "danger"}
+              label={connectionStatus.label}
+              tone={connectionStatus.tone === "success" ? "success" : connectionStatus.tone === "neutral" ? "neutral" : "danger"}
             />
             {snapshot.game.status === "IN_PROGRESS" ? (
               <button

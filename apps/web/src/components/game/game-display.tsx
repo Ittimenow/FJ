@@ -6,6 +6,7 @@ import { BroadcastGameSummary } from "@/components/game/broadcast-game-summary";
 import { GamePlayerMark } from "@/components/game/game-player-mark";
 import { formatGameTime, useLiveGame, useRemainingSeconds } from "@/components/game/use-live-game";
 import { localizeGameText } from "@/lib/game-labels";
+import { connectionPresentation } from "@/lib/connection-health";
 import type { GamePlayer, GameSnapshot } from "@/lib/types";
 
 export type DisplayFieldView = "classic" | "journey";
@@ -19,7 +20,8 @@ export function GameDisplay({
   token: string;
   initialView: DisplayFieldView;
 }) {
-  const { snapshot, connected, error } = useLiveGame(initialSnapshot, token);
+  const { snapshot, connection, error } = useLiveGame(initialSnapshot, token);
+  const connectionStatus = connectionPresentation(connection.phase);
   const remaining = useRemainingSeconds(snapshot);
   const [view, setView] = useState(initialView);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -70,10 +72,14 @@ export function GameDisplay({
           </span>
           <span className={[
             "inline-flex items-center gap-1.5 rounded-lg px-3 py-2",
-            connected ? "bg-[#31491d] text-[#eaf3e0]" : "bg-red-950 text-red-100"
+            connection.phase === "connected"
+              ? "bg-[#31491d] text-[#eaf3e0]"
+              : connection.phase === "connecting" || connection.phase === "reconnecting"
+                ? "bg-[#5f431a] text-[#fff0df]"
+                : "bg-red-950 text-red-100"
           ].join(" ")} role="status" aria-live="polite">
             <CircleDot size={13} aria-hidden="true" />
-            <span className="hidden sm:inline">{connected ? "На связи" : "Нет связи"}</span>
+            <span className="hidden sm:inline">{connectionStatus.label}</span>
           </span>
           <button
             type="button"

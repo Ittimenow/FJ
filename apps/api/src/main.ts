@@ -1,3 +1,4 @@
+import "./instrument";
 import "reflect-metadata";
 import { Logger, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -5,6 +6,7 @@ import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { RedisIoAdapter } from "./config/redis-io.adapter";
+import { RuntimeHealthService } from "./monitoring/runtime-health.service";
 
 async function bootstrap() {
   const logger = new Logger("Bootstrap");
@@ -14,6 +16,7 @@ async function bootstrap() {
   app.useBodyParser("json", { limit: "256kb" });
   app.useBodyParser("urlencoded", { extended: true, limit: "256kb" });
   const config = app.get(ConfigService);
+  const runtimeHealth = app.get(RuntimeHealthService);
   const webOrigin =
     config.get<string>("WEB_ORIGIN") ??
     config.get<string>("APP_PUBLIC_URL") ??
@@ -43,11 +46,18 @@ async function bootstrap() {
 
   const redisUrl = config.get<string>("REDIS_URL");
   if (redisUrl) {
+    runtimeHealth.setRedisState({ configured: true, connected: false });
     const redisAdapter = new RedisIoAdapter(app);
     try {
       await redisAdapter.connectToRedis(redisUrl);
       app.useWebSocketAdapter(redisAdapter);
+      runtimeHealth.setRedisState({ configured: true, connected: true });
     } catch (error) {
+      runtimeHealth.setRedisState({
+        configured: true,
+        connected: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
       logger.warn(
         `Redis adapter disabled: ${
           error instanceof Error ? error.message : String(error)

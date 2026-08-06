@@ -79,8 +79,5 @@ function joinErrorMessage(message: unknown) {
   if (message === "Only waiting games can be joined") {
     return "Комната уже запущена. Войти можно только до старта игры.";
   }
-  if (message === "Game is full") {
-    return "Комната заполнена.";
-  }
   return "Комната не найдена или уже запущена";
 }

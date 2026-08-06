@@ -7,6 +7,7 @@ export const realtimeEvents = {
   loanTake: "loan:take",
   loanRepay: "loan:repay",
   paycheckReceive: "paycheck:receive",
+  babyGift: "player:baby_gift",
   stateUpdate: "state:update",
   gamePaused: "game:paused",
   gameResumed: "game:resumed",

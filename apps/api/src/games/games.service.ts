@@ -21,6 +21,7 @@ import {
 } from "@prisma/client";
 import {
   cardActionTypes,
+  isBabyGiftWindowOpen,
   canEscapeRatRace,
   legacyCardEffectAliases,
   moveOnCircularTrack,
@@ -35,6 +36,7 @@ import { randomInt } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
+import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
 import { ChatDto } from "./dto/chat.dto";
@@ -43,6 +45,7 @@ import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { nextAvailableSeat } from "./game-seating";
 import {
   gameTimeline,
   pauseGameTimeline,
@@ -199,7 +202,7 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Новая партия",
         mode: GameMode.MULTIPLAYER,
-        maxPlayers: dto.maxPlayers ?? 6,
+        maxPlayers: null,
         settings: {
           timeLimitMinutes: dto.timeLimitMinutes ?? 90,
           periodCount: dto.periodCount ?? 1
@@ -408,25 +411,13 @@ export class GamesService {
     if (existing) return this.snapshot(game.id);
 
     const role = dto.role ?? "PLAYER";
-    const currentPlayers = game.players.filter(
-      (player) => player.role === GameRole.PLAYER
-    );
-    if (role === "PLAYER" && currentPlayers.length >= game.maxPlayers) {
-      throw new BadRequestException("В игре нет свободных мест");
-    }
-
     const occupiedSeats = new Set(
       game.players
         .map((player) => player.seat)
         .filter((seat): seat is number => typeof seat === "number")
     );
     const seat: number | null =
-      role === "PLAYER"
-        ? (Array.from(
-            { length: game.maxPlayers },
-            (_value, index) => index + 1
-          ).find((candidate) => !occupiedSeats.has(candidate)) ?? null)
-        : null;
+      role === "PLAYER" ? nextAvailableSeat(occupiedSeats) : null;
     const color = seat
       ? playerColors[(seat - 1) % playerColors.length] ?? null
       : null;
@@ -497,25 +488,13 @@ export class GamesService {
       );
       if (existing) return;
 
-      const currentPlayers = game.players.filter(
-        (player) => player.role === GameRole.PLAYER
-      );
-      if (dto.role === GameRole.PLAYER && currentPlayers.length >= game.maxPlayers) {
-        throw new BadRequestException("В игре нет свободных мест");
-      }
-
       const occupiedSeats = new Set(
         game.players
           .map((player) => player.seat)
           .filter((seat): seat is number => typeof seat === "number")
       );
       const seat =
-        dto.role === GameRole.PLAYER
-          ? (Array.from(
-              { length: game.maxPlayers },
-              (_value, index) => index + 1
-            ).find((candidate) => !occupiedSeats.has(candidate)) ?? null)
-          : null;
+        dto.role === GameRole.PLAYER ? nextAvailableSeat(occupiedSeats) : null;
       const color = seat
         ? playerColors[(seat - 1) % playerColors.length] ?? null
         : null;
@@ -648,14 +627,14 @@ export class GamesService {
         where: { isActive: true },
         orderBy: { id: "asc" }
       });
-      if (professions.length < game.players.length) {
-        throw new BadRequestException("Не хватает профессий для всех игроков. Обратитесь к администратору.");
+      if (professions.length === 0) {
+        throw new BadRequestException("Для начала игры нужна хотя бы одна активная профессия");
       }
 
       const shuffledProfessions = [...professions].sort(() => Math.random() - 0.5);
 
       for (const [index, player] of game.players.entries()) {
-        const profession = shuffledProfessions[index];
+        const profession = shuffledProfessions[index % shuffledProfessions.length];
         if (!profession) continue;
         await tx.gamePlayer.update({
           where: { id: player.id },
@@ -894,18 +873,12 @@ export class GamesService {
         const currentPlayers = game.players.filter(
           (player) => player.role === GameRole.PLAYER && player.status === "JOINED"
         );
-        if (currentPlayers.length >= game.maxPlayers) {
-          throw new BadRequestException("В игре нет свободных мест");
-        }
         const occupiedSeats = new Set(
           currentPlayers
             .map((player) => player.seat)
             .filter((value): value is number => typeof value === "number")
         );
-        seat =
-          Array.from({ length: game.maxPlayers }, (_value, index) => index + 1).find(
-            (candidate) => !occupiedSeats.has(candidate)
-          ) ?? null;
+        seat = nextAvailableSeat(occupiedSeats);
         color = seat ? playerColors[(seat - 1) % playerColors.length] ?? null : null;
       }
 
@@ -2097,6 +2070,129 @@ export class GamesService {
       });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async sendBabyGift(gameId: string, userId: string, dto: BabyGiftDto) {
+    if (!Number.isSafeInteger(dto.amountCents) || dto.amountCents <= 0) {
+      throw new BadRequestException("Укажите положительную сумму поздравления");
+    }
+
+    const emittedEvents: PendingEvent[] = [];
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const sender = await this.requirePlayer(tx, gameId, userId, true);
+        const birthEvent = await tx.gameEvent.findFirst({
+          where: {
+            id: dto.birthEventId,
+            gameId,
+            type: "player:baby"
+          },
+          select: {
+            id: true,
+            sequence: true,
+            gamePlayerId: true
+          }
+        });
+        if (!birthEvent?.gamePlayerId) {
+          throw new NotFoundException("Событие рождения ребёнка не найдено");
+        }
+        if (birthEvent.gamePlayerId === sender.id) {
+          throw new BadRequestException("Нельзя поздравить самого себя");
+        }
+
+        const laterTurnStarts = await tx.gameEvent.findMany({
+          where: {
+            gameId,
+            sequence: { gt: birthEvent.sequence },
+            type: {
+              in: ["player:roll_dice", "turn:skipped", "bankruptcy:turn_skipped"]
+            }
+          },
+          select: { type: true, sequence: true }
+        });
+        if (!isBabyGiftWindowOpen(laterTurnStarts, birthEvent.sequence)) {
+          throw new BadRequestException("Срок поздравления уже закончился");
+        }
+
+        const existingGift = await tx.babyGift.findUnique({
+          where: {
+            birthEventId_senderGamePlayerId: {
+              birthEventId: birthEvent.id,
+              senderGamePlayerId: sender.id
+            }
+          },
+          select: { id: true }
+        });
+        if (existingGift) {
+          throw new ConflictException("Вы уже поздравили этого игрока");
+        }
+
+        const [senderState, recipientState] = await Promise.all([
+          tx.playerFinancialState.findUniqueOrThrow({
+            where: { gamePlayerId: sender.id }
+          }),
+          tx.playerFinancialState.findUniqueOrThrow({
+            where: { gamePlayerId: birthEvent.gamePlayerId }
+          })
+        ]);
+        const amount = BigInt(dto.amountCents);
+        if (senderState.cashCents < amount) {
+          throw new BadRequestException("Не хватает наличных для поздравления");
+        }
+
+        await tx.babyGift.create({
+          data: {
+            gameId,
+            birthEventId: birthEvent.id,
+            senderGamePlayerId: sender.id,
+            recipientGamePlayerId: birthEvent.gamePlayerId,
+            amountCents: amount
+          }
+        });
+        const [updatedSenderState, updatedRecipientState] = await Promise.all([
+          tx.playerFinancialState.update({
+            where: { gamePlayerId: sender.id },
+            data: { cashCents: { decrement: amount } },
+            select: { cashCents: true }
+          }),
+          tx.playerFinancialState.update({
+            where: { gamePlayerId: birthEvent.gamePlayerId },
+            data: { cashCents: { increment: amount } },
+            select: { cashCents: true }
+          })
+        ]);
+
+        emittedEvents.push({
+          type: realtimeEvents.babyGift,
+          payload: {
+            birthEventId: birthEvent.id,
+            senderGamePlayerId: sender.id,
+            recipientGamePlayerId: birthEvent.gamePlayerId,
+            amountCents: cents(amount),
+            senderBeforeCashCents: cents(senderState.cashCents),
+            senderAfterCashCents: cents(updatedSenderState.cashCents),
+            recipientBeforeCashCents: cents(recipientState.cashCents),
+            recipientAfterCashCents: cents(updatedRecipientState.cashCents)
+          }
+        });
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "baby_gift_sent" }
+        });
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Вы уже поздравили этого игрока");
+      }
+      throw error;
+    }
 
     return this.actionResult(gameId, emittedEvents);
   }

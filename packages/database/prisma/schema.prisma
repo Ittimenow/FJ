@@ -169,7 +169,7 @@ model Game {
   title            String
   status           GameStatus @default(WAITING)
   mode             GameMode   @default(MULTIPLAYER)
-  maxPlayers       Int        @default(6) @map("max_players")
+  maxPlayers       Int?       @map("max_players")
   currentTurnIndex Int        @default(0) @map("current_turn_index")
   currentRound     Int        @default(1) @map("current_round")
   settings         Json       @default("{}")
@@ -185,6 +185,7 @@ model Game {
   players      GamePlayer[]
   events       GameEvent[]
   chatMessages GameChatMessage[]
+  babyGifts    BabyGift[]
 
   @@index([status])
   @@index([mode, status])
@@ -220,6 +221,8 @@ model GamePlayer {
   assets         PlayerAsset[]
   liabilities    PlayerLiability[]
   events         GameEvent[]
+  sentBabyGifts  BabyGift[] @relation("BabyGiftSender")
+  receivedBabyGifts BabyGift[] @relation("BabyGiftRecipient")
 
   @@unique([gameId, userId])
   @@unique([gameId, seat])
@@ -433,11 +436,32 @@ model GameEvent {
   game       Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
   gamePlayer GamePlayer? @relation(fields: [gamePlayerId], references: [id], onDelete: SetNull)
   actor      User?       @relation("UserEvents", fields: [actorUserId], references: [id], onDelete: SetNull)
+  babyGifts  BabyGift[]
 
   @@unique([gameId, sequence])
   @@index([gameId, type])
   @@index([actorUserId])
   @@map("game_events")
+}
+
+model BabyGift {
+  id                    String   @id @default(uuid()) @db.Uuid
+  gameId                String   @map("game_id") @db.Uuid
+  birthEventId          String   @map("birth_event_id") @db.Uuid
+  senderGamePlayerId    String   @map("sender_game_player_id") @db.Uuid
+  recipientGamePlayerId String   @map("recipient_game_player_id") @db.Uuid
+  amountCents           BigInt   @map("amount_cents")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  birthEvent GameEvent  @relation(fields: [birthEventId], references: [id], onDelete: Cascade)
+  sender     GamePlayer @relation("BabyGiftSender", fields: [senderGamePlayerId], references: [id], onDelete: Cascade)
+  recipient  GamePlayer @relation("BabyGiftRecipient", fields: [recipientGamePlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([birthEventId, senderGamePlayerId])
+  @@index([gameId, createdAt])
+  @@index([recipientGamePlayerId])
+  @@map("baby_gifts")
 }
 
 model GameChatMessage {
@@ -465,4 +489,25 @@ model FeedbackMessage {
 
   @@index([createdAt])
   @@map("feedback_messages")
+}
+
+model MonitoringIssue {
+  id          String   @id @default(uuid()) @db.Uuid
+  fingerprint String   @unique
+  status      String   @default("OPEN")
+  severity    String
+  source      String
+  kind        String
+  message     String
+  stack       String?
+  details     Json     @default("{}")
+  occurrences Int      @default(1)
+  release     String?
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  resolvedAt  DateTime? @map("resolved_at")
+
+  @@index([status, lastSeenAt])
+  @@index([source, kind])
+  @@map("monitoring_issues")
 }

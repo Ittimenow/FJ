@@ -4,6 +4,7 @@ import { fastTrackBoard, ratRaceBoard } from "@cashflow/shared";
 import {
   BookOpenText,
   Boxes,
+  Activity,
   CircleHelp,
   Download,
   History,
@@ -20,6 +21,7 @@ import { useMemo, useState } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
 import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
+import { AdminMonitoringPanel } from "@/components/admin/admin-monitoring-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
@@ -39,6 +41,7 @@ type AdminSection =
   | "rules"
   | "board"
   | "feedback"
+  | "monitoring"
   | "changes";
 
 type AdminMenuItem = {
@@ -51,6 +54,7 @@ const mainMenu: AdminMenuItem[] = [
   { id: "dashboard", label: "Обзор", icon: LayoutDashboard },
   { id: "users", label: "Пользователи", icon: UsersRound },
   { id: "feedback", label: "Предложения", icon: MessageSquareText },
+  { id: "monitoring", label: "Мониторинг", icon: Activity },
   { id: "changes", label: "Изменения", icon: History }
 ];
 
@@ -69,6 +73,7 @@ const adminSections = new Set<AdminSection>([
   "rules",
   "board",
   "feedback",
+  "monitoring",
   "changes"
 ]);
 
@@ -192,6 +197,13 @@ export function AdminPanel({
             </CardHeader>
             <CardContent>
               <AdminFeedbackPanel token={token} />
+            </CardContent>
+          </Card>
+        ) : null}
+        {section === "monitoring" ? (
+          <Card className="rounded-2xl border-0">
+            <CardContent className="pt-6">
+              <AdminMonitoringPanel token={token} />
             </CardContent>
           </Card>
         ) : null}
@@ -999,7 +1011,7 @@ function AdminGameRow({ game }: { game: GameListItem }) {
         <div className="mt-1 text-xs text-muted">
           {game.mode === "SOLO"
             ? `С ботами · ${players.filter((player) => player.controller === "BOT").length} соперников`
-            : `${game.code} · ${players.length}/${game.maxPlayers} игроков`}
+            : `${game.code} · ${players.length} игроков`}
         </div>
       </div>
       <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">{gameStatusLabel(game.status)}</Badge>

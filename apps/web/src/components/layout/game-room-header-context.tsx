@@ -28,6 +28,10 @@ import { Input } from "@/components/ui/input";
 import { shortDate } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
 import type { ChatMessage } from "@/lib/types";
+import {
+  connectionPresentation,
+  type ConnectionDiagnostics
+} from "@/lib/connection-health";
 
 export interface GameRoomHeaderState {
   gameId: string;
@@ -35,6 +39,7 @@ export interface GameRoomHeaderState {
   title: string;
   status: string;
   connected: boolean;
+  connection: ConnectionDiagnostics;
   code: string;
   isSolo: boolean;
   currentRound: number;
@@ -49,6 +54,7 @@ export interface GameRoomHeaderState {
   onPause: (() => void) | null;
   onResume: (() => void) | null;
   onDeleteGame: (() => void) | null;
+  onCheckConnection: () => void;
 }
 
 const GameRoomHeaderContext = createContext<{
@@ -128,6 +134,9 @@ export function GameRoomHeaderSlot() {
               </span>
             </button>
           ) : null}
+          <div className="md:hidden">
+            <ConnectionStatusControl state={state} />
+          </div>
           <div className="hidden items-center gap-2 md:flex">
             {state.status === "ENDED" ? (
               <span className="rounded-lg bg-card px-3 py-2 font-bold text-ink">
@@ -149,15 +158,7 @@ export function GameRoomHeaderSlot() {
                 <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink lg:inline">
                   {gameStatusLabel(state.status)}
                 </span>
-                <span
-                  className={[
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 font-bold",
-                    state.connected ? "bg-[#eaf3e0] text-success" : "bg-red-50 text-red-700"
-                  ].join(" ")}
-                >
-                  <CircleDot size={12} aria-hidden="true" />
-                  <span className="hidden lg:inline">{state.connected ? "На связи" : "Нет связи"}</span>
-                </span>
+                <ConnectionStatusControl state={state} />
                 <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink xl:inline">
                   Раунд {state.currentRound}
                 </span>
@@ -183,6 +184,114 @@ export function GameRoomHeaderSlot() {
       ) : null}
     </div>
   );
+}
+
+function ConnectionStatusControl({ state }: { state: GameRoomHeaderState }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const presentation = connectionPresentation(state.connection.phase);
+  const toneClass = {
+    neutral: "bg-[#e8effe] text-journey",
+    success: "bg-[#eaf3e0] text-success",
+    warning: "bg-[#fff0df] text-[#8a3d0a]",
+    danger: "bg-red-50 text-red-700"
+  }[presentation.tone];
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30 ${toneClass}`}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={`${presentation.label}. Открыть диагностику соединения`}
+      >
+        <CircleDot size={12} aria-hidden="true" />
+        <span className="hidden lg:inline">{presentation.label}</span>
+      </button>
+      {open ? (
+        <section
+          role="dialog"
+          aria-label="Диагностика соединения"
+          className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[min(340px,calc(100vw-24px))] rounded-2xl bg-white p-4 text-left text-ink shadow-[0_18px_48px_rgba(23,36,63,.2)]"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-extrabold">{presentation.label}</h2>
+              <p className="mt-1 text-sm leading-5 text-muted">{presentation.detail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-card hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30"
+              aria-label="Закрыть диагностику"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-card p-3 text-sm">
+            <ConnectionMetric label="API" value={latencyText(state.connection.apiLatencyMs)} />
+            <ConnectionMetric label="Игровой канал" value={latencyText(state.connection.socketLatencyMs)} />
+            <ConnectionMetric
+              label="Попытка подключения"
+              value={state.connection.reconnectAttempt ? String(state.connection.reconnectAttempt) : "—"}
+            />
+            <ConnectionMetric
+              label="Последняя проверка"
+              value={checkedAtText(state.connection.lastCheckedAt)}
+            />
+          </dl>
+          <button
+            type="button"
+            onClick={state.onCheckConnection}
+            disabled={state.connection.checking}
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-journey px-4 font-extrabold text-white transition hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/30 disabled:cursor-wait disabled:opacity-60"
+          >
+            {state.connection.checking ? "Проверяем…" : "Проверить соединение"}
+          </button>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function ConnectionMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs font-bold text-muted">{label}</dt>
+      <dd className="mt-1 truncate font-extrabold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function latencyText(value: number | null) {
+  return value === null ? "Нет ответа" : `${value} мс`;
+}
+
+function checkedAtText(value: string | null) {
+  if (!value) return "Ещё не было";
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date(value));
 }
 
 function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {

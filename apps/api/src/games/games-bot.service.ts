@@ -23,6 +23,8 @@ import {
   type BotFinancialSnapshot
 } from "./bot-strategy";
 import { GamesRealtimeService } from "./games-realtime.service";
+import { MetricsService } from "../monitoring/metrics.service";
+import { MonitoringService } from "../monitoring/monitoring.service";
 import { GamesService } from "./games.service";
 
 type BotPendingAction =
@@ -100,7 +102,9 @@ export class GamesBotService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly games: GamesService,
-    private readonly realtime: GamesRealtimeService
+    private readonly realtime: GamesRealtimeService,
+    private readonly metrics: MetricsService,
+    private readonly monitoring: MonitoringService
   ) {}
 
   onModuleInit() {
@@ -129,6 +133,8 @@ export class GamesBotService implements OnModuleInit {
   }
 
   private async run(gameId: string) {
+    const runStartedAt = performance.now();
+    let runOutcome: "ok" | "error" = "ok";
     const leaseToken = randomUUID();
     if (!(await this.acquireLease(gameId, leaseToken))) {
       const stillActive = await this.prisma.game.findFirst({
@@ -163,14 +169,24 @@ export class GamesBotService implements OnModuleInit {
         if (step === maximumStepsPerRun - 1) exhaustedStepBudget = true;
       }
     } catch (error) {
+      runOutcome = "error";
       this.logger.warn(
         `Не удалось выполнить ход бота в игре ${gameId}: ${(error as Error).message}`
       );
+      void this.monitoring.recordIssue({
+        source: "bot",
+        kind: "bot_turn_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack ?? null : null,
+        severity: "error",
+        details: { gameId }
+      });
       const retryCount = (this.retryCounts.get(gameId) ?? 0) + 1;
       this.retryCounts.set(gameId, retryCount);
       const retryDelayMs = retryCount <= 3 ? retryCount * 1_000 : 30_000;
       setTimeout(() => this.kick(gameId), retryDelayMs);
     } finally {
+      this.metrics.record("bot run", performance.now() - runStartedAt, runOutcome);
       await this.releaseLease(gameId, leaseToken);
       if (exhaustedStepBudget) this.kick(gameId);
     }

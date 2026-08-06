@@ -80,6 +80,5 @@ function inviteErrorMessage(message: string) {
   if (message === "Only waiting games can be joined") {
     return "Партия уже началась или была завершена.";
   }
-  if (message === "Game is full") return "В комнате больше нет свободных мест.";
   return "Приглашение недействительно или комната сейчас недоступна.";
 }

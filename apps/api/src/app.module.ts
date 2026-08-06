@@ -1,4 +1,6 @@
 import { Controller, Get, Module } from "@nestjs/common";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { SentryModule } from "@sentry/nestjs/setup";
 import { ConfigModule } from "@nestjs/config";
 import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
@@ -9,6 +11,9 @@ import { MailModule } from "./mail/mail.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
 import { UsersModule } from "./users/users.module";
+import { MonitoringExceptionFilter } from "./monitoring/monitoring-exception.filter";
+import { MonitoringInterceptor } from "./monitoring/monitoring.interceptor";
+import { MonitoringModule } from "./monitoring/monitoring.module";
 
 @Controller()
 class AppController {
@@ -90,7 +95,9 @@ function classifyDatabaseError(error: unknown) {
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
+    MonitoringModule,
     MailModule,
     PrismaModule,
     AuthModule,
@@ -100,6 +107,10 @@ function classifyDatabaseError(error: unknown) {
     GamesModule,
     FeedbackModule
   ],
-  controllers: [AppController]
+  controllers: [AppController],
+  providers: [
+    { provide: APP_FILTER, useClass: MonitoringExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: MonitoringInterceptor }
+  ]
 })
 export class AppModule {}

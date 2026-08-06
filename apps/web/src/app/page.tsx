@@ -78,7 +78,7 @@ const firstGameSteps: Array<{ icon: LucideIcon; title: string; text: string }> =
   {
     icon: Users,
     title: "Соберите стол",
-    text: "От 2 до 6 игроков, а также роли банкира и наблюдателя.",
+    text: "От 2 игроков без верхнего лимита, а также роли банкира и наблюдателя.",
   },
   {
     icon: BriefcaseBusiness,
@@ -202,7 +202,7 @@ const faqItems = [
   ],
   [
     "Сколько человек участвуют в партии?",
-    "В игровой комнате могут участвовать от 2 до 6 игроков. Также предусмотрены роли банкира и наблюдателя.",
+    "Для старта нужны минимум два игрока, а верхнего лимита в командной комнате нет. Также предусмотрены роли банкира и наблюдателя.",
   ],
   [
     "Это финансовая или инвестиционная рекомендация?",
@@ -347,18 +347,6 @@ function Modal({
                   </label>
                 </>
               )}
-              {kind === "create" && (
-                <label>
-                  Количество игроков
-                  <select name="players" defaultValue="4">
-                    <option value="2">2 игрока</option>
-                    <option value="3">3 игрока</option>
-                    <option value="4">4 игрока</option>
-                    <option value="5">5 игроков</option>
-                    <option value="6">6 игроков</option>
-                  </select>
-                </label>
-              )}
               {kind === "team" && (
                 <label>
                   Когда удобно играть
@@ -476,7 +464,7 @@ export default function Home() {
             потоками дохода.
           </p>
           <p className="hero-support">
-            Соберите стол из 2–6 человек, покупайте активы, берите кредиты,
+            Соберите за одним столом всю команду, покупайте активы, берите кредиты,
             переживайте увольнения и внезапные расходы. Ищите тот самый
             пассивный доход, который больше ваших трат. Считает сервер — вы
             только принимаете решения.
@@ -698,7 +686,7 @@ export default function Home() {
               loading="lazy"
             />
           </picture>
-          <div className="match-card"><strong>Команда собрана</strong><span>4 из 6 игроков</span></div>
+          <div className="match-card"><strong>Команда собрана</strong><span>4 игрока готовы</span></div>
         </div>
       </section>
 

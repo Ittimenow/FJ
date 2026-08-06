@@ -1,8 +1,9 @@
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 export default function nextConfig(phase) {
-  return {
+  const config = {
     distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
     transpilePackages: ["@cashflow/shared"],
     typedRoutes: true,
@@ -23,4 +24,11 @@ export default function nextConfig(phase) {
       ];
     }
   };
+
+  return withSentryConfig(config, {
+    silent: true,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT
+  });
 }

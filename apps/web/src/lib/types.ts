@@ -55,7 +55,7 @@ export interface GameListItem {
   title: string;
   status: string;
   mode: "MULTIPLAYER" | "SOLO";
-  maxPlayers: number;
+  maxPlayers: number | null;
   createdAt: string;
   players: Array<{
     id: string;
@@ -78,7 +78,7 @@ export interface GameSnapshot {
     title: string;
     status: "WAITING" | "IN_PROGRESS" | "PAUSED" | "ENDED" | "CANCELLED";
     mode: "MULTIPLAYER" | "SOLO";
-    maxPlayers: number;
+    maxPlayers: number | null;
     currentTurnIndex: number;
     currentRound: number;
     currentPlayerId: string | null;

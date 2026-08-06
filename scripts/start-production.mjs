@@ -192,6 +192,16 @@ async function setupDatabaseIfNeeded() {
     "prisma:prepare-solo-bots",
     "--workspace=@cashflow/database"
   ]);
+  await run(npmCommand, [
+    "run",
+    "prisma:prepare-monitoring",
+    "--workspace=@cashflow/database"
+  ]);
+  await run(npmCommand, [
+    "run",
+    "prisma:prepare-baby-gifts",
+    "--workspace=@cashflow/database"
+  ]);
 
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);
@@ -260,10 +270,7 @@ function selectTarget(url) {
 
 function proxyHttp(req, res) {
   if (req.url === "/healthz") {
-    const status = startupErrorMessage ? "error" : appReady ? "ok" : "starting";
-    const statusCode = startupErrorMessage ? 500 : 200;
-    res.writeHead(statusCode, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status, error: startupErrorMessage }));
+    respondHealth(res);
     return;
   }
 
@@ -309,6 +316,61 @@ function proxyHttp(req, res) {
   });
 
   req.pipe(proxyReq);
+}
+
+function respondHealth(res) {
+  if (!appReady || startupErrorMessage) {
+    const status = startupErrorMessage ? "error" : "starting";
+    res.writeHead(startupErrorMessage ? 500 : 200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ status, error: startupErrorMessage }));
+    return;
+  }
+
+  const startedAt = Date.now();
+  const request = http.get(
+    {
+      hostname: apiHost,
+      port: apiPort,
+      path: "/api/health/ready",
+      timeout: 4000
+    },
+    (apiResponse) => {
+      const chunks = [];
+      apiResponse.on("data", (chunk) => chunks.push(chunk));
+      apiResponse.on("end", () => {
+        const ready = apiResponse.statusCode === 200;
+        res.writeHead(ready ? 200 : 503, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            status: ready ? "ok" : "error",
+            error: ready ? null : "API readiness check failed",
+            latencyMs: Date.now() - startedAt,
+            api: safeJson(Buffer.concat(chunks).toString("utf8"))
+          })
+        );
+      });
+    }
+  );
+  request.on("timeout", () => request.destroy(new Error("API readiness timeout")));
+  request.on("error", (error) => {
+    if (res.headersSent) return;
+    res.writeHead(503, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "error",
+        error: error.message,
+        latencyMs: Date.now() - startedAt
+      })
+    );
+  });
+}
+
+function safeJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function proxyUpgrade(req, socket, head) {

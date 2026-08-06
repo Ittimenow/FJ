@@ -1,4 +1,5 @@
 export * from "./board";
+export * from "./baby-gifts";
 export * from "./card-actions";
 export * from "./engine";
 export * from "./events";
