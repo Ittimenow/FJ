@@ -22,6 +22,8 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:sync-cities": "tsx prisma/seed.ts --sync-cities",
     "prisma:sync-cards": "tsx prisma/seed.ts --sync-cards",
+    "prisma:import-cards": "tsx prisma/import-cards.ts",
+    "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

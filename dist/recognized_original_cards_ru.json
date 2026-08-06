@@ -1,0 +1,3819 @@
+[
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r1c1_акции-ok4u-30",
+    "title": "Акции OK4U: $30",
+    "bodyText": "Акции — компания OK4U Drug\nРеспектабельная фармацевтическая компания\nспециализируется на производстве лекарств\nдля людей старше 70 лет.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nСегодняшняя цена: $30\nНазвание: OK4U\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r1c2_привилегированные-акции-2big-1-200",
+    "title": "Привилегированные акции 2BIG: $1,200",
+    "bodyText": "Привилегированные акции - 2BIG Power\nВысокодоходные привилегированные акции крупнейшей национальной электроэнергетической компании. Дивиденды и цены зафиксированы на достаточно высоком уровне Государственной комиссией по коммунальному хозяйству.\nКаждый игрок может прямо сейчас купить или\nпродать столько, сколько пожелает.\nНазвание: 2BIG\nСегодняшняя цена: $1200\nПроцентный доход = 10 %\nЧистый доход: $10 в месяц\nПределы колебания цен: $1200-$1200",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "2BIG"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "10"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r1c3_акции-ok4u-10",
+    "title": "Акции OK4U: $10",
+    "bodyText": "Акции — компания OK4U Drug\nИнфляционные ожидания привели к снижению\nкурса акций этой респектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nСегодняшняя цена: $10\nНазвание: OK4U\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r2c1_акции-on2u-30",
+    "title": "Акции ON2U: $30",
+    "bodyText": "Акции - компания ON2U Entertainment\nБлагодаря кассовому успеху кинофильма для\nвзрослых цена акций прокатной компании стабильно растет.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nСегодняшняя цена: $30\nНазвание: ON2U\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r2c2_обратное-дробление-акций-ok4u",
+    "title": "Обратное дробление акций OK4U",
+    "bodyText": "Акции — компания OK4U Drug\nОснователи компании! Скандал с просроченными\nлекарствами привел к огромным убыткам. Все акционеры потеряли 1/2 своих прав на собственность.\nКаждый, кто владеет акциями OK4U, теряет 1/2\nих стоимости. (Деньги платить не нужно, так как\nноминальная стоимость пакета не меняется.)\nАкционеры не получают дивидендов. Никто не\nможет купить или продать акции.\nНазвание: OK4U\nОбратное дробление акций: 1 к 2",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "asset.quantity.divide",
+        "amountCents": 2,
+        "payload": {}
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r2c3_акции-myt4u-30",
+    "title": "Акции MYT4U: $30",
+    "bodyText": "Акции — компания MYT4U Electronics\nСнижение учетных ставок привело к заметному\nросту курса акций этого продавца бытовой\nэлектронной техники.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nСегодняшняя цена: $30\nНазвание: MYT4U\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r3c1_вы-нашли-великолепную-сделку-35-000-220-мес",
+    "title": "Вы нашли великолепную сделку!: $35,000, +$220/мес",
+    "bodyText": "Вы нашли великолепную сделку!\nДом 3/2 старой постройки, конфискованный правительственным агентством за неплатежи. Заселен\nи выставлен на продажу с государственным финансированием.\nЕсли в этом есть необходимость, возьмите в Банке\nредит, но КУПИТЕ\n132 % ROI, можно продать за $65 000–$135 000\nЦена: $35 000\nИпотека: $33 000\nПервый взнос: $2000\nДенежный поток: +$220",
+    "category": "realestate",
+    "subcategory": "requires_mandatory_purchase_financing",
+    "isActive": false,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "35000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "2000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "33000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "220"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r3c2_взаимный-фонд-gro4us-20",
+    "title": "Взаимный фонд GRO4US: $20",
+    "bodyText": "Взаимный фонд — фонд GRO4US\nВ фонде появился блестящий молодой управляющий. Все уверены, что он обладает даром\nМидаса.\nТолько вы можете купить по этой цене столько\nпаев, сколько захотите.\nКаждый может продать свои паи по этой цене.\nНазвание: GRO4US Сегодняшняя цена: $20\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": "mutual_fund",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "GRO4US"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r3c3_10-акров-свободной-земли-5-000",
+    "title": "10 акров свободной земли: $5,000",
+    "bodyText": "10 акров свободной земли\nИзумительный, похожий на парк 10-акровый\nучасток в неосвоенном районе. Никаких дорог,\nникаких коммунальных услуг, никакого шума. Купите сами или продайте это право другому игроку\n0 % ROI, впоследствии можно будет продать за ??\nИпотека: $0\nЦена: $5000\nПервый взнос: $5000\nДенежный поток: $0",
+    "category": "land",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r4c1_акции-myt4u-10",
+    "title": "Акции MYT4U: $10",
+    "bodyText": "Акции - компания MYT4U Electronics\nСпад на рынке привел к снижению курса акций\nэтого продавца бытовой электронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U\nСегодняшняя цена: $10\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r4c2_дробление-акций-ok4u",
+    "title": "Дробление акций OK4U",
+    "bodyText": "Акции - компания OK4U Drug\nДела компании идут настолько хорошо, что руководство только что решило провести дробление\nакций!\nУ каждого владельца акций OK4U удваивается\nих количество. (Номинальная стоимость пакета\nне меняется.)\nАкционеры не получают дивидендов. Никто\nне может купить или продать акции.\nНазвание: OK4U\nДробление акций: 2 к 1",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "asset.quantity.multiply",
+        "amountCents": 2,
+        "payload": {}
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r4c3_квартира-на-продажу-55-000-160-мес",
+    "title": "Квартира на продажу: $55,000, +$160/мес",
+    "bodyText": "Квартира на продажу —\n2 спальни / 1 ванная\nМолодожены продают квартиру 2/1 старой постройки, так как по причине прибавления в семье\nжелают переселиться в дом 3/2. Будет выставлена\nна рынок в самое ближайшее время. Купите сами\nили продайте это право другому игроку\nИпотека: $50 000\nЦена: $55 000\nПервый взнос: $5000\nДенежный поток: +$160",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "55000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "160"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r5c1_акции-ok4u-20",
+    "title": "Акции OK4U: $20",
+    "bodyText": "Акции — компания OK4U Drug\nСнижение уровня инфляции привело к росту курса\nакций этой респектабельной фармацевтической\nкомпании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $20\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r5c2_взаимный-фонд-gro4us-30",
+    "title": "Взаимный фонд GRO4US: $30",
+    "bodyText": "Взаимный фонд — фонд GRO4US\nОбщий подъем на фондовом рынке приводит\nк укрепению финансовых позиций этого хорошо\nуправляемого фонда\nТолько вы можете купить по этой цене столько\nпаев, сколько захотите.\nКаждый может продать свои паи по этой цене.\nНазвание: GRO4US\nСегодняшняя цена: $30\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": "mutual_fund",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "GRO4US"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r5c3_квартира-на-продажу-40-000-140-мес",
+    "title": "Квартира на продажу: $40,000, +$140/мес",
+    "bodyText": "Квартира на продажу -\n2 спальни / 1 ванная\nРодители продают в университетском городке\nквартиру 2/1, в которой жил их ребенок. Огромный спрос на аренду жилья в данном районе. Купите сами или продайте это право другому игроку.\n42 % ROI, можно продать за $45 000-$65 000.\nИпотека: $36 000\nЦена: $40 000\nПервый взнос: $4000\nДенежный поток: +$140",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "36000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "140"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r6c1_акции-ok4u-50",
+    "title": "Акции OK4U: $50",
+    "bodyText": "Акции - компания OK4U Drug\nБум на рынке вызвал рост курса акций этой респектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $50\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r6c2_депозитный-сертификат-cd-5-000",
+    "title": "Депозитный сертификат CD: $5,000",
+    "bodyText": "Депозитный сертификат\nОдин из ведущих банков предлагает своим\nклиентам этот депозитный сертификат.\nГарантированная выплата процентов и ликвидность после любого срока владения.\nКаждый игрок может прямо сейчас купить или\nпродать столько сертификатов, сколько пожелает.\nНазвание: CD\nСегодняшняя цена: $5000\nПроцентный доход = 4,8 %\nЧистый доход: $20 в месяц\nПределы колебания цен: $5000-$5000",
+    "category": "certificate",
+    "subcategory": "deposit_certificate",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "CD"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "20"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r6c3_дом-на-продажу-65-000-160-мес",
+    "title": "Дом на продажу: $65,000, +$160/мес",
+    "bodyText": "Дом на продажу\n3 спальни / 2 ванные\nПрекрасный дом 3/2 неожиданно был выставлен\nна рынок владельцем, распродающим недвижимость. Дом старой постройки в отличном состоянии с проживающим в нем жильцом. Купите сами\nили продайте это право другому игроку\n38 % ROI, можно продать за $65 000–$135 000.\nЦена: $65 000\nИпотека: $60 000\nПервый взнос: $5000\nДенежный поток: +$160",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "65000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "160"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r7c1_жилец-наносит-ущерб-500",
+    "title": "Жилец наносит ущерб: $500",
+    "bodyText": "Жилец наносит ущерб\nвашей собственности\nЖилец не заплатил за 2 месяца и уехал из города\nпосле того, как нанес ущерб вашей собственности.\nСтраховка покрывает большую часть убытков, но\nвам все равно приходится выложить $500 из своего кармана.\nЗаплатите $500, если вы владеете любой арендной\nнедвижимостью. (Банк при необходимости выдаст\nкредит под обычный процент.)\nПлатит только тот игрок, который вытянул эту\nкарточку.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -500,
+        "payload": {
+          "automatic": true,
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_rental_realestate",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r7c2_акции-on2u-20",
+    "title": "Акции ON2U: $20",
+    "bodyText": "Акции — компания ON2U Entertainment\nНедавнее слияние привело к повышению рыночной доли этой ведущей прокатной компании,\nи данная тенденция выглядит стабильной.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $20\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_1_r7c3_дом-на-продажу-50-000-100-мес",
+    "title": "Дом на продажу: $50,000, +$100/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nНизкий первый взнос за этот дом 3/2 связан\nс неожиданным отъездом владельца и продавца\nиз города. Толковый покупатель сумеет извлечь\nиз него неплохую выгоду. Купите сами или продайте это право другому игроку.\n40 % ROI, можно продать за $65 000-$135 000.\nИпотека: $47 000\nЦена: $50 000\nПервый взнос: $3000\nДенежный поток: +$100",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "47000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r1c1_акции-myt4u-30",
+    "title": "Акции MYT4U: $30",
+    "bodyText": "Акции — компания MYT4U Electronics\nПодъем на рынке укрепил курс акций этого продавца бытовой электронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U\nСегодняшняя цена: $30\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r1c2_квартира-на-продажу-60-000-100-мес",
+    "title": "Квартира на продажу: $60,000, -$100/мес",
+    "bodyText": "Квартира на продажу —\n2 спальни / 1 ванная\nВеликолепная квартира 2/1 в хорошем районе.\nПрежняя владелица добилась успеха в бизнесе\nВы можете последовать ее примеру. Купите сами\nили продайте это право другому игроку.\n-24 % ROI, можно продать за $45 000-$65 000\nИпотека: $55 000\nЦена: $60 000\nПервый взнос: $5000\nДенежный поток: -$100",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "55000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r2c1_акции-ok4u-1",
+    "title": "Акции OK4U: $1",
+    "bodyText": "Акции — компания OK4U Drug\nПаника на рынке привела к обесцениванию акций\nэтой респектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $1\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "1"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "1"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r2c2_квартира-на-продажу-40-000-220-мес",
+    "title": "Квартира на продажу: $40,000, +$220/мес",
+    "bodyText": "Квартира на продажу —\n2 спальни / 1 ванная\nБанк продает конфискат! Квартира 2/1 в удобном районе, близко от потенциальной работы и магазинов. Не упустите возможность! Банк обеспечивает финансирование на льготных условиях. Купите сами или продайте это право другому игроку.\n53 % ROI, можно продать за $45 000-$65 000.\nЦена: $40 000\nИпотека: $35 000\nПервый взнос: $5000\nДенежный поток: +$220",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "35000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "220"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r2c3_акции-on2u-10",
+    "title": "Акции ON2U: $10",
+    "bodyText": "Акции - компания ON2U Entertainment\nНовый парк развлечений принес огромные убытки\nЦена акций упала до рекордно низкого уровня.\nТолько вы можете купить по этой цене столько.\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nСегодняшняя цена: $10\nНазвание: ON2U\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r3c1_акции-ok4u-10",
+    "title": "Акции OK4U: $10",
+    "bodyText": "Акции — компания OK4U Drug\nВысокие учетные ставки привели к снижению\nкурса акций этой респектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $10\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r3c2_создайте-компанию-без-отрыва-от-работы-5-000",
+    "title": "Создайте компанию без отрыва от работы: $5,000",
+    "bodyText": "Создайте компанию без отрыва от работы\nРазработайте интересную компьютерную программу, создайте компанию для ее производства\nи продажи. Никаких доходов и дополнительного\nвознаграждения на начальном этапе, большие\nзатраты времени. Используйте сами или продайте\nэто право другому игроку\n0 % ROI, можно будет продать за ??, если вообще удастся продать.\nЦена: $5000\nПассив: $0\nПервый взнос: $5000\nДенежный поток: $0",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r3c3_акции-ok4u-5",
+    "title": "Акции OK4U: $5",
+    "bodyText": "Акции — компания OK4U Drug\nРост учетных ставок привел к резкому падению\nкурса акций этой респектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $5\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r4c1_квартира-на-продажу-50-000-100-мес",
+    "title": "Квартира на продажу: $50,000, +$100/мес",
+    "bodyText": "Квартира на продажу -\n2 спальни / 1 ванная\nКвартиру 2/1 в хорошем состоянии продает владелец, собирающийся жениться. Требует ремонта.\nНе самый лучший район. Купите сами или продайте это право другому игроку.\n24 % ROI, можно продать за $45 000-$65 000.\nЦена: $50 000\nИпотека: $45 000\nПервый взнос: $5000\nДенежный поток: +$100",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "45000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r4c2_дробление-акций-myt4u",
+    "title": "Дробление акций MYT4U",
+    "bodyText": "Акции - компания MYT4U Electronics\nДеловая активность настолько высока и компания\nдобилась таких успехов, что руководство решило\nпровести дробление акций!\nУ каждого владельца акций MYT4U удваивается\nих количество. (Номинальная стоимость пакета\nне меняется.)\nАкционеры по-прежнему не получают дивидендов.\nНикто не может купить или продать акции.\nНазвание: MYT4U\nДробление акций: 2 к 1",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "asset.quantity.multiply",
+        "amountCents": 2,
+        "payload": {}
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r4c3_акции-myt4u-20",
+    "title": "Акции MYT4U: $20",
+    "bodyText": "Акции — компания MYT4U Electronics\nБыстро растущая компания по продаже бытовой\nэлектронной техники, возглавляемая 32-летним\nвыпускником Гарварда.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене\nНазвание: MYT4U\nСегодняшняя цена: $20\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r5c1_дом-на-продажу-50-000-200-мес",
+    "title": "Дом на продажу: $50,000, +$200/мес",
+    "bodyText": "Дом на продажу —\n3 спальни / 2 ванные\nОтличный дом 3/2 в условиях спада на рынке,\nвызванного массовыми увольнениями. Хорошая\nинвестиционная недвижимость для толкового покупателя. Купите сами или продайте это право\nдругому игроку.\n60 % ROI, можно продать за $65 000-$135 000.\nЦена: $50 000\nИпотека: $46 000\nПервый взнос: $4000\nДенежный поток: +$200",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "46000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "200"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r5c2_акции-myt4u-5",
+    "title": "Акции MYT4U: $5",
+    "bodyText": "Акции - компания MYT4U Electronics\nВысокий уровень инфляции привел к резкому\nпадению курса акций этого продавца бытовой\nэлектронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U\nСегодняшняя цена: $5\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r5c3_обратное-дробление-акций-myt4u",
+    "title": "Обратное дробление акций MYT4U",
+    "bodyText": "Акции — компания MYT4U Electronics\nКомпания реорганизуется! Спад на рынке и раздувание штатов привели к огромным убыткам.\nАкционеры потеряли 1/2 своих прав на владение\nкомпанией.\nКаждый владелец акций MYT4U теряет 1/2 их\nстоимости. (Денег платить не нужно, так как номинальная стоимость пакета не меняется.)\nПо-прежнему никаких дивидендов. Никто не может купить или продать акции.\nНазвание: MYT4U\nОбратное дробление акций: 1 к 2",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "asset.quantity.divide",
+        "amountCents": 2,
+        "payload": {}
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r6c1_акции-ok4u-40",
+    "title": "Акции OK4U: $40",
+    "bodyText": "Акции — компания OK4U Drug\nПодьем на рынке вызвал рост курса акций этой\nреспектабельной фармацевтической компании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: OK4U\nСегодняшняя цена: $40\nНикаких дивидендов (Процентный доход\nили ROI = 0,%)\nПределы колебания цен: $5-$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r6c2_акции-myt4u-1",
+    "title": "Акции MYT4U: $1",
+    "bodyText": "Акции - компания MYT4U Electronics\nПаника, вызванная торговой войной, стала причиной рекордного падения курса акций этого продавца бытовой электронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U\nСегодняшняя цена: $1\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "1"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "1"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r6c3_акции-on2u-20",
+    "title": "Акции ON2U: $20",
+    "bodyText": "Акции — компания ON2U Entertainment\nБлагодаря новому менеджеру отдела закупок фильмов цена акций кинокомпании может возрасти.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $20\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r7c1_вы-нашли-великолепную-сделку-45-000-250-мес",
+    "title": "Вы нашли великолепную сделку!: $45,000, +$250/мес",
+    "bodyText": "Вы нашли великолепную сделку!\nКомпания купила дом 3/2 переведенного в другой\nгород менеджера. В настоящее время дом не заселен, он был выставлен на рынок 6 месяцев назад,\nцена на него только что снижена.\nЕсли в этом есть необходимость, возьмите в Банке\nкредит, но КУПИТЕ!\n150 % ROI, можно продать за $65 000-$135 000.\nЦена: $45 000\nИпотека: $43 000\nПервый взнос: $2000\nДенежный поток: +$250",
+    "category": "realestate",
+    "subcategory": "requires_mandatory_purchase_financing",
+    "isActive": false,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "45000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "2000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "43000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "250"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r7c2_редкая-золотая-монета-500",
+    "title": "Редкая золотая монета: $500",
+    "bodyText": "Редкая золотая монета\nВы заметили на «толкучке» необычную золотую\nмонету эпохи заселения Нового Света номиналом\nв один песо, чеканившуюся в XVI веке только\nв Гаване. Монета в хорошем состоянии и в единственном экземпляре. Продавец просит $500. Купите сами или продайте это право другому игроку.\n0 % ROI, можно будет продать за $0–$4000.\nЦена: $500\nПассив: $0\nПервый взнос: $500\nДенежный поток: $0",
+    "category": "collectible",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "500"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "500"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_2_r7c3_депозитный-сертификат-cd-4-000",
+    "title": "Депозитный сертификат CD: $4,000",
+    "bodyText": "Депозитный сертификат\nОдин из ведущих банков предлагает своим\nклиентам этот депозитный сертификат.\nГарантированная выплата процентов и ликвидность после любого срока владения.\nКаждый игрок может прямо сейчас купить или\nпродать столько, сколько пожелает.\nНазвание: CD\nСегодняшняя цена: $4000\nПроцентный доход = 6 %\nЧистый доход: $20 в месяц\nПределы колебания цен: $4000-$4000",
+    "category": "certificate",
+    "subcategory": "deposit_certificate",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "CD"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "20"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r1c1_акции-myt4u-40",
+    "title": "Акции MYT4U: $40",
+    "bodyText": "Акции - компания MYT4U Electronics\nБум на рынке вызвал рекордный рост курса акций этого продавца бытовой электронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U Сегодняшняя цена: $40\nНикаких дивидендов (Процентный доход\nили ROI - 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r1c2_взаимный-фонд-gro4us-30",
+    "title": "Взаимный фонд GRO4US: $30",
+    "bodyText": "Взаимный фонд — фонд GRO4US\nСнижение учетных ставок вызывает оживление\nрынка, что приводит к укреплению финансовых\nпозиций фонда.\nТолько вы можете купить по этой цене столько\nпаев, сколько захотите.\nКаждый может продать свои паи по этой цене.\nНазвание: GRO4US\nСегодняшняя цена: $30\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": "mutual_fund",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "GRO4US"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r2c1_акции-on2u-30",
+    "title": "Акции ON2U: $30",
+    "bodyText": "Акции - компания ON2U Entertainment\nБольшой спрос на видеокассеты с записями старых лент из фильмотеки компании резко повысил\nцену акций.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $30\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "30"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r2c2_дом-на-продажу-3-спальни-2-ванные-50-000-100-мес",
+    "title": "Дом на продажу — 3 спальни / 2 ванные: $50,000, +$100/мес",
+    "bodyText": "Дом на продажу — 3 спальни / 2 ванные\nЦена на этот конфискованный банком дом, полгода остававшийся без жильцов, только что была\nснижена. Банковский кредит покроет стоимость\nремонта. Купите сами или продайте это право\nдругому игроку.\n22 % ROI, можно продать за $65 000-$135 000.\nИпотека: $50 000\nЦена: $50 000\nПервый взнос: $0\nДенежный поток: +$100",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r3c1_акции-on2u-40",
+    "title": "Акции ON2U: $40",
+    "bodyText": "Акции - компания ON2U Entertainment\nБлагодаря кассовому успеху детского кинофильма\nцена акций прокатной компании поднялась до рекордного уровня.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $40\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r3c2_акции-myt4u-5",
+    "title": "Акции MYT4U: $5",
+    "bodyText": "Акции — компания MYT4U Electronics\nРекордное повышение учетных ставок привело\nк сверхнормативному падению курса акций этого\nпродавца бытовой электронной техники!\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: MYT4U\nСегодняшняя цена: $5\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $5-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r4c1_акции-on2u-10",
+    "title": "Акции ON2U: $10",
+    "bodyText": "Акции - компания ON2U Entertainment\nКассовый провал экстравагантного музыкального\nкинофильма у аудитории среднего возраста привел к падению курса акций кинокомпании.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $10\nНикаких дивидендов (Процентный доход\nили ROI = 0%)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r4c2_взаимный-фонд-gro4us-40",
+    "title": "Взаимный фонд GRO4US: $40",
+    "bodyText": "Взаимный фонд — фонд GRO4US\nБум на рынке электроэнергии довел стоимость\nакций фонда до рекордного уровня.\nТолько вы можете купить по этой цене столько\nпаев, сколько захотите.\nКаждый может продать свои паи по этой цене.\nНазвание: GRO4US Сегодняшняя цена: $40\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": "mutual_fund",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "GRO4US"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r5c1_акции-on2u-5",
+    "title": "Акции ON2U: $5",
+    "bodyText": "Акции — компания ON2U Entertainment\nПосле третьего подряд кассового провала менеджер отдела закупок уволен. Акции падают.\nПредседатель правления остался без премии.\nТолько вы можете купить по этой цене столько\nакций, сколько захотите.\nКаждый может продать свои акции по этой цене.\nНазвание: ON2U\nСегодняшняя цена: $5\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "ON2U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r5c2_дом-на-продажу-50-000-100-мес",
+    "title": "Дом на продажу: $50,000, -$100/мес",
+    "bodyText": "Дом на продажу —\n3 спальни / 2 ванные\nДом 3/2 в старом районе предлагает управление\nшоссейных дорог. Рынок недвижимости на спаде.\nНИКАКИХ предложений на аукционе, который\nпроходил на прошлой неделе. Купите сами или\nпродайте это право другому игроку.\n?? % ROI, можно продать за $65 000-$135 000.\nИпотека: $50 000\nЦена: $50 000\nПервый взнос: $0\nДенежный поток: -$100",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r6c1_привилегированные-акции-2big-1-200",
+    "title": "Привилегированные акции 2BIG: $1,200",
+    "bodyText": "Привилегированные акции - 2BIG Power\nВысокодоходные привилегированные акции крупнейшей национальной электроэнергетической компании. Дивиденды и цены зафиксированы на достаточно высоком уровне Государственной комиссией по коммунальному хозяйству.\nКаждый игрок может прямо сейчас купить или\nпродать столько, сколько пожелает.\nНазвание: 2BIG\nСегодняшняя цена: $1200\nПроцентный доход = 10 %\nЧистый доход: $10 в месяц\nПределы колебания цен: $1200-$1200",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "2BIG"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "1200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "10"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r6c2_создайте-компанию-без-отрыва-от-работы-3-000",
+    "title": "Создайте компанию без отрыва от работы: $3,000",
+    "bodyText": "Создайте компанию без отрыва от работы\nИзобретите новый способ изготовления автомобильных «наворотов», создайте компанию для их\nпроизводства и продажи. Никаких доходов и дополнительного вознаграждения на начальном этапе, большие затраты времени. Используйте сами\nили продайте это право другому игроку.\n0 % ROI, можно будет продать за ??, если вообще удастся продать.\nПассив: $0\nЦена: $3000\nПервый взнос: $3000\nДенежный поток: $0",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r6c3_другу-нужны-деньги-срочно-3-000",
+    "title": "Другу нужны деньги... Срочно: $3,000",
+    "bodyText": "Другу нужны деньги... Срочно\nОдному из ваших друзей срочно понадобились наличные. Он готов продать вам 10 одноунциевых\nзолотых крюгеррандов намного ниже обычной цены, по $300 за каждую монету. Купите сами или\nпродайте это право другому игроку.\n0 % ROI, в будущем можно будет продать за ??.\nПассив: $0\nЦена: $3000\nПервый взнос: $3000\nДенежный поток: $0",
+    "category": "collectible",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r3c3_свояченица-просит-одолжить-денег-5-000",
+    "title": "Свояченица просит одолжить денег: $5,000",
+    "bodyText": "Свояченица просит одолжить денег\nВаша свояченица потеряла работу. Ей нужно\n$5000, чтобы заплатить взносы за дом. Она обещает отдать вам $10 000, как только найдет новую работу. Купите сами или продайте это право\nдругому игроку.\n?? % ROI.\nПассив: $0\nЦена: $5000\nПервый взнос: $5000\nДенежный поток: $0",
+    "category": "loan",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "5000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "original_ru_small_small_3_r5c3_взаимный-фонд-gro4us-10",
+    "title": "Взаимный фонд GRO4US: $10",
+    "bodyText": "Взаимный фонд — фонд GRO4US\nНизкие доходы большинства компаний вызвали\nснижение цен на акции взаимного фонда.\nТолько вы можете купить по этой цене столько\nпаев, сколько захотите.\nКаждый может продать свои паи по этой цене.\nНазвание: GRO4US\nСегодняшняя цена: $10\nНикаких дивидендов (Процентный доход\nили ROI = 0 %)\nПределы колебания цен: $10-$30",
+    "category": "stock",
+    "subcategory": "mutual_fund",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "GRO4US"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "30"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r1c1_дуплекс-на-продажу-70-000-140-мес",
+    "title": "Дуплекс на продажу: $70,000, +$140/мес",
+    "bodyText": "Дуплекс на продажу\nСамый лучший дуплекс во всем районе! Владелица отходит от дел и переезжает в другой\nштат, чтобы быть поближе к внукам. Купите сами\nили продайте это право другому игроку.\n24 % ROI, можно продать за $50 000-$80 000.\nИпотека: $63 000\nЦена: $70 000\nПервый взнос: $7000\nДенежный поток: +$140",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "70000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "7000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "63000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "140"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r1c2_дуплекс-на-продажу-60-000-300-мес",
+    "title": "Дуплекс на продажу: $60,000, +$300/мес",
+    "bodyText": "Дуплекс на продажу\nДуплекс в отличном состоянии, в привлекательном районе, продается по причине переезда владельца. Отличная инвестиционная возможность\nдля толкового покупателя. Купите сами или продайте это право другому игроку.\n60 % ROI, можно продать за $50 000–$80 000.\nИпотека: $54 000\nЦена: $60 000\nПервый взнос: $6000\nДенежный поток: +$300",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "6000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "54000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "300"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r1c3_предприятие-на-продажу-150-000-2-500-мес",
+    "title": "Предприятие на продажу: $150,000, +$2,500/мес",
+    "bodyText": "Предприятие на продажу\nИспытывающий серьезные финансовые затруднения владелец продает процветающую прачечную\nсамообслуживания на оживленном шоссе. Владелец живет в другом штате, лицензия оформлена.\nКупите сами или продайте это право другому игроку.\n100 % ROI. Пока никаких других покупателей\nЦена: $150 000\nПассив: $120 000\nПервый взнос: $30 000\nДенежный поток: +$2500",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "150000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "120000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2500"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r2c1_пансионат-с-полупансионом-150-000-1-000-мес",
+    "title": "Пансионат с полупансионом: $150,000, +$1,000/мес",
+    "bodyText": "Пансионат с полупансионом\nВладелец отходит от дел и желает продать\nНЕМЕДЛЕННО. Прекрасная клиентура\nв курортном районе. 5 спален/3 ванные. Купите\nсами или продайте это право другому игроку.\n40 % ROI, можно продать за $100 000-$300 000.\nЦена: $150 000\nИпотека: $120 000\nПервый взнос: $30 000\nДенежный поток: +$1000",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "150000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "120000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r2c2_4-плекс-на-продажу-80-000-400-мес",
+    "title": "4-плекс на продажу: $80,000, +$400/мес",
+    "bodyText": "4-плекс на продажу\nПродается только что построенный 4-плекс в развивающемся районе. Владелец выселен за неуплату подоходного налога. Купите сами или продайте\nэто право другому игроку.\n24 % ROI, можно продать за $100 000-$140 000.\nЦена: $80 000\nИпотека: $60 000\nПервый взнос: $20 000\nДенежный поток: +$400",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "400"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r2c3_прорыв-канализации-2-000",
+    "title": "Прорыв канализации: $2,000",
+    "bodyText": "Прорыв канализации\nВода заливает все квартиры вашего 8-плекса!\nТребуется срочный ремонт канализационной\nтрубы.\nЕсли вы владеете 8-плексом, заплатите $2000\nза установку новой трубы. (Банк может предоставить кредит на обычных условиях.)\nЕсли у вас во владении несколько 8-плексов,\nоплатите ремонт только в одном.",
+    "category": "expense",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -2000,
+        "payload": {
+          "automatic": true,
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_8_plex",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r3c1_4-плекс-на-продажу-100-000-800-мес",
+    "title": "4-плекс на продажу: $100,000, +$800/мес",
+    "bodyText": "4-плекс на продажу\n4-плекс в возрождающемся районе. Все квартиры\nзаселены, ремонт проводится своевременно. Требует только первого взноса и терпения. Купите\nсами или продайте это право другому игроку.\n48 % ROI, можно продать за $100 000-$140 000.\nЦена: $100 000\nИпотека: $80 000\nПервый взнос: $20 000\nДенежный поток: +$800",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "800"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r3c2_4-плекс-на-продажу-90-000-500-мес",
+    "title": "4-плекс на продажу: $90,000, +$500/мес",
+    "bodyText": "4-плекс на продажу\nСтарый 4-плекс рядом с новым шоссе. Владелец,\nживущий в этом же доме, переезжает в более\nтихий район. Цена продавца рассчитана\nна быструю продажу. Купите сами или продайте\nэто право другому игроку.\n40 % ROI, можно продать за $100 000-$140 000.\nЦена: $90 000\nИпотека: $75 000\nПервый взнос: $15 000\nДенежный поток: +$500",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "90000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "75000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "500"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r3c3_8-плекс-на-продажу-160-000-1-700-мес",
+    "title": "8-плекс на продажу: $160,000, +$1,700/мес",
+    "bodyText": "8-плекс на продажу\nБизнесмену срочно нужны деньги, чтобы сохранить совместное предприятие. Он продает 8-плекс,\nчтобы собрать необходимые средства. Хорошая\nвозможность для толкового человека. Купите сами\nили продайте это право другому игроку.\n64 % ROI, можно продать за $200 000-$280 000.\nИпотека: $128 000\nЦена: $160 000\nПервый взнос: $32 000\nДенежный поток: +$1700",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "160000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "32000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "128000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1700"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r4c1_дом-на-продажу-75-000-300-мес",
+    "title": "Дом на продажу: $75,000, +$300/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nДом 3/2 на поле для гольфа обладает потенциалом прироста стоимости и приносит положительный доход. Хорошая квартплата и отличные условия финансирования. Купите сами или продайте\nэто право другому игроку.\n51 % ROI, можно продать за $65 000-$135 000.\nЦена: $75 000\nИпотека: $68 000\nПервый взнос: $7000\nДенежный поток: +$300",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "75000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "7000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "68000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "300"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r4c2_дом-на-продажу-67-000-400-мес",
+    "title": "Дом на продажу: $67,000, +$400/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nПереведенный в другой город торговый агент содержал дом 3/2 в идеальном состоянии, поэтому\nквартплата за это жилье, находящееся в хорошем\nрайоне, может быть очень высокой. Купите сами\nили продайте это право другому игроку.\n40 % ROI, можно продать за $65 000-$135 000.\nЦена: $67 000\nИпотека: $55 000\nПервый взнос: $12 000\nДенежный поток: +$400",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "67000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "12000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "55000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "400"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r4c3_дом-на-продажу-70-000-500-мес",
+    "title": "Дом на продажу: $70,000, +$500/мес",
+    "bodyText": "Дом на продажу —\n3 спальни / 2 ванные\nСупруги разводятся и продают дом 3/2 в районе,\nзаселенном владельцами собственных домов.\nВыставлен на рынок 5 месяцев назад. Купите\nсами или продайте это право другому игроку.\n30 % ROI, можно продать за $65 000-$135 000.\nИпотека: $50 000\nЦена: $70 000\nПервый взнос: $20 000\nДенежный поток: +$500",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "70000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "500"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r5c1_дом-на-продажу-125-000-100-мес",
+    "title": "Дом на продажу: $125,000, -$100/мес",
+    "bodyText": "Дом на продажу —\n3 спальни / 2 ванные\nПродается дом 3/2 с бассейном и всеми удобствами в районе среднего класса. Хорошие школы. Купите сами или продайте это право другому\nигроку.\n-6 % ROI, можно продать за $65 000-$150 000.\nЦена: $125 000\nИпотека: $105 000\nПервый взнос: $20 000\nДенежный поток: -$100",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "125000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "105000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-100"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r5c2_8-плекс-на-продажу-200-000-1-600-мес",
+    "title": "8-плекс на продажу: $200,000, +$1,600/мес",
+    "bodyText": "8-плекс на продажу\nЮридические неприятности вынуждают владельца\nпродать этот 8-плекс. Кредитор хорошо вас знает\nи согласен выдать ссуду без проволочек. Купите\nсами или продайте это право другому игроку.\n48 % ROI, можно продать за $200 000-$280 000.\nЦена: $200 000\nИпотека: $160 000\nПервый взнос: $40 000\nДенежный поток: +$1600",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "160000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1600"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r5c3_8-плекс-на-продажу-240-000-950-мес",
+    "title": "8-плекс на продажу: $240,000, +$950/мес",
+    "bodyText": "8-плекс на продажу\nОтходящий от дел инвестор и владелец продает\nэтот 8-плекс по цене последней оценки.\nПрофессиональное управление и уход за газоном.\nВся учетная документация в порядке. Купите\nсами или продайте это право другому игроку\n29 % ROI, можно продать за $200 000-$280 000\nЦена: $240 000\nИпотека: $200 000\nПервый взнос: $40 000\nДенежный поток: +$950",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "240000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "950"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r6c1_20-акров-земли-на-продажу-20-000",
+    "title": "20 акров земли на продажу: $20,000",
+    "bodyText": "20 акров земли на продажу\n20 акров свободной земли в жилой зоне. Возможность значительного прироста стоимости в связи\nс переквалификацией зоны в коммерческую. Купите сами или продайте это право другому игроку.\n0 % ROI, можно будет продать за ??\nЦена: $20 000\nИпотека: $0\nПервый взнос: $20 000\nДенежный поток: $0",
+    "category": "land",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r6c2_требуется-партнер-25-000-1-000-мес",
+    "title": "Требуется партнер: $25,000, +$1,000/мес",
+    "bodyText": "Требуется партнер\nс ограниченной ответственностью\nПреуспевающий врач расширяет свой офис и клинику. Ищет партнера, готового вложить долю\nв стоимость строительных работ. Купите сами или\nпродайте это право другому игроку.\n48 % ROI, владелец сможет впоследствии\nвыкупить у вас долю за $50 000-$75 000.\nПассив: $0\nЦена: $25 000\nПервый взнос: $25 000\nДенежный поток: +$1000",
+    "category": "partnership",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "25000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "25000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_1_r6c3_требуется-партнер-30-000-1-500-мес",
+    "title": "Требуется партнер: $30,000, +$1,500/мес",
+    "bodyText": "Требуется партнер\nс ограниченной ответственностью\nСеть бутербродных удваивает количество торговых точек.\nВладельцу нужен дополнительный\nосновной капитал для получения кредита на текущие расходы. Купите сами или продайте это\nправо другому игроку.\n60 % ROI, владелец сможет впоследствии выкупить у вас долю за $60 000-$90 000.\nПассив: $0\nЦена: $30 000\nПервый взнос: $30 000\nДенежный поток: +$1500",
+    "category": "partnership",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1500"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r1c1_предприятие-на-продажу-200-000-2-700-мес",
+    "title": "Предприятие на продажу: $200,000, +$2,700/мес",
+    "bodyText": "Предприятие на продажу\nПроцветающая сеть телефонов-автоматов продается в связи со смертью владельца. Наследники\nживут в другом штате. Все места установки автоматов обеспечены долгосрочными контрактами.\nКупите сами или продайте это право другому\n81 % ROI. Пока никаких других покупателей.\nЦена: $200 000\nПассив: $160 000\nПервый взнос: $40 000\nДенежный поток: +$2700",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "160000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2700"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r1c2_предприятие-на-продажу-100-000-1-600-мес",
+    "title": "Предприятие на продажу: $100,000, +$1,600/мес",
+    "bodyText": "Предприятие на продажу\nВладелец просрочил кредит и находится в отчаянном положении. Продает 30 видеоавтоматов для\nигры в пинбол, установленных на основе долгосрочных контрактов. Купите сами или продайте\nэто право другому игроку.\n96 % ROI. Пока никаких других покупателей.\nЦена: $100 000\nПассив: $80 000\nПервый взнос: $20 000\nДенежный поток: +$1600",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1600"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r1c3_многоквартирные-дома-на-продажу-575-000-3-400-мес",
+    "title": "Многоквартирные дома на продажу: $575,000, +$3,400/мес",
+    "bodyText": "Многоквартирные дома на продажу\nПродаются 2 дома, общее число квартир - 24.\nВладелец управлял ими с помощью проживающего тут же помощника. Причина продажи отход от дел. Купите сами или продайте это право\nдругому игроку.\n54 % ROI, можно продать за $600 000-$960 000.\nЦена: $575 000\nИпотека: $500 000\nПервый взнос: $75 000\nДенежный поток: +$3400",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "575000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "75000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "500000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "3400"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r2c1_4-плекс-на-продажу-80-000-750-мес",
+    "title": "4-плекс на продажу: $80,000, +$750/мес",
+    "bodyText": "4-плекс на продажу\nВынужденная продажа 4-плекса. Проживающий\nв другом штате владелец испытывает серьезные\nфинансовые трудности и не может оплатить налоги. Часть документации отсутствует. Купите сами\nили продайте это право другому игроку.\n56 % ROI, можно продать за $100 000-$140 000.\nЦена: $80 000\nИпотека: $64 000\nПервый взнос: $16 000\nДенежный поток: +$750",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "16000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "64000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "750"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r2c2_предприятие-на-продажу-125-000-1-800-мес",
+    "title": "Предприятие на продажу: $125,000, +$1,800/мес",
+    "bodyText": "Предприятие на продажу\nПроцветающая автомойка на 4 машины рядом\nс оживленным перекрестком. Продавец переезжает в поселок для престарелых в другом штате. Купите сами или продайте это право другому игроку.\n86 % ROI. Пока никаких других покупателей.\nЦена: $125 000\nПассив: $100 000\nПервый взнос: $25 000\nДенежный поток: +$1800",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "125000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "25000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1800"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r2c3_торговый-пассаж-на-продажу-50-000-800-мес",
+    "title": "Торговый пассаж на продажу: $50,000, +$800/мес",
+    "bodyText": "Торговый пассаж на продажу\nБанк конфисковал пассаж у обанкротившегося\nвладельца. В данный момент торговые площади\nзаняты на 50 %. Выставлен на продажу только\nвчера. Купите сами или продайте это право\nдругому игроку\n19 % ROI, можно продать за $35 000-$150 000\nЦена: $50 000\nИпотека: $0\nПервый взнос: $50 000\nДенежный поток: +$800",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "800"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r3c1_8-плекс-на-продажу-220-000-1-700-мес",
+    "title": "8-плекс на продажу: $220,000, +$1,700/мес",
+    "bodyText": "8-плекс на продажу\nЗанимающийся реинвестированием владелец продает 8-плекс за приемлемую цену. Финансирование сделки полностью подготовлено. Все, что\nнужно от вас, — это заплатить первый взнос. Купите сами или продайте это право другому игроку.\n51 % ROI, можно продать за $200 000-$280 000.\nЦена: $220 000\nИпотека: $180 000\nПервый взнос: $40 000\nДенежный поток: +$1700",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "220000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "180000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1700"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r3c2_многоквартирный-дом-на-продажу-350-000-2-400-мес",
+    "title": "Многоквартирный дом на продажу: $350,000, +$2,400/мес",
+    "bodyText": "Многоквартирный дом на продажу\n12-квартирный дом продают наследники владельца, проживающие в другом штате. Большая очередь претендентов на аренду квартир в этом\nздании. Купите сами или продайте это право другому игроку.\n58 % ROI, можно продать за $300 000-$480 000.\nИпотека: $300 000\nЦена: $350 000\nПервый взнос: $50 000\nДенежный поток: +$2400",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "350000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "300000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2400"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r3c3_франшиза-пиццерии-на-продажу-500-000-5-000-мес",
+    "title": "Франшиза пиццерии на продажу: $500,000, +$5,000/мес",
+    "bodyText": "Франшиза пиццерии на продажу\nКомпания «Диетическая пицца» продает лицензию\nна торговую точку. Рынок продуктов питания\nна подъёме. Пиццерия находится рядом с колледжем.\nБольшой наплыв посетителей. Купите сами или\nпродайте это право другому игроку.\n60 % ROI, можно продать за $520 000-$800 000.\nИпотека: $400 000\nЦена: $500 000\nПервый взнос: $100 000\nДенежный поток: +$5000",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "500000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "400000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "5000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r4c1_автомойка-на-продажу-350-000-1-500-мес",
+    "title": "Автомойка на продажу: $350,000, +$1,500/мес",
+    "bodyText": "Автомойка на продажу\nВраждующая семья владельцев продает автомойку. Хотят продать как можно скорее. Превосходное расположение в развивающемся районе. Купите сами или продайте это право другому игроку.\n36 % ROI, можно продать за 12-25 номиналов\nгодового денежного потока.\nИпотека: $300 000\nЦена: $350 000\nПервый взнос: $50 000\nДенежный поток: +$1500",
+    "category": "business",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "350000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "300000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1500"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r4c2_дом-на-продажу-65-000-300-мес",
+    "title": "Дом на продажу: $65,000, +$300/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nУ этого дома 3/2 хороший инвестиционный потенциал, но вам необходимо проявить терпение.\nПоложительный денежный поток, несмотря на низкую квартплату. Купите сами или продайте это\nправо другому игроку.\n45 % ROI, можно продать за $65 000-$135 000.\nИпотека: $57 000\nЦена: $65 000\nПервый взнос: $8000\nДенежный поток: +$300",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "65000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "57000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "300"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r4c3_многоквартирный-дом-на-продажу-1-200-000-11-000-мес",
+    "title": "Многоквартирный дом на продажу: $1,200,000, +$11,000/мес",
+    "bodyText": "Многоквартирный дом на продажу\nДом на 60 квартир продается пенсионным фондом,\nконфисковавшим его у строителя и владельца.\nУправляющий живет в этом же доме. Купите сами\nили продайте это право другому игроку.\n66 % ROI, можно продать за $1 500 000–$2 700 000.\nИпотека: $1 000 000\nЦена: $1 200 000\nПервый взнос: $200 000\nДенежный поток: +$11 000",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "1200000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "1000000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "11000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r5c1_требуется-партнер-20-000-800-мес",
+    "title": "Требуется партнер: $20,000, +$800/мес",
+    "bodyText": "Требуется партнер\nс ограниченной ответственностью\nПроцветающая сеть пиццерий расширяет производство и собирается выпускать замороженные\nпиццы для продуктовых магазинов. Владельцу\nнеобходим капитал на покупку оборудования. Купите сами или продайте это право другому игроку.\n48 % ROI, владелец сможет впоследствии\nвыкупить у вас долю за $40 000-$60 000\nПассив: $0\nЦена: $20 000\nПервый взнос: $20 000\nДенежный поток: +$800",
+    "category": "partnership",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "800"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r5c2_дом-на-продажу-65-000-150-мес",
+    "title": "Дом на продажу: $65,000, +$150/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nБизнесмен продает этот дом 3/2, так как ему\nнужны наличные, чтобы спасти свой бизнес. Проживающий в доме жилец чрезвычайно доволен\nусловиями. Купите сами или продайте это право\nдругому игроку.\n26 % ROI, можно продать за $65 000-$135 000.\nИпотека: $58 000\nЦена: $65 000\nПервый взнос: $7000\nДенежный поток: +$150",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "65000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "7000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "58000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "150"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r5c3_дом-на-продажу-70-000-300-мес",
+    "title": "Дом на продажу: $70,000, +$300/мес",
+    "bodyText": "Дом на продажу -\n3 спальни / 2 ванные\nПониженный в должности менеджер вынужден\nпродать этот дом 3/2, потому что не может оплачивать кредит. Район развивается. Купите сами\nили продайте это право другому игроку.\n40 % ROI, можно продать за $65 000-$135 000.\nЦена: $70 000\nИпотека: $61 000\nПервый взнос: $9000\nДенежный поток: +$300",
+    "category": "realestate",
+    "subcategory": "house3m",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "70000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "9000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "61000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "300"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r6c1_дуплекс-на-продажу-45-000-320-мес",
+    "title": "Дуплекс на продажу: $45,000, +$320/мес",
+    "bodyText": "Дуплекс на продажу\nПрекрасный дуплекс с хорошими жильцами!\nУ владельца проблемы с налогами, желает\nпродать как можно быстрее. Купите сами\nили продайте это право другому игроку.\n48 % ROI, можно продать за $50 000-$80 000.\nЦена: $45 000\nИпотека: $37 000\nПервый взнос: $8000\nДенежный поток: +$320",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "45000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "37000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "320"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_2_r6c3_4-плекс-на-продажу-140-000-2-000-мес",
+    "title": "4-плекс на продажу: $140,000, +$2,000/мес",
+    "bodyText": "4-плекс на продажу\n4-плекс продается владельцем, переезжающим\nв другой штат. Все документы в порядке, все\nквартиры заселены, низкая текучесть жильцов,\nв хорошем районе. Купите сами или продайте это\nправо другому игроку.\n75 % ROI, можно продать за $100 000-$140 000.\nИпотека: $108 000\nЦена: $140 000\nПервый взнос: $32 000\nДенежный поток: +$2000",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "140000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "32000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "108000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r1c1_многоквартирный-дом-на-продажу-550-000-2-800-мес",
+    "title": "Многоквартирный дом на продажу: $550,000, +$2,800/мес",
+    "bodyText": "Многоквартирный дом на продажу\nСтарый 24-квартирный дом рядом с общественным колледжем продает отходящий от дел владелец и строитель. Полностью заселен, дает отличный денежный поток. Купите сами или продайте\nэто право другому игроку.\n67 % ROI, можно продать за $600 000-$960 000.\nЦена: $550 000\nИпотека: $500 000\nПервый взнос: $50 000\nДенежный поток: +$2800",
+    "category": "realestate",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "550000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "500000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2800"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r2c1_дуплекс-на-продажу-60-000-400-мес",
+    "title": "Дуплекс на продажу: $60,000, +$400/мес",
+    "bodyText": "Дуплекс на продажу\nВладелец вынужден продать дуплекс, чтобы оплатить больничные счета. Обе квартиры заселены,\nвсе документы оформлены, хорошая инвестиционная возможность. Купите сами или продайте это право другому игроку.\n40 % ROI, можно продать за $50 000-$80 000.\nЦена: $60 000\nИпотека: $48 000\nПервый взнос: $12 000\nДенежный поток: +$400",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "12000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "48000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "400"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r3c1_требуется-партнер-30-000-1-000-мес",
+    "title": "Требуется партнер: $30,000, +$1,000/мес",
+    "bodyText": "Требуется партнер\nс ограниченной ответственностью\nАвтодилер желает расширить свой салон и заняться лизингом машин двух-трехлетнего возраста.\nНуждается в капитале, так как компания-производитель машин не выказала интереса. Купите сами\nили продайте это право другому игроку.\n40 % ROI, владелец сможет впоследствии\nвыкупить у вас долю за $60 000-$90 000.\nЦена: $30 000\nПассив: $0\nПервый взнос: $30 000\nДенежный поток: +$1000",
+    "category": "partnership",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1000"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r4c1_дуплекс-на-продажу-50-000-240-мес",
+    "title": "Дуплекс на продажу: $50,000, +$240/мес",
+    "bodyText": "Дуплекс на продажу\nВладелец выселяется из этого дома по причине\nроста семьи. Квартирант остается. Дом хорошо\nуправляется и находится в живописном месте. Купите сами или продайте это право другому игроку.\n36 % ROI, можно продать за $50 000—$70 000.\nИпотека: $42 000\nЦена: $50 000\nПервый взнос: $8000\nДенежный поток: +$240",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "42000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "240"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r5c1_4-плекс-на-продажу-125-000-600-мес",
+    "title": "4-плекс на продажу: $125,000, +$600/мес",
+    "bodyText": "4-плекс на продажу\nКрасивый 4-плекс в хорошем районе, управляется\nнадежной компанией. Постоянные жильцы, положительный денежный поток, мало проблем. Вся\nучетная документация в порядке. Купите сами\nили продайте это право другому игроку.\n48 % ROI, можно продать за $100 000-$140 000.\nИпотека: $110 000\nЦена: $125 000\nПервый взнос: $15 000\nДенежный поток: +$600",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "125000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "110000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "600"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "original_ru_big_big_3_r6c1_жилец-наносит-вред-вашей-собственности-1-000",
+    "title": "Жилец наносит вред вашей собственности: $1,000",
+    "bodyText": "Жилец наносит вред вашей собственности\nПотерявший работу жилец отказался платить\nза квартиру. После его выселения вы обнаруживаете, что он нанес значительный ущерб вашей\nсобственности.\nСтраховка покрывает большую часть убытков, но\nвам все равно приходится выложить $1000 из своего кармана.\nЗаплатите $1000, если вы владеете любой арендной недвижимостью. (Банк при необходимости\nвыдает кредит под обычный процент.)\nПлатит только тот игрок, который вытянул эту\nкарточку.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -1000,
+        "payload": {
+          "automatic": true,
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_rental_realestate",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r1c1_купите-телевизор-с-большим-экраном-4-000",
+    "title": "Купите телевизор с большим экраном: $4,000",
+    "bodyText": "Купите телевизор с большим экраном\nЗаплатите $4000.\n(Можете расплатиться кредитной карточкой. Если\nвы используете карточку, то внесите $4000 в графу «Выплаты по кредитным карточкам» и добавьте $120 в колонку ежемесячных расходов.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "payment_choice",
+        "metaValue": "cash_or_credit"
+      },
+      {
+        "metaKey": "cash_price",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "credit_balance",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "credit_payment",
+        "metaValue": "120"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r1c2_в-отпуск-всей-семьей-2-000",
+    "title": "В отпуск всей семьей!: $2,000",
+    "bodyText": "В отпуск всей семьей!\nОбойдется в $2000.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -2000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r1c3_встреча-выпускников-средней-школы-250",
+    "title": "Встреча выпускников средней школы: $250",
+    "bodyText": "Встреча выпускников средней школы\nПотратьте $250.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -250,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r2c1_купите-новую-теннисную-ракетку-200",
+    "title": "Купите новую теннисную ракетку: $200",
+    "bodyText": "Купите новую теннисную ракетку\nПотратьте $200.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r2c2_купите-детям-игрушки-50-за-ребенка",
+    "title": "Купите детям игрушки: $50 за ребёнка",
+    "bodyText": "Купите детям игрушки\nПотратьте $50 на каждого ребенка.",
+    "category": "family",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "per_child",
+        "metaValue": "true"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -50,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r2c3_день-рождения-100",
+    "title": "День рождения!: $100",
+    "bodyText": "День рождения!\nСводите детей в парк развлечений\nи потратьте $100\n(если у вас есть ребенок).",
+    "category": "family",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r3c1_купите-кофеварку-для-капучино-150",
+    "title": "Купите кофеварку для капучино: $150",
+    "bodyText": "Купите кофеварку для капучино\nЗаплатите $150.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -150,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r3c2_не-можете-пройти-мимо-новой-картины-200",
+    "title": "Не можете пройти мимо новой картины: $200",
+    "bodyText": "Не можете пройти мимо новой картины\nместного художника\nОбходится вам в $200.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r3c3_купите-себе-и-другу-кофе-10",
+    "title": "Купите себе и другу кофе: $10",
+    "bodyText": "Купите себе и другу кофе\nс молоком и капучино\nЗаплатите $10.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -10,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r4c1_покупка-мебели-300",
+    "title": "Покупка мебели: $300",
+    "bodyText": "Покупка мебели\nДавно пора заменить старое кресло.\nЗаплатите $300.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -300,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r4c2_сходите-на-концерт-180",
+    "title": "Сходите на концерт: $180",
+    "bodyText": "Сходите на концерт\nУжин, билеты и кофе обойдутся вам в $180.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -180,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r4c3_свадьба-вашей-дочери-2-000",
+    "title": "Свадьба вашей дочери: $2,000",
+    "bodyText": "Свадьба вашей дочери\nЗаплатите $2000\n(если у вас есть ребенок).",
+    "category": "family",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -2000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r5c1_купите-кухонный-комбайн-150",
+    "title": "Купите кухонный комбайн: $150",
+    "bodyText": "Купите кухонный комбайн\nЗаплатите $150.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -150,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r5c2_купите-новый-шар-для-боулинга-80",
+    "title": "Купите новый шар для боулинга: $80",
+    "bodyText": "Купите новый шар для боулинга\nЗаплатите $80.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -80,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r5c3_покраска-дома-600",
+    "title": "Покраска дома: $600",
+    "bodyText": "Покраска дома\nОбойдется вам в $600.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -600,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r6c1_приступ-мотовства-150",
+    "title": "Приступ мотовства: $150",
+    "bodyText": "Приступ мотовства\nКупите новые наручные часы\n(даже если у вас есть еще трое часов).\nЗаплатите $150.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -150,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r6c2_купите-новые-динамики-500",
+    "title": "Купите новые динамики: $500",
+    "bodyText": "Купите новые динамики\nдля стереосистемы\nЗаплатите $500.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -500,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_1_r6c3_купите-новые-мячи-для-гольфа-20",
+    "title": "Купите новые мячи для гольфа: $20",
+    "bodyText": "Купите новые мячи для гольфа\nЗаплатите $20.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -20,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r1c1_купите-новый-мобильный-телефон-100",
+    "title": "Купите новый мобильный телефон: $100",
+    "bodyText": "Купите новый мобильный телефон\nЗаплатите $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r1c2_сломался-кондиционер-в-машине-700",
+    "title": "Сломался кондиционер в машине: $700",
+    "bodyText": "Сломался кондиционер в машине\nЗаплатите $700.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -700,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r1c3_слухи-о-массовых-увольнениях-220",
+    "title": "Слухи о массовых увольнениях: $220",
+    "bodyText": "Слухи о массовых увольнениях\nЗапишитесь на курсы\nпрофессиональной подготовки.\nЗаплатите $220 за обучение и книги.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -220,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r2c1_новый-катер-1-000",
+    "title": "Новый катер!: $1,000",
+    "bodyText": "Новый катер!\nЗаплатите первый взнос $1000,\nа $17 000 оплатите в рассрочку.\n(Внесите $17 000 кредита на катер в колонку «Пассивы», а в колонку «Расходы» добавьте выплаты\nпо кредиту за новый катер в размере $340.)",
+    "category": "expense",
+    "subcategory": "loan",
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -1000,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "liability.create",
+        "amountCents": 17000,
+        "payload": {
+          "mandatory": true,
+          "type": "doodad_loan",
+          "name": "Новый катер",
+          "paymentCents": 340
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r2c2_купите-новое-удилище-100",
+    "title": "Купите новое удилище: $100",
+    "bodyText": "Купите новое удилище\nЗаплатите $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r2c3_сыграйте-2-раунда-в-гольф-100",
+    "title": "Сыграйте 2 раунда в гольф: $100",
+    "bodyText": "Сыграйте 2 раунда в гольф\nЗаплатите $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r3c1_сыграйте-в-лотерею-на-свой-100",
+    "title": "Сыграйте в лотерею на свой: $100",
+    "bodyText": "Сыграйте в лотерею на свой\nсчастливый номер!\nРасстаньтесь со $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r3c2_сходите-на-бейсбол-50",
+    "title": "Сходите на бейсбол: $50",
+    "bodyText": "Сходите на бейсбол\nЗаплатите $50.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -50,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r3c3_сын-поступает-в-колледж-1-500",
+    "title": "Сын поступает в колледж: $1,500",
+    "bodyText": "Сын поступает в колледж\nЗаплатите $1500\n(если у вас есть ребенок).",
+    "category": "family",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -1500,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r4c1_навестите-стоматолога-100",
+    "title": "Навестите стоматолога: $100",
+    "bodyText": "Навестите стоматолога\nПломба стоит $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r4c2_потек-водонагреватель-450",
+    "title": "Потек водонагреватель: $450",
+    "bodyText": "Потек водонагреватель\nЗаплатите $450 за новый.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -450,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r4c3_поход-по-магазинам-350",
+    "title": "Поход по магазинам!: $350",
+    "bodyText": "Поход по магазинам!\nЗаплатите $350 за изумительные\nфальшивые бриллианты.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -350,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r5c1_обед-с-друзьями-40",
+    "title": "Обед с друзьями: $40",
+    "bodyText": "Обед с друзьями\nЗаплатите $40.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -40,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r5c2_поужинайте-в-ресторане-80",
+    "title": "Поужинайте в ресторане: $80",
+    "bodyText": "Поужинайте в ресторане\nПотратьте $80.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -80,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r5c3_сходите-в-казино-200",
+    "title": "Сходите в казино: $200",
+    "bodyText": "Сходите в казино\nПроиграйте $200.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r6c1_ваш-юбилей-200",
+    "title": "Ваш юбилей!: $200",
+    "bodyText": "Ваш юбилей!\nПотратьте $200.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r6c2_нужно-заменить-покрышки-300",
+    "title": "Нужно заменить покрышки: $300",
+    "bodyText": "Нужно заменить покрышки\nЗаплатите $300.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -300,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_2_r6c3_парковка-на-стоянке-для-инвалидов-100",
+    "title": "Парковка на стоянке для инвалидов: $100",
+    "bodyText": "Парковка на стоянке для инвалидов\nЗаплатите штраф $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r1c1_налоговая-проверка-350",
+    "title": "Налоговая проверка: $350",
+    "bodyText": "Налоговая проверка\nКакая жалость!\nЗаплатите в налоговую инспекцию $350.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -350,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r2c1_зубные-пластинки-для-ребенка-2-000",
+    "title": "Зубные пластинки для ребёнка: $2,000",
+    "bodyText": "Вашему ребенку нужно поставить\nзубные пластинки\nЗаплатите $2000\n(если у вас есть ребенок).",
+    "category": "family",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -2000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r3c1_новые-музыкальные-компакт-диски-100",
+    "title": "Новые музыкальные компакт-диски: $100",
+    "bodyText": "Купите новые музыкальные\nкомпакт-диски\nЗаплатите $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r4c1_сходите-на-авиашоу-120",
+    "title": "Сходите на авиашоу: $120",
+    "bodyText": "Сходите на авиашоу\nЗаплатите $120.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -120,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r5c1_нужны-новые-солнцезащитные-очки-70",
+    "title": "Нужны новые солнцезащитные очки: $70",
+    "bodyText": "Нужны новые солнцезащитные очки\nЗаплатите $70.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -70,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "original_ru_doodad_doodad_3_r6c1_купите-новую-одежду-250",
+    "title": "Купите новую одежду: $250",
+    "bodyText": "Купите новую одежду\nЗаплатите $250.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -250,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  }
+]

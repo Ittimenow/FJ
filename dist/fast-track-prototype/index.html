@@ -16,50 +16,57 @@
       FORM: точное расширение существующей игровой системы, заданное пользователем; concept seed не применялся.
       FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
     -->
-    <header class="prototype-header">
-      <div class="header-copy">
-        <p class="prototype-status">Изолированный прототип · данные и цвета не подключены к игре</p>
-        <h1>Скоростная дорожка</h1>
-        <p class="header-summary">
-          Все 48 ячеек в проверенной последовательности. Выберите клетку, чтобы увидеть
-          стоимость, денежный поток и правило.
-        </p>
-      </div>
-
-      <div class="view-switcher" role="group" aria-label="Вариант игрового поля">
-        <button class="view-button is-active" type="button" data-view="classic" aria-pressed="true">
-          <span class="view-number">1</span>
-          <span><strong>Поле 1</strong><small>Единый маршрут · 48 клеток</small></span>
-        </button>
-        <button class="view-button" type="button" data-view="journey" aria-pressed="false">
-          <span class="view-number">2</span>
-          <span><strong>Поле 2</strong><small>Маршрутное кольцо</small></span>
-        </button>
+    <header class="app-shell-header">
+      <div class="app-shell-bar">
+        <div class="brand-logo" aria-label="Финансовое путешествие">
+          <img src="../../apps/web/public/logo.svg" alt="" width="40" height="40" />
+          <span><strong>Финансовое</strong><strong>путешествие</strong></span>
+        </div>
+        <div class="game-header-summary">
+          <strong>Большой круг</strong>
+          <span>Изолированный прототип</span>
+        </div>
+        <div class="game-header-controls" aria-label="Состояние партии">
+          <span class="header-chip">Период 1/4</span>
+          <span class="header-chip">Раунд 3</span>
+          <span class="current-turn-chip">Ход: Анна</span>
+          <span class="profile-mark" aria-label="Профиль Анны">А</span>
+        </div>
       </div>
     </header>
 
-    <main>
-      <section class="control-strip" aria-label="Легенда и сценарий прототипа">
+    <main class="app-shell-main">
+      <section class="game-toolbar" aria-label="Управление игровым полем">
+        <div class="toolbar-copy">
+          <h1>Скоростная дорожка</h1>
+          <p>48 клеток · демонстрационные данные</p>
+        </div>
         <div class="legend" aria-label="Типы клеток">
           <span class="legend-item type-business"><b>Б</b> Бизнес</span>
-          <span class="legend-item type-dream"><b>М</b> Мечта</span>
+          <span class="legend-item type-dream"><b>М</b> Место</span>
           <span class="legend-item type-expense"><b>Ф</b> Расход</span>
           <span class="legend-item type-positive"><b>О</b> Положительный эффект</span>
         </div>
-        <div class="scenario-note">
-          <span class="scenario-dot" aria-hidden="true"></span>
-          Демонстрационный ход: игрок находится на клетке 24
+        <div class="view-switcher" role="group" aria-label="Вариант игрового поля">
+          <button class="view-button is-active" type="button" data-view="classic" aria-pressed="true">
+            <span class="view-number">1</span>
+            <span><strong>Поле 1</strong><small>48 клеток</small></span>
+          </button>
+          <button class="view-button" type="button" data-view="journey" aria-pressed="false">
+            <span class="view-number">2</span>
+            <span><strong>Поле 2</strong><small>Кольцо</small></span>
+          </button>
         </div>
       </section>
 
       <section class="board-shell" aria-label="Предпросмотр Скоростной дорожки">
         <div class="board-scroll" tabindex="0" aria-label="Игровое поле; область можно прокручивать">
           <div id="classic-board" class="board board-classic" aria-label="Поле 1, единый маршрут">
-            <svg class="classic-route" viewBox="0 0 1380 960" aria-hidden="true">
-              <path class="classic-route-line" d="M 690 212 H 228 V 752 H 492 V 892 H 116 Q 80 892 80 856 V 104 Q 80 68 116 68 H 1264 Q 1300 68 1300 104 V 856 Q 1300 892 1264 892 H 888 V 752 H 1152 V 212 H 690"></path>
-              <text class="classic-start-label" x="656" y="166">СТАРТ</text>
-              <text class="classic-transition-label classic-transition-out" x="466" y="824">11–12</text>
-              <text class="classic-transition-label classic-transition-return" x="862" y="824">37–38</text>
+            <svg class="classic-route" viewBox="0 0 1240 706" aria-hidden="true">
+              <path class="classic-route-line" d="M 620 143 H 200 V 563 H 440 V 667 H 92 Q 60 667 60 635 V 71 Q 60 39 92 39 H 1148 Q 1180 39 1180 71 V 635 Q 1180 667 1148 667 H 800 V 563 H 1040 V 143 H 620"></path>
+              <text class="classic-start-label" x="594" y="98">СТАРТ</text>
+              <text class="classic-transition-label classic-transition-out" x="420" y="620">11–12</text>
+              <text class="classic-transition-label classic-transition-return" x="780" y="620">37–38</text>
             </svg>
           </div>
           <div id="journey-board" class="board board-journey" aria-label="Поле 2" hidden>
@@ -77,21 +84,6 @@
 
       <div id="cell-detail-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-      <section class="prototype-notes" aria-labelledby="notes-title">
-        <h2 id="notes-title">Что проверяет прототип</h2>
-        <div class="notes-layout">
-          <p>
-            Оба поля используют один каталог и одинаковые состояния. Цвет никогда не работает
-            один: каждая клетка показывает номер, буквенный код и доступное название типа.
-          </p>
-          <ul>
-            <li>текущая позиция и несколько фигурок;</li>
-            <li>купленный бизнес и закрытая возможность;</li>
-            <li>целевая мечта и её удорожание;</li>
-            <li>стоимость, денежный поток, ROI и условия броска.</li>
-          </ul>
-        </div>
-      </section>
     </main>
 
     <template id="detail-template">

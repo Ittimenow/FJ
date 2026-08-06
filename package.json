@@ -25,7 +25,8 @@
     "db:verify": "npm run prisma:verify --workspace=@cashflow/database",
     "db:seed": "npm run prisma:seed --workspace=@cashflow/database",
     "db:sync-cities": "npm run prisma:sync-cities --workspace=@cashflow/database",
-    "db:sync-cards": "npm run prisma:sync-cards --workspace=@cashflow/database"
+    "db:sync-cards": "npm run prisma:sync-cards --workspace=@cashflow/database",
+    "db:import-cards": "npm run prisma:import-cards --workspace=@cashflow/database --"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

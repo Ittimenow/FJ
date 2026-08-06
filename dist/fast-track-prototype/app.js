@@ -51,7 +51,7 @@ const cells = [
 
 const typeLabels = {
   business: "Бизнес",
-  dream: "Мечта",
+  dream: "Место / мечта",
   expense: "Расход",
   positive: "Положительный эффект"
 };
@@ -78,9 +78,9 @@ function cellFlow(cell) {
 }
 
 function classicPosition(index) {
-  const columns = [36, 168, 300, 432, 564, 696, 828, 960, 1092, 1224];
-  const rows = [34, 170, 278, 386, 494, 602, 710, 846];
-  const outer = { left: 20, right: 1240, top: 26, bottom: 850 };
+  const columns = [4, 144, 264, 384, 504, 624, 744, 864, 984, 1124];
+  const rows = [4, 108, 192, 276, 360, 444, 528, 632];
+  const outer = { left: 4, right: 1124, top: 4, bottom: 632 };
 
   if (index < 4) return { x: columns[4 - index], y: rows[1] };
   if (index < 8) return { x: columns[1], y: rows[index - 2] };
@@ -239,21 +239,82 @@ function createPlayerOverview() {
       </div>
       <span class="player-turn-tag">Ваш ход</span>
     </div>
-    <dl class="player-metrics">
-      <div><dt>Наличные</dt><dd>$147 000</dd></div>
-      <div><dt>Общий доход</dt><dd>$89 000 / мес</dd></div>
-      <div class="is-positive"><dt>Денежный поток</dt><dd>+$27 000 / мес</dd></div>
-      <div><dt>Расходы</dt><dd>$62 000 / мес</dd></div>
-    </dl>
-    <div class="player-assets">
-      <div class="player-section-heading">Активы · 3</div>
-      <p>Сеть ресторанов · коммунальная компания · золотой рудник</p>
+    <div class="player-tabs" role="tablist" aria-label="Информация об игроке">
+      <button type="button" role="tab" aria-selected="true" tabindex="0" data-player-tab="player">Игрок</button>
+      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="assets">Активы <span>3</span></button>
+      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="expenses">Расходы</button>
+      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="liabilities">Долги <span>1</span></button>
     </div>
-    <div class="player-goal">
-      <div class="player-goal-row"><span>Финансовая цель</span><strong>+$50 000 / мес</strong></div>
-      <div class="player-goal-row"><span>Целевая мечта</span><strong>Древние города Азии · $450 000</strong></div>
-    </div>
+    <div class="player-tab-panel" role="tabpanel"></div>
   `;
+
+  const tabContent = {
+    player: `
+      <dl class="player-metrics">
+        <div><dt>Наличные</dt><dd>$147 000</dd></div>
+        <div><dt>Общий доход</dt><dd>$89 000 / мес</dd></div>
+        <div class="is-positive"><dt>Денежный поток</dt><dd>+$27 000 / мес</dd></div>
+        <div><dt>Расходы</dt><dd>$62 000 / мес</dd></div>
+      </dl>
+      <div class="player-assets">
+        <div class="player-section-heading">Активы · 3</div>
+        <p>Сеть ресторанов · коммунальная компания · золотой рудник</p>
+      </div>
+      <div class="player-goal">
+        <div class="player-goal-row"><span>Финансовая цель</span><strong>+$50 000 / мес</strong></div>
+        <div class="player-goal-row"><span>Целевая мечта</span><strong>Древние города Азии · $450 000</strong></div>
+      </div>
+    `,
+    assets: `
+      <div class="player-list-heading"><strong>Активы</strong><span>+$21 000 / мес</span></div>
+      <ul class="player-list">
+        <li><span>Сеть ресторанов</span><strong>+$14 000</strong></li>
+        <li><span>Коммунальная компания</span><strong>+$10 000</strong></li>
+        <li><span>Золотой рудник</span><strong>−$3 000</strong></li>
+      </ul>
+    `,
+    expenses: `
+      <div class="player-list-heading"><strong>Расходы</strong><span>$62 000 / мес</span></div>
+      <ul class="player-list">
+        <li><span>Налоги и жильё</span><strong>$31 000</strong></li>
+        <li><span>Кредиты</span><strong>$18 000</strong></li>
+        <li><span>Прочие расходы</span><strong>$13 000</strong></li>
+      </ul>
+    `,
+    liabilities: `
+      <div class="player-list-heading"><strong>Долги</strong><span>$180 000</span></div>
+      <ul class="player-list">
+        <li><span>Банковский кредит</span><strong>$18 000 / мес</strong></li>
+      </ul>
+    `
+  };
+  const panel = overview.querySelector(".player-tab-panel");
+  const tabs = [...overview.querySelectorAll("[data-player-tab]")];
+
+  function selectPlayerTab(tab) {
+    tabs.forEach((candidate) => {
+      const active = candidate === tab;
+      candidate.setAttribute("aria-selected", String(active));
+      candidate.tabIndex = active ? 0 : -1;
+    });
+    panel.innerHTML = tabContent[tab.dataset.playerTab];
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => selectPlayerTab(tab));
+    tab.addEventListener("keydown", (event) => {
+      let nextIndex = index;
+      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+      if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = tabs.length - 1;
+      if (nextIndex === index) return;
+      event.preventDefault();
+      selectPlayerTab(tabs[nextIndex]);
+      tabs[nextIndex].focus();
+    });
+  });
+  selectPlayerTab(tabs[0]);
   return overview;
 }
 
