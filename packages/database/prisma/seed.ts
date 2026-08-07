@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CardType, Prisma, PrismaClient, ProfessionLineSection } from "@prisma/client";
+import {
+  AssetStatus,
+  CardType,
+  GameStatus,
+  Prisma,
+  PrismaClient,
+  ProfessionLineSection
+} from "@prisma/client";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -23,6 +30,13 @@ loadRootEnv();
 
 const prisma = new PrismaClient();
 const defaultCardSetId = "00000000-0000-0000-0000-000000000001";
+const retiredAmwayLevelTwoSlugs = [
+  "small_deal_0083_amway-империя-свободы",
+  "small_deal_0084_amway-империя-свободы",
+  "small_deal_0085_amway-империя-свободы",
+  "small_deal_0086_amway-империя-свободы",
+  "small_deal_0087_amway-империя-свободы"
+];
 const citiesFile = resolve(here, "data/russian-cities.csv");
 const cityAliasesFile = resolve(here, "data/russian-city-aliases.json");
 
@@ -84,6 +98,91 @@ function parseCsvRow(row: string) {
 
 function normalizeCitySearchName(value: string) {
   return value.trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function settingsWithoutCards(
+  settings: Prisma.JsonValue,
+  retiredCardIds: Set<number>
+): Prisma.InputJsonValue | null {
+  const root = jsonRecord(settings);
+  const cardDecks = jsonRecord(root?.cardDecks);
+  const smallDeal = jsonRecord(cardDecks?.[CardType.SMALL_DEAL]);
+  if (!root || !cardDecks || !smallDeal) return null;
+
+  const filterPile = (value: unknown) =>
+    Array.isArray(value)
+      ? value.filter(
+          (cardId): cardId is number =>
+            Number.isInteger(cardId) && !retiredCardIds.has(Number(cardId))
+        )
+      : [];
+  const drawPile = filterPile(smallDeal.drawPile);
+  const discardPile = filterPile(smallDeal.discardPile);
+  const previousSize =
+    (Array.isArray(smallDeal.drawPile) ? smallDeal.drawPile.length : 0) +
+    (Array.isArray(smallDeal.discardPile) ? smallDeal.discardPile.length : 0);
+  if (drawPile.length + discardPile.length === previousSize) return null;
+
+  return {
+    ...root,
+    cardDecks: {
+      ...cardDecks,
+      [CardType.SMALL_DEAL]: {
+        ...smallDeal,
+        drawPile,
+        discardPile,
+        deckSize: drawPile.length + discardPile.length
+      }
+    }
+  } as Prisma.InputJsonValue;
+}
+
+function prematureNetworkMarketingAssetIds(
+  assets: Array<{
+    id: string;
+    gamePlayerId: string;
+    symbol: string | null;
+    quantity: number;
+    units: number;
+  }>
+) {
+  const grouped = new Map<string, typeof assets>();
+  for (const asset of assets) {
+    const key = `${asset.gamePlayerId}:${asset.symbol ?? ""}`;
+    const group = grouped.get(key) ?? [];
+    group.push(asset);
+    grouped.set(key, group);
+  }
+
+  const prematureIds: string[] = [];
+  for (const group of grouped.values()) {
+    const levels = new Set<number>();
+    for (const asset of group) {
+      if (asset.quantity > 1 && asset.units === asset.quantity) {
+        for (let level = 1; level <= asset.quantity; level += 1) levels.add(level);
+      } else if (asset.quantity >= 1 && asset.quantity <= 4) {
+        levels.add(asset.quantity);
+      }
+    }
+    let completedLevel = 0;
+    while (levels.has(completedLevel + 1)) completedLevel += 1;
+    prematureIds.push(
+      ...group
+        .filter(
+          (asset) =>
+            !(asset.quantity > 1 && asset.units === asset.quantity) &&
+            asset.quantity > completedLevel
+        )
+        .map((asset) => asset.id)
+    );
+  }
+  return prematureIds;
 }
 
 async function seedCities(db: PrismaClient | Prisma.TransactionClient = prisma) {
@@ -454,14 +553,15 @@ async function seedCards(
   db: PrismaClient | Prisma.TransactionClient = prisma
 ) {
   const replaceAll = options.replaceAll ?? true;
+  const hasDefaultCardSet = await db.cardSet.count({ where: { isDefault: true } });
   const defaultCardSet = await db.cardSet.upsert({
     where: { id: defaultCardSetId },
     create: {
       id: defaultCardSetId,
       name: "Основной",
-      isDefault: true
+      isDefault: hasDefaultCardSet === 0
     },
-    update: { isDefault: true }
+    update: {}
   });
   const file = resolve(repoRoot, "dist/seed_cards.sql");
   if (!existsSync(file)) {
@@ -627,6 +727,100 @@ async function main() {
       didApply
         ? `Applied reference data migration: ${migrationId}`
         : `Reference data migration already applied: ${migrationId}`
+    );
+
+    const networkMarketingMigrationId = "2026-08-07-network-marketing-sequence";
+    const networkMarketingMigration = await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${networkMarketingMigrationId}))`;
+        const applied = await tx.referenceDataMigration.findUnique({
+          where: { id: networkMarketingMigrationId }
+        });
+        if (applied) return null;
+
+        await seedCards({ replaceAll: false }, tx);
+        const retiredCards = await tx.card.findMany({
+          where: {
+            cardSetId: defaultCardSetId,
+            slug: { in: retiredAmwayLevelTwoSlugs }
+          },
+          select: { id: true }
+        });
+        const retiredCardIds = new Set(retiredCards.map((card) => card.id));
+        if (retiredCardIds.size > 0) {
+          await tx.card.updateMany({
+            where: { id: { in: [...retiredCardIds] } },
+            data: { isActive: false }
+          });
+        }
+
+        const unfinishedGames = await tx.game.findMany({
+          where: {
+            cardSetId: defaultCardSetId,
+            status: {
+              in: [GameStatus.WAITING, GameStatus.IN_PROGRESS, GameStatus.PAUSED]
+            }
+          },
+          select: { id: true, settings: true }
+        });
+        let updatedDecks = 0;
+        for (const game of unfinishedGames) {
+          const settings = settingsWithoutCards(game.settings, retiredCardIds);
+          if (!settings) continue;
+          await tx.game.update({ where: { id: game.id }, data: { settings } });
+          updatedDecks += 1;
+        }
+
+        const networkMarketingAssets = await tx.playerAsset.findMany({
+          where: {
+            type: "network_marketing",
+            status: AssetStatus.ACTIVE,
+            gamePlayer: {
+              game: {
+                cardSetId: defaultCardSetId,
+                status: {
+                  in: [GameStatus.WAITING, GameStatus.IN_PROGRESS, GameStatus.PAUSED]
+                }
+              }
+            }
+          },
+          select: {
+            id: true,
+            gamePlayerId: true,
+            symbol: true,
+            quantity: true,
+            units: true
+          }
+        });
+        const prematureAssetIds = prematureNetworkMarketingAssetIds(
+          networkMarketingAssets
+        );
+        if (prematureAssetIds.length > 0) {
+          await tx.playerAsset.updateMany({
+            where: { id: { in: prematureAssetIds } },
+            data: {
+              status: AssetStatus.SOLD,
+              soldAt: new Date(),
+              cashflowCents: 0n
+            }
+          });
+        }
+
+        await tx.referenceDataMigration.create({
+          data: { id: networkMarketingMigrationId }
+        });
+        return {
+          retiredCards: retiredCardIds.size,
+          updatedDecks,
+          retiredPrematureAssets: prematureAssetIds.length
+        };
+      },
+      { maxWait: 10_000, timeout: 120_000 }
+    );
+    console.log(
+      networkMarketingMigration
+        ? `Applied reference data migration: ${networkMarketingMigrationId} ${JSON.stringify(networkMarketingMigration)}`
+        : `Reference data migration already applied: ${networkMarketingMigrationId}`
     );
     return;
   }

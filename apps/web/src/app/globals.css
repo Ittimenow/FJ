@@ -103,6 +103,32 @@ body {
   max-height: 100%;
 }
 
+.bank-dialog-overlay {
+  top: var(--app-shell-header-bottom);
+  display: grid;
+  overflow: hidden;
+  padding-top: clamp(0.5rem, 1.5vh, 1rem);
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  place-items: center;
+}
+
+.bank-dialog-panel {
+  max-height: 100%;
+}
+
+.bank-dialog-scroll {
+  scrollbar-gutter: stable;
+}
+
+.desktop-game-board-grid {
+  width: 100%;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  aspect-ratio: 1216 / 670;
+}
+
 @media (max-width: 1023px) {
   :root {
     --app-shell-mobile-header-offset: var(--app-shell-header-bottom);
@@ -136,6 +162,20 @@ body {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-shell-main:has(.game-room--classic-active) {
+    padding-top: clamp(0.5rem, 1.5vh, 0.75rem);
+    padding-bottom: 0;
+  }
+
+  .desktop-game-board-grid {
+    width: min(
+      100%,
+      calc((100dvh - var(--app-shell-header-bottom) - clamp(2rem, 4vh, 2.25rem)) * 1.814)
+    );
   }
 }
 

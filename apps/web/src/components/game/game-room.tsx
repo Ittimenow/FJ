@@ -36,7 +36,8 @@ import {
   Trophy,
   UserRound,
   UserX,
-  UsersRound
+  UsersRound,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -175,6 +176,8 @@ export function GameRoom({
   );
   const [figurineSaving, setFigurineSaving] = useState(false);
   const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
+  const [bankDialogOpen, setBankDialogOpen] = useState(false);
+  const [journalOnlyMine, setJournalOnlyMine] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mobileBoardRef = useRef<HTMLDivElement>(null);
@@ -1063,7 +1066,7 @@ export function GameRoom({
     diceIntervalRef.current = null;
   }
 
-  const renderTurnFeed = () => (
+  const renderTurnFeed = (showHeader = true) => (
     <GameTurnFeed
       gameId={snapshot.game.id}
       token={token}
@@ -1075,11 +1078,32 @@ export function GameRoom({
       currentTurnIndex={snapshot.game.currentTurnIndex}
       gameStatus={snapshot.game.status}
       onSendBabyGift={sendBabyGift}
+      onlyMine={journalOnlyMine}
+      onToggleOnlyMine={() => setJournalOnlyMine((value) => !value)}
+      showHeader={showHeader}
     />
   );
 
+  const renderJournalFilterButton = () => (
+    <Button
+      type="button"
+      variant={journalOnlyMine ? "primary" : "secondary"}
+      className="h-9 px-3 text-xs"
+      onClick={() => setJournalOnlyMine((value) => !value)}
+    >
+      {journalOnlyMine ? "Показать всех" : "Только мои"}
+    </Button>
+  );
+
   return (
-    <div className="game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5">
+    <div
+      className={cn(
+        "game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5",
+        gameRoomView === "classic" && snapshot.game.status !== "WAITING"
+          ? "game-room--classic-active"
+          : null
+      )}
+    >
       {canManage ? (
         <nav
           aria-label="Экраны ведущего"
@@ -1168,6 +1192,21 @@ export function GameRoom({
         onConfirm={chooseFigurine}
         onClose={() => setFigurinePickerOpen(false)}
       />
+      <BankDialog
+        open={bankDialogOpen}
+        loanAmount={loanAmount}
+        currentCashCents={me?.financialState?.cashCents ?? 0}
+        currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
+        onLoanDecrease={() => changeLoanAmount(-1000)}
+        onLoanIncrease={() => changeLoanAmount(1000)}
+        onLoanAmountChange={updateLoanAmount}
+        onTakeLoan={async () => {
+          const loanTaken = await takeLoan();
+          if (loanTaken) setBankDialogOpen(false);
+        }}
+        canTakeLoan={canTakeLoan}
+        onClose={() => setBankDialogOpen(false)}
+      />
       {snapshot.game.status === "IN_PROGRESS" &&
       me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
@@ -1250,7 +1289,6 @@ export function GameRoom({
               marketSaleOffer={marketSaleOffer}
               canAnswerMarketSale={canAnswerMarketSale}
               currentCashCents={me?.financialState?.cashCents ?? 0}
-              currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
               waitingStockSellerCount={waitingStockSellerCount}
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
@@ -1269,12 +1307,8 @@ export function GameRoom({
               onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
               onSellStock={sellStockFromDeal}
               onDeclineStockSale={declineStockSale}
-              loanAmount={loanAmount}
-              onLoanDecrease={() => changeLoanAmount(-1000)}
-              onLoanIncrease={() => changeLoanAmount(1000)}
-              onLoanAmountChange={updateLoanAmount}
-              onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
+              onOpenBank={() => setBankDialogOpen(true)}
               activityFeed={renderTurnFeed()}
                 embedded
               />
@@ -1291,6 +1325,8 @@ export function GameRoom({
           players={gamePlayers}
           canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
           onCloseLiability={closeLiability}
+          canOpenBank={selectedPlayer?.id === me?.id && canTakeLoan}
+          onOpenBank={() => setBankDialogOpen(true)}
           outsidePlayers={snapshot.players.filter(
             (player) =>
               player.role === "PLAYER" &&
@@ -1319,7 +1355,6 @@ export function GameRoom({
               marketSaleOffer={marketSaleOffer}
               canAnswerMarketSale={canAnswerMarketSale}
               currentCashCents={me?.financialState?.cashCents ?? 0}
-              currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
               waitingStockSellerCount={waitingStockSellerCount}
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
@@ -1338,13 +1373,10 @@ export function GameRoom({
               onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
               onSellStock={sellStockFromDeal}
               onDeclineStockSale={declineStockSale}
-              loanAmount={loanAmount}
-              onLoanDecrease={() => changeLoanAmount(-1000)}
-              onLoanIncrease={() => changeLoanAmount(1000)}
-              onLoanAmountChange={updateLoanAmount}
-              onTakeLoan={takeLoan}
               canTakeLoan={canTakeLoan}
-              activityFeed={renderTurnFeed()}
+              onOpenBank={() => setBankDialogOpen(true)}
+              headerControl={renderJournalFilterButton()}
+              activityFeed={renderTurnFeed(false)}
               embedded
             />
           </>
@@ -1366,6 +1398,8 @@ export function GameRoom({
               currentPlayerId={snapshot.game.currentPlayerId}
               canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
               onCloseLiability={closeLiability}
+              canOpenBank={selectedPlayer?.id === me?.id && canTakeLoan}
+              onOpenBank={() => setBankDialogOpen(true)}
               actionAttentionKey={
                 ownPendingAction?.type ?? (stockSaleOffer ? "stock_sale_window" : null)
               }
@@ -1392,7 +1426,6 @@ export function GameRoom({
                   marketSaleOffer={marketSaleOffer}
                   canAnswerMarketSale={canAnswerMarketSale}
                   currentCashCents={me?.financialState?.cashCents ?? 0}
-                  currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
                   waitingStockSellerCount={waitingStockSellerCount}
                   dealQuantity={dealQuantity}
                   setDealQuantity={updateDealQuantity}
@@ -1411,13 +1444,10 @@ export function GameRoom({
                   onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
                   onSellStock={sellStockFromDeal}
                   onDeclineStockSale={declineStockSale}
-                  loanAmount={loanAmount}
-                  onLoanDecrease={() => changeLoanAmount(-1000)}
-                  onLoanIncrease={() => changeLoanAmount(1000)}
-                  onLoanAmountChange={updateLoanAmount}
-                  onTakeLoan={takeLoan}
                   canTakeLoan={canTakeLoan}
-                  activityFeed={renderTurnFeed()}
+                  onOpenBank={() => setBankDialogOpen(true)}
+                  headerControl={renderJournalFilterButton()}
+                  activityFeed={renderTurnFeed(false)}
                     embedded
                   />
                 </>
@@ -2460,6 +2490,8 @@ function DesktopGameBoard({
   players,
   canManageLiabilities,
   onCloseLiability,
+  canOpenBank,
+  onOpenBank,
   outsidePlayers,
   children
 }: {
@@ -2468,12 +2500,14 @@ function DesktopGameBoard({
   players: GamePlayer[];
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
+  canOpenBank: boolean;
+  onOpenBank: () => void;
   outsidePlayers: GamePlayer[];
   children: ReactNode;
 }) {
   return (
-    <section className="w-full rounded-2xl bg-card p-3 shadow-panel">
-      <div className="grid grid-cols-[repeat(8,145px)] grid-rows-[repeat(6,105px)] justify-center gap-2 overflow-x-auto">
+    <section className="desktop-game-board-shell w-full rounded-2xl bg-card p-3 shadow-panel">
+      <div className="desktop-game-board-grid grid justify-center gap-2 overflow-x-auto">
         {snapshot.board.map((cell) => {
           const players = cellPlayers(snapshot, cell.index);
           return (
@@ -2497,6 +2531,8 @@ function DesktopGameBoard({
             currentPlayerId={snapshot.game.currentPlayerId}
             canManageLiabilities={canManageLiabilities}
             onCloseLiability={onCloseLiability}
+            canOpenBank={canOpenBank}
+            onOpenBank={onOpenBank}
             outsidePlayers={outsidePlayers}
           />
           <div className="min-h-0 overflow-y-auto rounded-xl bg-white p-3 shadow-panel">
@@ -2516,6 +2552,8 @@ function DesktopFinancialPanel({
   currentPlayerId,
   canManageLiabilities,
   onCloseLiability,
+  canOpenBank,
+  onOpenBank,
   outsidePlayers
 }: {
   player: GamePlayer | undefined;
@@ -2523,6 +2561,8 @@ function DesktopFinancialPanel({
   currentPlayerId: string | null;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
+  canOpenBank: boolean;
+  onOpenBank: () => void;
   outsidePlayers: GamePlayer[];
 }) {
   const [activeTab, setActiveTab] = useState<DesktopFinancialTab>("player");
@@ -2629,7 +2669,16 @@ function DesktopFinancialPanel({
                   </div>
                 </div>
               </div>
-              <Badge className="bg-surface text-ink">финансовый отчёт</Badge>
+              <Button
+                type="button"
+                variant="primary"
+                className="h-9 shrink-0 gap-2 px-3 text-xs"
+                onClick={onOpenBank}
+                disabled={!canOpenBank}
+              >
+                <Landmark size={15} aria-hidden="true" />
+                Банк
+              </Button>
             </div>
             <div className="mt-4 grid grid-cols-5 gap-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
@@ -2973,7 +3022,7 @@ function BoardCellTile({
         "relative overflow-hidden rounded-md border",
         appearance.tile,
         compact
-          ? "h-[105px] w-[145px] p-3"
+          ? "h-full min-h-0 w-full min-w-0 p-3"
           : mobile
             ? "h-24 w-full p-2"
             : "min-h-24 aspect-square p-3",
@@ -3336,6 +3385,8 @@ function MobileGameTabs({
   currentPlayerId,
   canManageLiabilities,
   onCloseLiability,
+  canOpenBank,
+  onOpenBank,
   actionAttentionKey,
   turnTabRequest,
   actions
@@ -3345,6 +3396,8 @@ function MobileGameTabs({
   currentPlayerId: string | null;
   canManageLiabilities: boolean;
   onCloseLiability: (liability: PlayerLiability) => void;
+  canOpenBank: boolean;
+  onOpenBank: () => void;
   actionAttentionKey: string | null;
   turnTabRequest: number;
   actions: ReactNode;
@@ -3470,6 +3523,16 @@ function MobileGameTabs({
                   </div>
                 </div>
               </div>
+              <Button
+                type="button"
+                variant="primary"
+                className="h-9 shrink-0 gap-2 px-3 text-xs"
+                onClick={onOpenBank}
+                disabled={!canOpenBank}
+              >
+                <Landmark size={15} aria-hidden="true" />
+                Банк
+              </Button>
             </div>
             <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
@@ -3645,7 +3708,7 @@ function LoanPanel({
   canTakeLoan: boolean;
 }) {
   return (
-    <div className="rounded-md border border-line bg-surface p-3">
+    <div className="rounded-xl bg-surface p-3">
       <div className="text-sm font-medium">Взять кредит</div>
       <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
         <Button
@@ -3686,6 +3749,125 @@ function LoanPanel({
         Доступен во время активной партии. Сумма должна быть кратна{" "}
         <strong>{money(1000)}</strong>.
       </p>
+    </div>
+  );
+}
+
+function BankDialog({
+  open,
+  loanAmount,
+  currentCashCents,
+  currentMonthlyCashflowCents,
+  onLoanDecrease,
+  onLoanIncrease,
+  onLoanAmountChange,
+  onTakeLoan,
+  canTakeLoan,
+  onClose
+}: {
+  open: boolean;
+  loanAmount: number;
+  currentCashCents: number;
+  currentMonthlyCashflowCents: number;
+  onLoanDecrease: () => void;
+  onLoanIncrease: () => void;
+  onLoanAmountChange: (value: number) => void;
+  onTakeLoan: () => Promise<void>;
+  canTakeLoan: boolean;
+  onClose: () => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="bank-dialog-overlay fixed inset-0 z-[80] bg-[#07152d]/60 backdrop-blur-[2px]"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bank-dialog-title"
+        aria-describedby="bank-dialog-description"
+        className="bank-dialog-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-[0_34px_90px_rgba(5,18,45,.35)]"
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const focusable = Array.from(
+            panelRef.current?.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+            ) ?? []
+          );
+          if (focusable.length === 0) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+          <div>
+            <h2 id="bank-dialog-title" className="text-xl font-extrabold tracking-[-0.025em] text-ink">
+              Банк
+            </h2>
+            <p id="bank-dialog-description" className="mt-1 text-sm leading-5 text-muted">
+              Выберите сумму кредита и проверьте, как изменится финансовый отчёт.
+            </p>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label="Закрыть банк"
+            onClick={onClose}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-muted shadow-[0_5px_14px_rgba(27,57,118,.10)] transition hover:-translate-y-0.5 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+          >
+            <X size={19} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="bank-dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5 sm:pb-5">
+          <LoanPanel
+            loanAmount={loanAmount}
+            currentCashCents={currentCashCents}
+            currentMonthlyCashflowCents={currentMonthlyCashflowCents}
+            onLoanDecrease={onLoanDecrease}
+            onLoanIncrease={onLoanIncrease}
+            onLoanAmountChange={onLoanAmountChange}
+            onTakeLoan={() => void onTakeLoan()}
+            canTakeLoan={canTakeLoan}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -3946,7 +4128,6 @@ function ActionsPanel({
   marketSaleOffer,
   canAnswerMarketSale,
   currentCashCents,
-  currentMonthlyCashflowCents,
   waitingStockSellerCount,
   dealQuantity,
   setDealQuantity,
@@ -3965,12 +4146,9 @@ function ActionsPanel({
   onStockSaleIncrease,
   onSellStock,
   onDeclineStockSale,
-  loanAmount,
-  onLoanDecrease,
-  onLoanIncrease,
-  onLoanAmountChange,
-  onTakeLoan,
   canTakeLoan,
+  onOpenBank,
+  headerControl,
   activityFeed,
   embedded = false
 }: {
@@ -3985,7 +4163,6 @@ function ActionsPanel({
   marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
   canAnswerMarketSale: boolean;
   currentCashCents: number;
-  currentMonthlyCashflowCents: number;
   waitingStockSellerCount: number;
   dealQuantity: number | "";
   setDealQuantity: (value: number | "") => void;
@@ -4004,21 +4181,16 @@ function ActionsPanel({
   onStockSaleIncrease: () => void;
   onSellStock: () => void;
   onDeclineStockSale: () => void;
-  loanAmount: number;
-  onLoanDecrease: () => void;
-  onLoanIncrease: () => void;
-  onLoanAmountChange: (value: number) => void;
-  onTakeLoan: () => Promise<boolean>;
   canTakeLoan: boolean;
+  onOpenBank: () => void;
+  headerControl?: ReactNode;
   activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
-  const [bankOpen, setBankOpen] = useState(false);
   const [stockCostDraft, setStockCostDraft] = useState("");
   const [stockCostEditing, setStockCostEditing] = useState(false);
 
   useEffect(() => {
-    setBankOpen(false);
     setStockCostDraft("");
     setStockCostEditing(false);
   }, [latestCard?.cardId]);
@@ -4042,11 +4214,6 @@ function ActionsPanel({
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerCount === 0;
-
-  async function takeLoanAndCloseBank() {
-    const loanTaken = await onTakeLoan();
-    if (loanTaken) setBankOpen(false);
-  }
 
   const content = (
     <>
@@ -4406,7 +4573,7 @@ function ActionsPanel({
               <Button
                 className="w-full min-w-0"
                 variant="secondary"
-                onClick={() => setBankOpen(true)}
+                onClick={onOpenBank}
                 disabled={!canTakeLoan}
               >
                 Взять кредит
@@ -4423,36 +4590,23 @@ function ActionsPanel({
         </div>
       ) : null}
 
-      {bankOpen ? (
-        <div className="rounded-md border border-line bg-white p-3">
-          <div className="mb-3 text-sm font-medium">Банк</div>
-          <LoanPanel
-            loanAmount={loanAmount}
-            currentCashCents={currentCashCents}
-            currentMonthlyCashflowCents={currentMonthlyCashflowCents}
-            onLoanDecrease={onLoanDecrease}
-            onLoanIncrease={onLoanIncrease}
-            onLoanAmountChange={onLoanAmountChange}
-            onTakeLoan={() => void takeLoanAndCloseBank()}
-            canTakeLoan={canTakeLoan}
-          />
-        </div>
-      ) : null}
     </>
   );
 
   const header = (
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Действия</h2>
-      <Button
-        variant="primary"
-        className="h-9 gap-2 px-3 text-xs"
-        onClick={() => setBankOpen((value) => !value)}
-        disabled={!canTakeLoan}
-      >
-        <Landmark size={15} aria-hidden="true" />
-        {bankOpen ? "Скрыть банк" : "Банк"}
-      </Button>
+      {headerControl ?? (
+        <Button
+          variant="primary"
+          className="h-9 gap-2 px-3 text-xs"
+          onClick={onOpenBank}
+          disabled={!canTakeLoan}
+        >
+          <Landmark size={15} aria-hidden="true" />
+          Банк
+        </Button>
+      )}
     </div>
   );
 
@@ -4461,9 +4615,7 @@ function ActionsPanel({
       <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
         {header}
         {content}
-        {activityFeed ? (
-          <div className="mt-1 border-t border-line/70 pt-4">{activityFeed}</div>
-        ) : null}
+        {activityFeed ? <div className="mt-1">{activityFeed}</div> : null}
       </section>
     );
   }
@@ -4475,9 +4627,7 @@ function ActionsPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {content}
-        {activityFeed ? (
-          <div className="border-t border-line/70 pt-4">{activityFeed}</div>
-        ) : null}
+        {activityFeed ? <div>{activityFeed}</div> : null}
       </CardContent>
     </Card>
   );
@@ -4658,7 +4808,10 @@ function GameTurnFeed({
   currentTurnPlayer,
   currentTurnIndex,
   gameStatus,
-  onSendBabyGift
+  onSendBabyGift,
+  onlyMine,
+  onToggleOnlyMine,
+  showHeader
 }: {
   gameId: string;
   token: string;
@@ -4670,10 +4823,12 @@ function GameTurnFeed({
   currentTurnIndex: number;
   gameStatus: GameSnapshot["game"]["status"];
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
+  onlyMine: boolean;
+  onToggleOnlyMine: () => void;
+  showHeader: boolean;
 }) {
   const [historyEvents, setHistoryEvents] = useState(events);
   const [visibleCount, setVisibleCount] = useState(10);
-  const [onlyMine, setOnlyMine] = useState(false);
   const [replayLoaded, setReplayLoaded] = useState(events.length < 80);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -4687,7 +4842,6 @@ function GameTurnFeed({
   useEffect(() => {
     setHistoryEvents(events);
     setVisibleCount(10);
-    setOnlyMine(false);
     setReplayLoaded(events.length < 80);
     setLoadError(null);
     setNewEventSequenceFloor(null);
@@ -4791,23 +4945,28 @@ function GameTurnFeed({
 
   return (
     <section className="w-full min-w-0 max-w-full" aria-label="Лента ходов">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-base font-extrabold">Лента ходов</h3>
-          <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
+      {showHeader ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-extrabold">Лента ходов</h3>
+            <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
+          </div>
+          <Button
+            type="button"
+            variant={onlyMine ? "primary" : "secondary"}
+            className="h-9 px-3"
+            onClick={onToggleOnlyMine}
+          >
+            {onlyMine ? "Показать всех" : "Только мои"}
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant={onlyMine ? "primary" : "secondary"}
-          className="h-9 px-3"
-          onClick={() => setOnlyMine((value) => !value)}
-        >
-          {onlyMine ? "Показать всех" : "Только мои"}
-        </Button>
-      </div>
+      ) : null}
 
       <div
-        className="mt-3 w-full min-w-0 max-w-full space-y-3"
+        className={cn(
+          "w-full min-w-0 max-w-full space-y-3",
+          showHeader ? "mt-3" : null
+        )}
         role="feed"
         aria-live="polite"
         aria-relevant="additions text"

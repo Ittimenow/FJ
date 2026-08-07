@@ -10,8 +10,35 @@ CREATE TABLE IF NOT EXISTS "card_sets" (
 CREATE UNIQUE INDEX IF NOT EXISTS "card_sets_name_key"
   ON "card_sets"("name");
 INSERT INTO "card_sets" ("id", "name", "is_default", "updated_at")
-VALUES ('00000000-0000-0000-0000-000000000001', 'Основной', true, CURRENT_TIMESTAMP)
-ON CONFLICT ("id") DO UPDATE SET "is_default" = true;
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'Основной',
+  NOT EXISTS (SELECT 1 FROM "card_sets" WHERE "is_default" = true),
+  CURRENT_TIMESTAMP
+)
+ON CONFLICT ("id") DO NOTHING;
+
+UPDATE "card_sets"
+SET "is_default" = true
+WHERE "id" = '00000000-0000-0000-0000-000000000001'
+  AND NOT EXISTS (SELECT 1 FROM "card_sets" WHERE "is_default" = true);
+
+WITH "ranked_defaults" AS (
+  SELECT
+    "id",
+    ROW_NUMBER() OVER (ORDER BY "updated_at" DESC, "created_at" ASC, "id" ASC) AS "position"
+  FROM "card_sets"
+  WHERE "is_default" = true
+)
+UPDATE "card_sets"
+SET "is_default" = false
+WHERE "id" IN (
+  SELECT "id" FROM "ranked_defaults" WHERE "position" > 1
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "card_sets_single_default_idx"
+  ON "card_sets"("is_default")
+  WHERE "is_default" = true;
 
 ALTER TABLE "card_sets" ALTER COLUMN "updated_at" DROP DEFAULT;
 

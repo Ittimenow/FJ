@@ -61,6 +61,10 @@ import {
   type MarketAssetTarget,
   type MarketRule
 } from "./market-sale";
+import {
+  contiguousNetworkMarketingLevel,
+  networkMarketingLevelDecision
+} from "./network-marketing";
 
 type Tx = Prisma.TransactionClient;
 
@@ -3466,7 +3470,7 @@ export class GamesService {
     rule: { company: string; level: number; cashflowCents: bigint },
     emittedEvents: PendingEvent[]
   ) {
-    const existing = await tx.playerAsset.findMany({
+    let existing = await tx.playerAsset.findMany({
       where: {
         gamePlayerId,
         type: "network_marketing",
@@ -3481,31 +3485,50 @@ export class GamesService {
       orderBy: [{ quantity: "asc" }, { createdAt: "asc" }]
     });
 
-    const ownedLevels = new Set<number>();
-    for (const asset of existing) {
-      // Before levels were stored separately, one asset represented the whole
-      // already completed chain and both fields contained the current level.
-      if (asset.quantity > 1 && asset.units === asset.quantity) {
-        for (let level = 1; level <= asset.quantity; level += 1) {
-          ownedLevels.add(level);
+    const levelsFromAssets = (assets: typeof existing) => {
+      const levels = new Set<number>();
+      for (const asset of assets) {
+        // Legacy assets represented the whole completed chain in one row.
+        if (asset.quantity > 1 && asset.units === asset.quantity) {
+          for (let level = 1; level <= asset.quantity; level += 1) {
+            levels.add(level);
+          }
+        } else if (asset.quantity >= 1 && asset.quantity <= 4) {
+          levels.add(asset.quantity);
         }
-      } else if (asset.quantity >= 1 && asset.quantity <= 4) {
-        ownedLevels.add(asset.quantity);
       }
+      return levels;
+    };
+
+    let ownedLevels = levelsFromAssets(existing);
+    const completedLevel = contiguousNetworkMarketingLevel(ownedLevels);
+    const prematureAssets = existing.filter(
+      (asset) =>
+        !(asset.quantity > 1 && asset.units === asset.quantity) &&
+        asset.quantity > completedLevel
+    );
+    if (prematureAssets.length > 0) {
+      await tx.playerAsset.updateMany({
+        where: { id: { in: prematureAssets.map((asset) => asset.id) } },
+        data: {
+          status: AssetStatus.SOLD,
+          soldAt: new Date(),
+          cashflowCents: 0n
+        }
+      });
+      const prematureIds = new Set(prematureAssets.map((asset) => asset.id));
+      existing = existing.filter((asset) => !prematureIds.has(asset.id));
+      ownedLevels = levelsFromAssets(existing);
     }
 
-    const contiguousLevel = (levels: Set<number>) => {
-      let level = 0;
-      while (levels.has(level + 1)) level += 1;
-      return level;
-    };
-    const previousLevel = contiguousLevel(ownedLevels);
+    const decision = networkMarketingLevelDecision(ownedLevels, rule.level);
+    const previousLevel = decision.currentLevel;
     const previousCashflowCents = existing.reduce(
       (sum, asset) => sum + asset.cashflowCents,
       0n
     );
 
-    if (ownedLevels.has(rule.level)) {
+    if (!decision.accepted) {
       emittedEvents.push({
         type: "network_marketing:discarded",
         gamePlayerId,
@@ -3515,11 +3538,11 @@ export class GamesService {
           company: rule.company,
           level: rule.level,
           currentLevel: previousLevel,
-          requiredLevel: rule.level,
-          reason: "already_has_level"
+          requiredLevel: decision.requiredLevel,
+          reason: decision.reason
         }
       });
-      return false;
+      return prematureAssets.length > 0;
     }
 
     const assetName =
@@ -3540,7 +3563,7 @@ export class GamesService {
     });
 
     ownedLevels.add(rule.level);
-    const activeLevel = contiguousLevel(ownedLevels);
+    const activeLevel = contiguousNetworkMarketingLevel(ownedLevels);
     const companyAssets = await tx.playerAsset.findMany({
       where: {
         gamePlayerId,
@@ -3570,21 +3593,6 @@ export class GamesService {
           data: { cashflowCents }
         });
       }
-    }
-
-    if (activeLevel === previousLevel) {
-      emittedEvents.push({
-        type: "network_marketing:level_stored",
-        gamePlayerId,
-        payload: {
-          cardId: card.id,
-          title: card.title,
-          company: rule.company,
-          level: rule.level,
-          currentLevel: activeLevel
-        }
-      });
-      return true;
     }
 
     emittedEvents.push({

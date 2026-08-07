@@ -180,7 +180,7 @@ test("seed data preserves original small-deal classifications and finances", () 
   const matchingCard = (title: string) =>
     smallDeals.find((card) => card.includes(`'${title}'`)) ?? "";
 
-  assert.equal(smallDeals.length, 99);
+  assert.equal(smallDeals.length, 94);
   assert.match(matchingCard("2У коттедж: $40,000, +$220/мес"), /'mortgage', '35000'/);
   assert.match(matchingCard("2У коттедж: $55,000, +$160/мес"), /'mortgage', '50000'/);
   assert.match(matchingCard("3M коттедж: $65,000, +$160/мес"), /'mortgage', '60000'/);

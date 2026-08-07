@@ -1,12 +1,20 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Layers3, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Layers3,
+  Pencil,
+  Plus,
+  Save,
+  Star,
+  Trash2
+} from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { publicApiBaseUrl } from "@/lib/api";
 
-type AdminCardsView = "editor" | "unclear";
 type AdminCardType =
   | "SMALL_DEAL"
   | "BIG_DEAL"
@@ -72,7 +80,6 @@ const requiredCardTypes: AdminCardType[] = [
 ];
 
 export function AdminCardsPanel({ token }: { token: string }) {
-  const [view, setView] = useState<AdminCardsView>("editor");
   const [filter, setFilter] = useState<AdminCardType>("SMALL_DEAL");
   const [createFormOpen, setCreateFormOpen] = useState(false);
   const [createSetFormOpen, setCreateSetFormOpen] = useState(false);
@@ -85,10 +92,12 @@ export function AdminCardsPanel({ token }: { token: string }) {
   const [setsLoading, setSetsLoading] = useState(true);
   const [setSaving, setSetSaving] = useState(false);
   const [renameSaving, setRenameSaving] = useState(false);
+  const [defaultSaving, setDefaultSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [setsError, setSetsError] = useState<string | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [defaultError, setDefaultError] = useState<string | null>(null);
 
   async function loadCardSets(preferredId?: string) {
     setSetsLoading(true);
@@ -181,6 +190,37 @@ export function AdminCardsPanel({ token }: { token: string }) {
     }
   }
 
+  async function makeCardSetDefault() {
+    if (!selectedSet || selectedSet.isDefault) return;
+    setDefaultSaving(true);
+    setDefaultError(null);
+    try {
+      const response = await fetch(
+        `${publicApiBaseUrl()}/api/admin/cards/sets/${selectedSet.id}/default`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      if (!response.ok) throw new Error(await apiErrorMessage(response));
+      const updated = (await response.json()) as Pick<ApiCardSet, "id" | "isDefault">;
+      setCardSets((current) =>
+        current.map((set) => ({
+          ...set,
+          isDefault: set.id === updated.id
+        }))
+      );
+    } catch (defaultFailure) {
+      setDefaultError(
+        defaultFailure instanceof Error
+          ? defaultFailure.message
+          : "Не удалось сделать набор основным"
+      );
+    } finally {
+      setDefaultSaving(false);
+    }
+  }
+
   async function loadCards() {
     if (!selectedCardSetId) return;
     setLoading(true);
@@ -210,9 +250,9 @@ export function AdminCardsPanel({ token }: { token: string }) {
   }, []);
 
   useEffect(() => {
-    if (view !== "editor" || !selectedCardSetId) return;
+    if (!selectedCardSetId) return;
     void loadCards();
-  }, [filter, selectedCardSetId, view]);
+  }, [filter, selectedCardSetId]);
 
   const selectedSet = cardSets.find((set) => set.id === selectedCardSetId) ?? null;
   const missingTypes = selectedSet
@@ -283,6 +323,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
                 setCreateFormOpen(false);
                 setRenameFormOpen(false);
                 setRenameError(null);
+                setDefaultError(null);
               }}
               disabled={setsLoading || cardSets.length === 0}
             >
@@ -299,6 +340,22 @@ export function AdminCardsPanel({ token }: { token: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <p className="break-words font-extrabold text-ink">{selectedSet.name}</p>
+                  {selectedSet.isDefault ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8effe] px-2.5 py-1 text-xs font-extrabold text-journey">
+                      <Star size={13} fill="currentColor" aria-hidden="true" />
+                      Основной набор
+                    </span>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="h-9 px-3"
+                      disabled={defaultSaving || missingTypes.length > 0}
+                      onClick={() => void makeCardSetDefault()}
+                    >
+                      <Star className="mr-2" size={15} aria-hidden="true" />
+                      {defaultSaving ? "Назначаем…" : "Сделать основным"}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="h-9 px-3"
@@ -315,9 +372,25 @@ export function AdminCardsPanel({ token }: { token: string }) {
                   </Button>
                 </div>
                 <span className="text-sm font-bold text-muted">
-                  {selectedSet.activeCards} активных · {selectedSet.totalCards} всего
+                  {selectedSet.activeCards} активных карточек из {selectedSet.totalCards}
                 </span>
               </div>
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-line/70 pt-3 text-xs sm:grid-cols-4">
+                {requiredCardTypes.map((cardType) => {
+                  const type = cardTypes.find((candidate) => candidate.value === cardType);
+                  return (
+                    <div
+                      key={cardType}
+                      className="flex min-w-0 items-baseline justify-between gap-2 sm:block"
+                    >
+                      <dt className="truncate text-muted">{type?.label}</dt>
+                      <dd className="font-extrabold text-ink">
+                        {selectedSet.counts[cardType] ?? 0}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
               {renameFormOpen ? (
                 <form
                   className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
@@ -365,9 +438,17 @@ export function AdminCardsPanel({ token }: { token: string }) {
               ) : (
                 <p className="mt-2 flex items-start gap-2 text-sm leading-5 text-[#9a4b0b]">
                   <AlertTriangle className="mt-0.5 shrink-0" size={16} aria-hidden="true" />
-                  Для запуска добавьте активные карточки: {missingTypes.map((type) => type.label).join(", ")}.
+                  Набор пока нельзя использовать в партии: добавьте хотя бы одну
+                  активную карточку каждого отсутствующего типа —{" "}
+                  {missingTypes.map((type) => type.label).join(", ")}. Общий счётчик
+                  включает карточки остальных типов.
                 </p>
               )}
+              {defaultError ? (
+                <p className="mt-2 text-sm font-medium text-red-700" role="alert">
+                  {defaultError}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -379,32 +460,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
         ) : null}
       </section>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-line/70 pb-4" role="tablist" aria-label="Режим редактора карточек">
-        <Button
-          variant={view === "editor" ? "primary" : "secondary"}
-          className="shrink-0"
-          role="tab"
-          aria-selected={view === "editor"}
-          onClick={() => setView("editor")}
-        >
-          Редактор карточек
-        </Button>
-        <Button
-          variant={view === "unclear" ? "primary" : "secondary"}
-          className="shrink-0"
-          role="tab"
-          aria-selected={view === "unclear"}
-          onClick={() => setView("unclear")}
-        >
-          Непонятные карточки
-        </Button>
-      </div>
-
-      {view === "unclear" && selectedCardSetId ? (
-        <UnclearCardsPage token={token} cardSetId={selectedCardSetId} />
-      ) : null}
-
-      {view === "editor" && selectedCardSetId ? (
+      {selectedCardSetId ? (
         <>
           <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Тип карточек">
             {cardTypes.map((type) => (
@@ -492,71 +548,6 @@ export function AdminCardsPanel({ token }: { token: string }) {
             />
           ) : null}
         </>
-      ) : null}
-    </div>
-  );
-}
-
-function UnclearCardsPage({ token, cardSetId }: { token: string; cardSetId: string }) {
-  const [cards, setCards] = useState<ApiCard[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadCards() {
-    setLoading(true);
-    setError(null);
-
-    const query = new URLSearchParams({ cardSetId });
-    const response = await fetch(`${publicApiBaseUrl()}/api/admin/cards/unclear?${query.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setLoading(false);
-
-    if (!response.ok) {
-      setError("Не удалось загрузить непонятные карточки");
-      return;
-    }
-
-    setCards((await response.json()) as ApiCard[]);
-  }
-
-  useEffect(() => {
-    void loadCards();
-  }, [cardSetId]);
-
-  return (
-    <div className="space-y-4">
-      {error ? (
-        <div className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-800" role="alert">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-extrabold">
-            Непонятные карточки: {cards.length}
-          </h3>
-          <p className="mt-1 text-sm text-muted">
-            Активные карточки без строк в card_effects.
-          </p>
-        </div>
-        {loading ? <span className="text-sm text-muted" role="status">Загрузка…</span> : null}
-      </div>
-
-      {cards.length === 0 && !loading ? (
-        <p className="rounded-xl bg-card p-4 text-sm text-muted">
-          Таких карточек сейчас нет.
-        </p>
-      ) : null}
-
-      {cards.length > 0 ? (
-        <CardsTable
-          cards={cards}
-          token={token}
-          onCardSaved={() => void loadCards()}
-          onCardDeleted={() => void loadCards()}
-        />
       ) : null}
     </div>
   );

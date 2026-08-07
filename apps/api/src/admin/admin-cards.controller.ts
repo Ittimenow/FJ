@@ -42,9 +42,9 @@ export class AdminCardsController {
     return this.admin.updateCardSet(id, dto);
   }
 
-  @Get("unclear")
-  listUnclearCards(@Query("cardSetId") cardSetId?: string) {
-    return this.admin.listUnclearCards(cardSetId);
+  @Patch("sets/:id/default")
+  setDefaultCardSet(@Param("id", new ParseUUIDPipe()) id: string) {
+    return this.admin.setDefaultCardSet(id);
   }
 
   @Get()

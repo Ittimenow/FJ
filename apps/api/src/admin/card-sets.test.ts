@@ -40,3 +40,82 @@ test("переименование набора отклоняет назван�
     BadRequestException
   );
 });
+
+test("готовый набор становится единственным основным", async () => {
+  const operations: string[] = [];
+  const prisma = {
+    cardSet: {
+      findUnique: async () => ({
+        id: cardSetId,
+        name: "Семейная версия",
+        isDefault: false,
+        createdAt: new Date("2026-08-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-07T00:00:00.000Z")
+      })
+    },
+    card: {
+      groupBy: async () => [
+        { cardType: "SMALL_DEAL", _count: { _all: 1 } },
+        { cardType: "BIG_DEAL", _count: { _all: 1 } },
+        { cardType: "DOODAD", _count: { _all: 1 } },
+        { cardType: "MARKET", _count: { _all: 1 } }
+      ]
+    },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
+      cardSet: {
+        updateMany: async () => {
+          operations.push("unset");
+        },
+        update: async () => {
+          operations.push("set");
+          return {
+            id: cardSetId,
+            name: "Семейная версия",
+            isDefault: true,
+            createdAt: new Date("2026-08-07T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-07T00:00:00.000Z")
+          };
+        }
+      }
+    })
+  };
+  const service = new AdminService(prisma as never);
+
+  const updated = await service.setDefaultCardSet(cardSetId);
+
+  assert.deepEqual(operations, ["unset", "set"]);
+  assert.equal(updated.isDefault, true);
+});
+
+test("неполный набор нельзя сделать основным", async () => {
+  let transactionStarted = false;
+  const prisma = {
+    cardSet: {
+      findUnique: async () => ({
+        id: cardSetId,
+        name: "Неполный набор",
+        isDefault: false,
+        createdAt: new Date("2026-08-07T00:00:00.000Z"),
+        updatedAt: new Date("2026-08-07T00:00:00.000Z")
+      })
+    },
+    card: {
+      groupBy: async () => [
+        { cardType: "SMALL_DEAL", _count: { _all: 1 } },
+        { cardType: "BIG_DEAL", _count: { _all: 1 } },
+        { cardType: "DOODAD", _count: { _all: 1 } }
+      ]
+    },
+    $transaction: async () => {
+      transactionStarted = true;
+    }
+  };
+  const service = new AdminService(prisma as never);
+
+  await assert.rejects(
+    () => service.setDefaultCardSet(cardSetId),
+    (error: unknown) =>
+      error instanceof BadRequestException && error.message.includes("рынок")
+  );
+  assert.equal(transactionStarted, false);
+});

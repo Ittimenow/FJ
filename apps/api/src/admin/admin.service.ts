@@ -9,10 +9,18 @@ import { AccountStatus, CardType, Prisma, SystemRole } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
+import { missingCardTypes } from "../games/card-set";
 import { AdminCardDto } from "./dto/card.dto";
 import { CreateCardSetDto, UpdateCardSetDto } from "./dto/card-set.dto";
 import { AdminCreateUserDto } from "./dto/create-user.dto";
 import { AdminUpdateUserRoleDto } from "./dto/update-user-role.dto";
+
+const requiredCardTypeLabels: Partial<Record<CardType, string>> = {
+  SMALL_DEAL: "мелкая сделка",
+  BIG_DEAL: "крупная сделка",
+  DOODAD: "всякая всячина",
+  MARKET: "рынок"
+};
 
 @Injectable()
 export class AdminService {
@@ -95,6 +103,63 @@ export class AdminService {
     }
   }
 
+  async setDefaultCardSet(cardSetId: string) {
+    const cardSet = await this.prisma.cardSet.findUnique({
+      where: { id: cardSetId },
+      select: {
+        id: true,
+        name: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+    if (!cardSet) throw new NotFoundException("Набор карточек не найден");
+
+    const activeCounts = await this.prisma.card.groupBy({
+      by: ["cardType"],
+      where: { cardSetId, isActive: true },
+      _count: { _all: true }
+    });
+    const missingTypes = missingCardTypes(
+      activeCounts.map((row) => ({
+        cardType: row.cardType,
+        count: row._count._all
+      }))
+    );
+    if (missingTypes.length > 0) {
+      throw new BadRequestException(
+        `Нельзя сделать набор основным: добавьте активные карточки — ${missingTypes
+          .map((cardType) => requiredCardTypeLabels[cardType] ?? cardType)
+          .join(", ")}`
+      );
+    }
+    if (cardSet.isDefault) return toSerializable(cardSet);
+
+    return toSerializable(
+      await this.prisma.$transaction(
+        async (tx) => {
+          await tx.cardSet.updateMany({
+            where: { isDefault: true, id: { not: cardSetId } },
+            data: { isDefault: false }
+          });
+          return tx.cardSet.update({
+            where: { id: cardSetId },
+            data: { isDefault: true },
+            select: {
+              id: true,
+              name: true,
+              isDefault: true,
+              createdAt: true,
+              updatedAt: true
+            }
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+    );
+  }
+
   async listCards(cardType?: CardType, cardSetId?: string) {
     const resolvedCardSetId = await this.resolveCardSetId(cardSetId);
     const where: Prisma.CardWhereInput = {
@@ -109,89 +174,6 @@ export class AdminService {
         conditions: { orderBy: { id: "asc" } }
       },
       orderBy: [{ cardType: "asc" }, { title: "asc" }]
-    });
-
-    return toSerializable(cards);
-  }
-
-  async listUnclearCards(cardSetId?: string) {
-    const resolvedCardSetId = await this.resolveCardSetId(cardSetId);
-    const cards = await this.prisma.card.findMany({
-      where: {
-        cardSetId: resolvedCardSetId,
-        isActive: true,
-        effects: { none: {} },
-        NOT: [
-          {
-            AND: [
-              {
-                cardType: {
-                  in: [CardType.SMALL_DEAL, CardType.BIG_DEAL, CardType.FAST_TRACK]
-                }
-              },
-              {
-                OR: [
-                  { category: "stock" },
-                  { category: { contains: "share" } },
-                  { subcategory: "stock" },
-                  { subcategory: { contains: "share" } },
-                  { meta: { some: { metaKey: "symbol" } } },
-                  { title: { contains: "Акци" } },
-                  { title: { contains: "акци" } },
-                  { title: { contains: "Stock" } },
-                  { title: { contains: "stock" } },
-                  { title: { contains: "Share" } },
-                  { title: { contains: "share" } },
-                  { bodyText: { contains: "Акци" } },
-                  { bodyText: { contains: "акци" } },
-                  { bodyText: { contains: "Stock" } },
-                  { bodyText: { contains: "stock" } },
-                  { bodyText: { contains: "Share" } },
-                  { bodyText: { contains: "share" } }
-                ]
-              },
-              {
-                OR: [
-                  { meta: { some: { metaKey: { in: ["price", "today_price"] } } } },
-                  { bodyText: { contains: "сегодняшняя цена" } },
-                  { bodyText: { contains: "Сегодняшняя цена" } }
-                ]
-              }
-            ]
-          },
-          {
-            AND: [
-              { cardType: CardType.SMALL_DEAL },
-              {
-                OR: [
-                  { title: { contains: "TNI" } },
-                  { title: { contains: "AMWAY" } },
-                  { title: { contains: "сетевого маркетинга" } },
-                  { title: { contains: "Бриллиант" } },
-                  { title: { contains: "бриллиант" } },
-                  { bodyText: { contains: "TNI" } },
-                  { bodyText: { contains: "AMWAY" } },
-                  { bodyText: { contains: "сетевого маркетинга" } },
-                  { bodyText: { contains: "Бриллиант" } },
-                  { bodyText: { contains: "бриллиант" } }
-                ]
-              },
-              {
-                OR: [
-                  { title: { contains: "уровень" } },
-                  { bodyText: { contains: "уровень" } }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      include: {
-        meta: { orderBy: { id: "asc" } },
-        effects: { orderBy: { id: "asc" } },
-        conditions: { orderBy: { id: "asc" } }
-      },
-      orderBy: { id: "asc" }
     });
 
     return toSerializable(cards);
