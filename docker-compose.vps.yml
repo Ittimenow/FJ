@@ -2,6 +2,7 @@ name: fj
 
 services:
   app:
+    image: ${APP_IMAGE:-fj-app:local}
     build:
       context: .
       dockerfile: Dockerfile

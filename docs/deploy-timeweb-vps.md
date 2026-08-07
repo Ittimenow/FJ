@@ -211,6 +211,26 @@ NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=0.1
 
 Правило деплоя: деплойте только после успешной локальной проверки, а после деплоя сверяйте номер релиза на экране входа `https://gamefj.ru/login`. Номер релиза собирается автоматически из Git: базовая версия берется из корневого `package.json`, а номер деплоя добавляется из счетчика коммитов и короткого SHA.
 
+При push в `main` GitHub Actions выполняет production-сборку на GitHub runner,
+публикует образ с тегом commit SHA в GitHub Container Registry, а VPS только
+скачивает готовый образ и перезапускает сервисы. Для публикации и скачивания
+используется краткоживущий `GITHUB_TOKEN`; постоянный токен на VPS не хранится.
+Ожидание запуска сервисов ограничено тремя минутами, а вся SSH-часть деплоя —
+десятью минутами.
+
+Build-time параметры клиентского Sentry задаются в GitHub в разделе
+`Settings → Secrets and variables → Actions → Variables`:
+
+- `NEXT_PUBLIC_SENTRY_DSN`;
+- `NEXT_PUBLIC_SENTRY_ENVIRONMENT`;
+- `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`.
+
+Если переменные не заданы, клиентский Sentry остаётся отключённым, окружение
+считается `production`, а sampling rate — `0.1`. Серверные параметры Sentry и
+остальные runtime-секреты по-прежнему читаются из `.env.vps`.
+
+Команды ниже остаются запасным способом ручной сборки непосредственно на VPS:
+
 ```bash
 cd /opt/fj
 git pull

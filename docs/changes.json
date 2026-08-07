@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "fast-prebuilt-vps-deploys",
+          "category": "technical",
+          "summary": "Деплой на VPS теперь скачивает заранее собранный образ и завершается за ограниченное время вместо повторной длительной сборки на сервере."
+        },
+        {
           "id": "complete-original-market-deck",
           "category": "feature",
           "summary": "В набор «Оригинал» добавлены все карточки рынка с поддержкой их продаж и специальных событий."

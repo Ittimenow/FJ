@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:
@@ -52,51 +54,131 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  deploy:
+  image:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish production image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/ittimenow/fj:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          build-args: |
+            GITHUB_RUN_NUMBER=${{ github.run_number }}
+            GITHUB_SHA=${{ github.sha }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_ENVIRONMENT=${{ vars.NEXT_PUBLIC_SENTRY_ENVIRONMENT || 'production' }}
+            NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=${{ vars.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE || '0.1' }}
+          cache-from: type=gha,scope=fj-production
+          cache-to: type=gha,mode=max,scope=fj-production
+
+  deploy:
+    needs:
+      - build
+      - image
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    permissions:
+      packages: read
 
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
+        env:
+          APP_IMAGE: ghcr.io/ittimenow/fj@${{ needs.image.outputs.digest }}
+          DEPLOY_SHA: ${{ github.sha }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 30m
+          envs: APP_IMAGE,DEPLOY_SHA,GHCR_TOKEN,GHCR_USERNAME
+          command_timeout: 10m
           script: |
             set -eu
 
-            docker run --rm -v /opt/fj:/opt/fj --entrypoint sh caddy:2-alpine -c 'chown -R 1000:1000 /opt/fj'
-            cd /opt/fj
-            git fetch origin main
-            git reset --hard "${{ github.sha }}"
-            test "$(git rev-parse HEAD)" = "${{ github.sha }}"
-
-            export GITHUB_RUN_NUMBER="${{ github.run_number }}"
-            export GITHUB_SHA="${{ github.sha }}"
-
-            compose() {
-              docker compose --env-file .env.vps -f docker-compose.vps.yml "$@"
+            stage() {
+              printf '\n[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
             }
-            report_deploy_failure() {
+            registry_logged_in=0
+            report_deploy_result() {
               exit_code=$?
+              trap - EXIT
               if [ "$exit_code" -ne 0 ]; then
                 echo "::group::VPS compose diagnostics"
-                compose ps || true
-                compose logs --no-color --tail=200 app postgres || true
+                if [ -f /opt/fj/docker-compose.vps.yml ] && [ -f /opt/fj/.env.vps ]; then
+                  cd /opt/fj
+                  timeout 15s docker compose --env-file .env.vps -f docker-compose.vps.yml ps || true
+                  timeout 15s docker compose --env-file .env.vps -f docker-compose.vps.yml \
+                    logs --no-color --tail=200 app postgres || true
+                else
+                  echo "VPS compose files are not available for diagnostics"
+                fi
                 echo "::endgroup::"
+              fi
+              if [ "$registry_logged_in" -eq 1 ]; then
+                docker logout ghcr.io >/dev/null 2>&1 || true
               fi
               exit "$exit_code"
             }
-            trap report_deploy_failure EXIT
+            trap report_deploy_result EXIT
 
-            compose up -d --build --wait --wait-timeout 180
-            compose exec -T app \
-              wget -qO- http://127.0.0.1:3000/healthz | grep -q '"status":"ok"'
+            stage "Prepare repository"
+            timeout 30s docker run --rm -v /opt/fj:/opt/fj --entrypoint sh caddy:2-alpine \
+              -c 'chown -R 1000:1000 /opt/fj'
+            cd /opt/fj
+            timeout 1m git fetch origin main
+            git reset --hard "$DEPLOY_SHA"
+            test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
 
-            compose exec -T app \
-              head -n 2 /app/.game-release-version
-            docker image prune -f
-            trap - EXIT
+            stage "Authenticate to GitHub Container Registry"
+            test -n "$GHCR_TOKEN"
+            printf '%s' "$GHCR_TOKEN" | timeout 30s docker login ghcr.io \
+              --username "$GHCR_USERNAME" --password-stdin
+            registry_logged_in=1
+
+            stage "Pull production image"
+            timeout 3m docker compose --env-file .env.vps -f docker-compose.vps.yml pull app
+
+            stage "Start services and wait for health checks"
+            timeout 4m docker compose --env-file .env.vps -f docker-compose.vps.yml \
+              up -d --no-build --wait --wait-timeout 180
+
+            stage "Verify application health and release"
+            timeout 15s docker compose --env-file .env.vps -f docker-compose.vps.yml \
+              exec -T app \
+              wget -T 5 -t 1 -qO- http://127.0.0.1:3000/healthz | grep -q '"status":"ok"'
+            timeout 15s docker compose --env-file .env.vps -f docker-compose.vps.yml \
+              exec -T app sh -lc \
+                'test -f /app/.game-release-version && head -n 2 /app/.game-release-version'
+
+            stage "Prune old unused images"
+            timeout 30s docker image prune -af --filter "until=24h" || \
+              echo "WARNING: Docker image cleanup did not finish within 30 seconds"
+
+            stage "Deploy completed"
