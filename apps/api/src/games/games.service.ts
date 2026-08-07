@@ -43,6 +43,7 @@ import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
+import { missingCardTypes } from "./card-set";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
 import { nextAvailableSeat } from "./game-seating";
@@ -52,7 +53,14 @@ import {
   resumeGameTimeline,
   startGameTimeline
 } from "./game-timeline";
-import { isRentalRealEstateAsset, marketSalePriceForUnits } from "./market-sale";
+import {
+  isRentalRealEstateAsset,
+  marketAssetMatchesTarget,
+  marketRuleSalePriceCents,
+  originalMarketRule,
+  type MarketAssetTarget,
+  type MarketRule
+} from "./market-sale";
 
 type Tx = Prisma.TransactionClient;
 
@@ -77,6 +85,7 @@ interface PendingEvent {
 
 type CardWithRules = {
   id: number;
+  slug: string;
   cardType: CardType;
   title: string;
   bodyText: string;
@@ -89,6 +98,18 @@ type CardWithRules = {
     payload: Prisma.JsonValue;
   }>;
   conditions: Array<{ condType: string; payload: Prisma.JsonValue }>;
+};
+
+type MarketSaleOfferState = {
+  gamePlayerId: string;
+  assetId: string;
+  assetName: string;
+  salePriceCents: number;
+  mortgageCents: number;
+  proceedsCents: number;
+  cashflowCents: number;
+  netCashflowChangeCents: number;
+  cashflowAdjustmentCents: number;
 };
 
 type GamePendingAction =
@@ -139,6 +160,11 @@ type GamePendingAction =
       mortgageCents: number;
       proceedsCents: number;
       cashflowCents: number;
+      netCashflowChangeCents: number;
+      cashflowAdjustmentCents: number;
+      offerNumber: number;
+      totalOffers: number;
+      remainingOffers: MarketSaleOfferState[];
     };
 
 interface GameSettings {
@@ -194,7 +220,14 @@ export class GamesService {
   }
 
   async createGame(userId: string, dto: CreateGameDto) {
-    await this.ensureHostOrAdmin(userId);
+    const creator = await this.ensureHostOrAdmin(userId);
+    if (dto.cardSetId && creator.role !== SystemRole.ADMIN) {
+      throw new ForbiddenException("Выбирать набор карточек может только администратор");
+    }
+    const cardSet = await this.requirePlayableCardSet(
+      creator.role === SystemRole.ADMIN ? dto.cardSetId : undefined
+    );
+    const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
 
     const code = await this.generateGameCode();
     const game = await this.prisma.game.create({
@@ -203,10 +236,12 @@ export class GamesService {
         title: dto.title?.trim() || "Новая партия",
         mode: GameMode.MULTIPLAYER,
         maxPlayers: null,
+        cardSetId: cardSet.id,
         settings: {
           timeLimitMinutes: dto.timeLimitMinutes ?? 90,
-          periodCount: dto.periodCount ?? 1
-        },
+          periodCount: dto.periodCount ?? 1,
+          cardDecks
+        } as unknown as Prisma.InputJsonValue,
         createdById: userId,
         players: {
           create: {
@@ -227,11 +262,39 @@ export class GamesService {
         actorUserId: userId,
         type: "game:created",
         sequence: 1,
-        payload: toSerializable({ code: game.code, title: game.title })
+        payload: toSerializable({
+          code: game.code,
+          title: game.title,
+          cardSetId: cardSet.id,
+          cardSetName: cardSet.name
+        })
       }
     });
 
     return this.getGame(game.id, userId);
+  }
+
+  async getInviteMetadata(code: string) {
+    const normalizedCode = code.replace(/\s+/g, "").toUpperCase();
+    if (!normalizedCode) throw new NotFoundException("Игра не найдена");
+
+    const game = await this.prisma.game.findFirst({
+      where: {
+        code: normalizedCode,
+        mode: GameMode.MULTIPLAYER,
+        status: { not: GameStatus.CANCELLED }
+      },
+      select: {
+        title: true,
+        createdBy: { select: { displayName: true } }
+      }
+    });
+    if (!game) throw new NotFoundException("Игра не найдена");
+
+    return {
+      title: game.title,
+      hostName: game.createdBy?.displayName ?? null
+    };
   }
 
   async createSoloGame(userId: string, dto: CreateSoloGameDto) {
@@ -244,6 +307,8 @@ export class GamesService {
     }
 
     const botCount = dto.botCount;
+    const cardSet = await this.requirePlayableCardSet();
+    const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const code = await this.generateGameCode();
     const occupiedFigurines = new Set<string>();
     if (user.figurine && isFigurineId(user.figurine)) {
@@ -269,10 +334,12 @@ export class GamesService {
         title: dto.title?.trim() || "Одиночное путешествие",
         mode: GameMode.SOLO,
         maxPlayers: botCount + 1,
+        cardSetId: cardSet.id,
         settings: {
           timeLimitMinutes: dto.timeLimitMinutes ?? 90,
-          periodCount: 1
-        },
+          periodCount: 1,
+          cardDecks
+        } as unknown as Prisma.InputJsonValue,
         createdById: userId,
         players: {
           create: [
@@ -340,6 +407,7 @@ export class GamesService {
       this.prisma.game.findMany({
         where: mineWhere,
         include: {
+          cardSet: { select: { id: true, name: true } },
           players: {
             include: {
               user: { select: { id: true, displayName: true, email: true } }
@@ -363,6 +431,7 @@ export class GamesService {
               })
         },
         include: {
+          cardSet: { select: { id: true, name: true } },
           players: {
             include: {
               user: { select: { id: true, displayName: true, email: true } }
@@ -1333,39 +1402,14 @@ export class GamesService {
           payload: { reason: "deal_card_drawn" }
         });
       } else if (card.cardType === CardType.MARKET) {
-        const offer = await this.findMarketSaleOffer(tx, player.id, card);
-        if (offer) {
-          await tx.game.update({
-            where: { id: gameId },
-            data: {
-              settings: this.settingsWithPending(gameSettings, {
-                type: "market_sale",
-                gamePlayerId: player.id,
-                cardId: card.id,
-                title: card.title,
-                assetId: offer.assetId,
-                assetName: offer.assetName,
-                salePriceCents: offer.salePriceCents,
-                mortgageCents: offer.mortgageCents,
-                proceedsCents: offer.proceedsCents,
-                cashflowCents: offer.cashflowCents
-              })
-            }
-          });
-          emittedEvents.push({
-            type: "market:sale_offer",
-            gamePlayerId: player.id,
-            payload: {
-              cardId: card.id,
-              title: card.title,
-              ...offer
-            }
-          });
-          emittedEvents.push({
-            type: realtimeEvents.stateUpdate,
-            payload: { reason: "market_sale_offer" }
-          });
-        }
+        await this.resolveMarketCard(
+          tx,
+          gameId,
+          gameSettings,
+          player.id,
+          card,
+          emittedEvents
+        );
       }
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
@@ -1810,11 +1854,7 @@ export class GamesService {
         }
       });
       const pending = this.pendingAction(game.settings);
-      const activeIndex = game.currentTurnIndex % game.players.length;
-      const currentPlayer = game.players[activeIndex];
       if (
-        !currentPlayer ||
-        currentPlayer.id !== player.id ||
         pending?.type !== "market_sale" ||
         pending.gamePlayerId !== player.id
       ) {
@@ -1836,6 +1876,7 @@ export class GamesService {
       if (!asset) throw new NotFoundException("Актив не найден");
 
       const proceeds = BigInt(pending.proceedsCents);
+      const cashflowAdjustment = BigInt(pending.cashflowAdjustmentCents);
       if (proceeds < 0n && state.cashCents < proceeds * -1n) {
         throw new BadRequestException("Не хватает наличных для завершения продажи");
       }
@@ -1846,7 +1887,12 @@ export class GamesService {
           cashCents:
             proceeds >= 0n
               ? { increment: proceeds }
-              : { decrement: proceeds * -1n }
+              : { decrement: proceeds * -1n },
+          ...(cashflowAdjustment > 0n
+            ? { basePassiveIncomeCents: { increment: cashflowAdjustment } }
+            : cashflowAdjustment < 0n
+              ? { baseExpensesCents: { increment: cashflowAdjustment * -1n } }
+              : {})
         }
       });
       await tx.playerAsset.update({
@@ -1871,6 +1917,7 @@ export class GamesService {
           mortgageCents: pending.mortgageCents,
           proceedsCents: pending.proceedsCents,
           removedCashflowCents: Number(asset.cashflowCents),
+          netCashflowChangeCents: pending.netCashflowChangeCents,
           beforeCashCents: cents(state.cashCents),
           afterCashCents: cents(updatedState.cashCents)
         }
@@ -1880,15 +1927,13 @@ export class GamesService {
         await this.appendEvents(tx, gameId, userId, emittedEvents);
         return;
       }
-      await tx.game.update({
-        where: { id: gameId },
-        data: { settings: this.settingsWithPending(game.settings, null) }
-      });
-      await this.advanceTurn(tx, game, activeIndex);
-      emittedEvents.push({
-        type: realtimeEvents.stateUpdate,
-        payload: { reason: "market_sale_completed_turn_ended" }
-      });
+      await this.continueMarketSaleQueue(
+        tx,
+        game,
+        pending,
+        emittedEvents,
+        "market_sale_completed_turn_ended"
+      );
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
 
@@ -1912,22 +1957,13 @@ export class GamesService {
         }
       });
       const pending = this.pendingAction(game.settings);
-      const activeIndex = game.currentTurnIndex % game.players.length;
-      const currentPlayer = game.players[activeIndex];
       if (
-        !currentPlayer ||
-        currentPlayer.id !== player.id ||
         pending?.type !== "market_sale" ||
         pending.gamePlayerId !== player.id
       ) {
         throw new ForbiddenException("Сейчас нет предложения рынка, требующего вашего решения");
       }
 
-      await tx.game.update({
-        where: { id: gameId },
-        data: { settings: this.settingsWithPending(game.settings, null) }
-      });
-      await this.advanceTurn(tx, game, activeIndex);
       emittedEvents.push({
         type: "market:sale_declined",
         gamePlayerId: player.id,
@@ -1938,17 +1974,65 @@ export class GamesService {
           assetName: pending.assetName,
           salePriceCents: pending.salePriceCents,
           mortgageCents: pending.mortgageCents,
-          proceedsCents: pending.proceedsCents
+          proceedsCents: pending.proceedsCents,
+          offerNumber: pending.offerNumber,
+          totalOffers: pending.totalOffers
         }
       });
-      emittedEvents.push({
-        type: realtimeEvents.stateUpdate,
-        payload: { reason: "market_sale_declined_turn_ended" }
-      });
+      await this.continueMarketSaleQueue(
+        tx,
+        game,
+        pending,
+        emittedEvents,
+        "market_sale_declined_turn_ended"
+      );
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
 
     return this.actionResult(gameId, emittedEvents);
+  }
+
+  private async continueMarketSaleQueue(
+    tx: Tx,
+    game: {
+      id: string;
+      settings: Prisma.JsonValue;
+      currentRound: number;
+      currentTurnIndex: number;
+      players: Array<{ id: string }>;
+    },
+    pending: Extract<GamePendingAction, { type: "market_sale" }>,
+    emittedEvents: PendingEvent[],
+    completedReason: string
+  ) {
+    if (pending.remainingOffers.length > 0) {
+      const nextPending = this.marketPendingAction(
+        { id: pending.cardId, title: pending.title },
+        pending.remainingOffers,
+        pending.offerNumber + 1
+      );
+      await tx.game.update({
+        where: { id: game.id },
+        data: { settings: this.settingsWithPending(game.settings, nextPending) }
+      });
+      this.emitMarketSaleOffer(nextPending, emittedEvents);
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "market_sale_next_offer" }
+      });
+      return;
+    }
+
+    await tx.game.update({
+      where: { id: game.id },
+      data: { settings: this.settingsWithPending(game.settings, null) }
+    });
+    const activeIndex = game.currentTurnIndex % game.players.length;
+    await this.advanceTurn(tx, game, activeIndex);
+    emittedEvents.push({
+      type: realtimeEvents.stateUpdate,
+      payload: { reason: completedReason }
+    });
   }
 
   async acceptCharity(gameId: string, userId: string) {
@@ -2647,8 +2731,13 @@ export class GamesService {
   }
 
   async cards(cardType?: CardType) {
+    const cardSet = await this.requirePlayableCardSet();
     const cards = await this.prisma.card.findMany({
-      where: cardType ? { isActive: true, cardType } : { isActive: true },
+      where: {
+        cardSetId: cardSet.id,
+        isActive: true,
+        ...(cardType ? { cardType } : {})
+      },
       include: {
         meta: true,
         effects: true,
@@ -2788,40 +2877,15 @@ export class GamesService {
       });
 
       if (cardType === CardType.MARKET) {
-        const offer = await this.findMarketSaleOffer(tx, gamePlayerId, card);
-        if (offer) {
-          await tx.game.update({
-            where: { id: gameId },
-            data: {
-              settings: this.settingsWithPending(currentSettings, {
-                type: "market_sale",
-                gamePlayerId,
-                cardId: card.id,
-                title: card.title,
-                assetId: offer.assetId,
-                assetName: offer.assetName,
-                salePriceCents: offer.salePriceCents,
-                mortgageCents: offer.mortgageCents,
-                proceedsCents: offer.proceedsCents,
-                cashflowCents: offer.cashflowCents
-              })
-            }
-          });
-          emittedEvents.push({
-            type: "market:sale_offer",
-            gamePlayerId,
-            payload: {
-              cardId: card.id,
-              title: card.title,
-              ...offer
-            }
-          });
-          emittedEvents.push({
-            type: realtimeEvents.stateUpdate,
-            payload: { reason: "market_sale_offer" }
-          });
-          return true;
-        }
+        const pendingMarketAction = await this.resolveMarketCard(
+          tx,
+          gameId,
+          currentSettings,
+          gamePlayerId,
+          card,
+          emittedEvents
+        );
+        if (pendingMarketAction) return true;
       }
 
       if (cardType === CardType.DOODAD) {
@@ -2942,72 +3006,335 @@ export class GamesService {
     return false;
   }
 
-  private async findMarketSaleOffer(tx: Tx, gamePlayerId: string, card: CardWithRules) {
+  private async resolveMarketCard(
+    tx: Tx,
+    gameId: string,
+    gameSettings: Prisma.JsonValue,
+    currentGamePlayerId: string,
+    card: CardWithRules,
+    emittedEvents: PendingEvent[]
+  ) {
+    const rule = this.marketRule(card);
+    if (!rule) {
+      this.emitMarketNoEffect(card, currentGamePlayerId, "unsupported_rule", emittedEvents);
+      return false;
+    }
+
+    if (rule.action === "business_cashflow") {
+      await this.applyMarketBusinessCashflow(
+        tx,
+        gameId,
+        card,
+        rule.amountCents,
+        emittedEvents
+      );
+      return false;
+    }
+
+    if (rule.action === "surrender") {
+      await this.applyMarketSurrender(
+        tx,
+        currentGamePlayerId,
+        card,
+        rule,
+        emittedEvents
+      );
+      return false;
+    }
+
+    const offers = await this.findMarketSaleOffers(
+      tx,
+      gameId,
+      currentGamePlayerId,
+      card,
+      rule
+    );
+    if (offers.length === 0) {
+      this.emitMarketNoEffect(card, currentGamePlayerId, "no_matching_assets", emittedEvents);
+      return false;
+    }
+
+    const pending = this.marketPendingAction(card, offers, 1);
+    await tx.game.update({
+      where: { id: gameId },
+      data: { settings: this.settingsWithPending(gameSettings, pending) }
+    });
+    this.emitMarketSaleOffer(pending, emittedEvents);
+    emittedEvents.push({
+      type: realtimeEvents.stateUpdate,
+      payload: { reason: "market_sale_offer" }
+    });
+    return true;
+  }
+
+  private marketRule(card: CardWithRules): MarketRule | null {
+    const stableRule = originalMarketRule(card.slug);
+    if (stableRule) return stableRule;
+
     const marketText = this.normalizedSearchText(card.title, card.bodyText);
-    if (this.marketSaleIsUnsupported(marketText)) return null;
+    const target = this.marketTargetKeys(marketText)[0];
+    if (!target) return null;
+    const scope = marketText.includes("но не другие игроки") ? "current" : "all";
+    if (marketText.includes("втрое")) {
+      return {
+        action: "sale",
+        target,
+        scope,
+        pricing: { type: "down_payment_multiplier", multiplier: 3 }
+      };
+    }
+    if (marketText.includes("вдвое")) {
+      return {
+        action: "sale",
+        target,
+        scope,
+        pricing: { type: "down_payment_multiplier", multiplier: 2 }
+      };
+    }
+    if (marketText.includes("первоначальную стоимость") && marketText.includes("50 000")) {
+      return {
+        action: "sale",
+        target,
+        scope,
+        pricing: { type: "cost_plus", amountCents: 50000 }
+      };
+    }
 
-    const targetKeys = this.marketTargetKeys(marketText);
-    if (targetKeys.length === 0) return null;
+    const meta = this.metaMap(card.meta);
+    const priceCents = Number(
+      this.metaMoneyCents(meta, "price") ||
+      this.parseFirstMoneyCents(`${card.title}\n${card.bodyText}`)
+    );
+    if (!Number.isSafeInteger(priceCents) || priceCents <= 0) return null;
+    return {
+      action: "sale",
+      target,
+      scope,
+      pricing:
+        marketText.includes("каждый блок") || marketText.includes("каждый номер")
+          ? { type: "per_unit", priceCents }
+          : { type: "fixed", priceCents }
+    };
+  }
 
+  private async findMarketSaleOffers(
+    tx: Tx,
+    gameId: string,
+    currentGamePlayerId: string,
+    card: CardWithRules,
+    rule: Extract<MarketRule, { action: "sale" }>
+  ): Promise<MarketSaleOfferState[]> {
     const assets = await tx.playerAsset.findMany({
-      where: { gamePlayerId, status: AssetStatus.ACTIVE },
-      include: {
-        sourceCard: {
-          include: { meta: true }
+      where: {
+        status: AssetStatus.ACTIVE,
+        ...(rule.scope === "current" ? { gamePlayerId: currentGamePlayerId } : {}),
+        gamePlayer: {
+          gameId,
+          role: GameRole.PLAYER,
+          status: GamePlayerStatus.JOINED
         }
-      }
+      },
+      include: {
+        gamePlayer: { select: { seat: true } },
+        sourceCard: { include: { meta: true } }
+      },
+      orderBy: { createdAt: "asc" }
     });
 
-    const offers = assets.flatMap((asset) => {
-      const sourceCard = asset.sourceCard;
-      const assetText = this.normalizedSearchText(
-        asset.type,
-        asset.name,
-        sourceCard?.title,
-        sourceCard?.bodyText,
-        sourceCard?.category,
-        sourceCard?.subcategory
-      );
-      if (!targetKeys.some((key) => this.assetMatchesMarketTarget(key, assetText))) {
-        return [];
-      }
+    return assets
+      .flatMap((asset): Array<MarketSaleOfferState & { seat: number }> => {
+        const sourceCard = asset.sourceCard;
+        const assetText = this.normalizedSearchText(
+          asset.type,
+          asset.name,
+          sourceCard?.title,
+          sourceCard?.bodyText,
+          sourceCard?.category,
+          sourceCard?.subcategory
+        );
+        if (!marketAssetMatchesTarget(rule.target, assetText)) return [];
 
-      const salePrice = this.marketSalePriceCents(card, marketText, asset, assetText);
-      if (salePrice <= 0n) return [];
+        const noteSale = rule.pricing.type === "no_cash_note";
+        const salePrice = marketRuleSalePriceCents(rule, asset, assetText);
+        if (!noteSale && salePrice <= 0n) return [];
+        const sourceMeta = sourceCard ? this.metaMap(sourceCard.meta) : {};
+        const mortgage = noteSale
+          ? 0n
+          : this.metaMoneyCents(sourceMeta, "mortgage") ||
+            bigintMax(0n, asset.costBasisCents - asset.downPaymentCents);
+        const proceeds = noteSale ? 0n : salePrice - mortgage;
+        const netCashflowChange =
+          rule.pricing.type === "no_cash_note"
+            ? BigInt(rule.pricing.cashflowChangeCents)
+            : asset.cashflowCents * -1n;
+        const cashflowAdjustment = noteSale
+          ? netCashflowChange + asset.cashflowCents
+          : 0n;
 
-      const sourceMeta = sourceCard ? this.metaMap(sourceCard.meta) : {};
-      const mortgage =
-        this.metaMoneyCents(sourceMeta, "mortgage") ||
-        bigintMax(0n, asset.costBasisCents - asset.downPaymentCents);
-      const proceeds = salePrice - mortgage;
-
-      return [
-        {
+        return [{
+          gamePlayerId: asset.gamePlayerId,
           assetId: asset.id,
           assetName: asset.name,
           salePriceCents: Number(salePrice),
           mortgageCents: Number(mortgage),
           proceedsCents: Number(proceeds),
-          cashflowCents: Number(asset.cashflowCents)
-        }
-      ];
-    });
-
-    return offers.sort((left, right) => right.proceedsCents - left.proceedsCents)[0] ?? null;
+          cashflowCents: Number(asset.cashflowCents),
+          netCashflowChangeCents: Number(netCashflowChange),
+          cashflowAdjustmentCents: Number(cashflowAdjustment),
+          seat: asset.gamePlayer.seat ?? Number.MAX_SAFE_INTEGER
+        }];
+      })
+      .sort((left, right) => left.seat - right.seat)
+      .map(({ seat: _seat, ...offer }) => offer);
   }
 
-  private marketSaleIsUnsupported(marketText: string) {
-    return (
-      marketText.includes("племянник") ||
-      marketText.includes("сдайте обратно в банк") ||
-      marketText.includes("расширение малого бизнеса")
+  private async applyMarketBusinessCashflow(
+    tx: Tx,
+    gameId: string,
+    card: CardWithRules,
+    amountCents: number,
+    emittedEvents: PendingEvent[]
+  ) {
+    const assets = await tx.playerAsset.findMany({
+      where: {
+        status: AssetStatus.ACTIVE,
+        type: "business",
+        gamePlayer: {
+          gameId,
+          role: GameRole.PLAYER,
+          status: GamePlayerStatus.JOINED
+        }
+      },
+      select: { id: true, gamePlayerId: true }
+    });
+    if (assets.length === 0) {
+      this.emitMarketNoEffect(card, null, "no_matching_businesses", emittedEvents);
+      return;
+    }
+
+    await tx.playerAsset.updateMany({
+      where: { id: { in: assets.map((asset) => asset.id) } },
+      data: { cashflowCents: { increment: BigInt(amountCents) } }
+    });
+    const affectedPlayerIds = [...new Set(assets.map((asset) => asset.gamePlayerId))];
+    for (const gamePlayerId of affectedPlayerIds) {
+      const assetCount = assets.filter((asset) => asset.gamePlayerId === gamePlayerId).length;
+      await this.recalculatePlayer(tx, gamePlayerId, emittedEvents);
+      emittedEvents.push({
+        type: "market:cashflow_applied",
+        gamePlayerId,
+        payload: {
+          cardId: card.id,
+          title: card.title,
+          assetCount,
+          amountPerAssetCents: amountCents,
+          totalAmountCents: amountCents * assetCount
+        }
+      });
+    }
+  }
+
+  private async applyMarketSurrender(
+    tx: Tx,
+    gamePlayerId: string,
+    card: CardWithRules,
+    rule: Extract<MarketRule, { action: "surrender" }>,
+    emittedEvents: PendingEvent[]
+  ) {
+    const assets = await tx.playerAsset.findMany({
+      where: { gamePlayerId, status: AssetStatus.ACTIVE },
+      include: { sourceCard: true }
+    });
+    const matching = assets.filter((asset) =>
+      marketAssetMatchesTarget(
+        rule.target,
+        this.normalizedSearchText(
+          asset.type,
+          asset.name,
+          asset.sourceCard?.title,
+          asset.sourceCard?.bodyText,
+          asset.sourceCard?.category,
+          asset.sourceCard?.subcategory
+        )
+      )
     );
+    if (matching.length === 0) {
+      this.emitMarketNoEffect(card, gamePlayerId, "no_matching_assets", emittedEvents);
+      return;
+    }
+
+    await tx.playerAsset.updateMany({
+      where: { id: { in: matching.map((asset) => asset.id) } },
+      data: {
+        marketValueCents: 0n,
+        cashflowCents: 0n,
+        status: AssetStatus.SOLD,
+        soldAt: new Date()
+      }
+    });
+    await this.recalculatePlayer(tx, gamePlayerId, emittedEvents);
+    emittedEvents.push({
+      type: "market:assets_surrendered",
+      gamePlayerId,
+      payload: {
+        cardId: card.id,
+        title: card.title,
+        assetCount: matching.length,
+        assetNames: matching.map((asset) => asset.name),
+        removedCashflowCents: Number(
+          matching.reduce((sum, asset) => sum + asset.cashflowCents, 0n)
+        )
+      }
+    });
+  }
+
+  private marketPendingAction(
+    card: Pick<CardWithRules, "id" | "title">,
+    offers: MarketSaleOfferState[],
+    offerNumber: number
+  ): Extract<GamePendingAction, { type: "market_sale" }> {
+    const [offer, ...remainingOffers] = offers;
+    if (!offer) throw new Error("Нельзя создать пустую очередь предложений рынка");
+    return {
+      type: "market_sale",
+      cardId: card.id,
+      title: card.title,
+      ...offer,
+      offerNumber,
+      totalOffers: offerNumber + remainingOffers.length,
+      remainingOffers
+    };
+  }
+
+  private emitMarketSaleOffer(
+    pending: Extract<GamePendingAction, { type: "market_sale" }>,
+    emittedEvents: PendingEvent[]
+  ) {
+    const { remainingOffers: _remainingOffers, cashflowAdjustmentCents: _adjustment, ...payload } = pending;
+    emittedEvents.push({
+      type: "market:sale_offer",
+      gamePlayerId: pending.gamePlayerId,
+      payload
+    });
+  }
+
+  private emitMarketNoEffect(
+    card: Pick<CardWithRules, "id" | "title">,
+    gamePlayerId: string | null,
+    reason: string,
+    emittedEvents: PendingEvent[]
+  ) {
+    emittedEvents.push({
+      type: "market:no_effect",
+      gamePlayerId,
+      payload: { cardId: card.id, title: card.title, reason }
+    });
   }
 
   private marketTargetKeys(marketText: string) {
-    const keys: string[] = [];
-    if (marketText.includes("10 гектар")) keys.push("land10");
-    if (marketText.includes("20 гектар")) keys.push("land20");
+    const keys: MarketAssetTarget[] = [];
+    if (/(?:^|\s)10\s*(?:га|гектар)/.test(marketText)) keys.push("land10");
+    if (/(?:^|\s)20\s*(?:га|гектар)/.test(marketText)) keys.push("land20");
     if (marketText.includes("золот") && marketText.includes("монет")) keys.push("gold_coin");
     if (marketText.includes("2у")) keys.push("house2u");
     if (/\b3m\b|\b3м\b|3br|3\/2/.test(marketText)) keys.push("house3m");
@@ -3020,62 +3347,6 @@ export class GamesService {
     if (marketText.includes("салон") && marketText.includes("крас")) keys.push("beauty_salon");
     if (marketText.includes("партнерств")) keys.push("partnership");
     return [...new Set(keys)];
-  }
-
-  private assetMatchesMarketTarget(targetKey: string, assetText: string) {
-    if (targetKey === "land10") return assetText.includes("10 гектар");
-    if (targetKey === "land20") return assetText.includes("20 гектар");
-    if (targetKey === "gold_coin") {
-      return assetText.includes("золот") && assetText.includes("монет");
-    }
-    if (targetKey === "house2u") return assetText.includes("2у");
-    if (targetKey === "house3m") return /\b3m\b|\b3м\b|3\/2|3br/.test(assetText);
-    if (targetKey === "plex") {
-      return /duplex|plex|[248][\s-]*(кв|квартир)/.test(assetText);
-    }
-    if (targetKey === "apartment") return assetText.includes("апартамент");
-    if (targetKey === "carwash") return assetText.includes("автомой");
-    if (targetKey === "kebab") return assetText.includes("шашлык");
-    if (targetKey === "zirconium") return assetText.includes("циркони");
-    if (targetKey === "software") return assetText.includes("программ");
-    if (targetKey === "beauty_salon") {
-      return assetText.includes("салон") && assetText.includes("крас");
-    }
-    if (targetKey === "partnership") return assetText.includes("партнерств");
-    return false;
-  }
-
-  private marketSalePriceCents(
-    card: CardWithRules,
-    marketText: string,
-    asset: { downPaymentCents: bigint; costBasisCents: bigint; quantity: number },
-    assetText: string
-  ) {
-    const meta = this.metaMap(card.meta);
-
-    if (marketText.includes("втрое")) {
-      return asset.downPaymentCents * 3n;
-    }
-    if (marketText.includes("вдвое")) {
-      return asset.downPaymentCents * 2n;
-    }
-    if (marketText.includes("первоначальную стоимость") && marketText.includes("50 000")) {
-      return asset.costBasisCents + 50000n;
-    }
-
-    const basePrice =
-      this.metaMoneyCents(meta, "price") ||
-      this.parseFirstMoneyCents(`${card.title}\n${card.bodyText}`);
-    if (basePrice <= 0n) return 0n;
-
-    if (marketText.includes("каждый блок") || marketText.includes("каждый номер")) {
-      return marketSalePriceForUnits(basePrice, assetText);
-    }
-    if (marketText.includes("каждую по") || marketText.includes("каждая по")) {
-      return basePrice * BigInt(Math.max(asset.quantity, 1));
-    }
-
-    return basePrice;
   }
 
   private normalizedSearchText(...values: Array<string | null | undefined>) {
@@ -4181,12 +4452,16 @@ export class GamesService {
     settings: Prisma.JsonValue,
     cardType: CardType
   ): Promise<CardDeckDrawResult> {
+    const game = await tx.game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { cardSetId: true }
+    });
     const baseSettings = this.normalizedSettings(settings);
     const cardDecks = baseSettings.cardDecks
       ? { ...baseSettings.cardDecks }
-      : await this.initialCardDecks(tx);
+      : await this.initialCardDecks(tx, game.cardSetId);
     if (!cardDecks[cardType]) {
-      const initialized = await this.initialCardDecks(tx);
+      const initialized = await this.initialCardDecks(tx, game.cardSetId);
       for (const deckCardType of Object.values(CardType)) {
         cardDecks[deckCardType] ??= initialized[deckCardType] ?? {
           drawPile: [],
@@ -4236,7 +4511,12 @@ export class GamesService {
       where: { id: cardId },
       include: { meta: true, effects: true, conditions: true }
     });
-    if (!card || card.cardType !== cardType || !card.isActive) {
+    if (
+      !card ||
+      card.cardSetId !== game.cardSetId ||
+      card.cardType !== cardType ||
+      !card.isActive
+    ) {
       throw new BadRequestException(`Не найдены карточки типа ${cardTypeLabel(cardType)}`);
     }
 
@@ -4258,9 +4538,12 @@ export class GamesService {
       : {};
   }
 
-  private async initialCardDecks(tx: Tx): Promise<Partial<Record<CardType, CardDeckState>>> {
+  private async initialCardDecks(
+    tx: Pick<Tx, "card">,
+    cardSetId: string
+  ): Promise<Partial<Record<CardType, CardDeckState>>> {
     const cards = await tx.card.findMany({
-      where: { isActive: true },
+      where: { cardSetId, isActive: true },
       select: { id: true, cardType: true },
       orderBy: { id: "asc" }
     });
@@ -4573,6 +4856,12 @@ export class GamesService {
       typeof value.proceedsCents === "number" &&
       typeof value.cashflowCents === "number"
     ) {
+      const remainingOffers = Array.isArray(value.remainingOffers)
+        ? value.remainingOffers.flatMap((candidate) => {
+            const offer = this.marketSaleOfferState(candidate);
+            return offer ? [offer] : [];
+          })
+        : [];
       return {
         type: "market_sale",
         gamePlayerId: value.gamePlayerId,
@@ -4583,10 +4872,60 @@ export class GamesService {
         salePriceCents: value.salePriceCents,
         mortgageCents: value.mortgageCents,
         proceedsCents: value.proceedsCents,
-        cashflowCents: value.cashflowCents
+        cashflowCents: value.cashflowCents,
+        netCashflowChangeCents:
+          typeof value.netCashflowChangeCents === "number"
+            ? value.netCashflowChangeCents
+            : value.cashflowCents * -1,
+        cashflowAdjustmentCents:
+          typeof value.cashflowAdjustmentCents === "number"
+            ? value.cashflowAdjustmentCents
+            : 0,
+        offerNumber:
+          typeof value.offerNumber === "number" && value.offerNumber >= 1
+            ? Math.floor(value.offerNumber)
+            : 1,
+        totalOffers:
+          typeof value.totalOffers === "number" && value.totalOffers >= 1
+            ? Math.floor(value.totalOffers)
+            : 1 + remainingOffers.length,
+        remainingOffers
       };
     }
     return null;
+  }
+
+  private marketSaleOfferState(value: unknown): MarketSaleOfferState | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const offer = value as Record<string, unknown>;
+    if (
+      typeof offer.gamePlayerId !== "string" ||
+      typeof offer.assetId !== "string" ||
+      typeof offer.assetName !== "string" ||
+      typeof offer.salePriceCents !== "number" ||
+      typeof offer.mortgageCents !== "number" ||
+      typeof offer.proceedsCents !== "number" ||
+      typeof offer.cashflowCents !== "number"
+    ) {
+      return null;
+    }
+    return {
+      gamePlayerId: offer.gamePlayerId,
+      assetId: offer.assetId,
+      assetName: offer.assetName,
+      salePriceCents: offer.salePriceCents,
+      mortgageCents: offer.mortgageCents,
+      proceedsCents: offer.proceedsCents,
+      cashflowCents: offer.cashflowCents,
+      netCashflowChangeCents:
+        typeof offer.netCashflowChangeCents === "number"
+          ? offer.netCashflowChangeCents
+          : offer.cashflowCents * -1,
+      cashflowAdjustmentCents:
+        typeof offer.cashflowAdjustmentCents === "number"
+          ? offer.cashflowAdjustmentCents
+          : 0
+    };
   }
 
   private settingsWithPending(
@@ -4793,6 +5132,37 @@ export class GamesService {
     ) {
       throw new ForbiddenException("Создавать игры могут только ведущий или администратор");
     }
+    return user;
+  }
+
+  private async requirePlayableCardSet(cardSetId?: string) {
+    const cardSet = cardSetId
+      ? await this.prisma.cardSet.findUnique({
+          where: { id: cardSetId },
+          select: { id: true, name: true }
+        })
+      : await this.prisma.cardSet.findFirst({
+          where: { isDefault: true },
+          select: { id: true, name: true }
+        });
+    if (!cardSet) throw new NotFoundException("Набор карточек не найден");
+
+    const counts = await this.prisma.card.groupBy({
+      by: ["cardType"],
+      where: { cardSetId: cardSet.id, isActive: true },
+      _count: { _all: true }
+    });
+    const missingTypes = missingCardTypes(
+      counts.map((row) => ({ cardType: row.cardType, count: row._count._all }))
+    );
+    if (missingTypes.length > 0) {
+      throw new BadRequestException(
+        `В наборе «${cardSet.name}» не хватает карточек: ${missingTypes
+          .map((cardType) => cardTypeLabel(cardType))
+          .join(", ")}`
+      );
+    }
+    return cardSet;
   }
 
   private async canManageGame(gameId: string, userId: string) {
@@ -4895,6 +5265,7 @@ export class GamesService {
     const game = await this.prisma.game.findUniqueOrThrow({
       where: { id: gameId },
       include: {
+        cardSet: { select: { id: true, name: true } },
         players: {
           include: {
             user: {
@@ -4957,6 +5328,7 @@ export class GamesService {
         currentRound: game.currentRound,
         currentPlayerId: currentPlayer?.id ?? null,
         createdById: game.createdById,
+        cardSet: game.cardSet,
         startedAt: game.startedAt,
         endedAt: game.endedAt,
         timeLimitMinutes: timeline.timeLimitMinutes,

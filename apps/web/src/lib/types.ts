@@ -57,6 +57,10 @@ export interface GameListItem {
   mode: "MULTIPLAYER" | "SOLO";
   maxPlayers: number | null;
   createdAt: string;
+  cardSet: {
+    id: string;
+    name: string;
+  };
   players: Array<{
     id: string;
     role: string;
@@ -83,6 +87,10 @@ export interface GameSnapshot {
     currentRound: number;
     currentPlayerId: string | null;
     createdById: string | null;
+    cardSet: {
+      id: string;
+      name: string;
+    };
     startedAt: string | null;
     endedAt: string | null;
     timeLimitMinutes: number;
@@ -188,6 +196,18 @@ export interface PlayerLiability {
   paymentCents: number;
 }
 
+export interface MarketSaleOfferState {
+  gamePlayerId: string;
+  assetId: string;
+  assetName: string;
+  salePriceCents: number;
+  mortgageCents: number;
+  proceedsCents: number;
+  cashflowCents: number;
+  netCashflowChangeCents: number;
+  cashflowAdjustmentCents: number;
+}
+
 export type GamePendingAction =
   | {
       type: "choose_deal";
@@ -236,6 +256,11 @@ export type GamePendingAction =
       mortgageCents: number;
       proceedsCents: number;
       cashflowCents: number;
+      netCashflowChangeCents: number;
+      cashflowAdjustmentCents: number;
+      offerNumber: number;
+      totalOffers: number;
+      remainingOffers: MarketSaleOfferState[];
     };
 
 export interface GameEvent {

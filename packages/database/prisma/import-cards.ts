@@ -2,7 +2,9 @@ import { CardType, Prisma, PrismaClient } from "@prisma/client";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  cardImportScope,
   classifyCardChanges,
+  normalizeTargetCardSetName,
   type ImportCard,
   validateCardBatch
 } from "../src/card-import";
@@ -76,7 +78,7 @@ function cardData(card: ImportCard) {
 
 async function main() {
   if (process.argv.includes("--help")) {
-    console.log("Usage: npm run db:import-cards -- [--file PATH] [--dry-run|--apply] [--allow-production]");
+    console.log("Usage: npm run db:import-cards -- --set NAME [--file PATH] [--dry-run|--apply] [--allow-production]");
     return;
   }
 
@@ -86,6 +88,7 @@ async function main() {
   if (apply && process.env.NODE_ENV === "production" && !process.argv.includes("--allow-production")) {
     throw new Error("Запись в production заблокирована. Требуется отдельное явное разрешение и флаг --allow-production");
   }
+  const targetSetName = normalizeTargetCardSetName(argument("--set"));
 
   const file = resolve(argument("--file") ?? resolve(repoRoot, "dist/recognized_original_cards_ru.json"));
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
@@ -96,19 +99,32 @@ async function main() {
     return;
   }
 
-  const existingRows = await prisma.card.findMany({
-    where: { slug: { in: validation.cards.map((card) => card.slug) } },
-    include: {
-      meta: { orderBy: { id: "asc" } },
-      effects: { orderBy: { id: "asc" } },
-      conditions: { orderBy: { id: "asc" } }
-    }
+  const targetSet = await prisma.cardSet.findUnique({
+    where: { name: targetSetName },
+    select: { id: true, name: true }
   });
+  const existingRows = targetSet
+    ? await prisma.card.findMany({
+        where: cardImportScope(
+          targetSet.id,
+          validation.cards.map((card) => card.slug)
+        ),
+        include: {
+          meta: { orderBy: { id: "asc" } },
+          effects: { orderBy: { id: "asc" } },
+          conditions: { orderBy: { id: "asc" } }
+        }
+      })
+    : [];
   const plan = classifyCardChanges(validation.cards, existingRows.map(dbCard));
 
-  if (apply && (plan.created.length > 0 || plan.updated.length > 0)) {
+  if (apply && (!targetSet || plan.created.length > 0 || plan.updated.length > 0)) {
     const existingBySlug = new Map(existingRows.map((card) => [card.slug, card]));
     await prisma.$transaction(async (tx) => {
+      const writeSet = targetSet ?? await tx.cardSet.create({
+        data: { name: targetSetName },
+        select: { id: true }
+      });
       for (const card of [...plan.created, ...plan.updated]) {
         const current = existingBySlug.get(card.slug);
         if (current) {
@@ -122,6 +138,7 @@ async function main() {
         } else {
           await tx.card.create({
             data: {
+              cardSetId: writeSet.id,
               ...cardData(card),
               meta: card.meta.length > 0 ? { create: card.meta } : undefined,
               effects: card.effects.length > 0 ? { create: card.effects.map((row) => ({ effectType: row.effectType, amountCents: row.amountCents, payload: row.payload as Prisma.InputJsonValue })) } : undefined,
@@ -136,6 +153,9 @@ async function main() {
   console.log(JSON.stringify({
     mode: dryRun ? "dry-run" : "apply",
     file,
+    targetSet: targetSetName,
+    targetSetExists: Boolean(targetSet),
+    targetSetWillBeCreated: !targetSet,
     created: plan.created.length,
     updated: plan.updated.length,
     unchanged: plan.unchanged.length,

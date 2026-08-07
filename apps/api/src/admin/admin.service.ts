@@ -10,6 +10,7 @@ import * as bcrypt from "bcryptjs";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminCardDto } from "./dto/card.dto";
+import { CreateCardSetDto, UpdateCardSetDto } from "./dto/card-set.dto";
 import { AdminCreateUserDto } from "./dto/create-user.dto";
 import { AdminUpdateUserRoleDto } from "./dto/update-user-role.dto";
 
@@ -17,8 +18,89 @@ import { AdminUpdateUserRoleDto } from "./dto/update-user-role.dto";
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listCards(cardType?: CardType) {
-    const where: Prisma.CardWhereInput = cardType ? { cardType } : {};
+  async listCardSets() {
+    const [sets, activeCounts] = await Promise.all([
+      this.prisma.cardSet.findMany({
+        include: { _count: { select: { cards: true, games: true } } },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }]
+      }),
+      this.prisma.card.groupBy({
+        by: ["cardSetId", "cardType"],
+        where: { isActive: true },
+        _count: { _all: true }
+      })
+    ]);
+
+    return toSerializable(
+      sets.map((set) => ({
+        id: set.id,
+        name: set.name,
+        isDefault: set.isDefault,
+        createdAt: set.createdAt,
+        updatedAt: set.updatedAt,
+        totalCards: set._count.cards,
+        gamesCount: set._count.games,
+        activeCards: activeCounts
+          .filter((row) => row.cardSetId === set.id)
+          .reduce((total, row) => total + row._count._all, 0),
+        counts: Object.fromEntries(
+          activeCounts
+            .filter((row) => row.cardSetId === set.id)
+            .map((row) => [row.cardType, row._count._all])
+        )
+      }))
+    );
+  }
+
+  async createCardSet(dto: CreateCardSetDto) {
+    const name = this.cardSetName(dto.name);
+
+    try {
+      return toSerializable(
+        await this.prisma.cardSet.create({
+          data: { name },
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        })
+      );
+    } catch (error) {
+      this.handleCardSetWriteError(error);
+    }
+  }
+
+  async updateCardSet(cardSetId: string, dto: UpdateCardSetDto) {
+    const name = this.cardSetName(dto.name);
+
+    try {
+      return toSerializable(
+        await this.prisma.cardSet.update({
+          where: { id: cardSetId },
+          data: { name },
+          select: {
+            id: true,
+            name: true,
+            isDefault: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        })
+      );
+    } catch (error) {
+      this.handleCardSetWriteError(error);
+    }
+  }
+
+  async listCards(cardType?: CardType, cardSetId?: string) {
+    const resolvedCardSetId = await this.resolveCardSetId(cardSetId);
+    const where: Prisma.CardWhereInput = {
+      cardSetId: resolvedCardSetId,
+      ...(cardType ? { cardType } : {})
+    };
     const cards = await this.prisma.card.findMany({
       where,
       include: {
@@ -32,9 +114,11 @@ export class AdminService {
     return toSerializable(cards);
   }
 
-  async listUnclearCards() {
+  async listUnclearCards(cardSetId?: string) {
+    const resolvedCardSetId = await this.resolveCardSetId(cardSetId);
     const cards = await this.prisma.card.findMany({
       where: {
+        cardSetId: resolvedCardSetId,
         isActive: true,
         effects: { none: {} },
         NOT: [
@@ -115,6 +199,7 @@ export class AdminService {
 
   async createCard(dto: AdminCardDto) {
     this.validateCardRelations(dto);
+    await this.requireCardSet(dto.cardSetId);
 
     try {
       const card = await this.prisma.$transaction(async (tx) =>
@@ -143,6 +228,7 @@ export class AdminService {
       throw new BadRequestException("Invalid card id");
     }
     this.validateCardRelations(dto);
+    await this.requireCardSet(dto.cardSetId);
 
     try {
       const card = await this.prisma.$transaction(async (tx) => {
@@ -366,6 +452,7 @@ export class AdminService {
 
   private cardData(dto: AdminCardDto) {
     return {
+      cardSetId: dto.cardSetId,
       cardType: dto.cardType,
       slug: dto.slug.trim(),
       title: dto.title.trim(),
@@ -428,6 +515,50 @@ export class AdminService {
     }
   }
 
+  private async resolveCardSetId(cardSetId?: string) {
+    if (cardSetId) {
+      await this.requireCardSet(cardSetId);
+      return cardSetId;
+    }
+    const defaultSet = await this.prisma.cardSet.findFirst({
+      where: { isDefault: true },
+      select: { id: true }
+    });
+    if (!defaultSet) throw new NotFoundException("Основной набор карточек не найден");
+    return defaultSet.id;
+  }
+
+  private async requireCardSet(cardSetId: string) {
+    const cardSet = await this.prisma.cardSet.findUnique({
+      where: { id: cardSetId },
+      select: { id: true }
+    });
+    if (!cardSet) throw new NotFoundException("Набор карточек не найден");
+    return cardSet;
+  }
+
+  private cardSetName(value: string) {
+    const name = value.trim();
+    if (!name) throw new BadRequestException("Название набора обязательно");
+    return name;
+  }
+
+  private handleCardSetWriteError(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new ConflictException("Набор с таким названием уже есть");
+    }
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      throw new NotFoundException("Набор карточек не найден");
+    }
+    throw error;
+  }
+
   private handleCardWriteError(error: unknown): never {
     if (error instanceof NotFoundException || error instanceof BadRequestException) {
       throw error;
@@ -436,7 +567,7 @@ export class AdminService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      throw new ConflictException("Card slug or meta key already exists");
+      throw new ConflictException("Такой slug уже есть в этом наборе или повторяется meta-ключ");
     }
     throw error;
   }

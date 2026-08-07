@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { resolve } from "node:path";
-import { classifyCardChanges, type ImportCard, validateCardBatch } from "./card-import";
+import {
+  cardImportScope,
+  classifyCardChanges,
+  type ImportCard,
+  normalizeTargetCardSetName,
+  validateCardBatch
+} from "./card-import";
 
 const sourceFile = resolve(process.cwd(), "../../dist/recognized_original_cards_ru.json");
 const source = JSON.parse(readFileSync(sourceFile, "utf8")) as unknown;
@@ -71,4 +77,17 @@ test("classifies a repeated import as unchanged", () => {
   const changed = structuredClone(cards);
   changed[0]!.bodyText += " ";
   assert.equal(classifyCardChanges(changed, cards).updated.length, 1);
+});
+
+test("нормализует и требует название целевого набора", () => {
+  assert.equal(normalizeTargetCardSetName("  Оригинал  "), "Оригинал");
+  assert.throws(() => normalizeTargetCardSetName(undefined), /--set/);
+  assert.throws(() => normalizeTargetCardSetName("   "), /пустым/);
+});
+
+test("ограничивает поиск импорта одним набором", () => {
+  assert.deepEqual(cardImportScope("set-original", ["card-1", "card-2"]), {
+    cardSetId: "set-original",
+    slug: { in: ["card-1", "card-2"] }
+  });
 });

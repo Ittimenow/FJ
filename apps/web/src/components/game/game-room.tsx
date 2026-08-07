@@ -417,7 +417,7 @@ export function GameRoom({
   const canAnswerDoodadPayment =
     isMyTurn && Boolean(doodadPaymentChoice);
   const canAnswerMarketSale =
-    isMyTurn && Boolean(marketSaleOffer);
+    snapshot.game.status === "IN_PROGRESS" && Boolean(marketSaleOffer);
   const canTakeLoan =
     snapshot.game.status === "IN_PROGRESS" &&
     Boolean(me) &&
@@ -4078,15 +4078,28 @@ function ActionsPanel({
 
       {marketSaleOffer ? (
         <div className="rounded-md bg-[#f5f6fc] p-3">
-          <div className="text-sm font-medium">Предложение рынка</div>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-sm font-medium">Предложение рынка</div>
+            {marketSaleOffer.totalOffers > 1 ? (
+              <span className="text-xs font-medium text-neutral-600">
+                {marketSaleOffer.offerNumber} из {marketSaleOffer.totalOffers}
+              </span>
+            ) : null}
+          </div>
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             {localizeGameText(marketSaleOffer.title)}
           </p>
           <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
             <div>Актив: {localizeGameText(marketSaleOffer.assetName)}</div>
-            <div>
-              Цена продажи: <strong>{money(marketSaleOffer.salePriceCents)}</strong>
-            </div>
+            {marketSaleOffer.salePriceCents > 0 ? (
+              <div>
+                Цена продажи: <strong>{money(marketSaleOffer.salePriceCents)}</strong>
+              </div>
+            ) : (
+              <div>
+                Немедленная выплата: <strong>нет</strong>
+              </div>
+            )}
             {marketSaleOffer.mortgageCents > 0 ? (
               <div>
                 Закладная: <strong>{money(marketSaleOffer.mortgageCents)}</strong>
@@ -4096,12 +4109,12 @@ function ActionsPanel({
               {marketSaleOffer.proceedsCents >= 0 ? "К получению" : "К доплате"}:{" "}
               <strong>{money(Math.abs(marketSaleOffer.proceedsCents))}</strong>
             </div>
-            {marketSaleOffer.cashflowCents !== 0 ? (
+            {marketSaleOffer.netCashflowChangeCents !== 0 ? (
               <div>
-                {marketSaleOffer.cashflowCents > 0
+                {marketSaleOffer.netCashflowChangeCents < 0
                   ? "Денежный поток уменьшится на"
                   : "Денежный поток увеличится на"}{" "}
-                <strong>{money(Math.abs(marketSaleOffer.cashflowCents))}</strong>/мес
+                <strong>{money(Math.abs(marketSaleOffer.netCashflowChangeCents))}</strong>/мес
               </div>
             ) : null}
           </div>
@@ -4126,6 +4139,11 @@ function ActionsPanel({
               Отказаться
             </Button>
           </div>
+          {marketSaleOffer.totalOffers > 1 ? (
+            <p className="mt-2 text-xs leading-5 text-neutral-600">
+              После вашего решения игра перейдёт к следующему подходящему активу.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -5570,6 +5588,9 @@ const eventTitles: Record<string, string> = {
   "deal:sell": "Продажа актива",
   "market:sale_offer": "Предложение рынка",
   "market:sale_declined": "Отказ от продажи",
+  "market:no_effect": "Карточка рынка не сработала",
+  "market:cashflow_applied": "Рынок изменил денежный поток",
+  "market:assets_surrendered": "Активы возвращены банку",
   "loan:take": "Получен кредит",
   "loan:repay": "Погашен кредит",
   "bankruptcy:declared": "Объявлено банкротство",
@@ -5600,6 +5621,7 @@ const eventReasons: Record<string, string> = {
   deal_bought_turn_ended: "сделка куплена, ход завершен",
   deal_declined_turn_ended: "игрок отказался от сделки, ход завершен",
   market_sale_offer: "рынок предложил продать актив",
+  market_sale_next_offer: "рынок перешёл к следующему подходящему активу",
   market_sale_completed_turn_ended: "актив продан по рынку, ход завершен",
   market_sale_declined_turn_ended: "игрок отказался от продажи, ход завершен",
   charity_choice_required: "игрок должен выбрать благотворительность",
@@ -5892,6 +5914,24 @@ function eventDetails(event: GameEvent) {
         moneyDetail("Цена продажи", payload.salePriceCents),
         moneyDetail("К получению", payload.proceedsCents)
       ]);
+    case "market:no_effect":
+      return compactDetails([
+        textDetail("Карточка", payload.title),
+        textDetail("Результат", marketNoEffectReason(String(payload.reason ?? "")))
+      ]);
+    case "market:cashflow_applied":
+      return compactDetails([
+        textDetail("Карточка", payload.title),
+        numericDetail("Затронуто бизнесов", payload.assetCount),
+        moneyDetail("Изменение на бизнес", payload.amountPerAssetCents, "/мес"),
+        moneyDetail("Общее изменение", payload.totalAmountCents, "/мес")
+      ]);
+    case "market:assets_surrendered":
+      return compactDetails([
+        textDetail("Карточка", payload.title),
+        numericDetail("Возвращено активов", payload.assetCount),
+        moneyDetail("Снятый денежный поток", payload.removedCashflowCents, "/мес")
+      ]);
     case "loan:take":
       return compactDetails([
         moneyDetail("Получено наличными", payload.amountCents),
@@ -6068,6 +6108,12 @@ function marketSaleDetails(payload: Record<string, unknown>) {
     moneyDetail("Закладная", payload.mortgageCents),
     moneyDetail(proceeds >= 0 ? "К получению" : "К доплате", Math.abs(proceeds))
   ]);
+}
+
+function marketNoEffectReason(reason: string) {
+  if (reason === "no_matching_businesses") return "Ни у одного игрока нет подходящего малого бизнеса";
+  if (reason === "unsupported_rule") return "Для этой карточки не задано игровое правило";
+  return "Ни у одного игрока нет подходящего актива";
 }
 
 function stockEffectLabel(effectType: string) {

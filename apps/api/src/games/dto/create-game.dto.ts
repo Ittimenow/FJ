@@ -1,11 +1,15 @@
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 
 export class CreateGameDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
   title?: string;
+
+  @IsOptional()
+  @IsUUID()
+  cardSetId?: string;
 
   @IsOptional()
   @Type(() => Number)

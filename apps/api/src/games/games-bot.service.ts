@@ -227,6 +227,15 @@ export class GamesBotService implements OnModuleInit {
       );
       if (!resolved) return null;
     }
+    if (pending?.type === "market_sale") {
+      const offeredPlayer = game.players.find(
+        (player) => player.id === pending.gamePlayerId
+      );
+      if (!offeredPlayer || offeredPlayer.controller !== PlayerController.BOT) {
+        return null;
+      }
+      return this.pendingActionForBot(offeredPlayer, pending);
+    }
 
     const current = game.players[game.currentTurnIndex % game.players.length];
     if (!current || current.controller !== PlayerController.BOT || !current.financialState) {

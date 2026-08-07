@@ -88,6 +88,23 @@ const effectTypeSet = new Set<string>(importEffectTypes);
 const conditionTypeSet = new Set<string>(importConditionTypes);
 const metaKeySet = new Set<string>(importMetaKeys);
 
+export function normalizeTargetCardSetName(value: unknown) {
+  if (typeof value !== "string") {
+    throw new Error("Укажите целевой набор: --set \"Название\"");
+  }
+  const name = value.trim();
+  if (!name) throw new Error("Название целевого набора не может быть пустым");
+  if (name.length > 120) throw new Error("Название целевого набора длиннее 120 символов");
+  return name;
+}
+
+export function cardImportScope(cardSetId: string, slugs: string[]) {
+  return {
+    cardSetId,
+    slug: { in: slugs }
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

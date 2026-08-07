@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   isRentalRealEstateAsset,
+  marketAssetMatchesTarget,
   marketAssetUnits,
+  marketRuleSalePriceCents,
+  originalMarketRule,
+  originalMarketRules,
   marketSalePriceForUnits
 } from "./market-sale";
 
@@ -26,6 +30,69 @@ test("determines every supported Plex and apartment size", () => {
 test("calculates market price per block or apartment", () => {
   assert.equal(marketSalePriceForUnits(25000n, "8-plex"), 200000n);
   assert.equal(marketSalePriceForUnits(25000n, "60 квартир"), 1500000n);
+});
+
+test("defines a stable gameplay rule for every original market card", () => {
+  const seed = readFileSync(resolve(process.cwd(), "../../dist/seed_cards.sql"), "utf8");
+  const marketSlugs = [
+    ...seed.matchAll(
+      /VALUES \('market', '([^']+)',/g
+    )
+  ].map((match) => match[1] ?? "");
+
+  assert.equal(marketSlugs.length, 45);
+  assert.deepEqual(
+    marketSlugs.filter((slug) => !originalMarketRule(slug)),
+    []
+  );
+  assert.equal(Object.keys(originalMarketRules).length, 45);
+  assert.equal(
+    Object.values(originalMarketRules).filter((rule) => rule.action === "sale").length,
+    42
+  );
+});
+
+test("supports land abbreviations used by the original cards and assets", () => {
+  assert.equal(marketAssetMatchesTarget("land10", "10 га земли"), true);
+  assert.equal(marketAssetMatchesTarget("land10", "10 гектаров земли"), true);
+  assert.equal(marketAssetMatchesTarget("land20", "20 га земли"), true);
+  assert.equal(marketAssetMatchesTarget("land20", "10 га земли"), false);
+});
+
+test("calculates every supported market pricing mode", () => {
+  const asset = { downPaymentCents: 30000n, costBasisCents: 100000n };
+  const fixed = originalMarketRule("market_0166_покупатель-3m");
+  const perUnit = originalMarketRule("market_0184_покупатель-апартаменты");
+  const doubled = originalMarketRule("market_0151_партнерство");
+  const costPlus = originalMarketRule("market_0159_дело");
+
+  assert.ok(fixed?.action === "sale");
+  assert.ok(perUnit?.action === "sale");
+  assert.ok(doubled?.action === "sale");
+  assert.ok(costPlus?.action === "sale");
+  assert.equal(marketRuleSalePriceCents(fixed, asset, "3m дом"), 110000n);
+  assert.equal(marketRuleSalePriceCents(perUnit, asset, "24 апартамента"), 960000n);
+  assert.equal(marketRuleSalePriceCents(doubled, asset, "партнерство"), 60000n);
+  assert.equal(marketRuleSalePriceCents(costPlus, asset, "3m дом"), 150000n);
+});
+
+test("defines special market effects explicitly", () => {
+  assert.deepEqual(originalMarketRule("market_0157_расширение-малого-бизнеса"), {
+    action: "business_cashflow",
+    scope: "all",
+    amountCents: 400
+  });
+  assert.deepEqual(originalMarketRule("market_0160_инфляция"), {
+    action: "surrender",
+    target: "house3m",
+    scope: "current"
+  });
+  assert.deepEqual(originalMarketRule("market_0172_покупатель-3m"), {
+    action: "sale",
+    target: "house3m",
+    scope: "current",
+    pricing: { type: "no_cash_note", cashflowChangeCents: -500 }
+  });
 });
 
 test("distinguishes rental homes from other small-deal assets", () => {

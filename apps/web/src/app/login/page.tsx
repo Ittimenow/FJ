@@ -1,10 +1,22 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { LoginForm } from "@/components/auth/login-form";
 import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
 import { inviteCodeFromCallbackUrl, safeAuthCallbackUrl } from "@/lib/auth-redirect";
+import { gameInviteMetadata } from "@/lib/game-invite-metadata";
 import { gameReleasedAt } from "@/lib/release";
+
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}): Promise<Metadata> {
+  const callbackUrl = safeAuthCallbackUrl((await searchParams).callbackUrl);
+  const inviteCode = inviteCodeFromCallbackUrl(callbackUrl);
+  return inviteCode ? gameInviteMetadata(inviteCode) : {};
+}
 
 export default async function LoginPage({
   searchParams

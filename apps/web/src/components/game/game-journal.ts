@@ -170,6 +170,12 @@ export function eventHeadline(event: GameEvent) {
       return "Получено предложение рынка";
     case "market:sale_declined":
       return "Отказ от продажи";
+    case "market:no_effect":
+      return "Рынок не нашёл подходящих активов";
+    case "market:cashflow_applied":
+      return "Рынок изменил денежный поток бизнеса";
+    case "market:assets_surrendered":
+      return "Активы возвращены банку";
     case "player:baby":
       return "В семье появился ребёнок";
     case "player:baby_gift":

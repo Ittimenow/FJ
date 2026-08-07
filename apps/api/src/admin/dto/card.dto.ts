@@ -8,6 +8,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   ValidateNested
@@ -63,6 +64,9 @@ export class AdminCardConditionDto {
 }
 
 export class AdminCardDto {
+  @IsUUID()
+  cardSetId!: string;
+
   @IsEnum(CardType)
   cardType!: CardType;
 

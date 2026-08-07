@@ -22,6 +22,7 @@ function loadRootEnv() {
 loadRootEnv();
 
 const prisma = new PrismaClient();
+const defaultCardSetId = "00000000-0000-0000-0000-000000000001";
 const citiesFile = resolve(here, "data/russian-cities.csv");
 const cityAliasesFile = resolve(here, "data/russian-city-aliases.json");
 
@@ -453,6 +454,15 @@ async function seedCards(
   db: PrismaClient | Prisma.TransactionClient = prisma
 ) {
   const replaceAll = options.replaceAll ?? true;
+  const defaultCardSet = await db.cardSet.upsert({
+    where: { id: defaultCardSetId },
+    create: {
+      id: defaultCardSetId,
+      name: "Основной",
+      isDefault: true
+    },
+    update: { isDefault: true }
+  });
   const file = resolve(repoRoot, "dist/seed_cards.sql");
   if (!existsSync(file)) {
     console.warn("Skipping cards: dist/seed_cards.sql not found");
@@ -463,10 +473,7 @@ async function seedCards(
     `${replaceAll ? "Seeding" : "Synchronizing"} cards from dist/seed_cards.sql`
   );
   if (replaceAll) {
-    await db.cardCondition.deleteMany();
-    await db.cardEffect.deleteMany();
-    await db.cardMeta.deleteMany();
-    await db.card.deleteMany();
+    await db.card.deleteMany({ where: { cardSetId: defaultCardSet.id } });
   }
 
   const context: SqlContext = {};
@@ -488,6 +495,7 @@ async function seedCards(
       if (!cardType) throw new Error(`Unsupported card type: ${rawCardType}`);
 
       const data = {
+        cardSetId: defaultCardSet.id,
         cardType,
         slug,
         title: requireString(row.title, "cards.title"),
@@ -498,7 +506,12 @@ async function seedCards(
       const card = replaceAll
         ? await db.card.create({ data })
         : await db.card.upsert({
-            where: { slug },
+            where: {
+              cardSetId_slug: {
+                cardSetId: defaultCardSet.id,
+                slug
+              }
+            },
             create: data,
             update: data
           });
@@ -585,8 +598,12 @@ async function main() {
         const legacyApartmentSlug = "big_deal_0128_24";
         const apartmentSlug = "big_deal_0128_60-квартирные-апартаменты";
         const [legacyApartment, correctedApartment] = await Promise.all([
-          tx.card.findUnique({ where: { slug: legacyApartmentSlug } }),
-          tx.card.findUnique({ where: { slug: apartmentSlug } })
+          tx.card.findFirst({
+            where: { cardSetId: defaultCardSetId, slug: legacyApartmentSlug }
+          }),
+          tx.card.findFirst({
+            where: { cardSetId: defaultCardSetId, slug: apartmentSlug }
+          })
         ]);
         if (legacyApartment && !correctedApartment) {
           await tx.card.update({

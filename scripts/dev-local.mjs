@@ -313,6 +313,13 @@ try {
   log("Generating Prisma Client.");
   await run(npmCommand, ["run", "db:generate"], { env: localEnv });
 
+  log("Preparing card sets.");
+  await run(
+    npmCommand,
+    ["run", "prisma:prepare-card-sets", "--workspace=@cashflow/database"],
+    { env: localEnv }
+  );
+
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"], { env: localEnv });
 

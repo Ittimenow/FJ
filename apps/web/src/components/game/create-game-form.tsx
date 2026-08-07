@@ -1,18 +1,70 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
 
-export function CreateGameForm({ token }: { token: string }) {
+type GameCardSet = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  counts: Record<string, number>;
+};
+
+const requiredCardTypes = [
+  "SMALL_DEAL",
+  "BIG_DEAL",
+  "DOODAD",
+  "MARKET"
+];
+
+export function CreateGameForm({
+  token,
+  allowCardSetSelection = false
+}: {
+  token: string;
+  allowCardSetSelection?: boolean;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(90);
   const [periodCount, setPeriodCount] = useState(3);
+  const [cardSets, setCardSets] = useState<GameCardSet[]>([]);
+  const [cardSetId, setCardSetId] = useState("");
+  const [cardSetsLoading, setCardSetsLoading] = useState(allowCardSetSelection);
+  const [cardSetsError, setCardSetsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!allowCardSetSelection) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`${publicApiBaseUrl()}/api/admin/cards/sets`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error();
+        const sets = (await response.json()) as GameCardSet[];
+        if (cancelled) return;
+        setCardSets(sets);
+        setCardSetId(
+          sets.find((set) => set.isDefault && isPlayableCardSet(set))?.id ??
+          sets.find(isPlayableCardSet)?.id ??
+          ""
+        );
+      } catch {
+        if (!cancelled) setCardSetsError("Не удалось загрузить наборы. Будет использован основной набор.");
+      } finally {
+        if (!cancelled) setCardSetsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allowCardSetSelection, token]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,6 +80,7 @@ export function CreateGameForm({ token }: { token: string }) {
         },
         body: JSON.stringify({
           title: String(form.get("title") ?? ""),
+          ...(allowCardSetSelection && cardSetId ? { cardSetId } : {}),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
           periodCount: Number(form.get("periodCount") ?? 3)
         })
@@ -103,6 +156,37 @@ export function CreateGameForm({ token }: { token: string }) {
           </select>
         </div>
       </div>
+      {allowCardSetSelection ? (
+        <div>
+          <label htmlFor="game-card-set" className="mb-2 block text-sm font-extrabold text-ink">
+            Набор карточек
+          </label>
+          <select
+            id="game-card-set"
+            value={cardSetId}
+            onChange={(event) => setCardSetId(event.target.value)}
+            className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
+            disabled={cardSetsLoading || cardSets.length === 0}
+          >
+            {cardSets.map((set) => {
+              const ready = isPlayableCardSet(set);
+              return (
+                <option key={set.id} value={set.id} disabled={!ready}>
+                  {set.name}{set.isDefault ? " — основной" : ""}{ready ? "" : " — не заполнен"}
+                </option>
+              );
+            })}
+          </select>
+          <p className="mt-2 text-xs leading-5 text-muted">
+            После создания комнаты набор изменить нельзя: партия сохранит выбранные колоды.
+          </p>
+          {cardSetsError ? (
+            <p className="mt-2 text-xs font-medium leading-5 text-red-700" role="alert">
+              {cardSetsError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <p className="rounded-xl bg-card px-3 py-2 text-xs font-medium leading-5 text-muted">
         {periodCount === 1
           ? `Один период длительностью ${formatDuration(timeLimitMinutes * 60)}.`
@@ -115,7 +199,13 @@ export function CreateGameForm({ token }: { token: string }) {
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="action" className="w-full" disabled={loading} aria-busy={loading}>
+      <Button
+        type="submit"
+        variant="action"
+        className="w-full"
+        disabled={loading || cardSetsLoading || (allowCardSetSelection && cardSets.length > 0 && !cardSetId)}
+        aria-busy={loading}
+      >
         {loading ? "Создаём комнату..." : "Создать комнату"}
       </Button>
     </form>
@@ -131,4 +221,8 @@ function formatDuration(totalSeconds: number) {
 
 function periodWord(count: number) {
   return count >= 2 && count <= 4 ? "периода" : "периодов";
+}
+
+function isPlayableCardSet(set: GameCardSet) {
+  return requiredCardTypes.every((type) => (set.counts[type] ?? 0) > 0);
 }

@@ -173,6 +173,7 @@ model Game {
   currentTurnIndex Int        @default(0) @map("current_turn_index")
   currentRound     Int        @default(1) @map("current_round")
   settings         Json       @default("{}")
+  cardSetId        String     @map("card_set_id") @db.Uuid
   createdById      String?    @map("created_by_id") @db.Uuid
   startedAt        DateTime?  @map("started_at")
   endedAt          DateTime?  @map("ended_at")
@@ -182,6 +183,7 @@ model Game {
   botLeaseUntil    DateTime?  @map("bot_lease_until")
 
   createdBy    User?             @relation("CreatedGames", fields: [createdById], references: [id], onDelete: SetNull)
+  cardSet      CardSet           @relation(fields: [cardSetId], references: [id], onDelete: Restrict)
   players      GamePlayer[]
   events       GameEvent[]
   chatMessages GameChatMessage[]
@@ -190,6 +192,7 @@ model Game {
   @@index([status])
   @@index([mode, status])
   @@index([createdById])
+  @@index([cardSetId])
   @@map("games")
 }
 
@@ -284,10 +287,24 @@ model ProfessionLine {
   @@map("profession_lines")
 }
 
+model CardSet {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cards Card[]
+  games Game[]
+
+  @@map("card_sets")
+}
+
 model Card {
   id          Int      @id @default(autoincrement())
+  cardSetId   String   @map("card_set_id") @db.Uuid
   cardType    CardType @map("card_type")
-  slug        String   @unique
+  slug        String
   title       String
   bodyText    String   @map("body_text")
   category    String?
@@ -296,13 +313,16 @@ model Card {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  cardSet    CardSet         @relation(fields: [cardSetId], references: [id], onDelete: Restrict)
   meta       CardMeta[]
   effects    CardEffect[]
   conditions CardCondition[]
   assets     PlayerAsset[]
 
   @@index([cardType])
+  @@index([cardSetId, cardType])
   @@index([category])
+  @@unique([cardSetId, slug])
   @@map("cards")
 }
 

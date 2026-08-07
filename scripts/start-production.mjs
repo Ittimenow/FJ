@@ -199,6 +199,11 @@ async function setupDatabaseIfNeeded() {
   ]);
   await run(npmCommand, [
     "run",
+    "prisma:prepare-card-sets",
+    "--workspace=@cashflow/database"
+  ]);
+  await run(npmCommand, [
+    "run",
     "prisma:prepare-baby-gifts",
     "--workspace=@cashflow/database"
   ]);

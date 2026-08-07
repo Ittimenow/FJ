@@ -319,7 +319,7 @@ function AdminDashboard({
             <CardTitle className="text-xl">Новая комната</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <CreateGameForm token={token} />
+            <CreateGameForm token={token} allowCardSetSelection />
             <div className="border-t border-line pt-4">
               <JoinGameForm token={token} />
             </div>
@@ -1010,8 +1010,8 @@ function AdminGameRow({ game }: { game: GameListItem }) {
         <div className="font-extrabold">{game.title}</div>
         <div className="mt-1 text-xs text-muted">
           {game.mode === "SOLO"
-            ? `С ботами · ${players.filter((player) => player.controller === "BOT").length} соперников`
-            : `${game.code} · ${players.length} игроков`}
+            ? `С ботами · ${players.filter((player) => player.controller === "BOT").length} соперников · ${game.cardSet.name}`
+            : `${game.code} · ${players.length} игроков · ${game.cardSet.name}`}
         </div>
       </div>
       <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">{gameStatusLabel(game.status)}</Badge>

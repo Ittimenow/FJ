@@ -21,6 +21,16 @@ import { UpdateHostParticipationDto } from "./dto/update-host-participation.dto"
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
 
+@Controller("game-invites")
+export class GameInvitesController {
+  constructor(private readonly games: GamesService) {}
+
+  @Get(":code/metadata")
+  metadata(@Param("code") code: string) {
+    return this.games.getInviteMetadata(code);
+  }
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller("games")
 export class GamesController {
