@@ -16,10 +16,11 @@ const source = JSON.parse(readFileSync(sourceFile, "utf8")) as unknown;
 test("validates the complete recognized deck", () => {
   const result = validateCardBatch(source);
   assert.deepEqual(result.errors, []);
-  assert.equal(result.cards.length, 139);
+  assert.equal(result.cards.length, 181);
   assert.equal(result.cards.filter((card) => card.cardType === "SMALL_DEAL").length, 56);
   assert.equal(result.cards.filter((card) => card.cardType === "BIG_DEAL").length, 41);
   assert.equal(result.cards.filter((card) => card.cardType === "DOODAD").length, 42);
+  assert.equal(result.cards.filter((card) => card.cardType === "MARKET").length, 42);
 });
 
 test("preserves direct game money amounts and represented mechanics", () => {
@@ -32,6 +33,7 @@ test("preserves direct game money amounts and represented mechanics", () => {
   const conditional = cards.find((card) => card.title.startsWith("Жилец наносит ущерб"));
   const stock = cards.find((card) => card.title === "Акции OK4U: $30");
   const deal = cards.find((card) => card.title === "Дуплекс на продажу: $70,000, +$140/мес");
+  const market = cards.find((card) => card.title === "Покупатель автомойки: $250,000");
 
   assert.equal(television?.meta.find((row) => row.metaKey === "credit_payment")?.metaValue, "120");
   assert.deepEqual(boat?.effects.map((effect) => effect.amountCents), [-1000, 17000]);
@@ -41,6 +43,7 @@ test("preserves direct game money amounts and represented mechanics", () => {
   assert.equal(conditional?.conditions[0]?.condType, "has_rental_realestate");
   assert.equal(stock?.meta.find((row) => row.metaKey === "symbol")?.metaValue, "OK4U");
   assert.equal(deal?.meta.find((row) => row.metaKey === "down_payment")?.metaValue, "7000");
+  assert.equal(market?.meta.find((row) => row.metaKey === "price")?.metaValue, "250000");
 });
 
 test("rejects duplicate slugs, duplicate meta keys and unknown actions", () => {
@@ -72,7 +75,7 @@ test("classifies a repeated import as unchanged", () => {
   const repeated = classifyCardChanges(cards, structuredClone(cards));
   assert.equal(repeated.created.length, 0);
   assert.equal(repeated.updated.length, 0);
-  assert.equal(repeated.unchanged.length, 139);
+  assert.equal(repeated.unchanged.length, 181);
 
   const changed = structuredClone(cards);
   changed[0]!.bodyText += " ";

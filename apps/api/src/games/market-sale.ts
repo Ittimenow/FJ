@@ -2,9 +2,9 @@ export function marketAssetUnits(assetText: string) {
   if (/60[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 60;
   if (/24[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 24;
   if (/12[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 12;
-  if (/8[\s-]*(кв|квартир|plex)/.test(assetText)) return 8;
-  if (/4[\s-]*(кв|квартир|plex)|4х-кварт/.test(assetText)) return 4;
-  if (/2[\s-]*(кв|квартир|plex)|duplex|двух-кварт/.test(assetText)) return 2;
+  if (/8[\s-]*(кв|квартир|plex|плекс)/.test(assetText)) return 8;
+  if (/4[\s-]*(кв|квартир|plex|плекс)|4х-кварт/.test(assetText)) return 4;
+  if (/2[\s-]*(кв|квартир|plex|плекс)|duplex|дуплекс|двух-кварт/.test(assetText)) return 2;
   return 1;
 }
 
@@ -25,6 +25,9 @@ export type MarketAssetTarget =
   | "zirconium"
   | "software"
   | "beauty_salon"
+  | "boarding_house"
+  | "shopping_center"
+  | "auto_accessories"
   | "partnership";
 
 export type MarketRule =
@@ -34,7 +37,7 @@ export type MarketRule =
       scope: "all" | "current";
       pricing:
         | { type: "fixed"; priceCents: number }
-        | { type: "per_unit"; priceCents: number }
+        | { type: "per_unit"; priceCents: number; minimumUnits?: number }
         | { type: "down_payment_multiplier"; multiplier: number }
         | { type: "cost_plus"; amountCents: number }
         | { type: "no_cash_note"; cashflowChangeCents: number };
@@ -61,11 +64,15 @@ const fixedSale = (
   pricing: { type: "fixed", priceCents }
 });
 
-const perUnitSale = (target: "plex" | "apartment", priceCents: number): MarketRule => ({
+const perUnitSale = (
+  target: "plex" | "apartment",
+  priceCents: number,
+  minimumUnits?: number
+): MarketRule => ({
   action: "sale",
   target,
   scope: "all",
-  pricing: { type: "per_unit", priceCents }
+  pricing: { type: "per_unit", priceCents, ...(minimumUnits ? { minimumUnits } : {}) }
 });
 
 /**
@@ -154,8 +161,72 @@ export const originalMarketRules: Readonly<Record<string, MarketRule>> = {
   "market_0189_покупатель-3m": fixedSale("house3m", 65000)
 };
 
+/** Stable rules for the newly recognized physical Russian market sheets. */
+export const recognizedOriginalMarketRules: Readonly<Record<string, MarketRule>> = {
+  market_1_r1c1: {
+    action: "sale", target: "partnership", scope: "all",
+    pricing: { type: "down_payment_multiplier", multiplier: 3 }
+  },
+  market_1_r1c2: { action: "business_cashflow", scope: "all", amountCents: 400 },
+  market_1_r1c3: perUnitSale("plex", 35000),
+  market_1_r2c1: fixedSale("boarding_house", 250000),
+  market_1_r2c2: perUnitSale("plex", 25000),
+  market_1_r2c3: {
+    action: "sale", target: "partnership", scope: "all",
+    pricing: { type: "down_payment_multiplier", multiplier: 2 }
+  },
+  market_1_r3c1: fixedSale("software", 100000),
+  market_1_r3c2: perUnitSale("plex", 35000),
+  market_1_r3c3: fixedSale("house2u", 45000),
+  market_1_r4c1: {
+    action: "sale", target: "partnership", scope: "all",
+    pricing: { type: "down_payment_multiplier", multiplier: 2 }
+  },
+  market_1_r4c2: fixedSale("house3m", 135000),
+  market_1_r4c3: fixedSale("house2u", 65000),
+  market_1_r5c1: perUnitSale("plex", 40000),
+  market_1_r5c2: perUnitSale("plex", 35000),
+  market_1_r5c3: fixedSale("land10", 150000),
+  market_1_r6c1: fixedSale("house2u", 55000),
+  market_1_r6c2: fixedSale("gold_coin", 600),
+  market_1_r6c3: {
+    action: "sale", target: "house3m", scope: "current",
+    pricing: { type: "cost_plus", amountCents: 50000 }
+  },
+  market_2_r1c1: fixedSale("house3m", 135000),
+  market_2_r1c2: fixedSale("carwash", 250000),
+  market_2_r1c3: fixedSale("house3m", 65000),
+  market_2_r2c1: fixedSale("gold_coin", 5000),
+  market_2_r2c2: fixedSale("auto_accessories", 50000),
+  market_2_r2c3: perUnitSale("plex", 30000),
+  market_2_r3c1: perUnitSale("plex", 25000),
+  market_2_r3c2: perUnitSale("plex", 30000),
+  market_2_r3c3: fixedSale("house3m", 90000),
+  market_2_r4c1: fixedSale("house3m", 110000),
+  market_2_r4c2: { action: "surrender", target: "house3m", scope: "current" },
+  market_2_r4c3: perUnitSale("plex", 40000),
+  market_2_r5c1: perUnitSale("plex", 45000),
+  market_2_r5c2: fixedSale("house3m", 100000),
+  market_2_r5c3: fixedSale("shopping_center", 100000),
+  market_2_r6c1: perUnitSale("apartment", 30000, 13),
+  market_2_r6c2: fixedSale("house2u", 55000),
+  market_2_r6c3: perUnitSale("plex", 25000),
+  market_3_r1c1: {
+    action: "sale", target: "house3m", scope: "current",
+    pricing: { type: "no_cash_note", cashflowChangeCents: -500 }
+  },
+  market_3_r2c1: { action: "business_cashflow", scope: "all", amountCents: 250 },
+  market_3_r3c1: fixedSale("land20", 200000),
+  market_3_r4c1: perUnitSale("plex", 40000),
+  market_3_r5c1: fixedSale("house3m", 100000),
+  market_3_r6c1: perUnitSale("plex", 30000)
+};
+
 export function originalMarketRule(slug: string) {
-  return originalMarketRules[slug] ?? null;
+  const existing = originalMarketRules[slug];
+  if (existing) return existing;
+  const source = slug.match(/^original_ru_market_(market_[123]_r\d+c\d+)_/)?.[1];
+  return source ? recognizedOriginalMarketRules[source] ?? null : null;
 }
 
 export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: string) {
@@ -163,9 +234,9 @@ export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: s
   if (target === "land10") return /(?:^|\s)10\s*(?:га|гектар)/.test(normalized);
   if (target === "land20") return /(?:^|\s)20\s*(?:га|гектар)/.test(normalized);
   if (target === "gold_coin") return normalized.includes("золот") && normalized.includes("монет");
-  if (target === "house2u") return normalized.includes("2у");
+  if (target === "house2u") return /\b2у\b|2\/1|2\s*спальн/.test(normalized);
   if (target === "house3m") return /\b3m\b|\b3м\b|3\/2|3br/.test(normalized);
-  if (target === "plex") return /duplex|plex|[248][\s-]*(кв|квартир)/.test(normalized);
+  if (target === "plex") return /duplex|дуплекс|plex|плекс|[248][\s-]*(кв|квартир)/.test(normalized);
   if (target === "apartment") return normalized.includes("апартамент");
   if (target === "carwash") return normalized.includes("автомой");
   if (target === "kebab") return normalized.includes("шашлык");
@@ -174,6 +245,9 @@ export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: s
   if (target === "beauty_salon") {
     return normalized.includes("салон") && normalized.includes("крас");
   }
+  if (target === "boarding_house") return /пансион|ночлег.*завтрак/.test(normalized);
+  if (target === "shopping_center") return normalized.includes("торгов") && normalized.includes("пассаж");
+  if (target === "auto_accessories") return normalized.includes("автомобильн") && normalized.includes("наворот");
   return normalized.includes("партнерств");
 }
 
@@ -184,7 +258,9 @@ export function marketRuleSalePriceCents(
 ) {
   if (rule.pricing.type === "fixed") return BigInt(rule.pricing.priceCents);
   if (rule.pricing.type === "per_unit") {
-    return marketSalePriceForUnits(BigInt(rule.pricing.priceCents), assetText);
+    const units = marketAssetUnits(assetText);
+    if (rule.pricing.minimumUnits && units < rule.pricing.minimumUnits) return 0n;
+    return BigInt(rule.pricing.priceCents) * BigInt(units);
   }
   if (rule.pricing.type === "down_payment_multiplier") {
     return asset.downPaymentCents * BigInt(rule.pricing.multiplier);

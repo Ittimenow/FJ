@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "complete-original-market-deck",
+          "category": "feature",
+          "summary": "В набор «Оригинал» добавлены все карточки рынка с поддержкой их продаж и специальных событий."
+        },
+        {
           "id": "targeted-card-set-import",
           "category": "improvement",
           "summary": "Импорт карточек можно безопасно направить в отдельный набор, не изменяя одноимённые карточки в других наборах."

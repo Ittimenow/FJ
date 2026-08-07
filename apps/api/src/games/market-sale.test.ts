@@ -9,14 +9,18 @@ import {
   marketRuleSalePriceCents,
   originalMarketRule,
   originalMarketRules,
+  recognizedOriginalMarketRules,
   marketSalePriceForUnits
 } from "./market-sale";
 
 test("determines every supported Plex and apartment size", () => {
   const cases: Array<[string, number]> = [
     ["Duplex: $45,000", 2],
+    ["Дуплекс на продажу", 2],
     ["4-Plex: $100,000", 4],
+    ["4-плекс на продажу", 4],
     ["8-Plex: $240,000", 8],
+    ["8-плекс на продажу", 8],
     ["12-квартирный дом", 12],
     ["24 квартиры", 24],
     ["60 квартирный комплекс", 60]
@@ -59,6 +63,12 @@ test("supports land abbreviations used by the original cards and assets", () => 
   assert.equal(marketAssetMatchesTarget("land20", "10 га земли"), false);
 });
 
+test("matches Russian physical-deck home names", () => {
+  assert.equal(marketAssetMatchesTarget("house2u", "Квартира 2/1, 2 спальни"), true);
+  assert.equal(marketAssetMatchesTarget("plex", "Дуплекс на продажу"), true);
+  assert.equal(marketAssetMatchesTarget("plex", "8-плекс на продажу"), true);
+});
+
 test("calculates every supported market pricing mode", () => {
   const asset = { downPaymentCents: 30000n, costBasisCents: 100000n };
   const fixed = originalMarketRule("market_0166_покупатель-3m");
@@ -93,6 +103,42 @@ test("defines special market effects explicitly", () => {
     scope: "current",
     pricing: { type: "no_cash_note", cashflowChangeCents: -500 }
   });
+});
+
+test("defines a stable gameplay rule for every newly recognized market card", () => {
+  const cards = JSON.parse(
+    readFileSync(resolve(process.cwd(), "../../dist/recognized_original_cards_ru.json"), "utf8")
+  ) as Array<{ cardType: string; slug: string }>;
+  const marketCards = cards.filter((card) => card.cardType === "MARKET");
+
+  assert.equal(marketCards.length, 42);
+  assert.equal(Object.keys(recognizedOriginalMarketRules).length, 42);
+  assert.deepEqual(marketCards.filter((card) => !originalMarketRule(card.slug)), []);
+});
+
+test("matches the physical-deck business buyers to their exact assets", () => {
+  assert.equal(marketAssetMatchesTarget("boarding_house", "Пансионат с полупансионом"), true);
+  assert.equal(marketAssetMatchesTarget("shopping_center", "Торговый пассаж на продажу"), true);
+  assert.equal(
+    marketAssetMatchesTarget("auto_accessories", "Компания автомобильных «наворотов»"),
+    true
+  );
+  assert.equal(marketAssetMatchesTarget("auto_accessories", "Автомойка"), false);
+});
+
+test("requires more than 12 apartments for the restricted buyer", () => {
+  const rule = originalMarketRule(
+    "original_ru_market_market_2_r6c1_покупатель-домов-более-чем-на-12-квартир"
+  );
+  assert.ok(rule?.action === "sale");
+  assert.equal(
+    marketRuleSalePriceCents(rule, { downPaymentCents: 0n, costBasisCents: 0n }, "8-плекс"),
+    0n
+  );
+  assert.equal(
+    marketRuleSalePriceCents(rule, { downPaymentCents: 0n, costBasisCents: 0n }, "24 апартамента"),
+    720000n
+  );
 });
 
 test("distinguishes rental homes from other small-deal assets", () => {
@@ -153,7 +199,8 @@ test("seed data preserves original small-deal classifications and finances", () 
     assert.equal(
       values.price - (values.mortgage ?? 0),
       values.down_payment,
-      card.match(/VALUES \('small_deal', '[^']+', '([^']+)'/)?.[1]
+      card.match(/VALUES \('small_deal', '[^']+', '([^']+)'/)?.[1] ??
+        "Карточка сделки без названия"
     );
   }
 });
