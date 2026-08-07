@@ -21,6 +21,42 @@ export type CashChangeExpression =
       value: string;
     };
 
+const eventReasonLabels: Record<string, string> = {
+  player_added: "игрок добавлен в комнату",
+  game_deleted: "игра удалена",
+  game_started: "игра запущена",
+  turn_skipped: "ход пропущен",
+  roll_resolved: "ход обработан",
+  deal_bought: "актив куплен",
+  loan_taken: "кредит получен",
+  loan_repaid: "кредит погашен",
+  deal_choice_required: "игрок должен выбрать мелкую или крупную сделку",
+  deal_card_drawn: "карточка сделки открыта",
+  automatic_card_resolved_turn_ended: "карточка применена автоматически, ход завершен",
+  network_marketing_resolved_turn_ended: "карточка сетевого маркетинга обработана, ход завершен",
+  deal_bought_turn_ended: "сделка куплена, ход завершен",
+  deal_declined_turn_ended: "игрок отказался от сделки, ход завершен",
+  market_sale_offer: "рынок предложил продать актив",
+  market_sale_next_offer: "рынок перешёл к следующему подходящему активу",
+  market_sale_completed_turn_ended: "актив продан по рынку, ход завершен",
+  market_sale_declined_turn_ended: "игрок отказался от продажи, ход завершен",
+  charity_choice_required: "игрок должен выбрать благотворительность",
+  charity_accepted_turn_ended: "благотворительность оплачена, ход завершен",
+  charity_declined_turn_ended: "игрок отказался от благотворительности, ход завершен",
+  downsized: "потеря работы",
+  player_choice: "решение игрока",
+  passed_paycheck: "игрок прошел расчётный чек",
+  landed_on_paycheck: "игрок встал на расчётный чек",
+  missing_previous_level: "нет предыдущего уровня",
+  already_has_level: "этот уровень уже не нужен"
+};
+
+export function eventReasonLabel(value: unknown) {
+  const reason = String(value ?? "");
+  if (!reason) return null;
+  return eventReasonLabels[reason] ?? "причина не указана";
+}
+
 export function eventCashChange(event: GameEvent): CashChange | null {
   const before = optionalPayloadNumber(event.payload, "beforeCashCents");
   const after = optionalPayloadNumber(event.payload, "afterCashCents");

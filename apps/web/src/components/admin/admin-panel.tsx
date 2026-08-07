@@ -6,7 +6,7 @@ import {
   Boxes,
   Activity,
   CircleHelp,
-  Download,
+  Gamepad2,
   History,
   LayoutDashboard,
   Map as MapIcon,
@@ -18,26 +18,26 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
 import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
+import { AdminGamesPanel } from "@/components/admin/admin-games-panel";
 import { AdminMonitoringPanel } from "@/components/admin/admin-monitoring-panel";
 import { AdminPublicationsPanel } from "@/components/admin/admin-publications-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { publicApiBaseUrl } from "@/lib/api";
 import type { SystemRelease } from "@/lib/changes";
-import { money, shortDate } from "@/lib/format";
+import { money } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
 import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
 type AdminSection =
   | "dashboard"
+  | "games"
   | "users"
   | "cards"
   | "rules"
@@ -55,6 +55,7 @@ type AdminMenuItem = {
 
 const mainMenu: AdminMenuItem[] = [
   { id: "dashboard", label: "Обзор", icon: LayoutDashboard },
+  { id: "games", label: "Игры", icon: Gamepad2 },
   { id: "users", label: "Пользователи", icon: UsersRound },
   { id: "feedback", label: "Предложения", icon: MessageSquareText },
   { id: "monitoring", label: "Мониторинг", icon: Activity },
@@ -72,6 +73,7 @@ const allMenuItems = [...mainMenu, ...settingsMenu];
 
 const adminSections = new Set<AdminSection>([
   "dashboard",
+  "games",
   "users",
   "cards",
   "rules",
@@ -170,6 +172,7 @@ export function AdminPanel({
         {section === "dashboard" ? (
           <AdminDashboard profile={profile} games={games} token={token} />
         ) : null}
+        {section === "games" ? <AdminGamesPanel token={token} /> : null}
         {section === "users" ? (
           <Card className="rounded-2xl border-0">
             <CardHeader>
@@ -333,71 +336,6 @@ function AdminDashboard({
         </Card>
       </section>
 
-      <Card className="rounded-2xl border-0">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-xl">История игр</CardTitle>
-            <p className="mt-1 text-sm text-muted">Завершённые партии и экспорт аналитики.</p>
-          </div>
-          <AnalyticsExportButton token={token} />
-        </CardHeader>
-        <CardContent>
-          <HistoryTable history={profile.history} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function AnalyticsExportButton({ token }: { token: string }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function downloadExport() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `${publicApiBaseUrl()}/api/admin/analytics/export.ndjson?status=ENDED`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(body || `Ошибка экспорта: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      const date = new Date().toISOString().slice(0, 10);
-      link.href = url;
-      link.download = `game-history-${date}.ndjson`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (downloadError) {
-      setError(
-        downloadError instanceof Error
-          ? downloadError.message
-          : "Не удалось скачать историю игр"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-1 sm:items-end">
-      <Button variant="secondary" onClick={downloadExport} disabled={loading}>
-        <Download className="mr-2" size={16} aria-hidden="true" />
-        {loading ? "Готовлю файл..." : "Скачать историю игр"}
-      </Button>
-      {error ? <p className="max-w-sm text-xs text-red-700" role="alert">{error}</p> : null}
     </div>
   );
 }
@@ -931,71 +869,6 @@ function BoardTable({
   );
 }
 
-function HistoryTable({ history }: { history: ProfileResponse["history"] }) {
-  if (history.length === 0) {
-    return <p className="rounded-xl bg-card p-4 text-sm text-muted">Истории игр пока нет.</p>;
-  }
-
-  return (
-    <>
-      <div className="grid gap-3 md:hidden">
-        {history.map((item) => (
-          <article key={`${item.gameId}-${item.joinedAt}`} className="rounded-xl bg-card p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <Link className="font-extrabold text-journey" href={`/games/${item.gameId}`}>
-                  {item.title}
-                </Link>
-                <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
-              </div>
-              <Badge className="shrink-0 bg-[#e8effe] font-bold text-journey">
-                {gameStatusLabel(item.status)}
-              </Badge>
-            </div>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-xs text-muted">Результат</dt><dd className="mt-1 font-bold">{gameResult(item)}</dd></div>
-              <div><dt className="text-xs text-muted">Денежный поток</dt><dd className="mt-1 font-bold">{money(item.monthlyCashflowCents)}</dd></div>
-              <div><dt className="text-xs text-muted">Профессия</dt><dd className="mt-1 font-bold">{item.profession ?? "—"}</dd></div>
-              <div><dt className="text-xs text-muted">Дата</dt><dd className="mt-1 font-bold">{shortDate(item.joinedAt)}</dd></div>
-            </dl>
-          </article>
-        ))}
-      </div>
-      <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[780px] text-left text-sm">
-        <thead className="border-b border-line/70 text-muted">
-          <tr>
-            <th className="pb-3 font-bold">Партия</th>
-            <th className="pb-3 font-bold">Статус</th>
-            <th className="pb-3 font-bold">Результат</th>
-            <th className="pb-3 font-bold">Профессия</th>
-            <th className="pb-3 font-bold">Денежный поток</th>
-            <th className="pb-3 font-bold">Дата</th>
-          </tr>
-        </thead>
-        <tbody>
-          {history.map((item) => (
-            <tr key={`${item.gameId}-${item.joinedAt}`} className="border-b border-line/70 last:border-b-0">
-              <td className="py-4 pr-4">
-                <Link className="font-extrabold text-journey" href={`/games/${item.gameId}`}>
-                  {item.title}
-                </Link>
-                <div className="mt-1 font-mono text-xs text-muted">{item.code}</div>
-              </td>
-              <td className="py-4 pr-4">{gameStatusLabel(item.status)}</td>
-              <td className="py-4 pr-4">{gameResult(item)}</td>
-              <td className="py-4 pr-4">{item.profession ?? "—"}</td>
-              <td className="py-4 pr-4 font-bold">{money(item.monthlyCashflowCents)}</td>
-              <td className="py-4">{shortDate(item.joinedAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="min-w-0 px-3 sm:px-5 first:pl-0 last:pr-0">
@@ -1032,11 +905,4 @@ function mergeCurrentGames(games: GamesListResponse) {
     byId.set(game.id, game);
   }
   return [...byId.values()];
-}
-
-function gameResult(item: ProfileResponse["history"][number]) {
-  if (item.wonAt) return "Победа";
-  if (item.escapedRatRaceAt) return "Вышел из крысиных бегов";
-  if (item.endedAt) return "Завершена";
-  return "В процессе";
 }

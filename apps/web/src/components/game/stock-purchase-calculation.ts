@@ -23,6 +23,27 @@ export function stockQuantityForCostCents(
   return Math.floor(costCents / unitPriceCents);
 }
 
+export function maxStockQuantityForCashCents(
+  unitPriceCents: number,
+  availableCashCents: number
+) {
+  if (!Number.isFinite(unitPriceCents) || unitPriceCents <= 0) return 0;
+  if (!Number.isFinite(availableCashCents) || availableCashCents <= 0) return 0;
+  return Math.floor(availableCashCents / unitPriceCents);
+}
+
+export function canAffordPurchaseCents(
+  availableCashCents: number,
+  purchaseCostCents: number
+) {
+  return (
+    Number.isFinite(availableCashCents) &&
+    Number.isFinite(purchaseCostCents) &&
+    purchaseCostCents >= 0 &&
+    availableCashCents >= purchaseCostCents
+  );
+}
+
 export function changeStockQuantity(
   quantity: StockQuantity,
   delta: number

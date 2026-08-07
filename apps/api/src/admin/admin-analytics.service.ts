@@ -7,7 +7,14 @@ export interface AnalyticsQuery {
   from?: string;
   to?: string;
   status?: GameStatus;
+  mode?: GameMode;
+  search?: string;
   limit?: string;
+}
+
+export interface GameCatalogQuery extends AnalyticsQuery {
+  page?: string;
+  pageSize?: string;
 }
 
 @Injectable()
@@ -67,6 +74,70 @@ export class AdminAnalyticsService {
     });
 
     return toSerializable(games.map((game) => this.gameSummary(game)));
+  }
+
+  async gameCatalog(query: GameCatalogQuery) {
+    const where = this.gameWhere(query);
+    const page = this.positiveInteger(query.page, "page", 1, 1_000_000);
+    const pageSize = this.positiveInteger(query.pageSize, "pageSize", 25, 100);
+    const skip = (page - 1) * pageSize;
+
+    const [games, total] = await Promise.all([
+      this.prisma.game.findMany({
+        where,
+        select: {
+          id: true,
+          code: true,
+          title: true,
+          status: true,
+          mode: true,
+          maxPlayers: true,
+          currentRound: true,
+          startedAt: true,
+          endedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: { select: { id: true, displayName: true } },
+          players: {
+            select: {
+              id: true,
+              userId: true,
+              guestName: true,
+              controller: true,
+              botStrategy: true,
+              role: true,
+              status: true,
+              seat: true,
+              joinedAt: true,
+              user: { select: { id: true, displayName: true } },
+              profession: { select: { id: true, slug: true, name: true } },
+              financialState: {
+                select: {
+                  monthlyCashflowCents: true,
+                  passiveIncomeCents: true,
+                  escapedRatRaceAt: true,
+                  wonAt: true
+                }
+              }
+            },
+            orderBy: { seat: "asc" }
+          },
+          _count: { select: { events: true, chatMessages: true } }
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: pageSize
+      }),
+      this.prisma.game.count({ where })
+    ]);
+
+    return toSerializable({
+      items: games.map((game) => this.gameSummary(game)),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize))
+    });
   }
 
   async gameDetail(gameId: string) {
@@ -190,6 +261,34 @@ export class AdminAnalyticsService {
   async exportNdjson(query: AnalyticsQuery) {
     const where = this.gameWhere(query);
     const limit = this.limit(query.limit, 500, 5000);
+    return this.exportGames(where, limit, {
+      from: query.from ?? null,
+      to: query.to ?? null,
+      status: query.status ?? null,
+      mode: query.mode ?? null,
+      search: query.search?.trim() || null,
+      limit
+    });
+  }
+
+  async exportSelectedNdjson(gameIds: string[]) {
+    const uniqueIds = [...new Set(gameIds)];
+    if (uniqueIds.length === 0 || uniqueIds.length > 5000) {
+      throw new BadRequestException("Нужно выбрать от 1 до 5000 игр");
+    }
+
+    return this.exportGames(
+      { id: { in: uniqueIds } },
+      uniqueIds.length,
+      { selectedGameIds: uniqueIds, limit: uniqueIds.length }
+    );
+  }
+
+  private async exportGames(
+    where: Prisma.GameWhereInput,
+    limit: number,
+    filters: Record<string, unknown>
+  ) {
     const games = await this.prisma.game.findMany({
       where,
       select: { id: true },
@@ -202,12 +301,7 @@ export class AdminAnalyticsService {
         kind: "export_meta",
         schemaVersion: 2,
         generatedAt: new Date(),
-        filters: {
-          from: query.from ?? null,
-          to: query.to ?? null,
-          status: query.status ?? null,
-          limit
-        }
+        filters
       })
     ];
 
@@ -236,20 +330,47 @@ export class AdminAnalyticsService {
       }
       where.status = query.status;
     }
+    if (query.mode) {
+      if (!Object.values(GameMode).includes(query.mode)) {
+        throw new BadRequestException("Invalid game mode");
+      }
+      where.mode = query.mode;
+    }
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: "insensitive" } },
+        { code: { contains: search, mode: "insensitive" } },
+        { createdBy: { displayName: { contains: search, mode: "insensitive" } } },
+        {
+          players: {
+            some: {
+              OR: [
+                { guestName: { contains: search, mode: "insensitive" } },
+                { user: { displayName: { contains: search, mode: "insensitive" } } }
+              ]
+            }
+          }
+        }
+      ];
+    }
     return where;
   }
 
   private dateRange(from?: string, to?: string) {
     const range: Prisma.DateTimeFilter = {};
     if (from) range.gte = this.parseDate(from, "from");
-    if (to) range.lte = this.parseDate(to, "to");
+    if (to) range.lte = this.parseDate(to, "to", true);
     return Object.keys(range).length > 0 ? range : null;
   }
 
-  private parseDate(value: string, field: string) {
+  private parseDate(value: string, field: string, includeWholeDay = false) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
       throw new BadRequestException(`Invalid ${field} date`);
+    }
+    if (includeWholeDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      date.setUTCHours(23, 59, 59, 999);
     }
     return date;
   }
@@ -259,6 +380,20 @@ export class AdminAnalyticsService {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
       throw new BadRequestException(`limit must be an integer from 1 to ${max}`);
+    }
+    return parsed;
+  }
+
+  private positiveInteger(
+    value: string | undefined,
+    field: string,
+    fallback: number,
+    max: number
+  ) {
+    if (!value) return fallback;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+      throw new BadRequestException(`${field} must be an integer from 1 to ${max}`);
     }
     return parsed;
   }

@@ -5,7 +5,8 @@ import type { GameEvent } from "../../lib/types";
 import {
   cashChangeExpression,
   compactPlayerActionDetails,
-  eventCashChange
+  eventCashChange,
+  eventReasonLabel
 } from "./game-event-result";
 
 function gameEvent(type: string, payload: Record<string, unknown>): GameEvent {
@@ -127,4 +128,9 @@ test("убирает повтор карточки у отказа и оплач
     kind: "delta",
     value: `−${money(200)}`
   });
+});
+
+test("понятно объясняет ручной и автоматический пропуск хода", () => {
+  assert.equal(eventReasonLabel("player_choice"), "решение игрока");
+  assert.equal(eventReasonLabel("downsized"), "потеря работы");
 });

@@ -7,12 +7,17 @@ import {
   type FigurineId
 } from "@cashflow/shared";
 import {
+  ArrowRightToLine,
   Banknote,
   BellRing,
   Bot,
   BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Circle,
   CircleAlert,
   CircleDot,
@@ -65,6 +70,7 @@ import {
   cashChangeExpression,
   compactPlayerActionDetails,
   eventCashChange,
+  eventReasonLabel,
   type CashChange
 } from "@/components/game/game-event-result";
 import {
@@ -73,8 +79,10 @@ import {
   type GameEndTone
 } from "@/components/game/game-end-result";
 import {
+  canAffordPurchaseCents,
   changeStockCostCents,
   changeStockQuantity,
+  maxStockQuantityForCashCents,
   normalizeStockQuantity,
   stockPurchaseCostCents,
   stockQuantityForCostCents
@@ -1081,18 +1089,15 @@ export function GameRoom({
       onlyMine={journalOnlyMine}
       onToggleOnlyMine={() => setJournalOnlyMine((value) => !value)}
       showHeader={showHeader}
+      botStatusMessage={botTurnMessage}
     />
   );
 
   const renderJournalFilterButton = () => (
-    <Button
-      type="button"
-      variant={journalOnlyMine ? "primary" : "secondary"}
-      className="h-9 px-3 text-xs"
-      onClick={() => setJournalOnlyMine((value) => !value)}
-    >
-      {journalOnlyMine ? "Показать всех" : "Только мои"}
-    </Button>
+    <JournalFilterButton
+      onlyMine={journalOnlyMine}
+      onToggle={() => setJournalOnlyMine((value) => !value)}
+    />
   );
 
   return (
@@ -1104,7 +1109,7 @@ export function GameRoom({
           : null
       )}
     >
-      {canManage ? (
+      {canManage && !isSolo ? (
         <nav
           aria-label="Экраны ведущего"
           className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-[0_12px_32px_rgba(23,36,63,.18)]"
@@ -1143,18 +1148,6 @@ export function GameRoom({
           <span>{gameAnnouncement}</span>
         </div>
       ) : null}
-      {botTurnMessage ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-center gap-3 rounded-2xl bg-[#f4f0ff] px-4 py-3 text-sm font-bold text-[#513393] shadow-[0_10px_28px_rgba(118,85,199,.12)]"
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#7655c7] shadow-[0_5px_14px_rgba(118,85,199,.14)]">
-            <Bot size={18} aria-hidden="true" />
-          </span>
-          <span>{botTurnMessage}</span>
-        </div>
-      ) : null}
       {snapshot.game.status === "PAUSED" ? (
         <GamePauseBanner
           currentPeriod={snapshot.game.currentPeriod}
@@ -1166,15 +1159,17 @@ export function GameRoom({
           onResume={resumeGame}
         />
       ) : null}
-      {canRoll && !pendingAction && !rollingDice ? (
-        <MobileRollPrompt
-          diceCount={activeDiceCount}
-          onRoll={() => {
-            setTurnTabRequest((current) => current + 1);
-            void rollDice();
-          }}
-        />
-      ) : null}
+      <MobileTurnDialog
+        open={canRoll && !pendingAction}
+        rolling={rollingDice}
+        diceValues={diceFaces}
+        diceCount={activeDiceCount}
+        onSkip={skipTurn}
+        onRoll={() => {
+          setTurnTabRequest((current) => current + 1);
+          void rollDice();
+        }}
+      />
       <GameEndPopup
         open={gameEndOpen && snapshot.game.status === "ENDED"}
         winner={winner}
@@ -1269,14 +1264,16 @@ export function GameRoom({
           turnTabRequest={turnTabRequest}
           actions={
             <>
-              <DiceAction
-                canRoll={canRoll && !pendingAction}
-                rolling={rollingDice}
-                phase={turnAnimationPhase}
-                diceValues={diceFaces}
-                onRoll={rollDice}
-                onSkip={skipTurn}
-              />
+              <div className="hidden xl:block">
+                <DiceAction
+                  canRoll={canRoll && !pendingAction}
+                  rolling={rollingDice}
+                  phase={turnAnimationPhase}
+                  diceValues={diceFaces}
+                  onRoll={rollDice}
+                  onSkip={skipTurn}
+                />
+              </div>
               <ActionsPanel
               canChooseDeal={canChooseDeal}
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
@@ -1406,14 +1403,6 @@ export function GameRoom({
               turnTabRequest={turnTabRequest}
               actions={
                 <>
-                  <DiceAction
-                    canRoll={canRoll && !pendingAction}
-                    rolling={rollingDice}
-                    phase={turnAnimationPhase}
-                    diceValues={diceFaces}
-                    onRoll={rollDice}
-                    onSkip={skipTurn}
-                  />
                   <ActionsPanel
                   canChooseDeal={canChooseDeal}
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
@@ -1714,19 +1703,67 @@ function DiceAction({
   );
 }
 
-function MobileRollPrompt({ diceCount, onRoll }: { diceCount: number; onRoll: () => void }) {
+function MobileTurnDialog({
+  open,
+  rolling,
+  diceValues,
+  diceCount,
+  onRoll,
+  onSkip
+}: {
+  open: boolean;
+  rolling: boolean;
+  diceValues: number[];
+  diceCount: number;
+  onRoll: () => void;
+  onSkip: () => void;
+}) {
+  const [mobileViewport, setMobileViewport] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1279px)");
+    const updateViewport = () => setMobileViewport(media.matches);
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
+
+  if (!open || !mobileViewport) return null;
+
   return (
-    <div className="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-sm rounded-xl bg-white p-3 shadow-[0_18px_46px_rgba(63,91,53,.22)] ring-1 ring-[#cad8bd] xl:hidden">
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-[#3f5b35]">Ваш ход</div>
-          <p className="mt-0.5 text-xs text-[#65745e]">
-            {diceCount > 1 ? "Доступно два кубика" : "Можно сделать бросок"}
-          </p>
-        </div>
-        <Button className="shrink-0" onClick={onRoll}>
-          Бросить кубик
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] pb-[max(.75rem,env(safe-area-inset-bottom))] pl-[max(.75rem,env(safe-area-inset-left))] pr-[max(.75rem,env(safe-area-inset-right))] xl:hidden">
+      <div
+        role="region"
+        aria-label="Действия текущего хода"
+        className="pointer-events-auto mx-auto flex w-full max-w-sm items-center gap-2 rounded-2xl bg-[#fff5ed] p-2 shadow-[0_18px_48px_rgba(5,18,45,.28)]"
+      >
+        <button
+          type="button"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#7b3f17] shadow-[0_6px_16px_rgba(123,63,23,.12)] transition hover:bg-[#fffaf6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c0560c] disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onSkip}
+          disabled={rolling}
+          aria-label="Пропустить ход"
+          title="Пропустить ход"
+        >
+          <X size={18} strokeWidth={2.5} aria-hidden="true" />
+        </button>
+        <Button
+          type="button"
+          variant="action"
+          className="h-12 min-w-0 flex-1 whitespace-nowrap px-1.5 text-xs text-white min-[360px]:px-3 min-[360px]:text-sm"
+          onClick={onRoll}
+          disabled={rolling}
+          aria-busy={rolling}
+        >
+          {rolling ? "Бросаем…" : diceCount > 1 ? "Бросить кубики" : "Бросить кубик"}
         </Button>
+        <div className="flex shrink-0 gap-1" aria-live="polite">
+          {diceValues.map((diceValue, index) => (
+            <div key={index} className="-m-5 scale-50">
+              <DiceFace value={diceValue} rolling={rolling} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1948,66 +1985,105 @@ function StockSalePanel({
   onDecline: () => void;
 }) {
   const saleTotalCents = offer.salePriceCents * quantity;
+  const quantityControlClassName =
+    "h-11 min-w-0 rounded-xl bg-white px-0 text-ink shadow-[0_6px_16px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]";
 
   return (
-    <div className="rounded-md border border-line bg-surface p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium">Продажа акций</div>
-          <p className="mt-1 text-sm text-neutral-600">{localizeGameText(offer.title)}</p>
-        </div>
+    <section className="rounded-2xl bg-card p-3 shadow-[0_16px_36px_rgba(27,57,118,.10)] min-[420px]:p-4">
+      <div>
+        <h3 className="text-base font-extrabold text-ink">Продажа акций</h3>
+        <p className="mt-2 text-sm leading-6 text-muted">{localizeGameText(offer.title)}</p>
+        <p className="mt-1 text-sm font-bold text-ink">
+          Доступно акций: {offer.quantity}
+        </p>
       </div>
 
-      <div className="mt-4 space-y-2 rounded-md border border-line bg-white p-3 text-sm">
-        <AssetInfoRow label="Тикер" value={offer.symbol} />
-        <AssetInfoRow label="Доступно акций" value={String(offer.quantity)} />
-        <AssetInfoRow label="Цена за акцию" value={money(offer.salePriceCents)} />
-      </div>
-
-      <div className="mt-4 rounded-md border border-line bg-white p-3">
-        <div className="text-sm font-medium">Количество на продажу</div>
-        <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
+      <div className="mt-5">
+        <label htmlFor="stock-sale-quantity" className="text-sm font-extrabold text-ink">
+          Количество на продажу
+        </label>
+        <div className="mt-2 grid grid-cols-[repeat(2,minmax(0,.7fr))_minmax(4rem,1.5fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
           <Button
-            variant="secondary"
-            className="px-3"
+            variant="ghost"
+            className={quantityControlClassName}
+            onClick={() => onQuantityChange(quantity - 20)}
+            disabled={quantity <= 1}
+            aria-label="Уменьшить количество на 20"
+            title="Уменьшить на 20"
+          >
+            <ChevronsLeft size={17} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            className={quantityControlClassName}
             onClick={onDecrease}
             disabled={quantity <= 1}
+            aria-label="Уменьшить количество на 1"
+            title="Уменьшить на 1"
           >
-            &lt;
+            <ChevronLeft size={17} aria-hidden="true" />
           </Button>
           <Input
+            id="stock-sale-quantity"
             type="number"
             min={1}
             max={offer.quantity}
             step={1}
+            inputMode="numeric"
             value={quantity}
             onChange={(event) => onQuantityChange(Number(event.target.value))}
-            className="text-center font-semibold"
+            className="h-11 px-1 text-center font-extrabold tabular-nums"
           />
           <Button
-            variant="secondary"
-            className="px-3"
+            variant="ghost"
+            className={quantityControlClassName}
             onClick={onIncrease}
             disabled={quantity >= offer.quantity}
+            aria-label="Увеличить количество на 1"
+            title="Увеличить на 1"
           >
-            &gt;
+            <ChevronRight size={17} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            className={quantityControlClassName}
+            onClick={() => onQuantityChange(quantity + 20)}
+            disabled={quantity >= offer.quantity}
+            aria-label="Увеличить количество на 20"
+            title="Увеличить на 20"
+          >
+            <ChevronsRight size={17} aria-hidden="true" />
+          </Button>
+          <Button
+            variant="ghost"
+            className={quantityControlClassName}
+            onClick={() => onQuantityChange(offer.quantity)}
+            disabled={quantity >= offer.quantity}
+            aria-label="Выбрать максимальное количество акций"
+            title="Выбрать максимум"
+          >
+            <ArrowRightToLine size={17} aria-hidden="true" />
           </Button>
         </div>
-        <div className="mt-3 rounded-md bg-surface px-3 py-2 text-sm">
-          <div className="text-neutral-600">Сумма продажи</div>
-          <div className="mt-1 font-semibold">
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 text-sm">
+          <span className="font-medium text-muted">Сумма продажи</span>
+          <strong className="text-base font-extrabold text-ink">
             {quantity} x {money(offer.salePriceCents)} = {money(saleTotalCents)}
-          </div>
+          </strong>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button onClick={onSell}>Продать</Button>
-        <Button variant="secondary" onClick={onDecline}>
+        <Button variant="action" onClick={onSell}>Продать</Button>
+        <Button
+          variant="ghost"
+          className="bg-white text-ink shadow-[0_7px_18px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]"
+          onClick={onDecline}
+        >
           Не продавать
         </Button>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -2979,16 +3055,13 @@ function MobileBoard({
                     ].join(" ")}
                   />
                 </div>
-                <div className="mt-1 flex min-h-7 flex-wrap justify-center gap-0.5">
-                  {players.map((player) => (
-                    <PlayerToken
-                      key={player.id}
-                      player={player}
-                      small
-                      mobileBoard
-                      moving={player.id === animatedOtherPlayer?.playerId}
-                    />
-                  ))}
+                <div className="mt-1 h-9">
+                  <PlayerTokenStack
+                    players={players}
+                    small
+                    mobileBoard
+                    movingPlayerId={animatedOtherPlayer?.playerId ?? null}
+                  />
                 </div>
               </div>
             );
@@ -3070,11 +3143,50 @@ function BoardCellTile({
           )}
         </Badge>
       </div>
-      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-        {players.map((player) => (
-          <PlayerToken key={player.id} player={player} desktopBoard={compact} />
-        ))}
+      <div className="absolute bottom-2 left-2 right-2 h-12">
+        <PlayerTokenStack players={players} desktopBoard={compact} />
       </div>
+    </div>
+  );
+}
+
+function PlayerTokenStack({
+  players,
+  small = false,
+  desktopBoard = false,
+  mobileBoard = false,
+  movingPlayerId = null
+}: {
+  players: GamePlayer[];
+  small?: boolean;
+  desktopBoard?: boolean;
+  mobileBoard?: boolean;
+  movingPlayerId?: string | null;
+}) {
+  const overlapClass = desktopBoard ? "-ml-7" : mobileBoard ? "-ml-5" : "-ml-3";
+
+  return (
+    <div
+      className={cn(
+        "flex h-full min-w-0 items-end isolate",
+        desktopBoard ? "justify-start" : "justify-center"
+      )}
+    >
+      {players.map((player, index) => (
+        <span
+          key={player.id}
+          className={cn("relative shrink-0", index > 0 && overlapClass)}
+          style={{ zIndex: index + 1 }}
+        >
+          <PlayerToken
+            player={player}
+            small={small}
+            desktopBoard={desktopBoard}
+            mobileBoard={mobileBoard}
+            moving={player.id === movingPlayerId}
+          />
+        </span>
+      ))}
     </div>
   );
 }
@@ -4196,19 +4308,22 @@ function ActionsPanel({
   }, [latestCard?.cardId]);
 
   const maxStockQuantity =
-    latestCard?.isStock && latestCard.priceCents > 0
-      ? Math.max(1, Math.floor(currentCashCents / latestCard.priceCents))
-      : 1;
+    latestCard?.isStock
+      ? maxStockQuantityForCashCents(latestCard.priceCents, currentCashCents)
+      : 0;
   const validDealQuantity = typeof dealQuantity === "number" && dealQuantity >= 1;
   const totalStockCostCents =
     latestCard?.isStock
       ? stockPurchaseCostCents(latestCard.priceCents, dealQuantity)
       : 0;
-  const fullDealCostCents = latestCard
+  const purchaseCostCents = latestCard
     ? latestCard.isStock
       ? totalStockCostCents
-      : latestCard.priceCents || latestCard.downPaymentCents
+      : latestCard.downPaymentCents
     : 0;
+  const canAffordLatestDeal = latestCard
+    ? canAffordPurchaseCents(currentCashCents, purchaseCostCents)
+    : false;
   const canPayCharity =
     charityChoice ? currentCashCents >= charityChoice.donationCents : false;
   const canCloseMarketSale =
@@ -4413,143 +4528,209 @@ function ActionsPanel({
                   </div>
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  <div className="grid grid-cols-[repeat(3,minmax(0,.7fr))_minmax(5rem,2fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
-                    {[-100, -20, -1].map((step) => (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label
+                      htmlFor="stock-purchase-quantity"
+                      className="mb-1 block text-xs font-semibold text-neutral-600"
+                    >
+                      Кол-во
+                    </label>
+                    <div className="grid grid-cols-[repeat(2,minmax(0,.75fr))_minmax(4.5rem,1.8fr)_repeat(3,minmax(0,.75fr))] items-center gap-1">
                       <Button
-                        key={step}
                         variant="secondary"
-                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, step))}
+                        className="h-10 min-w-0 px-0"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, -100))}
                         disabled={!validDealQuantity}
-                        aria-label={`Уменьшить количество на ${Math.abs(step)}`}
-                        title={`−${Math.abs(step)}`}
+                        aria-label="Уменьшить количество на 100"
+                        title="Уменьшить на 100"
                       >
-                        {step === -100 ? "<<<" : step === -20 ? "<<" : "<"}
+                        <ChevronsLeft size={16} aria-hidden="true" />
                       </Button>
-                    ))}
-                    <Input
-                      type="number"
-                      min={1}
-                      step={1}
-                      inputMode="numeric"
-                      value={dealQuantity}
-                      placeholder="Количество"
-                      aria-label="Количество акций"
-                      onChange={(event) =>
-                        setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
-                      }
-                      className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
-                    />
-                    {[1, 20, 100].map((step) => (
                       <Button
-                        key={step}
                         variant="secondary"
-                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, step))}
-                        aria-label={`Увеличить количество на ${step}`}
-                        title={`+${step}`}
+                        className="h-10 min-w-0 px-0"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, -10))}
+                        disabled={!validDealQuantity}
+                        aria-label="Уменьшить количество на 10"
+                        title="Уменьшить на 10"
                       >
-                        {step === 100 ? ">>>" : step === 20 ? ">>" : ">"}
+                        <ChevronLeft size={16} aria-hidden="true" />
                       </Button>
-                    ))}
+                      <Input
+                        id="stock-purchase-quantity"
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        value={dealQuantity}
+                        placeholder="Кол-во"
+                        aria-label="Количество акций"
+                        onChange={(event) =>
+                          setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
+                        }
+                        className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
+                      />
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, 10))}
+                        aria-label="Увеличить количество на 10"
+                        title="Увеличить на 10"
+                      >
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0"
+                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, 100))}
+                        aria-label="Увеличить количество на 100"
+                        title="Увеличить на 100"
+                      >
+                        <ChevronsRight size={16} aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-1 text-[10px] font-bold uppercase"
+                        onClick={() => setDealQuantity(maxStockQuantity)}
+                        disabled={
+                          dealQuantity === maxStockQuantity ||
+                          (maxStockQuantity === 0 && dealQuantity === "")
+                        }
+                        aria-label="Выбрать максимальное количество акций на текущие наличные"
+                        title="Максимум на текущие наличные"
+                      >
+                        max
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-[repeat(3,minmax(0,.7fr))_minmax(5rem,2fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
-                    {[-100_000, -20_000, -100].map((stepCents) => (
+                  <div>
+                    <label
+                      htmlFor="stock-purchase-cost"
+                      className="mb-1 block text-xs font-semibold text-neutral-600"
+                    >
+                      Стоимость
+                    </label>
+                    <div className="grid grid-cols-[repeat(2,minmax(0,.75fr))_minmax(4.5rem,1.8fr)_repeat(3,minmax(0,.75fr))] items-center gap-1">
                       <Button
-                        key={stepCents}
                         variant="secondary"
-                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        className="h-10 min-w-0 px-0"
                         onClick={() =>
                           setDealQuantity(
-                            changeStockCostCents(
-                              dealQuantity,
-                              latestCard.priceCents,
-                              stepCents
-                            )
+                            changeStockCostCents(dealQuantity, latestCard.priceCents, -1000)
                           )
                         }
                         disabled={!validDealQuantity}
-                        aria-label={`Уменьшить стоимость на ${money(Math.abs(stepCents))}`}
-                        title={`−${money(Math.abs(stepCents))}`}
+                        aria-label="Уменьшить стоимость на 1000 долларов"
+                        title="Уменьшить на $1000"
                       >
-                        {stepCents === -100_000 ? "<<<" : stepCents === -20_000 ? "<<" : "<"}
+                        <ChevronsLeft size={16} aria-hidden="true" />
                       </Button>
-                    ))}
-                    <Input
-                      type="number"
-                      min={latestCard.priceCents / 100}
-                      step={1}
-                      inputMode="decimal"
-                      value={
-                        stockCostEditing
-                          ? stockCostDraft
-                          : validDealQuantity
-                            ? totalStockCostCents / 100
-                            : ""
-                      }
-                      placeholder="Стоимость"
-                      aria-label="Стоимость покупки акций в долларах"
-                      onFocus={() => {
-                        setStockCostEditing(true);
-                        setStockCostDraft(
-                          validDealQuantity ? String(totalStockCostCents / 100) : ""
-                        );
-                      }}
-                      onChange={(event) => {
-                        setStockCostDraft(event.target.value);
-                        setDealQuantity(
-                          event.target.value === ""
-                            ? ""
-                            : stockQuantityForCostCents(
-                                latestCard.priceCents,
-                                Math.round(Number(event.target.value) * 100)
-                              )
-                        )
-                      }}
-                      onBlur={() => {
-                        setStockCostEditing(false);
-                        setStockCostDraft(
-                          validDealQuantity ? String(totalStockCostCents / 100) : ""
-                        );
-                      }}
-                      className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
-                    />
-                    {[100, 20_000, 100_000].map((stepCents) => (
                       <Button
-                        key={stepCents}
                         variant="secondary"
-                        className="h-10 min-w-0 px-0 text-[11px] tabular-nums"
+                        className="h-10 min-w-0 px-0"
                         onClick={() =>
                           setDealQuantity(
-                            changeStockCostCents(
-                              dealQuantity,
-                              latestCard.priceCents,
-                              stepCents
-                            )
+                            changeStockCostCents(dealQuantity, latestCard.priceCents, -500)
                           )
                         }
-                        aria-label={`Увеличить стоимость на ${money(stepCents)}`}
-                        title={`+${money(stepCents)}`}
+                        disabled={!validDealQuantity}
+                        aria-label="Уменьшить стоимость на 500 долларов"
+                        title="Уменьшить на $500"
                       >
-                        {stepCents === 100_000 ? ">>>" : stepCents === 20_000 ? ">>" : ">"}
+                        <ChevronLeft size={16} aria-hidden="true" />
                       </Button>
-                    ))}
+                      <Input
+                        id="stock-purchase-cost"
+                        type="number"
+                        min={latestCard.priceCents}
+                        step={1}
+                        inputMode="decimal"
+                        value={
+                          stockCostEditing
+                            ? stockCostDraft
+                            : validDealQuantity
+                              ? totalStockCostCents
+                              : ""
+                        }
+                        placeholder="Стоимость"
+                        aria-label="Стоимость покупки акций в долларах"
+                        onFocus={() => {
+                          setStockCostEditing(true);
+                          setStockCostDraft(validDealQuantity ? String(totalStockCostCents) : "");
+                        }}
+                        onChange={(event) => {
+                          setStockCostDraft(event.target.value);
+                          setDealQuantity(
+                            event.target.value === ""
+                              ? ""
+                              : stockQuantityForCostCents(
+                                  latestCard.priceCents,
+                                  Math.round(Number(event.target.value))
+                                )
+                          );
+                        }}
+                        onBlur={() => {
+                          setStockCostEditing(false);
+                          setStockCostDraft(validDealQuantity ? String(totalStockCostCents) : "");
+                        }}
+                        className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
+                      />
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0"
+                        onClick={() =>
+                          setDealQuantity(
+                            changeStockCostCents(dealQuantity, latestCard.priceCents, 500)
+                          )
+                        }
+                        aria-label="Увеличить стоимость на 500 долларов"
+                        title="Увеличить на $500"
+                      >
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-0"
+                        onClick={() =>
+                          setDealQuantity(
+                            changeStockCostCents(dealQuantity, latestCard.priceCents, 1000)
+                          )
+                        }
+                        aria-label="Увеличить стоимость на 1000 долларов"
+                        title="Увеличить на $1000"
+                      >
+                        <ChevronsRight size={16} aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-10 min-w-0 px-1 text-[10px] font-bold uppercase"
+                        onClick={() => setDealQuantity(maxStockQuantity)}
+                        disabled={
+                          dealQuantity === maxStockQuantity ||
+                          (maxStockQuantity === 0 && dealQuantity === "")
+                        }
+                        aria-label="Выбрать максимальную стоимость покупки на текущие наличные"
+                        title="Максимум на текущие наличные"
+                      >
+                        max
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
                 <p className="mt-2 text-xs text-neutral-500">
-                  На текущие наличные хватает: {maxStockQuantity}. Можно выбрать больше и взять кредит.
+                  На текущие наличные хватает: {maxStockQuantity}. Для большей покупки сначала возьмите кредит.
                 </p>
               </div>
             ) : null}
-            {fullDealCostCents > 0 && (!latestCard.isStock || validDealQuantity) ? (
+            {purchaseCostCents > 0 && (!latestCard.isStock || validDealQuantity) ? (
               <FundingProgress
                 className="mt-3"
                 availableCents={currentCashCents}
-                requiredCents={fullDealCostCents}
-                label="Полная стоимость сделки"
+                requiredCents={purchaseCostCents}
+                label="Сумма к оплате"
               />
             ) : null}
             {!canResolveLatestDeal ? (
@@ -4566,7 +4747,11 @@ function ActionsPanel({
               <Button
                 className="w-full min-w-0"
                 onClick={onBuyLatest}
-                disabled={!canResolveLatestDeal || (Boolean(latestCard?.isStock) && !validDealQuantity)}
+                disabled={
+                  !canResolveLatestDeal ||
+                  !canAffordLatestDeal ||
+                  (Boolean(latestCard?.isStock) && !validDealQuantity)
+                }
               >
                 Купить
               </Button>
@@ -4798,6 +4983,40 @@ function isJournalTurnComplete(entry: TurnJournalEntry) {
   );
 }
 
+function JournalFilterButton({
+  onlyMine,
+  onToggle
+}: {
+  onlyMine: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className="h-9 bg-surface px-3 text-xs text-muted shadow-none hover:bg-card hover:text-ink"
+      aria-pressed={onlyMine}
+      onClick={onToggle}
+    >
+      {onlyMine ? "Показать всех" : "Только мои"}
+    </Button>
+  );
+}
+
+function BotJournalStatus({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-3 rounded-2xl bg-[#f4f0ff] px-4 py-3 text-sm font-bold text-[#513393] shadow-[0_10px_28px_rgba(118,85,199,.12)]"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#7655c7] shadow-[0_5px_14px_rgba(118,85,199,.14)]">
+        <Bot size={18} aria-hidden="true" />
+      </span>
+      <span>{message}</span>
+    </div>
+  );
+}
+
 function GameTurnFeed({
   gameId,
   token,
@@ -4811,7 +5030,8 @@ function GameTurnFeed({
   onSendBabyGift,
   onlyMine,
   onToggleOnlyMine,
-  showHeader
+  showHeader,
+  botStatusMessage
 }: {
   gameId: string;
   token: string;
@@ -4826,6 +5046,7 @@ function GameTurnFeed({
   onlyMine: boolean;
   onToggleOnlyMine: () => void;
   showHeader: boolean;
+  botStatusMessage: string | null;
 }) {
   const [historyEvents, setHistoryEvents] = useState(events);
   const [visibleCount, setVisibleCount] = useState(10);
@@ -4951,14 +5172,7 @@ function GameTurnFeed({
             <h3 className="text-base font-extrabold">Лента ходов</h3>
             <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
           </div>
-          <Button
-            type="button"
-            variant={onlyMine ? "primary" : "secondary"}
-            className="h-9 px-3"
-            onClick={onToggleOnlyMine}
-          >
-            {onlyMine ? "Показать всех" : "Только мои"}
-          </Button>
+          <JournalFilterButton onlyMine={onlyMine} onToggle={onToggleOnlyMine} />
         </div>
       ) : null}
 
@@ -4972,6 +5186,7 @@ function GameTurnFeed({
         aria-relevant="additions text"
         aria-busy={loadingMore}
       >
+        {botStatusMessage ? <BotJournalStatus message={botStatusMessage} /> : null}
         {showPendingTurn && currentTurnPlayer ? (
           <JournalMotionItem animate={enteringPendingTurnIndex === currentTurnIndex}>
             <TurnJournalCard
@@ -4987,7 +5202,7 @@ function GameTurnFeed({
             />
           </JournalMotionItem>
         ) : null}
-        {visibleTurns.length === 0 && !showPendingTurn ? (
+        {visibleTurns.length === 0 && !showPendingTurn && !botStatusMessage ? (
           <p className="rounded-xl bg-surface p-3 text-sm text-muted">
             {onlyMine ? "Ваших ходов пока нет." : "Ходов пока нет."}
           </p>
@@ -5764,35 +5979,6 @@ const eventTitles: Record<string, string> = {
   "state:update": "Обновление состояния"
 };
 
-const eventReasons: Record<string, string> = {
-  player_added: "игрок добавлен в комнату",
-  game_deleted: "игра удалена",
-  game_started: "игра запущена",
-  turn_skipped: "ход пропущен",
-  roll_resolved: "ход обработан",
-  deal_bought: "актив куплен",
-  loan_taken: "кредит получен",
-  loan_repaid: "кредит погашен",
-  deal_choice_required: "игрок должен выбрать мелкую или крупную сделку",
-  deal_card_drawn: "карточка сделки открыта",
-  automatic_card_resolved_turn_ended: "карточка применена автоматически, ход завершен",
-  network_marketing_resolved_turn_ended: "карточка сетевого маркетинга обработана, ход завершен",
-  deal_bought_turn_ended: "сделка куплена, ход завершен",
-  deal_declined_turn_ended: "игрок отказался от сделки, ход завершен",
-  market_sale_offer: "рынок предложил продать актив",
-  market_sale_next_offer: "рынок перешёл к следующему подходящему активу",
-  market_sale_completed_turn_ended: "актив продан по рынку, ход завершен",
-  market_sale_declined_turn_ended: "игрок отказался от продажи, ход завершен",
-  charity_choice_required: "игрок должен выбрать благотворительность",
-  charity_accepted_turn_ended: "благотворительность оплачена, ход завершен",
-  charity_declined_turn_ended: "игрок отказался от благотворительности, ход завершен",
-  player_choice: "игрок пропустил ход",
-  passed_paycheck: "игрок прошел расчётный чек",
-  landed_on_paycheck: "игрок встал на расчётный чек",
-  missing_previous_level: "нет предыдущего уровня",
-  already_has_level: "этот уровень уже не нужен"
-};
-
 const cardTypes: Record<string, string> = {
   SMALL_DEAL: "Малая сделка",
   BIG_DEAL: "Крупная сделка",
@@ -5956,7 +6142,7 @@ function eventDetails(event: GameEvent) {
       ]);
     case "paycheck:receive":
       return compactDetails([
-        textDetail("Причина", translateReason(payload.reason)),
+        textDetail("Причина", eventReasonLabel(payload.reason)),
         moneyDetail("Наличные до", payload.beforeCashCents),
         moneyDetail("Денежный поток", payload.amountCents),
         moneyDetail("Наличные после", payload.afterCashCents),
@@ -6033,7 +6219,7 @@ function eventDetails(event: GameEvent) {
         numericDetail("Выпал уровень", payload.level),
         numericDetail("Текущий уровень", payload.currentLevel),
         numericDetail("Нужен уровень", payload.requiredLevel),
-        textDetail("Причина", translateReason(payload.reason))
+        textDetail("Причина", eventReasonLabel(payload.reason))
       ]);
     case "deal:choice_required":
       return ["Выберите: мелкая или крупная сделка."];
@@ -6195,9 +6381,9 @@ function eventDetails(event: GameEvent) {
         moneyDetail("Расходы", payload.totalExpensesCents, "/мес")
       ]);
     case "turn:skipped":
-      return compactDetails([textDetail("Причина", translateReason(payload.reason))]);
+      return compactDetails([textDetail("Причина", eventReasonLabel(payload.reason))]);
     case "state:update":
-      return compactDetails([textDetail("Причина", translateReason(payload.reason))]);
+      return compactDetails([textDetail("Причина", eventReasonLabel(payload.reason))]);
     default:
       return fallbackPayloadDetails(payload);
   }
@@ -6343,12 +6529,6 @@ function metaMoneyDetail(
   const raw = meta[key];
   if (raw === null || raw === undefined || raw === "") return null;
   return moneyDetail(label, toNumber(raw), suffix);
-}
-
-function translateReason(value: unknown) {
-  const reason = String(value ?? "");
-  if (!reason) return null;
-  return eventReasons[reason] ?? "причина не указана";
 }
 
 function botActionLabel(action: string) {

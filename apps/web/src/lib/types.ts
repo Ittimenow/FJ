@@ -89,6 +89,53 @@ export interface GamesListResponse {
   open: GameListItem[];
 }
 
+export interface AdminGameSummary {
+  id: string;
+  code: string;
+  title: string;
+  status: "WAITING" | "IN_PROGRESS" | "PAUSED" | "ENDED" | "CANCELLED";
+  mode: "MULTIPLAYER" | "SOLO";
+  maxPlayers: number | null;
+  currentRound: number;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  updatedAt: string;
+  durationMinutes: number | null;
+  createdBy: {
+    id: string;
+    displayName: string;
+  } | null;
+  playersCount: number;
+  eventsCount: number | null;
+  chatMessagesCount: number | null;
+  winnerName: string | null;
+  players: Array<{
+    id: string;
+    userId: string | null;
+    displayName: string | null;
+    guestName: string | null;
+    controller: string;
+    botStrategy: string | null;
+    status: string;
+    seat: number | null;
+    joinedAt: string;
+    profession: { id: number; slug: string; name: string } | null;
+    monthlyCashflowCents: number | null;
+    passiveIncomeCents: number | null;
+    escapedRatRaceAt: string | null;
+    wonAt: string | null;
+  }>;
+}
+
+export interface AdminGamesCatalogResponse {
+  items: AdminGameSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface GameListItem {
   id: string;
   code: string;

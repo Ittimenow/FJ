@@ -7,9 +7,11 @@
 
 ```text
 GET /api/admin/analytics/games
+GET /api/admin/analytics/catalog
 GET /api/admin/analytics/games/:id
 GET /api/admin/analytics/games/:id/replay
 GET /api/admin/analytics/export.ndjson
+POST /api/admin/analytics/export.ndjson
 ```
 
 Поддерживаемые query-параметры:
@@ -17,8 +19,28 @@ GET /api/admin/analytics/export.ndjson
 - `from`: нижняя граница `createdAt` партии, например `2026-01-01`.
 - `to`: верхняя граница `createdAt` партии.
 - `status`: `WAITING`, `IN_PROGRESS`, `PAUSED`, `ENDED` или `CANCELLED`.
+- `mode`: `MULTIPLAYER` или `SOLO`.
+- `search`: поиск по названию, коду, ведущему или участнику.
 - `limit`: максимум партий в ответе. Для JSON-списка по умолчанию `200`,
   максимум `1000`. Для NDJSON-экспорта по умолчанию `500`, максимум `5000`.
+
+Каталог `/catalog` дополнительно принимает `page` и `pageSize` (не более 100)
+и возвращает объект с полями `items`, `total`, `page`, `pageSize` и
+`totalPages`. Он используется административным разделом «Игры», поэтому все
+партии доступны последовательно, а не ограничены первой выборкой.
+
+Для экспорта отмеченных в панели партий отправьте JSON-массив их ID:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"gameIds":["00000000-0000-4000-8000-000000000001"]}' \
+  "https://gamefj.ru/api/admin/analytics/export.ndjson" \
+  > reports/selected-game-history.ndjson
+```
+
+За один запрос можно выбрать от 1 до 5000 партий. GET-вариант сохранён для
+автоматизированных выгрузок по фильтрам.
 
 ## Экспорт из production
 
