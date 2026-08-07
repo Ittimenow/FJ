@@ -53,6 +53,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     figurine: profile.user.figurine,
     gameRoomView: profile.user.gameRoomView,
     telegramChannel: profile.user.telegramChannel ?? "",
+    telegramMentionConsent: profile.user.telegramMentionConsent,
     city: profile.user.city
   }));
   const [displayName, setDisplayName] = useState(profile.user.displayName);
@@ -67,6 +68,9 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     profile.user.gameRoomView
   );
   const [telegramChannel, setTelegramChannel] = useState(profile.user.telegramChannel ?? "");
+  const [telegramMentionConsent, setTelegramMentionConsent] = useState(
+    profile.user.telegramMentionConsent
+  );
   const [city, setCity] = useState<CityOption | null>(profile.user.city);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -114,6 +118,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     figurine !== savedProfile.figurine ||
     gameRoomView !== savedProfile.gameRoomView ||
     normalizedTelegramChannel !== savedProfile.telegramChannel ||
+    telegramMentionConsent !== savedProfile.telegramMentionConsent ||
     city?.id !== savedProfile.city?.id;
   const visibleProfileMsg = profileMsg?.ok && hasProfileChanges ? null : profileMsg;
   const passwordsMatch = newPassword === confirmPassword;
@@ -155,6 +160,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       figurine,
       gameRoomView,
       telegramChannel: normalizedTelegramChannel,
+      telegramMentionConsent,
       city
     };
     const savedBefore = savedProfile;
@@ -207,6 +213,9 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       if (snapshot.telegramChannel !== savedBefore.telegramChannel) {
         body.telegramChannel = snapshot.telegramChannel;
       }
+      if (snapshot.telegramMentionConsent !== savedBefore.telegramMentionConsent) {
+        body.telegramMentionConsent = snapshot.telegramMentionConsent;
+      }
       if (snapshot.city?.id !== savedBefore.city?.id && snapshot.city) {
         body.cityId = snapshot.city.id;
       }
@@ -237,6 +246,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         figurine: snapshot.figurine,
         gameRoomView: snapshot.gameRoomView,
         telegramChannel: snapshot.telegramChannel,
+        telegramMentionConsent: snapshot.telegramMentionConsent,
         city: snapshot.city
       });
       setDisplayName((current) =>
@@ -521,6 +531,23 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                   >
                     {telegramError ?? "Имя пользователя из 5–32 латинских букв, цифр или подчёркиваний."}
                   </p>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card p-3 text-sm leading-5 text-ink">
+                    <input
+                      type="checkbox"
+                      checked={telegramMentionConsent}
+                      onChange={(event) => {
+                        setTelegramMentionConsent(event.target.checked);
+                        markProfileChanged(true);
+                      }}
+                      className="mt-0.5 h-4 w-4 accent-journey"
+                    />
+                    <span>
+                      <strong className="block">Разрешить публичное упоминание</strong>
+                      <span className="mt-1 block text-xs text-muted">
+                        В итогах завершённой игры появится ссылка на ваш Telegram. Без согласия будет показано только игровое имя.
+                      </span>
+                    </span>
+                  </label>
                 </div>
 
                 <CityCombobox

@@ -11,6 +11,7 @@ export interface ProfileResponse {
     gameExperience: number | null;
     gameRoomView: "classic" | "journey";
     telegramChannel: string | null;
+    telegramMentionConsent: boolean;
     city: {
       id: string;
       name: string;
@@ -42,6 +43,45 @@ export interface ProfileResponse {
     gameMode: "MULTIPLAYER" | "SOLO";
     outcome: "WIN" | "LOSS" | null;
   }>;
+}
+
+export interface PublicGameSummary {
+  id: string;
+  headline: string;
+  body: string;
+  publishedAt: string | null;
+  imageUrl: string;
+  pageUrl: string;
+  game: {
+    title: string;
+    endedAt: string | null;
+    currentRound: number;
+  };
+  facts: {
+    gameId: string;
+    title: string;
+    endedAt: string;
+    durationMinutes: number | null;
+    rounds: number;
+    endReason: string | null;
+    winnerGamePlayerId: string | null;
+    players: Array<{
+      id: string;
+      name: string;
+      mention: string;
+      profession: string | null;
+      figurine: string | null;
+      finalCashCents: number;
+      finalCashflowCents: number;
+      finalPassiveIncomeCents: number;
+      cashflowDeltaCents: number;
+      passiveIncomeDeltaCents: number;
+      assetsCount: number;
+      track: string;
+      status: string;
+    }>;
+    highlights: Array<{ playerId: string | null; kind: string; text: string }>;
+  };
 }
 
 export interface GamesListResponse {

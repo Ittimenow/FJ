@@ -204,12 +204,12 @@ export function RegisterForm({
         </div>
         <div>
           <label htmlFor="register-telegram-channel" className="mb-2 block text-sm font-extrabold text-ink">
-            Telegram-канал
+            Имя в Telegram
           </label>
           <Input
             id="register-telegram-channel"
             name="telegramChannel"
-            placeholder="@channel_name или channel_name"
+            placeholder="@username или username"
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}

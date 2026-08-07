@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "automatic-game-summaries-and-publications",
+          "category": "feature",
+          "summary": "После завершения партии администратор получает готовые текст и изображение с итогами, может опубликовать их в обсуждении Telegram-анонса и показать карточку на сайте."
+        },
+        {
           "id": "fast-prebuilt-vps-deploys",
           "category": "technical",
           "summary": "Деплой на VPS теперь скачивает заранее собранный образ и завершается за ограниченное время вместо повторной длительной сборки на сервере."

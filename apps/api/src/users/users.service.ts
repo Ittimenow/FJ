@@ -35,6 +35,7 @@ export class UsersService {
         gameExperience: true,
         gameRoomView: true,
         telegramChannel: true,
+        telegramMentionConsent: true,
         city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true,
@@ -152,6 +153,9 @@ export class UsersService {
         ...(dto.figurine !== undefined && { figurine: dto.figurine || null }),
         ...(dto.gameRoomView !== undefined && { gameRoomView: dto.gameRoomView }),
         ...(dto.telegramChannel !== undefined && { telegramChannel: dto.telegramChannel }),
+        ...(dto.telegramMentionConsent !== undefined && {
+          telegramMentionConsent: dto.telegramMentionConsent
+        }),
         ...(dto.cityId !== undefined && { cityId: dto.cityId })
       },
       select: {
@@ -166,6 +170,7 @@ export class UsersService {
         gameExperience: true,
         gameRoomView: true,
         telegramChannel: true,
+        telegramMentionConsent: true,
         city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true
@@ -252,6 +257,7 @@ export class UsersService {
           birthDate: null,
           gameExperience: null,
           telegramChannel: null,
+          telegramMentionConsent: false,
           cityId: null,
           status: AccountStatus.DELETED,
           deletedAt

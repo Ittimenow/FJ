@@ -881,6 +881,137 @@ textarea {
   --board-neutral: #aeb8c8;
 }
 
+.recent-results {
+  background: #102a5c;
+  color: #fff;
+}
+
+.recent-results-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.recent-results-head h2 {
+  margin: 0;
+  max-width: 720px;
+  color: #fff;
+  font-size: clamp(36px, 4vw, 54px);
+  font-weight: 850;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.recent-results-head p {
+  margin: 14px 0 0;
+  max-width: 650px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.recent-results-head > a {
+  display: inline-flex;
+  min-height: 46px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  border-radius: 15px;
+  background: #f98f2f;
+  padding: 0 18px;
+  color: #17243f;
+  font-weight: 800;
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.recent-results-head > a:hover {
+  transform: translateY(-2px);
+  background: #e77b1e;
+}
+
+.recent-results-head > a:focus-visible,
+.recent-result-card:focus-visible {
+  outline: 4px solid rgba(249, 143, 47, 0.45);
+  outline-offset: 3px;
+}
+
+.recent-results-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.recent-result-card {
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff9f1;
+  color: #17243f;
+  box-shadow: 0 20px 45px rgba(5, 18, 45, 0.25);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.recent-result-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 26px 54px rgba(5, 18, 45, 0.34);
+}
+
+.recent-result-card > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+}
+
+.recent-result-card > div {
+  padding: 20px;
+}
+
+.recent-result-card span {
+  color: #657597;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recent-result-card h3 {
+  margin: 8px 0 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.recent-result-card p {
+  margin: 10px 0 0;
+  color: #657597;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.recent-result-card strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+  color: #2967df;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .recent-results-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .recent-results-head {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .recent-results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

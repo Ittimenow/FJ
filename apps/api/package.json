@@ -10,7 +10,7 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
-    "test": "node --import tsx --test src/admin/*.test.ts src/games/*.test.ts src/auth/*.test.ts src/cities/*.test.ts src/monitoring/*.test.ts",
+    "test": "node --import tsx --test src/admin/*.test.ts src/games/*.test.ts src/auth/*.test.ts src/cities/*.test.ts src/monitoring/*.test.ts src/publications/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

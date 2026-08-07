@@ -1,6 +1,6 @@
 import { normalizeTelegramChannel, TELEGRAM_CHANNEL_PATTERN } from "@cashflow/shared";
 import { Transform, Type } from "class-transformer";
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, MinLength } from "class-validator";
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, MinLength } from "class-validator";
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -39,6 +39,10 @@ export class UpdateProfileDto {
     message: "Введите Telegram-имя из 5–32 латинских букв, цифр или подчёркиваний."
   })
   telegramChannel?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  telegramMentionConsent?: boolean;
 
   @IsOptional()
   @IsUUID(undefined, { message: "Выберите город из списка." })

@@ -15,6 +15,20 @@ enum GameStatus {
   CANCELLED
 }
 
+enum PublicationMode {
+  DISABLED
+  DRAFT
+  AUTOMATIC
+}
+
+enum SummaryStatus {
+  PENDING
+  DRAFT
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
 enum GameMode {
   MULTIPLAYER
   SOLO
@@ -99,6 +113,7 @@ model User {
   gameExperience  Int?      @map("game_experience")
   gameRoomView    String    @default("classic") @map("game_room_view")
   telegramChannel String?   @map("telegram_channel")
+  telegramMentionConsent Boolean @default(false) @map("telegram_mention_consent")
   cityId          String?   @map("city_id") @db.Uuid
   role         SystemRole    @default(USER)
   status       AccountStatus @default(ACTIVE)
@@ -188,12 +203,62 @@ model Game {
   events       GameEvent[]
   chatMessages GameChatMessage[]
   babyGifts    BabyGift[]
+  summary      GameSummary?
 
   @@index([status])
   @@index([mode, status])
   @@index([createdById])
   @@index([cardSetId])
   @@map("games")
+}
+
+model TelegramAnnouncement {
+  id                  String          @id @default(uuid()) @db.Uuid
+  title               String
+  postUrl             String          @map("post_url")
+  channelUsername     String          @map("channel_username")
+  channelChatId       String          @map("channel_chat_id")
+  channelMessageId    Int             @map("channel_message_id")
+  discussionChatId    String?         @map("discussion_chat_id")
+  discussionMessageId Int?            @map("discussion_message_id")
+  mode                PublicationMode @default(DRAFT)
+  isActive            Boolean         @default(true) @map("is_active")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  summaries GameSummary[]
+
+  @@index([isActive, createdAt])
+  @@map("telegram_announcements")
+}
+
+model GameSummary {
+  id                String        @id @default(uuid()) @db.Uuid
+  gameId            String        @unique @map("game_id") @db.Uuid
+  announcementId    String?       @map("announcement_id") @db.Uuid
+  status            SummaryStatus @default(PENDING)
+  headline          String?
+  body              String?       @db.Text
+  facts             Json          @default("{}")
+  sourceSequence    Int           @default(0) @map("source_sequence")
+  generationVersion Int           @default(1) @map("generation_version")
+  visibleOnSite     Boolean       @default(false) @map("visible_on_site")
+  sitePublishedAt   DateTime?     @map("site_published_at")
+  telegramMessageId Int?          @map("telegram_message_id")
+  telegramChatId    String?       @map("telegram_chat_id")
+  publishedAt       DateTime?     @map("published_at")
+  attempts          Int           @default(0)
+  lastError         String?       @map("last_error") @db.Text
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  game         Game                  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  announcement TelegramAnnouncement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([visibleOnSite, sitePublishedAt])
+  @@index([announcementId])
+  @@map("game_summaries")
 }
 
 model GamePlayer {

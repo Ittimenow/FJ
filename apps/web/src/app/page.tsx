@@ -23,6 +23,7 @@ import type { LucideIcon } from "lucide-react";
 import { publicSiteUrl } from "@/lib/site";
 import { CookieSettingsLink } from "@/components/analytics/cookie-settings-link";
 import { BrandLogo } from "@/components/layout/brand-logo";
+import { RecentGameResults } from "@/components/results/recent-game-results";
 
 type ModalKind = "create" | "join" | "team" | "host" | "leader" | "ai" | null;
 
@@ -738,6 +739,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <RecentGameResults />
 
       <section className="section faq-section" id="faq">
         <div className="faq-title"><p className="section-label">FAQ</p><h2>Всё важное перед первой партией</h2></div>

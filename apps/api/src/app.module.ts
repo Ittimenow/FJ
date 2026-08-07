@@ -14,6 +14,7 @@ import { UsersModule } from "./users/users.module";
 import { MonitoringExceptionFilter } from "./monitoring/monitoring-exception.filter";
 import { MonitoringInterceptor } from "./monitoring/monitoring.interceptor";
 import { MonitoringModule } from "./monitoring/monitoring.module";
+import { PublicationsModule } from "./publications/publications.module";
 
 @Controller()
 class AppController {
@@ -105,7 +106,8 @@ function classifyDatabaseError(error: unknown) {
     AdminModule,
     UsersModule,
     GamesModule,
-    FeedbackModule
+    FeedbackModule,
+    PublicationsModule
   ],
   controllers: [AppController],
   providers: [

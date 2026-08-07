@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${publicSiteUrl}/materials/financial-game`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     { url: `${publicSiteUrl}/materials/how-to-play`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     { url: `${publicSiteUrl}/materials/game-for-teams`, lastModified, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${publicSiteUrl}/results`, lastModified, changeFrequency: "weekly", priority: 0.7 },
     { url: `${publicSiteUrl}/privacy`, lastModified, changeFrequency: "yearly", priority: 0.3 },
     {
       url: `${publicSiteUrl}/personal-data-consent`,

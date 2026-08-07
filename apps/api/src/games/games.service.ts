@@ -5230,6 +5230,28 @@ export class GamesService {
       });
       sequence += 1;
     }
+
+    if (events.some((event) => event.type === realtimeEvents.gameEnded)) {
+      const announcement = await tx.telegramAnnouncement.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+        orderBy: { createdAt: "desc" }
+      });
+      await tx.gameSummary.upsert({
+        where: { gameId },
+        create: {
+          gameId,
+          announcementId: announcement?.id ?? null,
+          sourceSequence: sequence - 1
+        },
+        update: {
+          ...(announcement ? { announcementId: announcement.id } : {}),
+          sourceSequence: sequence - 1,
+          status: "PENDING",
+          lastError: null
+        }
+      });
+    }
   }
 
   private async compactSnapshot(tx: Tx, gameId: string) {

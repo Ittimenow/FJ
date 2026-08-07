@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Map as MapIcon,
   MessageSquareText,
+  Send,
   UsersRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,6 +23,7 @@ import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
 import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
 import { AdminMonitoringPanel } from "@/components/admin/admin-monitoring-panel";
+import { AdminPublicationsPanel } from "@/components/admin/admin-publications-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
@@ -42,6 +44,7 @@ type AdminSection =
   | "board"
   | "feedback"
   | "monitoring"
+  | "publications"
   | "changes";
 
 type AdminMenuItem = {
@@ -55,6 +58,7 @@ const mainMenu: AdminMenuItem[] = [
   { id: "users", label: "Пользователи", icon: UsersRound },
   { id: "feedback", label: "Предложения", icon: MessageSquareText },
   { id: "monitoring", label: "Мониторинг", icon: Activity },
+  { id: "publications", label: "Публикации", icon: Send },
   { id: "changes", label: "Изменения", icon: History }
 ];
 
@@ -74,6 +78,7 @@ const adminSections = new Set<AdminSection>([
   "board",
   "feedback",
   "monitoring",
+  "publications",
   "changes"
 ]);
 
@@ -207,6 +212,7 @@ export function AdminPanel({
             </CardContent>
           </Card>
         ) : null}
+        {section === "publications" ? <AdminPublicationsPanel token={token} /> : null}
         {section === "changes" ? (
           <Card className="rounded-2xl border-0">
             <CardHeader>
