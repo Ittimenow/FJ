@@ -1,0 +1,18 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "files.exclude": {
+    "**/.next": true,
+    "**/.sites-runtime": true,
+    "**/.wrangler": true,
+    "**/dist": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

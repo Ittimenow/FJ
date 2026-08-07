@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Hero: dev server",
+      "type": "npm",
+      "script": "dev:vscode",
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Hero: lint",
+      "type": "npm",
+      "script": "lint:vscode",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "Hero: production build",
+      "type": "npm",
+      "script": "build:vscode",
+      "problemMatcher": []
+    }
+  ]
+}
