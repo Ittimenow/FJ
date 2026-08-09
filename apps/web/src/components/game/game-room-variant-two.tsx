@@ -30,6 +30,7 @@ import {
 import {
   ReactNode,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -76,11 +77,11 @@ export function GameRoomVariantTwo({
     }
   }, [initialSelectedId, players, selectedPlayerId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (actionAttention) setCompactSection("actions");
   }, [actionAttention]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (turnTabRequest > 0) setCompactSection("actions");
   }, [turnTabRequest]);
 
@@ -97,7 +98,7 @@ export function GameRoomVariantTwo({
 
   return (
     <section
-      className="journey-game-view grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4"
+      className="journey-game-view grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 xl:h-full xl:min-h-0 xl:overflow-hidden"
       aria-label="Игровое поле, вариант 2"
     >
       <div
@@ -135,7 +136,7 @@ export function GameRoomVariantTwo({
                 document.getElementById(`journey-mobile-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative grid min-h-12 place-items-center gap-0.5 rounded-lg px-1 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
+                "relative grid min-h-12 touch-manipulation select-none place-items-center gap-0.5 rounded-lg px-1 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
                 active
                   ? "bg-[#dfe9d4] text-[#3f5b35]"
                   : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
@@ -154,13 +155,13 @@ export function GameRoomVariantTwo({
         })}
       </div>
 
-      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[250px_minmax(0,1fr)_300px]">
+      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 xl:h-full xl:min-h-0 xl:grid-cols-[250px_minmax(0,1fr)_300px]">
         <aside
           id="journey-mobile-panel-finance"
           role="tabpanel"
           aria-labelledby="journey-mobile-tab-finance"
           className={[
-            "min-w-0 space-y-3 xl:block",
+            "min-w-0 space-y-3 xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1",
             compactSection === "finance" ? "block" : "hidden"
           ].join(" ")}
         >
@@ -181,7 +182,7 @@ export function GameRoomVariantTwo({
           role="tabpanel"
           aria-labelledby="journey-mobile-tab-board"
           className={[
-            "min-w-0 xl:block",
+            "min-w-0 xl:block xl:h-full xl:min-h-0",
             compactSection === "board" ? "block" : "hidden"
           ].join(" ")}
         >
@@ -193,7 +194,7 @@ export function GameRoomVariantTwo({
           role="tabpanel"
           aria-labelledby="journey-mobile-tab-actions"
           className={[
-            "min-w-0 space-y-3 xl:block xl:max-h-[42rem] xl:overflow-y-auto xl:pr-1",
+            "min-w-0 space-y-3 xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1",
             compactSection === "actions" ? "block" : "hidden"
           ].join(" ")}
         >
@@ -542,13 +543,13 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-[#e9ddc7] shadow-panel">
+    <section className="h-full min-h-0 overflow-hidden rounded-2xl bg-[#e9ddc7] shadow-panel">
       <div
         ref={boardRef}
-        className="journey-board-stage relative overflow-auto bg-[#e9ddc7] p-2 sm:p-3"
+        className="journey-board-stage relative h-full min-h-0 overflow-auto bg-[#e9ddc7] p-2 sm:p-3 xl:grid xl:place-items-center"
       >
         <div
-          className="relative mx-auto aspect-[4/3] min-h-[390px] min-w-[640px] max-w-[900px] origin-center overflow-hidden rounded-xl bg-[#eee1c9] transition-transform duration-200"
+          className="journey-board-canvas relative mx-auto aspect-[4/3] min-h-[390px] min-w-[640px] max-w-[900px] origin-center overflow-hidden rounded-xl bg-[#eee1c9] transition-transform duration-200 xl:min-h-0 xl:max-h-full"
           style={{ transform: `scale(${zoom})` }}
         >
           <img

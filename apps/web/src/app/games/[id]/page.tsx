@@ -69,9 +69,13 @@ export default async function GamePage({
   const membership = snapshot.players.find(
     (player) => player.userId === session.user.id
   );
+  const gameRoomView = snapshot.players.find(
+    (player) => player.userId === session.user.id && player.role === "PLAYER"
+  )?.user?.gameRoomView ?? "classic";
 
   return (
     <AppShell
+      gameViewportMode={snapshot.game.status === "WAITING" ? null : gameRoomView}
       userName={userName}
       userAvatarUrl={membership?.user?.avatarUrl ?? null}
       userFigurine={membership?.user?.figurine ?? session.user.figurine}

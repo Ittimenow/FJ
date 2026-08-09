@@ -37,6 +37,14 @@ body {
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
 }
 
+html.game-room-viewport-locked,
+body.game-room-viewport-locked {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .brand-logo {
   display: inline-flex;
   min-width: 0;
@@ -122,6 +130,13 @@ body {
   scrollbar-gutter: stable;
 }
 
+.connection-diagnostics-dialog {
+  position: absolute;
+  top: calc(100% + 0.625rem);
+  right: 0;
+  width: min(21.25rem, calc(100vw - 1.5rem));
+}
+
 .desktop-game-board-grid {
   width: 100%;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -165,17 +180,116 @@ body {
   }
 }
 
-@media (min-width: 1280px) {
-  .app-shell-main:has(.game-room--classic-active) {
+@media (max-width: 767px) {
+  .connection-diagnostics-dialog {
+    position: fixed;
+    top: var(--app-shell-mobile-overlay-top);
+    right: max(0.75rem, env(safe-area-inset-right));
+    left: max(0.75rem, env(safe-area-inset-left));
+    width: auto;
+    max-height: calc(
+      100dvh - var(--app-shell-mobile-overlay-top) - var(--app-shell-mobile-overlay-bottom)
+    );
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell--game-classic-active {
+    display: flex;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-shell--game-classic-active > .app-shell-header {
+    flex: 0 0 auto;
+  }
+
+  .app-shell--game-classic-active > .app-shell-main {
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
     padding-top: clamp(0.5rem, 1.5vh, 0.75rem);
-    padding-bottom: 0;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .game-room--classic-active {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .game-room--classic-active > .desktop-game-board-viewport {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .desktop-game-board-viewport {
+    align-self: stretch;
+    overflow: hidden;
+  }
+
+  .desktop-game-board-shell {
+    container-type: size;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .desktop-game-board-grid {
-    width: min(
-      100%,
-      calc((100dvh - var(--app-shell-header-bottom) - clamp(2rem, 4vh, 2.25rem)) * 1.814)
-    );
+    width: min(100%, calc(100cqh * 1.814));
+    max-height: 100%;
+    margin-inline: auto;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-shell--game-journey-active {
+    display: flex;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-shell--game-journey-active > .app-shell-header {
+    flex: 0 0 auto;
+  }
+
+  .app-shell--game-journey-active > .app-shell-main {
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding-top: clamp(0.5rem, 1.5vh, 0.75rem);
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .game-room--journey-active {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .game-room--journey-active > .journey-game-view {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .journey-board-canvas {
+    width: min(100%, 900px);
   }
 }
 

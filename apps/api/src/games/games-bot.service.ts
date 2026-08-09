@@ -9,7 +9,11 @@ import {
   PlayerController,
   Prisma
 } from "@prisma/client";
-import { cardActionTypes, legacyCardEffectAliases } from "@cashflow/shared";
+import {
+  cardActionTypes,
+  dealDownPaymentAmount,
+  legacyCardEffectAliases
+} from "@cashflow/shared";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -512,7 +516,7 @@ export class GamesBotService implements OnModuleInit {
       return this.metaAmount(meta.today_price) || this.metaAmount(meta.price) ||
         this.priceFromText(`${card.title}\n${card.bodyText}`);
     }
-    return this.metaAmount(meta.down_payment) || this.metaAmount(meta.price);
+    return dealDownPaymentAmount(meta, this.metaAmount(meta.price));
   }
 
   private effectAmount(

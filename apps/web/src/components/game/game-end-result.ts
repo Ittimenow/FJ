@@ -1,5 +1,4 @@
 export type GameEndIcon =
-  | "trophy"
   | "shield-check"
   | "hourglass"
   | "user-x"
@@ -9,10 +8,10 @@ export type GameEndIcon =
 export type GameEndTone = "victory" | "survival" | "timeout" | "danger" | "neutral";
 
 export interface GameEndPresentation {
-  icon: GameEndIcon;
+  icon: GameEndIcon | null;
   tone: GameEndTone;
   title: string;
-  description: string;
+  description: string | null;
 }
 
 export function gameEndPresentation({
@@ -24,12 +23,10 @@ export function gameEndPresentation({
 }): GameEndPresentation {
   if (winnerName || reason === "financial_freedom") {
     return {
-      icon: "trophy",
+      icon: null,
       tone: "victory",
       title: "Победа!",
-      description: winnerName
-        ? `${winnerName} достиг финансовой свободы`
-        : "Финансовая свобода достигнута"
+      description: null
     };
   }
 

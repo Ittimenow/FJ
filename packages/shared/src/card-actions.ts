@@ -17,3 +17,18 @@ export const legacyCardEffectAliases: Record<string, CardActionType> = {
   stock_reverse_split: cardActionTypes.assetQuantityDivide,
   stock_wipeout: cardActionTypes.assetWipeout
 };
+
+export function dealDownPaymentAmount(
+  meta: Record<string, unknown>,
+  fallbackAmount: number
+) {
+  const rawAmount = meta.down_payment;
+  if (rawAmount === null || rawAmount === undefined || rawAmount === "") {
+    return fallbackAmount;
+  }
+
+  const amount = Number(
+    typeof rawAmount === "string" ? rawAmount.replace(",", ".") : rawAmount
+  );
+  return Number.isFinite(amount) ? Math.round(amount) : fallbackAmount;
+}

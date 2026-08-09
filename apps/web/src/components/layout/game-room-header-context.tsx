@@ -230,7 +230,7 @@ function ConnectionStatusControl({ state }: { state: GameRoomHeaderState }) {
         <section
           role="dialog"
           aria-label="Диагностика соединения"
-          className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[min(340px,calc(100vw-24px))] rounded-2xl bg-white p-4 text-left text-ink shadow-[0_18px_48px_rgba(23,36,63,.2)]"
+          className="connection-diagnostics-dialog z-[80] rounded-2xl bg-white p-4 text-left text-ink shadow-[0_18px_48px_rgba(23,36,63,.2)]"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

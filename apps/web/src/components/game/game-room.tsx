@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  dealDownPaymentAmount,
   figurineImagePath,
   isBabyGiftWindowOpen,
   realtimeEvents,
@@ -8,6 +9,7 @@ import {
 } from "@cashflow/shared";
 import {
   ArrowRightToLine,
+  Baby,
   Banknote,
   BellRing,
   Bot,
@@ -26,6 +28,7 @@ import {
   Gift,
   HandCoins,
   Handshake,
+  Heart,
   Hourglass,
   Landmark,
   LayoutDashboard,
@@ -37,13 +40,12 @@ import {
   Plus,
   ReceiptText,
   ShieldCheck,
-  Send,
-  Trophy,
   UserRound,
   UserX,
   UsersRound,
   X
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   CSSProperties,
@@ -51,6 +53,7 @@ import {
   ReactNode,
   RefObject,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -65,6 +68,7 @@ import {
   GameRoomVariantTwo,
   type GameRoomView
 } from "@/components/game/game-room-variant-two";
+import { childExpenseCalculation } from "@/components/game/child-expense";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import {
   cashChangeExpression,
@@ -87,6 +91,11 @@ import {
   stockPurchaseCostCents,
   stockQuantityForCostCents
 } from "@/components/game/stock-purchase-calculation";
+import {
+  normalizeStockSaleQuantity,
+  stockSaleResetKey,
+  type StockSaleQuantity
+} from "@/components/game/stock-sale-state";
 import { useSetGameRoomHeader } from "@/components/layout/game-room-header-context";
 import { publicApiBaseUrl, publicSocketBaseUrl, publicSocketPath } from "@/lib/api";
 import {
@@ -99,7 +108,7 @@ import {
   type ConnectionDiagnostics
 } from "@/lib/connection-health";
 import { money, shortDate } from "@/lib/format";
-import { gamePlayerName } from "@/lib/game-player";
+import { gamePlayerName, unresolvedStockSellerNames } from "@/lib/game-player";
 import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
 import { cn } from "@/lib/utils";
 import type {
@@ -117,6 +126,11 @@ type GameActionResult = {
 };
 
 type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed";
+type DecisionSubmission =
+  | "deal_buy"
+  | "deal_decline"
+  | "stock_sell"
+  | "stock_decline";
 
 type UserSearchResult = {
   id: string;
@@ -168,7 +182,8 @@ export function GameRoom({
   const [turnTabRequest, setTurnTabRequest] = useState(0);
   const [rollingDice, setRollingDice] = useState(false);
   const [diceFaces, setDiceFaces] = useState([6]);
-  const [stockSaleQuantity, setStockSaleQuantity] = useState(1);
+  const [stockSaleQuantity, setStockSaleQuantity] = useState<StockSaleQuantity>(1);
+  const [decisionSubmission, setDecisionSubmission] = useState<DecisionSubmission | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [gameAnnouncement, setGameAnnouncement] = useState<string | null>(null);
@@ -192,6 +207,36 @@ export function GameRoom({
   const expirationRefreshRef = useRef(false);
   const lastDiagnosticReportRef = useRef(0);
   const previousGameStatusRef = useRef(initialSnapshot.game.status);
+  const decisionSubmissionRef = useRef(false);
+
+  useEffect(() => {
+    const desktopViewport = window.matchMedia(
+      gameRoomView === "classic" ? "(min-width: 1024px)" : "(min-width: 1280px)"
+    );
+    const documentElement = document.documentElement;
+    const { body } = document;
+
+    const syncViewportLock = () => {
+      const shouldLock = snapshot.game.status !== "WAITING" && desktopViewport.matches;
+
+      documentElement.classList.toggle("game-room-viewport-locked", shouldLock);
+      body.classList.toggle("game-room-viewport-locked", shouldLock);
+
+      if (shouldLock) {
+        documentElement.scrollTop = 0;
+        body.scrollTop = 0;
+      }
+    };
+
+    syncViewportLock();
+    desktopViewport.addEventListener("change", syncViewportLock);
+
+    return () => {
+      desktopViewport.removeEventListener("change", syncViewportLock);
+      documentElement.classList.remove("game-room-viewport-locked");
+      body.classList.remove("game-room-viewport-locked");
+    };
+  }, [gameRoomView, snapshot.game.status]);
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
@@ -446,16 +491,19 @@ export function GameRoom({
     ownPendingAction?.type === "stock_sale_window"
       ? latestBuyableCard
       : null;
-  const waitingStockSellerCount =
+  const waitingStockSellerNames =
     ownPendingAction?.type === "stock_sale_window"
-      ? ownPendingAction.sellerGamePlayerIds.filter(
-          (gamePlayerId) => !ownPendingAction.resolvedGamePlayerIds.includes(gamePlayerId)
-        ).length
-      : 0;
+      ? unresolvedStockSellerNames(
+          gamePlayers,
+          ownPendingAction.sellerGamePlayerIds,
+          ownPendingAction.resolvedGamePlayerIds
+        )
+      : [];
   const stockSaleOffer = useMemo(
     () => stockSaleOfferForPlayer(pendingAction, me),
     [me, pendingAction]
   );
+  const currentStockSaleResetKey = stockSaleResetKey(stockSaleOffer);
   const unresolvedBotStockSeller =
     pendingAction?.type === "stock_sale_window"
       ? gamePlayers.find(
@@ -548,8 +596,8 @@ export function GameRoom({
   }, [latestBuyableCard?.cardId]);
 
   useEffect(() => {
-    setStockSaleQuantity(1);
-  }, [stockSaleOffer?.cardId, stockSaleOffer]);
+    if (currentStockSaleResetKey) setStockSaleQuantity(1);
+  }, [currentStockSaleResetKey]);
 
   useEffect(() => {
     if (
@@ -854,6 +902,10 @@ export function GameRoom({
 
   async function rollDice() {
     if (rollingDice) return;
+    if (!socketRef.current?.connected) {
+      setError("Соединение с игрой восстанавливается. Дождитесь подключения и повторите бросок.");
+      return;
+    }
     setError(null);
     setRollingDice(true);
     setTurnAnimationPhase("rolling");
@@ -905,17 +957,49 @@ export function GameRoom({
     emit(realtimeEvents.cardDraw, { cardType });
   }
 
+  async function submitDecision(
+    kind: DecisionSubmission,
+    event: string,
+    payload: Record<string, unknown>,
+    fallbackMessage: string
+  ) {
+    if (decisionSubmissionRef.current) return;
+    decisionSubmissionRef.current = true;
+    setDecisionSubmission(kind);
+    setError(null);
+
+    try {
+      const result = await emitWithAck(event, payload);
+      applyActionResult(result);
+    } catch (caught) {
+      setError(gameErrorMessage(caught, fallbackMessage));
+    } finally {
+      decisionSubmissionRef.current = false;
+      setDecisionSubmission(null);
+    }
+  }
+
   function buyLatestDeal() {
     if (!latestBuyableCard) return;
     if (latestBuyableCard.isStock && (!dealQuantity || dealQuantity < 1)) return;
-    emit(realtimeEvents.dealBuy, {
-      cardId: latestBuyableCard.cardId,
-      quantity: latestBuyableCard.isStock ? dealQuantity : 1
-    });
+    void submitDecision(
+      "deal_buy",
+      realtimeEvents.dealBuy,
+      {
+        cardId: latestBuyableCard.cardId,
+        quantity: latestBuyableCard.isStock ? dealQuantity : 1
+      },
+      "Не удалось купить сделку"
+    );
   }
 
   function declineLatestDeal() {
-    emit("deal:decline", {});
+    void submitDecision(
+      "deal_decline",
+      "deal:decline",
+      {},
+      "Не удалось отказаться от сделки"
+    );
   }
 
   function sellMarketAsset() {
@@ -923,14 +1007,22 @@ export function GameRoom({
   }
 
   function sellStockFromDeal() {
-    if (!stockSaleOffer) return;
-    emit("stock:sell", {
-      quantity: Math.min(stockSaleQuantity, stockSaleOffer.quantity)
-    });
+    if (!stockSaleOffer || stockSaleQuantity === "") return;
+    void submitDecision(
+      "stock_sell",
+      "stock:sell",
+      { quantity: Math.min(stockSaleQuantity, stockSaleOffer.quantity) },
+      "Не удалось продать акции"
+    );
   }
 
   function declineStockSale() {
-    emit("stock:decline", {});
+    void submitDecision(
+      "stock_decline",
+      "stock:decline",
+      {},
+      "Не удалось отказаться от продажи акций"
+    );
   }
 
   function declineMarketSale() {
@@ -1052,10 +1144,14 @@ export function GameRoom({
     setDealQuantity(normalizeStockQuantity(value));
   }
 
-  function updateStockSaleQuantity(value: number) {
+  function updateStockSaleQuantity(value: StockSaleQuantity) {
     const maxQuantity = stockSaleOffer?.quantity ?? 1;
-    const normalized = Math.max(Math.floor(Number(value) || 1), 1);
-    setStockSaleQuantity(Math.min(normalized, maxQuantity));
+    setStockSaleQuantity(normalizeStockSaleQuantity(value, maxQuantity));
+  }
+
+  function changeStockSaleQuantity(delta: number) {
+    const current = stockSaleQuantity === "" ? 0 : stockSaleQuantity;
+    updateStockSaleQuantity(current + delta);
   }
 
   function startDiceAnimation(diceCount: number) {
@@ -1106,6 +1202,9 @@ export function GameRoom({
         "game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5",
         gameRoomView === "classic" && snapshot.game.status !== "WAITING"
           ? "game-room--classic-active"
+          : null,
+        gameRoomView === "journey" && snapshot.game.status !== "WAITING"
+          ? "game-room--journey-active"
           : null
       )}
     >
@@ -1164,6 +1263,7 @@ export function GameRoom({
         rolling={rollingDice}
         diceValues={diceFaces}
         diceCount={activeDiceCount}
+        maxCompactViewportWidth={gameRoomView === "classic" ? 1023 : 1279}
         onSkip={skipTurn}
         onRoll={() => {
           setTurnTabRequest((current) => current + 1);
@@ -1286,7 +1386,7 @@ export function GameRoom({
               marketSaleOffer={marketSaleOffer}
               canAnswerMarketSale={canAnswerMarketSale}
               currentCashCents={me?.financialState?.cashCents ?? 0}
-              waitingStockSellerCount={waitingStockSellerCount}
+              waitingStockSellerNames={waitingStockSellerNames}
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
               onBuyLatest={buyLatestDeal}
@@ -1300,8 +1400,9 @@ export function GameRoom({
               stockSaleOffer={stockSaleOffer}
               stockSaleQuantity={stockSaleQuantity}
               onStockSaleQuantityChange={updateStockSaleQuantity}
-              onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-              onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+              onStockSaleDecrease={() => changeStockSaleQuantity(-1)}
+              onStockSaleIncrease={() => changeStockSaleQuantity(1)}
+              decisionSubmission={decisionSubmission}
               onSellStock={sellStockFromDeal}
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
@@ -1315,7 +1416,7 @@ export function GameRoom({
       ) : (
         <>
           {snapshot.game.status !== "WAITING" ? (
-          <div className="hidden xl:block">
+          <div className="desktop-game-board-viewport hidden lg:block">
         <DesktopGameBoard
           snapshot={snapshot}
           selectedPlayer={selectedPlayer}
@@ -1339,6 +1440,7 @@ export function GameRoom({
               diceValues={diceFaces}
               onRoll={rollDice}
               onSkip={skipTurn}
+              pinnedToPanel
             />
             <ActionsPanel
               canChooseDeal={canChooseDeal}
@@ -1352,7 +1454,7 @@ export function GameRoom({
               marketSaleOffer={marketSaleOffer}
               canAnswerMarketSale={canAnswerMarketSale}
               currentCashCents={me?.financialState?.cashCents ?? 0}
-              waitingStockSellerCount={waitingStockSellerCount}
+              waitingStockSellerNames={waitingStockSellerNames}
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
               onBuyLatest={buyLatestDeal}
@@ -1366,13 +1468,15 @@ export function GameRoom({
               stockSaleOffer={stockSaleOffer}
               stockSaleQuantity={stockSaleQuantity}
               onStockSaleQuantityChange={updateStockSaleQuantity}
-              onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-              onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+              onStockSaleDecrease={() => changeStockSaleQuantity(-1)}
+              onStockSaleIncrease={() => changeStockSaleQuantity(1)}
+              decisionSubmission={decisionSubmission}
               onSellStock={sellStockFromDeal}
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
               headerControl={renderJournalFilterButton()}
+              pinnedHeader
               activityFeed={renderTurnFeed(false)}
               embedded
             />
@@ -1381,7 +1485,7 @@ export function GameRoom({
           </div>
           ) : null}
 
-      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 xl:hidden">
+      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 lg:hidden">
         {snapshot.game.status !== "WAITING" ? (
           <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-2">
             <MobileBoard
@@ -1415,7 +1519,7 @@ export function GameRoom({
                   marketSaleOffer={marketSaleOffer}
                   canAnswerMarketSale={canAnswerMarketSale}
                   currentCashCents={me?.financialState?.cashCents ?? 0}
-                  waitingStockSellerCount={waitingStockSellerCount}
+                  waitingStockSellerNames={waitingStockSellerNames}
                   dealQuantity={dealQuantity}
                   setDealQuantity={updateDealQuantity}
                   onBuyLatest={buyLatestDeal}
@@ -1429,8 +1533,9 @@ export function GameRoom({
                   stockSaleOffer={stockSaleOffer}
                   stockSaleQuantity={stockSaleQuantity}
                   onStockSaleQuantityChange={updateStockSaleQuantity}
-                  onStockSaleDecrease={() => updateStockSaleQuantity(stockSaleQuantity - 1)}
-                  onStockSaleIncrease={() => updateStockSaleQuantity(stockSaleQuantity + 1)}
+                  onStockSaleDecrease={() => changeStockSaleQuantity(-1)}
+                  onStockSaleIncrease={() => changeStockSaleQuantity(1)}
+                  decisionSubmission={decisionSubmission}
                   onSellStock={sellStockFromDeal}
                   onDeclineStockSale={declineStockSale}
                   canTakeLoan={canTakeLoan}
@@ -1644,7 +1749,8 @@ function DiceAction({
   phase,
   diceValues,
   onRoll,
-  onSkip
+  onSkip,
+  pinnedToPanel = false
 }: {
   canRoll: boolean;
   rolling: boolean;
@@ -1652,6 +1758,7 @@ function DiceAction({
   diceValues: number[];
   onRoll: () => void;
   onSkip: () => void;
+  pinnedToPanel?: boolean;
 }) {
   const status = rolling
     ? "Бросаем кубик…"
@@ -1664,8 +1771,20 @@ function DiceAction({
           : "Ожидайте своего хода";
 
   return (
-    <section className="mb-3 rounded-xl bg-[#fff5ed] px-2" aria-label="Бросок кубика">
-      <div className="flex h-12 items-center gap-2">
+    <section
+      className={cn(
+        "mb-3 rounded-xl bg-[#fff5ed] px-2",
+        pinnedToPanel &&
+          "sticky top-0 z-10 -mx-3 mb-0 h-[4.5rem] rounded-none px-3"
+      )}
+      aria-label="Бросок кубика"
+    >
+      <div
+        className={cn(
+          "flex h-12 items-center gap-2",
+          pinnedToPanel && "h-full"
+        )}
+      >
         <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0">
           <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
           {canRoll && !rolling ? (
@@ -1708,6 +1827,7 @@ function MobileTurnDialog({
   rolling,
   diceValues,
   diceCount,
+  maxCompactViewportWidth,
   onRoll,
   onSkip
 }: {
@@ -1715,18 +1835,19 @@ function MobileTurnDialog({
   rolling: boolean;
   diceValues: number[];
   diceCount: number;
+  maxCompactViewportWidth: number;
   onRoll: () => void;
   onSkip: () => void;
 }) {
   const [mobileViewport, setMobileViewport] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 1279px)");
+    const media = window.matchMedia(`(max-width: ${maxCompactViewportWidth}px)`);
     const updateViewport = () => setMobileViewport(media.matches);
     updateViewport();
     media.addEventListener("change", updateViewport);
     return () => media.removeEventListener("change", updateViewport);
-  }, []);
+  }, [maxCompactViewportWidth]);
 
   if (!open || !mobileViewport) return null;
 
@@ -1793,7 +1914,7 @@ function GameEndPopup({
     reason,
     winnerName: winner ? gamePlayerName(winner) : null
   });
-  const EndIcon = gameEndIcons[presentation.icon];
+  const EndIcon = presentation.icon ? gameEndIcons[presentation.icon] : null;
 
   return (
     <div className="game-end-overlay fixed inset-0 z-[70] bg-black/55">
@@ -1801,25 +1922,37 @@ function GameEndPopup({
         role="dialog"
         aria-modal="true"
         aria-labelledby="game-end-title"
-        aria-describedby="game-end-description"
+        aria-describedby={presentation.description ? "game-end-description" : undefined}
         className="game-end-dialog flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[#fff9f1] shadow-[0_34px_90px_rgba(5,18,45,.35)]"
       >
         <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
-          <div className="text-center">
-            <span
-              className={`mx-auto grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_22px_rgba(27,57,118,.14)] ${gameEndToneClasses[presentation.tone]}`}
-            >
-              <EndIcon size={25} aria-hidden="true" />
-            </span>
+          <div className={cn("text-center", !EndIcon && "pt-2")}>
+            {EndIcon ? (
+              <span
+                className={`mx-auto grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_22px_rgba(27,57,118,.14)] ${gameEndToneClasses[presentation.tone]}`}
+              >
+                <EndIcon size={25} aria-hidden="true" />
+              </span>
+            ) : null}
             <h2
               id="game-end-title"
-              className="mt-3 text-2xl font-extrabold tracking-[-0.025em] text-ink sm:text-3xl"
+              aria-label={presentation.tone === "victory" ? presentation.title : undefined}
+              className={cn(
+                "font-extrabold tracking-[-0.025em] text-ink",
+                EndIcon ? "mt-3 text-2xl sm:text-3xl" : "text-3xl sm:text-4xl"
+              )}
             >
-              {presentation.title}
+              {presentation.tone === "victory" ? (
+                <ArchedVictoryTitle />
+              ) : (
+                presentation.title
+              )}
             </h2>
-            <p id="game-end-description" className="mx-auto mt-2 max-w-lg text-sm text-[#657597]">
-              {presentation.description}
-            </p>
+            {presentation.description ? (
+              <p id="game-end-description" className="mx-auto mt-2 max-w-lg text-sm text-[#657597]">
+                {presentation.description}
+              </p>
+            ) : null}
           </div>
 
           {featuredPlayer ? (
@@ -1862,8 +1995,34 @@ function GameEndPopup({
   );
 }
 
-const gameEndIcons: Record<GameEndIcon, typeof Trophy> = {
-  trophy: Trophy,
+function ArchedVictoryTitle() {
+  const letters = ["П", "о", "б", "е", "д", "а", "!"];
+  const arc = [
+    { y: 5, rotate: -7 },
+    { y: 1, rotate: -4 },
+    { y: -2, rotate: -2 },
+    { y: -3, rotate: 0 },
+    { y: -2, rotate: 2 },
+    { y: 1, rotate: 4 },
+    { y: 5, rotate: 7 }
+  ];
+
+  return (
+    <span className="inline-flex min-h-12 items-start justify-center leading-none" aria-hidden="true">
+      {letters.map((letter, index) => (
+        <span
+          key={`${letter}-${index}`}
+          className="inline-block origin-bottom"
+          style={{ transform: `translateY(${arc[index]?.y ?? 0}px) rotate(${arc[index]?.rotate ?? 0}deg)` }}
+        >
+          {letter}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const gameEndIcons: Record<GameEndIcon, LucideIcon> = {
   "shield-check": ShieldCheck,
   hourglass: Hourglass,
   "user-x": UserX,
@@ -1973,18 +2132,22 @@ function StockSalePanel({
   onQuantityChange,
   onDecrease,
   onIncrease,
+  decisionSubmission,
   onSell,
   onDecline
 }: {
   offer: NonNullable<ReturnType<typeof stockSaleOfferForPlayer>>;
-  quantity: number;
-  onQuantityChange: (value: number) => void;
+  quantity: StockSaleQuantity;
+  onQuantityChange: (value: StockSaleQuantity) => void;
   onDecrease: () => void;
   onIncrease: () => void;
+  decisionSubmission: Extract<DecisionSubmission, "stock_sell" | "stock_decline"> | null;
   onSell: () => void;
   onDecline: () => void;
 }) {
-  const saleTotalCents = offer.salePriceCents * quantity;
+  const numericQuantity = quantity === "" ? 0 : quantity;
+  const saleTotalCents = offer.salePriceCents * numericQuantity;
+  const submitting = decisionSubmission !== null;
   const quantityControlClassName =
     "h-11 min-w-0 rounded-xl bg-white px-0 text-ink shadow-[0_6px_16px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]";
 
@@ -2006,8 +2169,8 @@ function StockSalePanel({
           <Button
             variant="ghost"
             className={quantityControlClassName}
-            onClick={() => onQuantityChange(quantity - 20)}
-            disabled={quantity <= 1}
+            onClick={() => onQuantityChange(numericQuantity - 20)}
+            disabled={submitting || numericQuantity <= 1}
             aria-label="Уменьшить количество на 20"
             title="Уменьшить на 20"
           >
@@ -2017,7 +2180,7 @@ function StockSalePanel({
             variant="ghost"
             className={quantityControlClassName}
             onClick={onDecrease}
-            disabled={quantity <= 1}
+            disabled={submitting || numericQuantity <= 1}
             aria-label="Уменьшить количество на 1"
             title="Уменьшить на 1"
           >
@@ -2031,14 +2194,17 @@ function StockSalePanel({
             step={1}
             inputMode="numeric"
             value={quantity}
-            onChange={(event) => onQuantityChange(Number(event.target.value))}
+            onChange={(event) =>
+              onQuantityChange(event.target.value === "" ? "" : Number(event.target.value))
+            }
+            disabled={submitting}
             className="h-11 px-1 text-center font-extrabold tabular-nums"
           />
           <Button
             variant="ghost"
             className={quantityControlClassName}
             onClick={onIncrease}
-            disabled={quantity >= offer.quantity}
+            disabled={submitting || numericQuantity >= offer.quantity}
             aria-label="Увеличить количество на 1"
             title="Увеличить на 1"
           >
@@ -2047,8 +2213,8 @@ function StockSalePanel({
           <Button
             variant="ghost"
             className={quantityControlClassName}
-            onClick={() => onQuantityChange(quantity + 20)}
-            disabled={quantity >= offer.quantity}
+            onClick={() => onQuantityChange(numericQuantity + 20)}
+            disabled={submitting || numericQuantity >= offer.quantity}
             aria-label="Увеличить количество на 20"
             title="Увеличить на 20"
           >
@@ -2058,7 +2224,7 @@ function StockSalePanel({
             variant="ghost"
             className={quantityControlClassName}
             onClick={() => onQuantityChange(offer.quantity)}
-            disabled={quantity >= offer.quantity}
+            disabled={submitting || numericQuantity >= offer.quantity}
             aria-label="Выбрать максимальное количество акций"
             title="Выбрать максимум"
           >
@@ -2068,19 +2234,30 @@ function StockSalePanel({
         <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 text-sm">
           <span className="font-medium text-muted">Сумма продажи</span>
           <strong className="text-base font-extrabold text-ink">
-            {quantity} x {money(offer.salePriceCents)} = {money(saleTotalCents)}
+            {quantity === ""
+              ? "Укажите количество"
+              : `${quantity} x ${money(offer.salePriceCents)} = ${money(saleTotalCents)}`}
           </strong>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button variant="action" onClick={onSell}>Продать</Button>
+        <Button
+          variant="action"
+          onClick={onSell}
+          disabled={submitting || quantity === ""}
+          aria-busy={decisionSubmission === "stock_sell"}
+        >
+          {decisionSubmission === "stock_sell" ? "Продаём…" : "Продать"}
+        </Button>
         <Button
           variant="ghost"
           className="bg-white text-ink shadow-[0_7px_18px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]"
           onClick={onDecline}
+          disabled={submitting}
+          aria-busy={decisionSubmission === "stock_decline"}
         >
-          Не продавать
+          {decisionSubmission === "stock_decline" ? "Отказываемся…" : "Не продавать"}
         </Button>
       </div>
     </section>
@@ -2611,7 +2788,7 @@ function DesktopGameBoard({
             onOpenBank={onOpenBank}
             outsidePlayers={outsidePlayers}
           />
-          <div className="min-h-0 overflow-y-auto rounded-xl bg-white p-3 shadow-panel">
+          <div className="min-h-0 overflow-y-auto rounded-xl bg-white px-3 pb-3 pt-0 shadow-panel">
             {children}
           </div>
         </div>
@@ -2737,9 +2914,12 @@ function DesktopFinancialPanel({
               <div className="flex min-w-0 items-center gap-3">
                 <PlayerIdentityMark player={player} />
                 <div className="min-w-0">
-                  <h2 className="truncate text-lg font-semibold">
-                    {gamePlayerName(player)}
-                  </h2>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 className="truncate text-lg font-semibold">
+                      {gamePlayerName(player)}
+                    </h2>
+                    <ChildrenMarks count={state.childrenCount} />
+                  </div>
                   <div className="mt-1 truncate text-sm text-neutral-500">
                     {player.profession?.name}
                   </div>
@@ -3520,11 +3700,11 @@ function MobileGameTabs({
   const liabilities = player ? repayableLiabilityRows(player) : [];
   const actionAttention = Boolean(actionAttentionKey);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (actionAttentionKey) setActiveTab("turn");
   }, [actionAttentionKey]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (turnTabRequest > 0) setActiveTab("turn");
   }, [turnTabRequest]);
 
@@ -3576,7 +3756,7 @@ function MobileGameTabs({
                 document.getElementById(`mobile-game-tab-${nextTab.id}`)?.focus();
               }}
               className={[
-                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] min-[360px]:text-[10px]",
+                "relative flex h-14 min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] min-[360px]:text-[10px]",
                 active
                   ? "bg-[#dfe9d4] text-[#3f5b35]"
                   : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
@@ -3627,8 +3807,11 @@ function MobileGameTabs({
               <div className="flex min-w-0 items-center gap-2.5">
                 <PlayerIdentityMark player={player} size="sm" />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">
-                    {gamePlayerName(player)}
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <div className="truncate text-sm font-semibold">
+                      {gamePlayerName(player)}
+                    </div>
+                    <ChildrenMarks count={state.childrenCount} size="sm" />
                   </div>
                   <div className="mt-0.5 truncate text-xs text-neutral-500">
                     {player.profession?.name}
@@ -4108,11 +4291,17 @@ function expenseRows(player: GamePlayer) {
   return expenseItems(player).map((item) => ({
     id: item.id,
     label: item.label,
-    value: money(item.amountCents)
+    value: money(item.amountCents),
+    calculation: item.calculation ?? null
   }));
 }
 
-function expenseItems(player: GamePlayer) {
+function expenseItems(player: GamePlayer): Array<{
+  id: string;
+  label: string;
+  amountCents: number;
+  calculation?: string | null;
+}> {
   const profession = player.profession;
   const state = player.financialState;
 
@@ -4173,7 +4362,10 @@ function expenseItems(player: GamePlayer) {
       amountCents:
         (state
           ? state.perChildCostCents * state.childrenCount
-          : profession?.childrenExpenseCents) ?? 0
+          : profession?.childrenExpenseCents) ?? 0,
+      calculation: state
+        ? childExpenseCalculation(state.childrenCount, state.perChildCostCents)
+        : null
     },
     {
       id: "bank_loan",
@@ -4240,7 +4432,7 @@ function ActionsPanel({
   marketSaleOffer,
   canAnswerMarketSale,
   currentCashCents,
-  waitingStockSellerCount,
+  waitingStockSellerNames,
   dealQuantity,
   setDealQuantity,
   onBuyLatest,
@@ -4256,11 +4448,13 @@ function ActionsPanel({
   onStockSaleQuantityChange,
   onStockSaleDecrease,
   onStockSaleIncrease,
+  decisionSubmission,
   onSellStock,
   onDeclineStockSale,
   canTakeLoan,
   onOpenBank,
   headerControl,
+  pinnedHeader = false,
   activityFeed,
   embedded = false
 }: {
@@ -4275,7 +4469,7 @@ function ActionsPanel({
   marketSaleOffer: Extract<GameSnapshot["game"]["pendingAction"], { type: "market_sale" }> | null;
   canAnswerMarketSale: boolean;
   currentCashCents: number;
-  waitingStockSellerCount: number;
+  waitingStockSellerNames: string[];
   dealQuantity: number | "";
   setDealQuantity: (value: number | "") => void;
   onBuyLatest: () => void;
@@ -4287,15 +4481,17 @@ function ActionsPanel({
   onPayDoodadWithCash: () => void;
   onPayDoodadWithCredit: () => void;
   stockSaleOffer: ReturnType<typeof stockSaleOfferForPlayer>;
-  stockSaleQuantity: number;
-  onStockSaleQuantityChange: (value: number) => void;
+  stockSaleQuantity: StockSaleQuantity;
+  onStockSaleQuantityChange: (value: StockSaleQuantity) => void;
   onStockSaleDecrease: () => void;
   onStockSaleIncrease: () => void;
+  decisionSubmission: DecisionSubmission | null;
   onSellStock: () => void;
   onDeclineStockSale: () => void;
   canTakeLoan: boolean;
   onOpenBank: () => void;
   headerControl?: ReactNode;
+  pinnedHeader?: boolean;
   activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
@@ -4328,7 +4524,13 @@ function ActionsPanel({
     charityChoice ? currentCashCents >= charityChoice.donationCents : false;
   const canCloseMarketSale =
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
-  const canResolveLatestDeal = waitingStockSellerCount === 0;
+  const canResolveLatestDeal = waitingStockSellerNames.length === 0;
+  const dealDecisionSubmitting =
+    decisionSubmission === "deal_buy" || decisionSubmission === "deal_decline";
+  const stockDecisionSubmission =
+    decisionSubmission === "stock_sell" || decisionSubmission === "stock_decline"
+      ? decisionSubmission
+      : null;
 
   const content = (
     <>
@@ -4353,6 +4555,7 @@ function ActionsPanel({
           onQuantityChange={onStockSaleQuantityChange}
           onDecrease={onStockSaleDecrease}
           onIncrease={onStockSaleIncrease}
+          decisionSubmission={stockDecisionSubmission}
           onSell={onSellStock}
           onDecline={onDeclineStockSale}
         />
@@ -4505,7 +4708,7 @@ function ActionsPanel({
                   Цена: <strong>{money(latestCard.priceCents)}</strong>
                 </div>
               ) : null}
-              {latestCard.downPaymentCents > 0 ? (
+              {!latestCard.isStock || latestCard.downPaymentCents > 0 ? (
                 <div>
                   Первоначальный взнос:{" "}
                   <strong>{money(latestCard.downPaymentCents)}</strong>
@@ -4734,8 +4937,8 @@ function ActionsPanel({
               />
             ) : null}
             {!canResolveLatestDeal ? (
-              <p className="mt-3 text-xs text-amber-700">
-                Ожидаем решение по продаже от игроков: {waitingStockSellerCount}.
+              <p className="mt-3 break-words text-xs text-amber-700">
+                Ожидаем решение по продаже от игроков: {waitingStockSellerNames.join(", ")}.
               </p>
             ) : null}
             <div
@@ -4750,16 +4953,18 @@ function ActionsPanel({
                 disabled={
                   !canResolveLatestDeal ||
                   !canAffordLatestDeal ||
+                  dealDecisionSubmitting ||
                   (Boolean(latestCard?.isStock) && !validDealQuantity)
                 }
+                aria-busy={decisionSubmission === "deal_buy"}
               >
-                Купить
+                {decisionSubmission === "deal_buy" ? "Покупаем…" : "Купить"}
               </Button>
               <Button
                 className="w-full min-w-0"
                 variant="secondary"
                 onClick={onOpenBank}
-                disabled={!canTakeLoan}
+                disabled={!canTakeLoan || dealDecisionSubmitting}
               >
                 Взять кредит
               </Button>
@@ -4767,9 +4972,10 @@ function ActionsPanel({
                 className="w-full min-w-0"
                 variant="secondary"
                 onClick={onDeclineLatest}
-                disabled={!canResolveLatestDeal}
+                disabled={!canResolveLatestDeal || dealDecisionSubmitting}
+                aria-busy={decisionSubmission === "deal_decline"}
               >
-                Отказаться
+                {decisionSubmission === "deal_decline" ? "Отказываемся…" : "Отказаться"}
               </Button>
             </div>
         </div>
@@ -4779,7 +4985,13 @@ function ActionsPanel({
   );
 
   const header = (
-    <div className="flex items-center justify-between gap-3">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3",
+        pinnedHeader &&
+          "sticky top-[4.5rem] z-[9] -mx-3 h-12 bg-white px-3"
+      )}
+    >
       <h2 className="text-lg font-semibold">Действия</h2>
       {headerControl ?? (
         <Button
@@ -5562,7 +5774,7 @@ function BabyGiftComposer({
         <Button
           type="button"
           variant="secondary"
-          className="h-11 w-11 shrink-0 px-0"
+          className="h-[50px] w-[50px] shrink-0 rounded-[15px] border-0 bg-[#e8effe] px-0 text-journey shadow-[0_6px_16px_rgba(41,103,223,.14)] hover:bg-[#dbe7ff]"
           onClick={() => changeAmount(-100)}
           disabled={submitting || normalizedAmount <= 1}
           aria-label="Уменьшить сумму поздравления на 100 долларов"
@@ -5571,7 +5783,7 @@ function BabyGiftComposer({
           <Minus size={17} aria-hidden="true" />
         </Button>
         <Input
-          className="min-w-[120px] flex-1 font-bold"
+          className="h-[50px] min-w-[120px] flex-1 font-bold"
           type="number"
           inputMode="numeric"
           min={1}
@@ -5590,7 +5802,7 @@ function BabyGiftComposer({
         <Button
           type="button"
           variant="secondary"
-          className="h-11 w-11 shrink-0 px-0"
+          className="h-[50px] w-[50px] shrink-0 rounded-[15px] border-0 bg-[#e8effe] px-0 text-journey shadow-[0_6px_16px_rgba(41,103,223,.14)] hover:bg-[#dbe7ff]"
           onClick={() => changeAmount(100)}
           disabled={submitting || normalizedAmount >= currentCashCents}
           aria-label="Увеличить сумму поздравления на 100 долларов"
@@ -5601,12 +5813,18 @@ function BabyGiftComposer({
         <Button
           type="button"
           variant="action"
-          className="h-11 min-w-[118px] gap-2 px-3"
+          className="h-[50px] w-[50px] shrink-0 rounded-[15px] px-0"
           onClick={() => void submitGift()}
           disabled={!validAmount || submitting || gamePaused}
+          aria-label={submitting ? "Отправляем поздравление" : "Отправить поздравление"}
+          aria-busy={submitting}
+          title={submitting ? "Отправляем поздравление" : "Отправить поздравление"}
         >
-          <Send size={16} aria-hidden="true" />
-          {submitting ? "Отправляем…" : "Отправить"}
+          <Heart
+            size={19}
+            className={submitting ? "motion-safe:animate-pulse" : undefined}
+            aria-hidden="true"
+          />
         </Button>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-xs text-[#5d4a27]">
@@ -7102,7 +7320,7 @@ function SectionList({
 }: {
   title: string;
   titleAlign?: "left" | "right";
-  rows: Array<{ id: string; label: string; value: string }>;
+  rows: Array<{ id: string; label: string; value: string; calculation?: string | null }>;
 }) {
   return (
     <div>
@@ -7119,14 +7337,41 @@ function SectionList({
       ) : (
         <div className="space-y-2">
           {rows.map((row) => (
-            <div key={row.id} className="flex min-w-0 justify-between gap-3 text-sm">
+            <div key={row.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
               <span className="min-w-0 break-words">{row.label}</span>
-              <span className="shrink-0 font-medium">{row.value}</span>
+              <span className="flex shrink-0 flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
+                {row.calculation ? (
+                  <span className="text-xs text-neutral-500">{row.calculation}</span>
+                ) : null}
+                <span className="font-medium">{row.value}</span>
+              </span>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function ChildrenMarks({ count, size = "md" }: { count: number; size?: "sm" | "md" }) {
+  if (count <= 0) return null;
+
+  return (
+    <span
+      className="flex shrink-0 items-center gap-0.5 text-[#718866]"
+      role="img"
+      aria-label={`Детей: ${count}`}
+      title={`Детей: ${count}`}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <Baby
+          key={index}
+          size={size === "sm" ? 14 : 16}
+          strokeWidth={2.25}
+          aria-hidden="true"
+        />
+      ))}
+    </span>
   );
 }
 
@@ -7176,7 +7421,7 @@ function latestDealCard(
       ? Math.abs(cashDelta)
       : isStock
         ? priceCents
-        : metaCents(meta, "down_payment") || priceCents;
+        : dealDownPaymentAmount(meta, priceCents);
 
   return {
     cardId: Number(event.payload.id),

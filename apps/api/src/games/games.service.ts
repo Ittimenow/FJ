@@ -21,6 +21,7 @@ import {
 } from "@prisma/client";
 import {
   cardActionTypes,
+  dealDownPaymentAmount,
   isBabyGiftWindowOpen,
   canEscapeRatRace,
   legacyCardEffectAliases,
@@ -1518,7 +1519,7 @@ export class GamesService {
           ? BigInt(Math.abs(cents(cashEffectAmount)))
           : stockDeal
             ? unitPriceCents
-            : this.metaMoneyCents(meta, "down_payment") || unitPriceCents;
+            : BigInt(dealDownPaymentAmount(meta, Number(unitPriceCents)));
       const cashflowCents =
         cashflowEffectAmount ?? BigInt(Math.round(Number(meta.cashflow_monthly ?? "0")));
       const assetSymbol = stockDeal ? this.stockSymbol(card, meta) : meta.symbol;

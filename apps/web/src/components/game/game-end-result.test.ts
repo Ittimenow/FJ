@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { gameEndPresentation } from "./game-end-result";
 
-test("показывает кубок и имя установленного победителя", () => {
+test("оставляет победное состояние без иконки и подписи", () => {
   assert.deepEqual(gameEndPresentation({ reason: null, winnerName: "Анна" }), {
-    icon: "trophy",
+    icon: null,
     tone: "victory",
     title: "Победа!",
-    description: "Анна достиг финансовой свободы"
+    description: null
   });
 });
 
 test("классифицирует все серверные причины завершения", () => {
   const cases = [
-    ["financial_freedom", "trophy", "Победа!"],
+    ["financial_freedom", null, "Победа!"],
     ["bots_eliminated", "shield-check", "Вы победили!"],
     ["time_limit", "hourglass", "Время истекло"],
     ["human_bankrupt", "user-x", "Вы выбыли"],
