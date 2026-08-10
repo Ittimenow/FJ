@@ -32,6 +32,7 @@ import {
   UpdateTelegramChannelPostDto
 } from "./publications.dto";
 import { composeSeriesPost, type TelegramPostSource } from "./telegram-post.logic";
+import { sendTelegramPhoto } from "./telegram-photo";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -315,36 +316,23 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
       data: { status: SummaryStatus.PUBLISHING, attempts: { increment: 1 }, lastError: null }
     });
     try {
-      const response = await fetch(`https://api.telegram.org/bot${this.botToken}/sendPhoto`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: summary.announcement.discussionChatId,
-          photo: `${this.publicUrl}/results/${summary.id}/opengraph-image`,
-          caption: telegramCaption(summary.body),
-          reply_parameters: {
-            message_id: summary.announcement.discussionMessageId,
-            allow_sending_without_reply: false
-          }
-        }),
-        signal: AbortSignal.timeout(15_000)
+      const result = await sendTelegramPhoto(this.botToken, {
+        chatId: summary.announcement.discussionChatId,
+        photoUrl: `${this.publicUrl}/results/${summary.id}/opengraph-image`,
+        caption: telegramCaption(summary.body),
+        replyParameters: {
+          message_id: summary.announcement.discussionMessageId,
+          allow_sending_without_reply: false
+        }
       });
-      const payload = await response.json() as {
-        ok?: boolean;
-        description?: string;
-        result?: { message_id?: number; chat?: { id?: number | string } };
-      };
-      if (!response.ok || !payload.ok || !payload.result?.message_id) {
-        throw new Error(payload.description || `Telegram вернул статус ${response.status}`);
-      }
       return toSerializable(await this.prisma.gameSummary.update({
         where: { id },
         data: {
           status: SummaryStatus.PUBLISHED,
           visibleOnSite: true,
           sitePublishedAt: summary.sitePublishedAt ?? new Date(),
-          telegramMessageId: payload.result.message_id,
-          telegramChatId: String(payload.result.chat?.id ?? summary.announcement.discussionChatId),
+          telegramMessageId: result.message_id,
+          telegramChatId: String(result.chat?.id ?? summary.announcement.discussionChatId),
           publishedAt: new Date(),
           lastError: null
         }
@@ -443,35 +431,22 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
       data: { status: TelegramPostStatus.PUBLISHING, attempts: { increment: 1 }, lastError: null }
     });
     try {
-      const response = await fetch(`https://api.telegram.org/bot${this.botToken}/sendPhoto`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: post.channelChatId,
-          photo: `${this.publicUrl}/telegram-publications/${post.id}/opengraph-image`,
-          caption: post.body
-        }),
-        signal: AbortSignal.timeout(15_000)
+      const result = await sendTelegramPhoto(this.botToken, {
+        chatId: post.channelChatId,
+        photoUrl: `${this.publicUrl}/telegram-publications/${post.id}/opengraph-image`,
+        caption: post.body
       });
-      const payload = await response.json() as {
-        ok?: boolean;
-        description?: string;
-        result?: { message_id?: number; chat?: { id?: number | string; username?: string } };
-      };
-      if (!response.ok || !payload.ok || !payload.result?.message_id) {
-        throw new Error(payload.description || `Telegram вернул статус ${response.status}`);
-      }
-      const username = payload.result.chat?.username
+      const username = result.chat?.username
         ?? (post.channelChatId.startsWith("@") ? post.channelChatId.slice(1) : null);
       const telegramPostUrl = username
-        ? `https://t.me/${username}/${payload.result.message_id}`
+        ? `https://t.me/${username}/${result.message_id}`
         : null;
       return toSerializable(await this.prisma.telegramChannelPost.update({
         where: { id },
         data: {
           status: TelegramPostStatus.PUBLISHED,
-          telegramMessageId: payload.result.message_id,
-          telegramChatId: String(payload.result.chat?.id ?? post.channelChatId),
+          telegramMessageId: result.message_id,
+          telegramChatId: String(result.chat?.id ?? post.channelChatId),
           telegramPostUrl,
           publishedAt: new Date(),
           lastError: null

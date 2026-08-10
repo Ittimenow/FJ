@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "upload-telegram-publication-images",
+          "category": "fix",
+          "summary": "Карточки итогов игр теперь загружаются в Telegram напрямую и публикуются даже тогда, когда Telegram не может получить изображение по внешней ссылке."
+        },
+        {
           "id": "keep-mobile-player-tab-after-dice-roll",
           "category": "improvement",
           "summary": "При старте игры на мобильном устройстве первой открывается информация об игроке, а после броска кубиков выбранная вкладка больше не переключается автоматически."
