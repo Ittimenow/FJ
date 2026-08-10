@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ExternalLink, ImageIcon, Layers3, LoaderCircle, Plus, RefreshCw, Send, Sparkles } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ExternalLink, ImageIcon, ImageOff, Layers3, LoaderCircle, Plus, RefreshCw, RotateCcw, Send, Sparkles } from "lucide-react";
 import { FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,10 +58,22 @@ type Overview = {
   channelPosts: ChannelPost[];
 };
 
+type ActionFeedback = {
+  kind: "error" | "success";
+  message: string;
+};
+
+type RunAction = (
+  key: string,
+  action: () => Promise<unknown>,
+  successMessage?: string
+) => Promise<void>;
+
 export function AdminPublicationsPanel({ token }: { token: string }) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, ActionFeedback>>({});
 
   async function request(path: string, init?: RequestInit) {
     const response = await fetch(`${publicApiBaseUrl()}/api/admin/publications${path}`, {
@@ -102,7 +114,7 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setBusy("announcement");
-    setError(null);
+    setFeedback((current) => omitKey(current, "announcement"));
     try {
       await request("/announcements", {
         method: "POST",
@@ -116,21 +128,43 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
       });
       event.currentTarget.reset();
       await load();
+      setFeedback((current) => ({
+        ...current,
+        announcement: { kind: "success", message: "Анонс подключён к обсуждению." }
+      }));
     } catch (createError) {
-      setError(message(createError));
+      setFeedback((current) => ({
+        ...current,
+        announcement: { kind: "error", message: message(createError) }
+      }));
     } finally {
       setBusy(null);
     }
   }
 
-  async function act(key: string, action: () => Promise<unknown>) {
+  async function act(key: string, action: () => Promise<unknown>, successMessage?: string) {
     setBusy(key);
-    setError(null);
+    setFeedback((current) => omitKey(current, key));
     try {
       await action();
       await load();
+      if (successMessage) {
+        setFeedback((current) => ({
+          ...current,
+          [key]: { kind: "success", message: successMessage }
+        }));
+      }
     } catch (actionError) {
-      setError(message(actionError));
+      const actionMessage = message(actionError);
+      try {
+        setOverview(await request(""));
+      } catch (refreshError) {
+        setError(message(refreshError));
+      }
+      setFeedback((current) => ({
+        ...current,
+        [key]: { kind: "error", message: actionMessage }
+      }));
     } finally {
       setBusy(null);
     }
@@ -148,19 +182,17 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
   const activeAnnouncement = overview.announcements.find((item) => item.isActive);
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-6">
       <section className="rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-extrabold tracking-[-0.025em]">Итоги игр</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-              Система собирает факты из журнала, готовит карточку и публикует её в обсуждении выбранного анонса.
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold">
-            {activeAnnouncement ? `Активен: ${activeAnnouncement.title}` : "Анонс не настроен"}
-          </div>
-        </div>
+        <h2 className="text-2xl font-extrabold tracking-[-0.025em]">Публикация итогов в Telegram</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
+          Создайте отдельный пост в канале: выберите завершённые игры, проверьте текст и карточку, затем отправьте публикацию.
+        </p>
+        <ol className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-white/85" aria-label="Этапы публикации">
+          <li>1. Выбрать игры и канал</li>
+          <li>2. Проверить текст и изображение</li>
+          <li>3. Опубликовать пост</li>
+        </ol>
       </section>
 
       {error ? (
@@ -173,6 +205,7 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
         summaries={overview.summaries}
         defaultChannel={activeAnnouncement?.channelChatId ?? "@playcashflowmoscow"}
         busy={busy}
+        feedback={feedback["channel-post-new"]}
         onAction={act}
         request={request}
       />
@@ -180,9 +213,9 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
       <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-xl font-extrabold">Новые посты в канал</h3>
+            <h3 className="text-xl font-extrabold">2. Проверьте и опубликуйте</h3>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
-              Черновики публикуются как самостоятельные посты с изображением, а не как комментарии к анонсу.
+              Отредактируйте текст, убедитесь, что карточка загрузилась, и отправьте готовый пост непосредственно в канал.
             </p>
           </div>
           <Button variant="secondary" onClick={() => void load()}>
@@ -195,86 +228,22 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
               key={`${post.id}-${post.generationVersion}-${post.status}`}
               post={post}
               busy={busy}
+              feedback={feedback[`channel-post-${post.id}`]}
               onAction={act}
               request={request}
             />
           )) : (
             <div className="rounded-xl bg-card p-5 text-sm text-muted">
-              Выберите одну игру или серию выше — здесь появится готовый к проверке черновик.
+              После выбора игр здесь появится текст, изображение и кнопка публикации.
             </div>
           )}
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,.8fr)_minmax(380px,1.2fr)]">
-          <div>
-            <h3 className="text-xl font-extrabold">Куда публиковать</h3>
-            <p className="mt-1 text-sm leading-6 text-muted">
-              Вставьте ссылку на пост-анонс и идентификаторы его корневого сообщения в связанной группе обсуждений.
-            </p>
-            <form className="mt-5 grid gap-4" onSubmit={createAnnouncement}>
-              <Field label="Название анонса">
-                <Input name="title" required placeholder="Игра 7 августа" />
-              </Field>
-              <Field label="Ссылка на пост Telegram">
-                <Input name="postUrl" type="url" required placeholder="https://t.me/playcashflowmoscow/29" />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="ID группы обсуждений">
-                  <Input name="discussionChatId" required placeholder="-1001234567890" />
-                </Field>
-                <Field label="ID сообщения обсуждения">
-                  <Input name="discussionMessageId" inputMode="numeric" required placeholder="29" />
-                </Field>
-              </div>
-              <Field label="Режим">
-                <select name="mode" defaultValue="DRAFT" className="h-[50px] rounded-xl border border-line bg-white px-3 text-sm font-bold text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
-                  <option value="DRAFT">Черновик — проверить перед отправкой</option>
-                  <option value="AUTOMATIC">Автоматически после завершения</option>
-                  <option value="DISABLED">Не отправлять в Telegram</option>
-                </select>
-              </Field>
-              <Button type="submit" variant="action" disabled={busy === "announcement"}>
-                <Send className="mr-2" size={17} aria-hidden="true" />
-                {busy === "announcement" ? "Сохраняем…" : "Подключить анонс"}
-              </Button>
-            </form>
-          </div>
-
-          <div className="min-w-0 rounded-xl bg-card p-4 sm:p-5">
-            <h3 className="text-base font-extrabold">Подключённые анонсы</h3>
-            <div className="mt-3 space-y-3">
-              {overview.announcements.length ? overview.announcements.map((announcement) => (
-                <div key={announcement.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong>{announcement.title}</strong>
-                      <Badge className={announcement.isActive ? "bg-green-100 font-bold text-success" : "bg-card font-bold text-muted"}>
-                        {announcement.isActive ? "Активен" : "Архив"}
-                      </Badge>
-                      <Badge className="bg-[#e8effe] font-bold text-journey">{modeLabel(announcement.mode)}</Badge>
-                    </div>
-                    <p className="mt-1 truncate text-xs text-muted">
-                      @{announcement.channelUsername} · обсуждение {announcement.discussionChatId ?? "не указано"}/{announcement.discussionMessageId ?? "—"}
-                    </p>
-                  </div>
-                  <a className="inline-flex h-10 items-center font-bold text-journey" href={announcement.postUrl} target="_blank" rel="noreferrer">
-                    Открыть <ExternalLink className="ml-1" size={15} aria-hidden="true" />
-                  </a>
-                </div>
-              )) : (
-                <p className="rounded-xl bg-white p-4 text-sm text-muted">Пока нет ни одного анонса.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {overview.eligibleGames.length ? (
         <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
-          <h3 className="text-xl font-extrabold">Игры без саммари</h3>
-          <p className="mt-1 text-sm text-muted">Можно обработать партии, завершённые до подключения автоматизации.</p>
+          <h3 className="text-xl font-extrabold">Завершённые игры без текста итогов</h3>
+          <p className="mt-1 text-sm text-muted">Создайте саммари, чтобы игра стала доступна для нового поста в Telegram.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {overview.eligibleGames.map((game) => (
               <div key={game.id} className="flex items-center justify-between gap-3 rounded-xl bg-card p-4">
@@ -285,7 +254,11 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
                 <Button
                   variant="secondary"
                   disabled={busy === game.id}
-                  onClick={() => void act(game.id, () => request(`/games/${game.id}/generate`, { method: "POST" }))}
+                  onClick={() => void act(
+                    game.id,
+                    () => request(`/games/${game.id}/generate`, { method: "POST" }),
+                    "Саммари создано — игру можно выбрать для публикации."
+                  )}
                 >
                   <Sparkles className="mr-2" size={16} aria-hidden="true" />
                   Создать
@@ -299,8 +272,8 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
       <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-xl font-extrabold">Очередь публикаций</h3>
-            <p className="mt-1 text-sm text-muted">Текст можно поправить до отправки, а карточку сайта — скрыть независимо.</p>
+            <h3 className="text-xl font-extrabold">Саммари завершённых игр</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">Эти тексты служат основой для постов. Здесь их можно пересобрать или отредактировать; отправка в обсуждение анонса доступна как дополнительный сценарий.</p>
           </div>
           <Button variant="secondary" onClick={() => void load()}>
             <RefreshCw className="mr-2" size={16} aria-hidden="true" /> Обновить
@@ -313,14 +286,89 @@ export function AdminPublicationsPanel({ token }: { token: string }) {
               summary={summary}
               announcements={overview.announcements}
               busy={busy}
+              feedback={feedback[`summary-${summary.id}`]}
               onAction={act}
               request={request}
             />
           )) : (
-            <div className="rounded-xl bg-card p-5 text-sm text-muted">После завершения следующей игры здесь появится готовый черновик.</div>
+            <div className="rounded-xl bg-card p-5 text-sm text-muted">После завершения игры здесь появится автоматически подготовленный текст итогов.</div>
           )}
         </div>
       </section>
+
+      <details className="group rounded-2xl bg-white p-5 shadow-panel sm:p-6">
+        <summary className="flex cursor-pointer list-none flex-col gap-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-xl font-extrabold">Публикация в обсуждение анонса</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">Дополнительный сценарий: отправить саммари комментарием под существующим постом канала.</p>
+          </div>
+          <span className="text-sm font-bold text-journey">
+            {activeAnnouncement ? `Анонс для комментариев: ${activeAnnouncement.title}` : "Комментарии к анонсу не настроены"}
+          </span>
+        </summary>
+
+        <div className="mt-6 grid gap-6 border-t border-line pt-6 xl:grid-cols-[minmax(0,.8fr)_minmax(380px,1.2fr)]">
+          <div>
+            <h4 className="text-lg font-extrabold">Подключить анонс и обсуждение</h4>
+            <p className="mt-1 text-sm leading-6 text-muted">Укажите существующий пост канала и корневое сообщение в связанной группе обсуждений.</p>
+            <form className="mt-5 grid gap-4" onSubmit={createAnnouncement}>
+              <Field label="Понятное название настройки">
+                <Input name="title" required placeholder="Игра 10 августа" />
+              </Field>
+              <Field label="Ссылка на пост-анонс в Telegram">
+                <Input name="postUrl" type="url" required placeholder="https://t.me/playcashflowmoscow/29" />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="ID группы обсуждений">
+                  <Input name="discussionChatId" required placeholder="-1001234567890" />
+                </Field>
+                <Field label="ID корневого сообщения">
+                  <Input name="discussionMessageId" inputMode="numeric" required placeholder="29" />
+                </Field>
+              </div>
+              <Field label="Когда отправлять комментарий">
+                <select name="mode" defaultValue="DRAFT" className="h-[50px] rounded-xl border border-line bg-white px-3 text-sm font-bold text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+                  <option value="DRAFT">Только вручную после проверки</option>
+                  <option value="AUTOMATIC">Автоматически после завершения игры</option>
+                  <option value="DISABLED">Не отправлять комментарии</option>
+                </select>
+              </Field>
+              <Button type="submit" variant="action" disabled={busy === "announcement"}>
+                <Send className="mr-2" size={17} aria-hidden="true" />
+                {busy === "announcement" ? "Подключаем…" : "Подключить обсуждение"}
+              </Button>
+              <ActionMessage feedback={feedback.announcement} />
+            </form>
+          </div>
+
+          <div className="min-w-0 rounded-xl bg-card p-4 sm:p-5">
+            <h4 className="text-base font-extrabold">Настроенные анонсы</h4>
+            <div className="mt-3 space-y-3">
+              {overview.announcements.length ? overview.announcements.map((announcement) => (
+                <div key={announcement.id} className="flex flex-col gap-3 rounded-xl bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong>{announcement.title}</strong>
+                      <Badge className={announcement.isActive ? "bg-green-100 font-bold text-success" : "bg-card font-bold text-muted"}>
+                        {announcement.isActive ? "Для новых комментариев" : "Архив"}
+                      </Badge>
+                      <Badge className="bg-[#e8effe] font-bold text-journey">{modeLabel(announcement.mode)}</Badge>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted">
+                      @{announcement.channelUsername} · группа {announcement.discussionChatId ?? "не указана"} · сообщение {announcement.discussionMessageId ?? "—"}
+                    </p>
+                  </div>
+                  <a className="inline-flex h-10 items-center font-bold text-journey" href={announcement.postUrl} target="_blank" rel="noreferrer">
+                    Открыть анонс <ExternalLink className="ml-1" size={15} aria-hidden="true" />
+                  </a>
+                </div>
+              )) : (
+                <p className="rounded-xl bg-white p-4 text-sm text-muted">Нет настроенных анонсов. Для самостоятельных постов в канал эта настройка не нужна.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -329,13 +377,15 @@ function NewChannelPostComposer({
   summaries,
   defaultChannel,
   busy,
+  feedback,
   onAction,
   request
 }: {
   summaries: Summary[];
   defaultChannel: string;
   busy: string | null;
-  onAction: (key: string, action: () => Promise<unknown>) => Promise<void>;
+  feedback?: ActionFeedback | undefined;
+  onAction: RunAction;
   request: (path: string, init?: RequestInit) => Promise<unknown>;
 }) {
   const [kind, setKind] = useState<ChannelPost["kind"]>("SINGLE_GAME");
@@ -365,9 +415,9 @@ function NewChannelPostComposer({
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-action text-ink">
             <Plus size={23} strokeWidth={2.5} aria-hidden="true" />
           </div>
-          <h3 className="mt-5 text-2xl font-extrabold tracking-[-0.025em]">Создать новый пост</h3>
+          <h3 className="mt-5 text-2xl font-extrabold tracking-[-0.025em]">1. Выберите игры и канал</h3>
           <p className="mt-2 max-w-xl text-sm leading-6 text-white/70">
-            Соберите самостоятельную публикацию для канала из одной завершённой игры или общей серии.
+            Выберите одну игру или серию. Система подготовит текст и изображение, но ничего не отправит без отдельного подтверждения.
           </p>
           <div className="mt-5 grid grid-cols-2 gap-2 rounded-xl bg-white/10 p-1.5" aria-label="Тип публикации">
             {(["SINGLE_GAME", "GAME_SERIES"] as const).map((value) => (
@@ -396,19 +446,24 @@ function NewChannelPostComposer({
             variant="action"
             className="mt-5 w-full"
             disabled={!valid || !channelChatId.trim() || isBusy}
-            onClick={() => void onAction("channel-post-new", async () => {
-              await request("/channel-posts", {
-                method: "POST",
-                body: JSON.stringify({ kind, summaryIds: selected, channelChatId: channelChatId.trim() })
-              });
-              setSelected([]);
-            })}
+            onClick={() => void onAction(
+              "channel-post-new",
+              async () => {
+                await request("/channel-posts", {
+                  method: "POST",
+                  body: JSON.stringify({ kind, summaryIds: selected, channelChatId: channelChatId.trim() })
+                });
+                setSelected([]);
+              },
+              "Черновик готов — проверьте его в следующем разделе."
+            )}
           >
             <Sparkles className="mr-2" size={17} aria-hidden="true" />
-            {isBusy ? "Собираем…" : "Создать черновик"}
+            {isBusy ? "Готовим пост…" : "Подготовить пост для проверки"}
           </Button>
+          <ActionMessage feedback={feedback} inverted />
           <p className="mt-3 text-xs leading-5 text-white/55">
-            {kind === "SINGLE_GAME" ? "Выберите одну игру." : `Выберите от 2 до 8 игр. Сейчас выбрано: ${selected.length}.`}
+            {kind === "SINGLE_GAME" ? "Для поста выберите одну игру в списке справа." : `Для серии выберите от 2 до 8 игр. Сейчас выбрано: ${selected.length}.`}
           </p>
         </div>
 
@@ -416,7 +471,7 @@ function NewChannelPostComposer({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h4 className="text-base font-extrabold">Завершённые игры</h4>
-              <p className="mt-1 text-xs text-muted">Доступны партии с уже созданным саммари.</p>
+              <p className="mt-1 text-xs text-muted">В список попадают игры, для которых уже подготовлен текст итогов.</p>
             </div>
             <span className="rounded-lg bg-card px-3 py-2 text-xs font-extrabold text-muted">{candidates.length}</span>
           </div>
@@ -446,7 +501,7 @@ function NewChannelPostComposer({
                 </label>
               );
             }) : (
-              <p className="rounded-xl bg-card p-4 text-sm text-muted">Сначала завершите игру и создайте для неё саммари.</p>
+              <p className="rounded-xl bg-card p-4 text-sm text-muted">Нет готовых игр. Ниже создайте саммари для завершённой партии.</p>
             )}
           </div>
         </div>
@@ -458,12 +513,14 @@ function NewChannelPostComposer({
 function ChannelPostEditor({
   post,
   busy,
+  feedback,
   onAction,
   request
 }: {
   post: ChannelPost;
   busy: string | null;
-  onAction: (key: string, action: () => Promise<unknown>) => Promise<void>;
+  feedback?: ActionFeedback | undefined;
+  onAction: RunAction;
   request: (path: string, init?: RequestInit) => Promise<unknown>;
 }) {
   const [title, setTitle] = useState(post.title);
@@ -491,7 +548,9 @@ function ChannelPostEditor({
         <div className="mt-3 flex flex-wrap gap-1.5">
           {games.map((game) => <span key={game.id} className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-muted">{game.title}</span>)}
         </div>
-        {post.lastError ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-800">{post.lastError}</p> : null}
+        <ActionMessage
+          feedback={feedback ?? (post.lastError ? { kind: "error", message: post.lastError } : undefined)}
+        />
         <div className="mt-4 grid gap-3">
           <Input value={title} onChange={(event) => setTitle(event.target.value)} disabled={published} aria-label="Заголовок нового Telegram-поста" />
           <textarea
@@ -511,17 +570,27 @@ function ChannelPostEditor({
         <div className="mt-4 flex flex-wrap gap-2">
           {!published ? (
             <>
-              <Button variant="secondary" disabled={isBusy || title.trim().length < 2 || body.trim().length < 10} onClick={() => void onAction(key, save)}>Сохранить</Button>
+              <Button
+                variant="secondary"
+                disabled={isBusy || title.trim().length < 2 || body.trim().length < 10}
+                onClick={() => void onAction(key, save, "Изменения сохранены, карточка обновлена.")}
+              >
+                Сохранить изменения
+              </Button>
               <Button
                 variant="action"
                 disabled={isBusy || title.trim().length < 2 || body.trim().length < 10 || !channelChatId.trim()}
-                onClick={() => void onAction(key, async () => {
-                  await save();
-                  return request(`/channel-posts/${post.id}/publish`, { method: "POST" });
-                })}
+                onClick={() => void onAction(
+                  key,
+                  async () => {
+                    await save();
+                    return request(`/channel-posts/${post.id}/publish`, { method: "POST" });
+                  },
+                  "Пост опубликован в Telegram-канале."
+                )}
               >
                 <Send className="mr-2" size={16} aria-hidden="true" />
-                {isBusy ? "Отправляем…" : "Опубликовать новый пост"}
+                {isBusy ? "Сохраняем и отправляем…" : "Опубликовать в канал"}
               </Button>
             </>
           ) : post.telegramPostUrl ? (
@@ -531,14 +600,11 @@ function ChannelPostEditor({
           ) : <span className="text-sm font-bold text-success">Пост опубликован</span>}
         </div>
       </div>
-      <div className="self-start rounded-xl bg-white p-3">
-        <img
-          src={`/telegram-publications/${post.id}/opengraph-image?v=${post.generationVersion}`}
-          alt={`Карточка Telegram-публикации «${post.title}»`}
-          className="aspect-[1200/630] w-full rounded-lg object-cover shadow-[0_8px_22px_rgba(23,36,63,.12)]"
-        />
-        <p className="mt-3 px-1 text-xs leading-5 text-muted">Изображение обновится после сохранения заголовка.</p>
-      </div>
+      <PublicationImagePreview
+        src={`/telegram-publications/${post.id}/opengraph-image?v=${post.generationVersion}`}
+        alt={`Карточка Telegram-публикации «${post.title}»`}
+        description="Карточка собирается автоматически из сохранённого заголовка и результатов игр. Сохраните изменения, чтобы обновить её."
+      />
     </article>
   );
 }
@@ -547,13 +613,15 @@ function SummaryEditor({
   summary,
   announcements,
   busy,
+  feedback,
   onAction,
   request
 }: {
   summary: Summary;
   announcements: Announcement[];
   busy: string | null;
-  onAction: (key: string, action: () => Promise<unknown>) => Promise<void>;
+  feedback?: ActionFeedback | undefined;
+  onAction: RunAction;
   request: (path: string, init?: RequestInit) => Promise<unknown>;
 }) {
   const [headline, setHeadline] = useState(summary.headline ?? "");
@@ -569,10 +637,12 @@ function SummaryEditor({
         <div className="flex flex-wrap items-center gap-2">
           <h4 className="text-lg font-extrabold">{summary.game.title}</h4>
           <StatusBadge status={summary.status} />
-          {summary.telegramMessageId ? <Badge className="bg-green-100 font-bold text-success">Отправлено в Telegram</Badge> : null}
+          {summary.telegramMessageId ? <Badge className="bg-green-100 font-bold text-success">Опубликовано в обсуждении</Badge> : null}
         </div>
         <p className="mt-1 text-xs text-muted">{summary.game.code} · {summary.game.currentRound} раундов</p>
-        {summary.lastError ? <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-800">{summary.lastError}</p> : null}
+        <ActionMessage
+          feedback={feedback ?? (summary.lastError ? { kind: "error", message: summary.lastError } : undefined)}
+        />
         <div className="mt-4 grid gap-3">
           <Input value={headline} onChange={(event) => setHeadline(event.target.value)} aria-label="Заголовок саммари" />
           <textarea
@@ -582,16 +652,6 @@ function SummaryEditor({
             rows={9}
             className="w-full resize-y rounded-xl border border-line bg-white px-4 py-3 text-sm leading-6 text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
           />
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-            <select value={announcementId} onChange={(event) => setAnnouncementId(event.target.value)} className="h-11 rounded-xl border border-line bg-white px-3 text-sm font-bold text-ink">
-              <option value="">Без Telegram-анонса</option>
-              {announcements.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-            </select>
-            <label className="flex items-center gap-2 text-sm font-bold text-ink">
-              <input type="checkbox" checked={visibleOnSite} onChange={(event) => setVisibleOnSite(event.target.checked)} className="h-4 w-4 accent-journey" />
-              Показывать на сайте
-            </label>
-          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -600,37 +660,63 @@ function SummaryEditor({
             onClick={() => void onAction(key, () => request(`/summaries/${summary.id}`, {
               method: "PATCH",
               body: JSON.stringify({ headline, body, ...(announcementId ? { announcementId } : {}), visibleOnSite })
-            }))}
-          >Сохранить</Button>
+            }), "Текст саммари сохранён.")}
+          >Сохранить текст</Button>
           <Button
             variant="ghost"
             disabled={isBusy || Boolean(summary.telegramMessageId)}
-            onClick={() => void onAction(key, () => request(`/games/${summary.gameId}/generate`, { method: "POST" }))}
+            onClick={() => void onAction(
+              key,
+              () => request(`/games/${summary.gameId}/generate`, { method: "POST" }),
+              "Саммари пересобрано по журналу игры."
+            )}
           >
             <Sparkles className="mr-2" size={16} aria-hidden="true" /> Пересобрать
           </Button>
-          <Button
-            variant="action"
-            disabled={isBusy || Boolean(summary.telegramMessageId) || !announcementId}
-            onClick={() => void onAction(key, async () => {
-              await request(`/summaries/${summary.id}`, {
-                method: "PATCH",
-                body: JSON.stringify({ headline, body, announcementId, visibleOnSite: true })
-              });
-              return request(`/summaries/${summary.id}/publish`, { method: "POST" });
-            })}
-          >
-            <Send className="mr-2" size={16} aria-hidden="true" />
-            {summary.telegramMessageId ? "Опубликовано" : "Опубликовать"}
-          </Button>
         </div>
+        <details className="mt-4 rounded-xl bg-white p-4">
+          <summary className="cursor-pointer text-sm font-extrabold text-journey focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+            Дополнительно: сайт и комментарий к анонсу
+          </summary>
+          <div className="mt-4 grid gap-3">
+            <label className="grid gap-2 text-sm font-bold text-ink">
+              <span>Анонс, под которым появится комментарий</span>
+              <select value={announcementId} onChange={(event) => setAnnouncementId(event.target.value)} className="h-11 rounded-xl border border-line bg-white px-3 text-sm font-bold text-ink">
+                <option value="">Не публиковать в обсуждение</option>
+                {announcements.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-ink">
+              <input type="checkbox" checked={visibleOnSite} onChange={(event) => setVisibleOnSite(event.target.checked)} className="h-4 w-4 accent-journey" />
+              Показывать итоги на сайте
+            </label>
+            <Button
+              variant="action"
+              disabled={isBusy || Boolean(summary.telegramMessageId) || !announcementId}
+              onClick={() => void onAction(
+                key,
+                async () => {
+                  await request(`/summaries/${summary.id}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ headline, body, announcementId, visibleOnSite: true })
+                  });
+                  return request(`/summaries/${summary.id}/publish`, { method: "POST" });
+                },
+                "Саммари опубликовано в обсуждении выбранного анонса."
+              )}
+            >
+              <Send className="mr-2" size={16} aria-hidden="true" />
+              {summary.telegramMessageId ? "Комментарий опубликован" : "Опубликовать в обсуждение"}
+            </Button>
+          </div>
+        </details>
       </div>
       <div className="flex min-h-48 flex-col items-center justify-center rounded-xl bg-white p-4 text-center">
         {summary.visibleOnSite || summary.status === "PUBLISHED" ? (
-          <img
+          <PublicationImagePreview
             src={`/results/${summary.id}/opengraph-image?v=${summary.generationVersion}`}
             alt={`Карточка результатов игры «${summary.game.title}»`}
-            className="aspect-[1200/630] w-full rounded-lg object-cover shadow-[0_8px_22px_rgba(23,36,63,.12)]"
+            description="Карточка сайта формируется автоматически из сохранённого саммари."
           />
         ) : (
           <>
@@ -641,6 +727,84 @@ function SummaryEditor({
         )}
       </div>
     </article>
+  );
+}
+
+function PublicationImagePreview({
+  src,
+  alt,
+  description
+}: {
+  src: string;
+  alt: string;
+  description: string;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const separator = src.includes("?") ? "&" : "?";
+  const imageUrl = `${src}${separator}attempt=${attempt}`;
+
+  useEffect(() => {
+    setState("loading");
+    setAttempt(0);
+  }, [src]);
+
+  return (
+    <div className="w-full self-start rounded-xl bg-white p-3">
+      <div className="relative aspect-[1200/630] overflow-hidden rounded-lg bg-card">
+        {state === "error" ? (
+          <div className="flex h-full flex-col items-center justify-center px-5 text-center" role="alert">
+            <ImageOff size={30} className="text-red-700" aria-hidden="true" />
+            <p className="mt-3 text-sm font-extrabold text-ink">Не удалось создать карточку</p>
+            <p className="mt-1 max-w-xs text-xs leading-5 text-muted">Повторите загрузку. Если ошибка сохранится, публикация в Telegram также не сможет отправить изображение.</p>
+            <button
+              type="button"
+              className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-[#e8effe] px-3 text-sm font-extrabold text-journey focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+              onClick={() => {
+                setState("loading");
+                setAttempt((current) => current + 1);
+              }}
+            >
+              <RotateCcw className="mr-2" size={15} aria-hidden="true" /> Повторить
+            </button>
+          </div>
+        ) : (
+          <>
+            <img
+              key={imageUrl}
+              src={imageUrl}
+              alt={alt}
+              onLoad={() => setState("ready")}
+              onError={() => setState("error")}
+              className={`h-full w-full object-cover transition-opacity duration-200 ${state === "ready" ? "opacity-100" : "opacity-0"}`}
+            />
+            {state === "loading" ? (
+              <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-muted" role="status">
+                <LoaderCircle className="mr-2 animate-spin text-journey" size={18} aria-hidden="true" /> Создаём карточку…
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+      <p className="mt-3 px-1 text-xs leading-5 text-muted">{description}</p>
+    </div>
+  );
+}
+
+function ActionMessage({ feedback, inverted = false }: { feedback?: ActionFeedback | undefined; inverted?: boolean }) {
+  if (!feedback) return null;
+  const success = feedback.kind === "success";
+  const styles = inverted && success
+    ? "bg-white/10 text-white"
+    : success
+      ? "bg-green-100 text-success"
+      : "bg-red-50 text-red-800";
+  const Icon = success ? CheckCircle2 : AlertCircle;
+  return (
+    <p className={`mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm font-bold ${styles}`} role={success ? "status" : "alert"}>
+      <Icon className="mt-0.5 shrink-0" size={16} aria-hidden="true" />
+      <span>{feedback.message}</span>
+    </p>
   );
 }
 
@@ -666,4 +830,10 @@ function modeLabel(mode: Announcement["mode"]) {
 
 function message(error: unknown) {
   return error instanceof Error ? error.message : "Не удалось выполнить действие";
+}
+
+function omitKey<T>(value: Record<string, T>, key: string) {
+  const next = { ...value };
+  delete next[key];
+  return next;
 }

@@ -1,5 +1,7 @@
+import React from "react";
 import { ImageResponse } from "next/og";
 import { telegramChannelPostCard } from "@/lib/telegram-posts";
+import type { TelegramChannelPostCard } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const alt = "Итоги финансовых игр";
@@ -15,6 +17,10 @@ export default async function TelegramPublicationImage({ params }: { params: Pro
       size
     );
   }
+  return new ImageResponse(<TelegramPublicationCard post={post} />, size);
+}
+
+export function TelegramPublicationCard({ post }: { post: TelegramChannelPostCard }) {
   const facts = post.items.map((item) => item.summary.facts);
   const players = unique(facts.flatMap((item) => item.players.map((player) => player.mention)));
   const rounds = facts.reduce((total, item) => total + item.rounds, 0);
@@ -24,7 +30,7 @@ export default async function TelegramPublicationImage({ params }: { params: Pro
   }));
   const firstHighlight = facts.flatMap((item) => item.highlights)[0]?.text;
 
-  return new ImageResponse(
+  return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "#faf2e8", color: "#17243f", padding: "52px 60px", fontFamily: "Arial, sans-serif" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -61,13 +67,12 @@ export default async function TelegramPublicationImage({ params }: { params: Pro
         </div>
         <div style={{ color: "#2967df", fontSize: 20, fontWeight: 800 }}>gamefj.ru</div>
       </div>
-    </div>,
-    size
+    </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 10 }}><span style={{ color: "#657597", fontSize: 16 }}>{label}</span><strong style={{ fontSize: 25 }}>{value}</strong></div>;
+  return <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}><span style={{ color: "#657597", fontSize: 16 }}>{label}</span><strong style={{ fontSize: 25 }}>{value}</strong></div>;
 }
 
 function unique(values: string[]) {

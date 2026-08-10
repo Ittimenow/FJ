@@ -56,7 +56,7 @@ export default async function ResultImage({ params }: { params: Promise<{ id: st
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 10 }}><span style={{ color: "#657597", fontSize: 16 }}>{label}</span><strong style={{ fontSize: 25 }}>{value}</strong></div>;
+  return <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}><span style={{ color: "#657597", fontSize: 16 }}>{label}</span><strong style={{ fontSize: 25 }}>{value}</strong></div>;
 }
 
 function money(value: number) {
