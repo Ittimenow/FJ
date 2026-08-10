@@ -29,6 +29,18 @@ enum SummaryStatus {
   FAILED
 }
 
+enum TelegramPostKind {
+  SINGLE_GAME
+  GAME_SERIES
+}
+
+enum TelegramPostStatus {
+  DRAFT
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
 enum GameMode {
   MULTIPLAYER
   SOLO
@@ -252,13 +264,52 @@ model GameSummary {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  game         Game                  @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  announcement TelegramAnnouncement? @relation(fields: [announcementId], references: [id], onDelete: SetNull)
+  game              Game                      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  announcement      TelegramAnnouncement?     @relation(fields: [announcementId], references: [id], onDelete: SetNull)
+  telegramPostItems TelegramChannelPostItem[]
 
   @@index([status, createdAt])
   @@index([visibleOnSite, sitePublishedAt])
   @@index([announcementId])
   @@map("game_summaries")
+}
+
+model TelegramChannelPost {
+  id                String             @id @default(uuid()) @db.Uuid
+  kind              TelegramPostKind
+  status            TelegramPostStatus @default(DRAFT)
+  title             String
+  body              String             @db.Text
+  channelChatId     String             @map("channel_chat_id")
+  generationVersion Int                @default(1) @map("generation_version")
+  telegramMessageId Int?               @map("telegram_message_id")
+  telegramChatId    String?            @map("telegram_chat_id")
+  telegramPostUrl   String?            @map("telegram_post_url")
+  publishedAt       DateTime?           @map("published_at")
+  attempts          Int                @default(0)
+  lastError         String?            @map("last_error") @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  items TelegramChannelPostItem[]
+
+  @@index([status, createdAt])
+  @@index([publishedAt])
+  @@map("telegram_channel_posts")
+}
+
+model TelegramChannelPostItem {
+  postId    String @map("post_id") @db.Uuid
+  summaryId String @map("summary_id") @db.Uuid
+  position  Int
+
+  post    TelegramChannelPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  summary GameSummary         @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+
+  @@id([postId, summaryId])
+  @@unique([postId, position])
+  @@index([summaryId])
+  @@map("telegram_channel_post_items")
 }
 
 model GamePlayer {

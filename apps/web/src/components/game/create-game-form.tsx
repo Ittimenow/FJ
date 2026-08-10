@@ -82,7 +82,8 @@ export function CreateGameForm({
           title: String(form.get("title") ?? ""),
           ...(allowCardSetSelection && cardSetId ? { cardSetId } : {}),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
-          periodCount: Number(form.get("periodCount") ?? 3)
+          periodCount: Number(form.get("periodCount") ?? 3),
+          botCount: Number(form.get("botCount") ?? 0)
         })
       });
 
@@ -155,6 +156,25 @@ export function CreateGameForm({
             <option value="6">6 периодов</option>
           </select>
         </div>
+      </div>
+      <div>
+        <label htmlFor="game-bot-count" className="mb-2 block text-sm font-extrabold text-ink">
+          Виртуальные игроки
+        </label>
+        <select
+          id="game-bot-count"
+          name="botCount"
+          defaultValue="0"
+          className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
+        >
+          <option value="0">Без ботов</option>
+          <option value="1">1 бот</option>
+          <option value="2">2 бота</option>
+          <option value="3">3 бота</option>
+        </select>
+        <p className="mt-2 text-xs leading-5 text-muted">
+          Боты появятся в лобби сразу и будут ходить по общим правилам вместе с людьми.
+        </p>
       </div>
       {allowCardSetSelection ? (
         <div>

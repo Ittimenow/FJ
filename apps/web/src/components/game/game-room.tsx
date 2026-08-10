@@ -129,6 +129,8 @@ type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed";
 type DecisionSubmission =
   | "deal_buy"
   | "deal_decline"
+  | "market_sell"
+  | "market_decline"
   | "stock_sell"
   | "stock_decline";
 
@@ -290,7 +292,9 @@ export function GameRoom({
         showTimelineAnnouncement(
           payload.reason === "period_complete"
             ? `Период ${payload.currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
-            : "Игра поставлена на паузу."
+            : payload.reason === "player_left"
+              ? "Вы вышли из игры. Партия автоматически поставлена на паузу."
+              : "Игра поставлена на паузу."
         );
       }
     );
@@ -424,9 +428,12 @@ export function GameRoom({
     .map((player) => player.figurine)
     .filter((figurine): figurine is string => Boolean(figurine));
   const playersWithoutFigurines = gamePlayers.filter((player) => !player.figurine);
+  const humanGamePlayers = gamePlayers.filter((player) => player.controller === "HUMAN");
   const startDisabledReason =
     gamePlayers.length < 2
       ? "Для старта нужны минимум два игрока."
+      : humanGamePlayers.length === 0
+        ? "Для старта нужен хотя бы один человек."
       : playersWithoutFigurines.length > 0
         ? "Все игроки должны выбрать фигурки."
         : null;
@@ -880,7 +887,9 @@ export function GameRoom({
       showTimelineAnnouncement(
         event.payload.reason === "period_complete"
           ? `Период ${currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
-          : "Игра поставлена на паузу."
+          : event.payload.reason === "player_left"
+            ? "Вы вышли из игры. Партия автоматически поставлена на паузу."
+            : "Игра поставлена на паузу."
       );
       return;
     }
@@ -931,7 +940,6 @@ export function GameRoom({
 
       setTurnAnimationPhase("landed");
       await wait(2500);
-      setTurnTabRequest((current) => current + 1);
     } catch (event) {
       stopDiceAnimation();
       setTurnAnimationPhase("ready");
@@ -1003,7 +1011,13 @@ export function GameRoom({
   }
 
   function sellMarketAsset() {
-    emit("market:sell", {});
+    if (!marketSaleOffer) return;
+    void submitDecision(
+      "market_sell",
+      "market:sell",
+      { assetId: marketSaleOffer.assetId },
+      "Не удалось продать объект"
+    );
   }
 
   function sellStockFromDeal() {
@@ -1026,7 +1040,13 @@ export function GameRoom({
   }
 
   function declineMarketSale() {
-    emit("market:decline", {});
+    if (!marketSaleOffer) return;
+    void submitDecision(
+      "market_decline",
+      "market:decline",
+      { assetId: marketSaleOffer.assetId },
+      "Не удалось отказаться от продажи"
+    );
   }
 
   function acceptCharity() {
@@ -1249,6 +1269,7 @@ export function GameRoom({
       ) : null}
       {snapshot.game.status === "PAUSED" ? (
         <GamePauseBanner
+          isSolo={isSolo}
           currentPeriod={snapshot.game.currentPeriod}
           periodCount={snapshot.game.periodCount}
           reason={snapshot.game.pauseReason}
@@ -1266,7 +1287,6 @@ export function GameRoom({
         maxCompactViewportWidth={gameRoomView === "classic" ? 1023 : 1279}
         onSkip={skipTurn}
         onRoll={() => {
-          setTurnTabRequest((current) => current + 1);
           void rollDice();
         }}
       />
@@ -1558,6 +1578,7 @@ export function GameRoom({
 }
 
 function GamePauseBanner({
+  isSolo,
   currentPeriod,
   periodCount,
   reason,
@@ -1566,25 +1587,33 @@ function GamePauseBanner({
   loading,
   onResume
 }: {
+  isSolo: boolean;
   currentPeriod: number;
   periodCount: number;
-  reason: "manual" | "period_complete" | null;
+  reason: "manual" | "period_complete" | "player_left" | null;
   remainingSeconds: number;
   canManage: boolean;
   loading: boolean;
   onResume: () => void;
 }) {
   const periodComplete = reason === "period_complete";
-  const title = periodComplete
-    ? `Период ${currentPeriod} завершён`
-    : "Игра поставлена на паузу";
-  const description = canManage
-    ? periodComplete
-      ? `Команда может отдохнуть. Когда будете готовы, начните период ${currentPeriod + 1}.`
-      : "Таймер периода остановлен. Продолжите игру, когда команда будет готова."
+  const playerLeft = reason === "player_left";
+  const title = playerLeft
+    ? "Игра остановлена после выхода"
     : periodComplete
-      ? `Следующий период начнёт ведущий или администратор. Все игровые действия временно недоступны.`
-      : "Ожидайте, пока ведущий или администратор продолжит игру. Все игровые действия временно недоступны.";
+      ? `Период ${currentPeriod} завершён`
+      : "Игра поставлена на паузу";
+  const description = playerLeft
+    ? "Партия автоматически поставлена на паузу. Весь прогресс сохранён — продолжите, когда вернётесь."
+    : canManage
+      ? periodComplete
+        ? `Команда может отдохнуть. Когда будете готовы, начните период ${currentPeriod + 1}.`
+        : isSolo
+          ? "Весь прогресс сохранён. Продолжите игру, когда будете готовы."
+          : "Таймер периода остановлен. Продолжите игру, когда команда будет готова."
+      : periodComplete
+        ? `Следующий период начнёт ведущий или администратор. Все игровые действия временно недоступны.`
+        : "Ожидайте, пока ведущий или администратор продолжит игру. Все игровые действия временно недоступны.";
 
   return (
     <section
@@ -1603,9 +1632,11 @@ function GamePauseBanner({
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:justify-end">
         <span className="rounded-xl bg-white px-3 py-2 text-sm font-extrabold tabular-nums text-ink">
-          {periodComplete
-            ? `Период ${currentPeriod}/${periodCount}`
-            : formatPeriodTime(remainingSeconds)}
+          {isSolo
+            ? "Прогресс сохранён"
+            : periodComplete
+              ? `Период ${currentPeriod}/${periodCount}`
+              : formatPeriodTime(remainingSeconds)}
         </span>
         {canManage ? (
           <Button
@@ -2585,11 +2616,13 @@ function WaitingRoomOverview({
 }) {
   const players = snapshot.players.filter((player) => player.status === "JOINED");
   const gamePlayers = players.filter((player) => player.role === "PLAYER");
+  const humanPlayers = gamePlayers.filter((player) => player.controller === "HUMAN");
   const readyPlayers = gamePlayers.filter((player) => Boolean(player.figurine));
   const enoughPlayers = gamePlayers.length >= 2;
+  const hasHumanPlayer = humanPlayers.length > 0;
   const figurinesReady = gamePlayers.length > 0 && readyPlayers.length === gamePlayers.length;
   const completedChecks =
-    Number(enoughPlayers) + Number(figurinesReady) + Number(canManage);
+    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(canManage);
 
   return (
     <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
@@ -2693,6 +2726,10 @@ function WaitingRoomOverview({
             label={enoughPlayers ? "Игроков достаточно" : "Нужно минимум два игрока"}
           />
           <LobbyCheck
+            complete={hasHumanPlayer}
+            label={hasHumanPlayer ? "Человек участвует" : "Нужен хотя бы один человек"}
+          />
+          <LobbyCheck
             complete={figurinesReady}
             label={figurinesReady ? "Фигурки выбраны" : `Фигурки: ${readyPlayers.length}/${gamePlayers.length}`}
           />
@@ -2704,7 +2741,7 @@ function WaitingRoomOverview({
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#dce4ef]">
           <div
             className="h-full rounded-full bg-action transition-[width] duration-300"
-            style={{ width: `${Math.round((completedChecks / 3) * 100)}%` }}
+            style={{ width: `${Math.round((completedChecks / 4) * 100)}%` }}
           />
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
@@ -2882,7 +2919,7 @@ function DesktopFinancialPanel({
                 "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
                 active
                   ? "bg-[#dfe9d4] text-[#3f5b35]"
-                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
+                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35] active:bg-white/70 active:text-[#3f5b35]"
               ].join(" ")}
             >
               <span aria-hidden="true">{tab.icon}</span>
@@ -3694,15 +3731,11 @@ function MobileGameTabs({
   turnTabRequest: number;
   actions: ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState<MobileGameTab>("turn");
+  const [activeTab, setActiveTab] = useState<MobileGameTab>("player");
   const state = player?.financialState;
   const assetCount = player?.assets.length ?? 0;
   const liabilities = player ? repayableLiabilityRows(player) : [];
   const actionAttention = Boolean(actionAttentionKey);
-
-  useLayoutEffect(() => {
-    if (actionAttentionKey) setActiveTab("turn");
-  }, [actionAttentionKey]);
 
   useLayoutEffect(() => {
     if (turnTabRequest > 0) setActiveTab("turn");
@@ -3759,7 +3792,7 @@ function MobileGameTabs({
                 "relative flex h-14 min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] min-[360px]:text-[10px]",
                 active
                   ? "bg-[#dfe9d4] text-[#3f5b35]"
-                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
+                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35] active:bg-white/70 active:text-[#3f5b35]"
               ].join(" ")}
             >
               <span aria-hidden="true">{tab.icon}</span>
@@ -4531,6 +4564,10 @@ function ActionsPanel({
     decisionSubmission === "stock_sell" || decisionSubmission === "stock_decline"
       ? decisionSubmission
       : null;
+  const marketDecisionSubmission =
+    decisionSubmission === "market_sell" || decisionSubmission === "market_decline"
+      ? decisionSubmission
+      : null;
 
   const content = (
     <>
@@ -4617,11 +4654,20 @@ function ActionsPanel({
             </p>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button onClick={onSellMarketAsset} disabled={!canAnswerMarketSale || !canCloseMarketSale}>
-              Продать
+            <Button
+              onClick={onSellMarketAsset}
+              disabled={!canAnswerMarketSale || !canCloseMarketSale || Boolean(marketDecisionSubmission)}
+              aria-busy={marketDecisionSubmission === "market_sell"}
+            >
+              {marketDecisionSubmission === "market_sell" ? "Продаём…" : "Продать"}
             </Button>
-            <Button variant="secondary" onClick={onDeclineMarketSale} disabled={!canAnswerMarketSale}>
-              Отказаться
+            <Button
+              variant="secondary"
+              onClick={onDeclineMarketSale}
+              disabled={!canAnswerMarketSale || Boolean(marketDecisionSubmission)}
+              aria-busy={marketDecisionSubmission === "market_decline"}
+            >
+              {marketDecisionSubmission === "market_decline" ? "Отказываемся…" : "Отказаться"}
             </Button>
           </div>
           {marketSaleOffer.totalOffers > 1 ? (
@@ -6306,11 +6352,20 @@ function eventDetails(event: GameEvent) {
           "Причина",
           payload.reason === "period_complete"
             ? "Период завершён"
-            : "Решение ведущего или администратора"
+            : payload.reason === "player_left"
+              ? "Игрок вышел из одиночной партии"
+              : "Решение ведущего или администратора"
         ),
-        numericDetail("Период", payload.currentPeriod)
+        payload.hasTimeLimit === false
+          ? null
+          : numericDetail("Период", payload.currentPeriod)
       ]);
     case "game:resumed":
+      if (payload.hasTimeLimit === false) return [];
+      return compactDetails([
+        numericDetail("Период", payload.currentPeriod),
+        numericDetail("Всего периодов", payload.periodCount)
+      ]);
     case "game:period_started":
       return compactDetails([
         numericDetail("Период", payload.currentPeriod),

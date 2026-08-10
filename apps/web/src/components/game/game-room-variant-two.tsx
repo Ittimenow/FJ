@@ -66,7 +66,7 @@ export function GameRoomVariantTwo({
   const currentPlayer = players.find((player) => player.id === snapshot.game.currentPlayerId);
   const initialSelectedId = me?.id ?? currentPlayer?.id ?? players[0]?.id ?? null;
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(initialSelectedId);
-  const [compactSection, setCompactSection] = useState<CompactSection>("board");
+  const [compactSection, setCompactSection] = useState<CompactSection>("finance");
   const selectedPlayer =
     players.find((player) => player.id === selectedPlayerId) ?? me ?? players[0];
   const actionAttention = snapshot.game.pendingAction?.gamePlayerId === me?.id;
@@ -76,10 +76,6 @@ export function GameRoomVariantTwo({
       setSelectedPlayerId(initialSelectedId);
     }
   }, [initialSelectedId, players, selectedPlayerId]);
-
-  useLayoutEffect(() => {
-    if (actionAttention) setCompactSection("actions");
-  }, [actionAttention]);
 
   useLayoutEffect(() => {
     if (turnTabRequest > 0) setCompactSection("actions");
@@ -139,7 +135,7 @@ export function GameRoomVariantTwo({
                 "relative grid min-h-12 touch-manipulation select-none place-items-center gap-0.5 rounded-lg px-1 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
                 active
                   ? "bg-[#dfe9d4] text-[#3f5b35]"
-                  : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35]"
+                  : "text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35] active:bg-white/70 active:text-[#3f5b35]"
               ].join(" ")}
             >
               <Icon size={17} aria-hidden="true" />
@@ -701,7 +697,9 @@ function JourneyHint({
   } else if (snapshot.game.status === "PAUSED") {
     text = snapshot.game.pauseReason === "period_complete"
       ? `Период ${snapshot.game.currentPeriod} завершён. Ожидайте начала следующего периода.`
-      : "Игра поставлена на паузу. Текущий ход и все незавершённые действия сохранены.";
+      : snapshot.game.pauseReason === "player_left"
+        ? "Вы вышли из игры, поэтому партия остановлена. Текущий ход и весь прогресс сохранены."
+        : "Игра поставлена на паузу. Текущий ход и все незавершённые действия сохранены.";
   } else if (canRoll) {
     text = "Ваш ход: бросьте кубик. После движения здесь появится следующее обязательное действие.";
   } else if (pending && pending.gamePlayerId === me?.id) {

@@ -84,6 +84,23 @@ export interface PublicGameSummary {
   };
 }
 
+export interface TelegramChannelPostCard {
+  id: string;
+  kind: "SINGLE_GAME" | "GAME_SERIES";
+  title: string;
+  body: string;
+  generationVersion: number;
+  items: Array<{
+    position: number;
+    summary: {
+      id: string;
+      headline: string;
+      facts: PublicGameSummary["facts"];
+      game: PublicGameSummary["game"];
+    };
+  }>;
+}
+
 export interface GamesListResponse {
   mine: GameListItem[];
   open: GameListItem[];
@@ -180,13 +197,13 @@ export interface GameSnapshot {
     };
     startedAt: string | null;
     endedAt: string | null;
-    timeLimitMinutes: number;
+    timeLimitMinutes: number | null;
     periodCount: number;
     currentPeriod: number;
     periodDeadlineAt: string | null;
     deadlineAt: string | null;
     remainingPeriodSeconds: number | null;
-    pauseReason: "manual" | "period_complete" | null;
+    pauseReason: "manual" | "period_complete" | "player_left" | null;
     pausedAt: string | null;
     pendingAction: GamePendingAction | null;
   };

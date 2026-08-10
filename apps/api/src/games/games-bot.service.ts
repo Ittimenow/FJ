@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
   AssetStatus,
   CardType,
-  GameMode,
   GamePlayerStatus,
   GameRole,
   GameStatus,
@@ -84,8 +83,8 @@ type BotAction =
   | { type: "decline_deal"; playerId: string; reason: string }
   | { type: "sell_stock"; playerId: string; quantity: number; reason: string }
   | { type: "decline_stock"; playerId: string; reason: string }
-  | { type: "sell_market"; playerId: string; reason: string }
-  | { type: "decline_market"; playerId: string; reason: string }
+  | { type: "sell_market"; playerId: string; assetId: string; reason: string }
+  | { type: "decline_market"; playerId: string; assetId: string; reason: string }
   | { type: "accept_charity"; playerId: string; reason: string }
   | { type: "decline_charity"; playerId: string; reason: string }
   | { type: "pay_doodad"; playerId: string; payment: "cash" | "credit"; reason: string }
@@ -130,7 +129,15 @@ export class GamesBotService implements OnModuleInit {
 
   private async recoverActiveGames() {
     const games = await this.prisma.game.findMany({
-      where: { mode: GameMode.SOLO, status: GameStatus.IN_PROGRESS },
+      where: {
+        status: GameStatus.IN_PROGRESS,
+        players: {
+          some: {
+            controller: PlayerController.BOT,
+            status: GamePlayerStatus.JOINED
+          }
+        }
+      },
       select: { id: true }
     });
     for (const game of games) this.kick(game.id);
@@ -142,7 +149,16 @@ export class GamesBotService implements OnModuleInit {
     const leaseToken = randomUUID();
     if (!(await this.acquireLease(gameId, leaseToken))) {
       const stillActive = await this.prisma.game.findFirst({
-        where: { id: gameId, mode: GameMode.SOLO, status: GameStatus.IN_PROGRESS },
+        where: {
+          id: gameId,
+          status: GameStatus.IN_PROGRESS,
+          players: {
+            some: {
+              controller: PlayerController.BOT,
+              status: GamePlayerStatus.JOINED
+            }
+          }
+        },
         select: { id: true }
       });
       if (stillActive) setTimeout(() => this.kick(gameId), leaseDurationMs + 250);
@@ -198,7 +214,15 @@ export class GamesBotService implements OnModuleInit {
 
   private loadGame(gameId: string) {
     return this.prisma.game.findFirst({
-      where: { id: gameId, mode: GameMode.SOLO },
+      where: {
+        id: gameId,
+        players: {
+          some: {
+            controller: PlayerController.BOT,
+            status: GamePlayerStatus.JOINED
+          }
+        }
+      },
       include: {
         players: {
           where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED },
@@ -357,6 +381,7 @@ export class GamesBotService implements OnModuleInit {
       return {
         type: decision.accepted ? "sell_market" : "decline_market",
         playerId: player.id,
+        assetId: pending.assetId,
         reason: decision.reason
       } satisfies BotAction;
     }
@@ -450,9 +475,9 @@ export class GamesBotService implements OnModuleInit {
       case "decline_stock":
         return this.games.declineStockSale(gameId, actorId);
       case "sell_market":
-        return this.games.sellMarketAsset(gameId, actorId);
+        return this.games.sellMarketAsset(gameId, actorId, { assetId: action.assetId });
       case "decline_market":
-        return this.games.declineMarketSale(gameId, actorId);
+        return this.games.declineMarketSale(gameId, actorId, { assetId: action.assetId });
       case "accept_charity":
         return this.games.acceptCharity(gameId, actorId);
       case "decline_charity":
@@ -547,8 +572,13 @@ export class GamesBotService implements OnModuleInit {
     const update = await this.prisma.game.updateMany({
       where: {
         id: gameId,
-        mode: GameMode.SOLO,
         status: GameStatus.IN_PROGRESS,
+        players: {
+          some: {
+            controller: PlayerController.BOT,
+            status: GamePlayerStatus.JOINED
+          }
+        },
         OR: [{ botLeaseUntil: null }, { botLeaseUntil: { lt: now } }]
       },
       data: {
@@ -563,7 +593,6 @@ export class GamesBotService implements OnModuleInit {
     const update = await this.prisma.game.updateMany({
       where: {
         id: gameId,
-        mode: GameMode.SOLO,
         status: GameStatus.IN_PROGRESS,
         botLeaseToken: token
       },

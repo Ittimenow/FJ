@@ -24,4 +24,11 @@ export class CreateGameDto {
   @Min(1)
   @Max(12)
   periodCount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  botCount?: number;
 }

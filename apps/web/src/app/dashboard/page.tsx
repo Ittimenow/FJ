@@ -276,6 +276,8 @@ function GameCard({
   showInvite?: boolean;
 }) {
   const players = game.players.filter((player) => player.role === "PLAYER");
+  const botCount = players.filter((player) => player.controller === "BOT").length;
+  const humanCount = players.length - botCount;
   const waiting = game.status === "WAITING";
 
   return (
@@ -298,8 +300,10 @@ function GameCard({
         <span className="inline-flex items-center gap-1.5">
           {game.mode === "SOLO" ? <Bot size={14} aria-hidden="true" /> : <UsersRound size={14} aria-hidden="true" />}
           {game.mode === "SOLO"
-            ? `${players.filter((player) => player.controller === "BOT").length} ботов`
-            : `${players.length} игроков`}
+            ? `${botCount} ботов`
+            : botCount > 0
+              ? `${humanCount} чел. · ${botCount} бот.`
+              : `${humanCount} игроков`}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Clock3 size={14} aria-hidden="true" />

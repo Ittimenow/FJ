@@ -7,7 +7,14 @@ import {
   OnModuleInit
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { GameStatus, Prisma, PublicationMode, SummaryStatus } from "@prisma/client";
+import {
+  GameStatus,
+  Prisma,
+  PublicationMode,
+  SummaryStatus,
+  TelegramPostKind,
+  TelegramPostStatus
+} from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { toSerializable } from "../common/json";
 import {
@@ -17,7 +24,14 @@ import {
   SummaryPlayerFacts,
   money
 } from "./game-summary.logic";
-import { CreateAnnouncementDto, UpdateAnnouncementDto, UpdateSummaryDto } from "./publications.dto";
+import {
+  CreateAnnouncementDto,
+  CreateTelegramChannelPostDto,
+  UpdateAnnouncementDto,
+  UpdateSummaryDto,
+  UpdateTelegramChannelPostDto
+} from "./publications.dto";
+import { composeSeriesPost, type TelegramPostSource } from "./telegram-post.logic";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -81,9 +95,42 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
     return toSerializable(this.publicSummary(summary));
   }
 
+  async channelPostCardData(id: string) {
+    const post = await this.prisma.telegramChannelPost.findUnique({
+      where: { id },
+      include: {
+        items: {
+          orderBy: { position: "asc" },
+          include: {
+            summary: {
+              include: { game: { select: { title: true, endedAt: true, currentRound: true } } }
+            }
+          }
+        }
+      }
+    });
+    if (!post) throw new NotFoundException("Карточка Telegram-публикации не найдена");
+    return toSerializable({
+      id: post.id,
+      kind: post.kind,
+      title: post.title,
+      body: post.body,
+      generationVersion: post.generationVersion,
+      items: post.items.map((item) => ({
+        position: item.position,
+        summary: {
+          id: item.summary.id,
+          headline: item.summary.headline,
+          facts: item.summary.facts,
+          game: item.summary.game
+        }
+      }))
+    });
+  }
+
   async adminOverview() {
     await this.drainPending();
-    const [announcements, summaries, eligibleGames] = await Promise.all([
+    const [announcements, summaries, eligibleGames, channelPosts] = await Promise.all([
       this.prisma.telegramAnnouncement.findMany({ orderBy: { createdAt: "desc" } }),
       this.prisma.gameSummary.findMany({
         include: {
@@ -98,9 +145,23 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
         select: { id: true, title: true, code: true, endedAt: true, currentRound: true },
         orderBy: { endedAt: "desc" },
         take: 50
+      }),
+      this.prisma.telegramChannelPost.findMany({
+        include: {
+          items: {
+            orderBy: { position: "asc" },
+            include: {
+              summary: {
+                include: { game: { select: { id: true, title: true, code: true, endedAt: true, currentRound: true } } }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50
       })
     ]);
-    return toSerializable({ announcements, summaries, eligibleGames });
+    return toSerializable({ announcements, summaries, eligibleGames, channelPosts });
   }
 
   async createAnnouncement(dto: CreateAnnouncementDto) {
@@ -298,6 +359,134 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async createChannelPost(dto: CreateTelegramChannelPostDto) {
+    const summaryIds = [...new Set(dto.summaryIds)];
+    if (dto.kind === TelegramPostKind.SINGLE_GAME && summaryIds.length !== 1) {
+      throw new BadRequestException("Для отдельного поста выберите одну игру");
+    }
+    if (dto.kind === TelegramPostKind.GAME_SERIES && summaryIds.length < 2) {
+      throw new BadRequestException("Для серии выберите минимум две игры");
+    }
+    const rows = await this.prisma.gameSummary.findMany({
+      where: { id: { in: summaryIds } },
+      include: { game: { select: { id: true, title: true, code: true, endedAt: true, currentRound: true } } }
+    });
+    if (rows.length !== summaryIds.length) {
+      throw new BadRequestException("Одна или несколько выбранных игр не найдены");
+    }
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const summaries = summaryIds.map((id) => byId.get(id)!);
+    if (summaries.some((summary) => !summary.headline || !summary.body)) {
+      throw new BadRequestException("Сначала сгенерируйте саммари для всех выбранных игр");
+    }
+    const sources = summaries.map((summary) => ({
+      headline: summary.headline!,
+      body: summary.body!,
+      facts: summary.facts as unknown as GameSummaryFacts
+    })) satisfies TelegramPostSource[];
+    let composed: { title: string; body: string };
+    try {
+      composed = dto.kind === TelegramPostKind.SINGLE_GAME
+        ? { title: sources[0]!.headline, body: telegramCaption(sources[0]!.body) }
+        : composeSeriesPost(sources);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "Не удалось собрать серию игр");
+    }
+    return toSerializable(await this.prisma.telegramChannelPost.create({
+      data: {
+        kind: dto.kind,
+        title: composed.title,
+        body: composed.body,
+        channelChatId: dto.channelChatId.trim(),
+        items: {
+          create: summaryIds.map((summaryId, position) => ({ summaryId, position }))
+        }
+      },
+      include: {
+        items: {
+          orderBy: { position: "asc" },
+          include: { summary: { include: { game: true } } }
+        }
+      }
+    }));
+  }
+
+  async updateChannelPost(id: string, dto: UpdateTelegramChannelPostDto) {
+    const post = await this.prisma.telegramChannelPost.findUnique({ where: { id } });
+    if (!post) throw new NotFoundException("Telegram-публикация не найдена");
+    if (post.telegramMessageId) {
+      throw new BadRequestException("Опубликованный пост больше нельзя изменять");
+    }
+    return toSerializable(await this.prisma.telegramChannelPost.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title.trim() }),
+        ...(dto.body !== undefined && { body: dto.body.trim() }),
+        ...(dto.channelChatId !== undefined && { channelChatId: dto.channelChatId.trim() }),
+        status: TelegramPostStatus.DRAFT,
+        generationVersion: { increment: 1 },
+        lastError: null
+      }
+    }));
+  }
+
+  async publishChannelPost(id: string) {
+    const post = await this.prisma.telegramChannelPost.findUnique({ where: { id } });
+    if (!post) throw new NotFoundException("Telegram-публикация не найдена");
+    if (post.telegramMessageId) return toSerializable(post);
+    if (!this.botToken) throw new BadRequestException("TELEGRAM_BOT_TOKEN не настроен");
+    if (post.body.length > 1024) {
+      throw new BadRequestException("Подпись Telegram не может быть длиннее 1024 символов");
+    }
+    await this.prisma.telegramChannelPost.update({
+      where: { id },
+      data: { status: TelegramPostStatus.PUBLISHING, attempts: { increment: 1 }, lastError: null }
+    });
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${this.botToken}/sendPhoto`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: post.channelChatId,
+          photo: `${this.publicUrl}/telegram-publications/${post.id}/opengraph-image`,
+          caption: post.body
+        }),
+        signal: AbortSignal.timeout(15_000)
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        description?: string;
+        result?: { message_id?: number; chat?: { id?: number | string; username?: string } };
+      };
+      if (!response.ok || !payload.ok || !payload.result?.message_id) {
+        throw new Error(payload.description || `Telegram вернул статус ${response.status}`);
+      }
+      const username = payload.result.chat?.username
+        ?? (post.channelChatId.startsWith("@") ? post.channelChatId.slice(1) : null);
+      const telegramPostUrl = username
+        ? `https://t.me/${username}/${payload.result.message_id}`
+        : null;
+      return toSerializable(await this.prisma.telegramChannelPost.update({
+        where: { id },
+        data: {
+          status: TelegramPostStatus.PUBLISHED,
+          telegramMessageId: payload.result.message_id,
+          telegramChatId: String(payload.result.chat?.id ?? post.channelChatId),
+          telegramPostUrl,
+          publishedAt: new Date(),
+          lastError: null
+        }
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Неизвестная ошибка Telegram";
+      await this.prisma.telegramChannelPost.update({
+        where: { id },
+        data: { status: TelegramPostStatus.FAILED, lastError: message }
+      });
+      throw new BadRequestException(`Не удалось создать пост: ${message}`);
+    }
+  }
+
   private async drainPending() {
     if (this.draining) return;
     this.draining = true;
@@ -489,5 +678,6 @@ function number(value: unknown) {
 
 function telegramCaption(body: string) {
   if (body.length <= 1024) return body;
-  return `${body.slice(0, 1000).trimEnd()}…\n\nПолные итоги: gamefj.ru`;
+  const suffix = "\n\nПолные итоги: gamefj.ru";
+  return `${body.slice(0, 1023 - suffix.length).trimEnd()}…${suffix}`;
 }

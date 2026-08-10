@@ -1,6 +1,6 @@
-import { PublicationMode } from "@prisma/client";
+import { PublicationMode, TelegramPostKind } from "@prisma/client";
 import { Transform } from "class-transformer";
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, MinLength } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, MinLength } from "class-validator";
 
 export class CreateAnnouncementDto {
   @IsString()
@@ -72,4 +72,38 @@ export class UpdateSummaryDto {
   @IsOptional()
   @IsBoolean()
   visibleOnSite?: boolean;
+}
+
+export class CreateTelegramChannelPostDto {
+  @IsEnum(TelegramPostKind)
+  kind!: TelegramPostKind;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(8)
+  @IsUUID(undefined, { each: true })
+  summaryIds!: string[];
+
+  @IsString()
+  @Matches(/^(@[A-Za-z0-9_]+|-?\d+)$/)
+  channelChatId!: string;
+}
+
+export class UpdateTelegramChannelPostDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(180)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(1024)
+  body?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(@[A-Za-z0-9_]+|-?\d+)$/)
+  channelChatId?: string;
 }

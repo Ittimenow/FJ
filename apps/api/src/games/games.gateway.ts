@@ -4,6 +4,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
@@ -16,6 +17,7 @@ import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
+import { MarketSaleDecisionDto } from "./dto/market-sale.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
@@ -47,7 +49,9 @@ function corsOriginFromEnv() {
     credentials: true
   }
 })
-export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
+export class GamesGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   server!: Server;
 
@@ -98,6 +102,24 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     this.logger.log(`Socket connected: ${client.id}`);
   }
 
+  handleDisconnect(client: Socket) {
+    const user = client.data.user as { userId?: string } | undefined;
+    const userId = user?.userId;
+    const gameIds = Array.isArray(client.data.joinedGameIds)
+      ? client.data.joinedGameIds.filter(
+          (value: unknown): value is string => typeof value === "string"
+        )
+      : [];
+    if (!userId || gameIds.length === 0) return;
+
+    for (const gameId of gameIds) {
+      const timer = setTimeout(() => {
+        void this.pauseSoloGameWithoutConnection(gameId, userId);
+      }, 5_000);
+      timer.unref();
+    }
+  }
+
   @SubscribeMessage("diagnostics:ping")
   diagnosticsPing() {
     return { status: "ok", serverTime: new Date().toISOString() };
@@ -109,8 +131,14 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     @MessageBody() body: { gameId: string }
   ) {
     const userId = this.userId(client);
-    await client.join(body.gameId);
     const snapshot = await this.games.getGame(body.gameId, userId);
+    await client.join(body.gameId);
+    const joinedGameIds = Array.isArray(client.data.joinedGameIds)
+      ? client.data.joinedGameIds.filter(
+          (value: unknown): value is string => typeof value === "string"
+        )
+      : [];
+    client.data.joinedGameIds = [...new Set([...joinedGameIds, body.gameId])];
     client.emit(realtimeEvents.stateUpdate, snapshot);
     return snapshot;
   }
@@ -246,9 +274,11 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
   @SubscribeMessage("market:sell")
   async sellMarketAsset(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { gameId: string }
+    @MessageBody() body: { gameId: string } & MarketSaleDecisionDto
   ) {
-    const result = await this.games.sellMarketAsset(body.gameId, this.userId(client));
+    const result = await this.games.sellMarketAsset(body.gameId, this.userId(client), {
+      assetId: body.assetId
+    });
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }
@@ -256,9 +286,11 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
   @SubscribeMessage("market:decline")
   async declineMarketSale(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { gameId: string }
+    @MessageBody() body: { gameId: string } & MarketSaleDecisionDto
   ) {
-    const result = await this.games.declineMarketSale(body.gameId, this.userId(client));
+    const result = await this.games.declineMarketSale(body.gameId, this.userId(client), {
+      assetId: body.assetId
+    });
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }
@@ -393,6 +425,25 @@ export class GamesGateway implements OnGatewayConnection, OnGatewayInit {
     const user = client.data.user as { userId: string } | undefined;
     if (!user) throw new Error("Socket is not authenticated");
     return user.userId;
+  }
+
+  private async pauseSoloGameWithoutConnection(gameId: string, userId: string) {
+    try {
+      const sockets = await this.server.in(gameId).fetchSockets();
+      const playerIsConnected = sockets.some(
+        (socket) => (socket.data.user as { userId?: string } | undefined)?.userId === userId
+      );
+      if (playerIsConnected) return;
+
+      const result = await this.games.pauseSoloGameWhenUnattended(gameId);
+      if (result) this.realtime.broadcastAction(gameId, result);
+    } catch (caught) {
+      this.logger.warn(
+        `Не удалось проверить автопаузу игры ${gameId}: ${
+          caught instanceof Error ? caught.message : String(caught)
+        }`
+      );
+    }
   }
 
   private extractToken(client: Socket): string {

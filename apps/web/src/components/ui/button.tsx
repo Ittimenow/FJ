@@ -6,11 +6,11 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  primary: "bg-journey text-white shadow-[0_10px_28px_rgba(41,103,223,.25)] hover:-translate-y-0.5 hover:bg-[#1f56c8]",
-  action: "bg-action text-ink shadow-action hover:-translate-y-0.5 hover:bg-[#e77b1e]",
-  secondary: "border border-line bg-card text-ink hover:-translate-y-0.5 hover:bg-white",
-  ghost: "text-ink hover:bg-card",
-  danger: "bg-red-700 text-white hover:bg-red-800"
+  primary: "bg-journey text-white shadow-[0_10px_28px_rgba(41,103,223,.25)] hover:-translate-y-0.5 hover:bg-[#1f56c8] active:translate-y-0 active:bg-[#1f56c8]",
+  action: "bg-action text-ink shadow-action hover:-translate-y-0.5 hover:bg-[#e77b1e] active:translate-y-0 active:bg-[#e77b1e]",
+  secondary: "border border-line bg-card text-ink hover:-translate-y-0.5 hover:bg-white active:translate-y-0 active:bg-white",
+  ghost: "text-ink hover:bg-card active:bg-card",
+  danger: "bg-red-700 text-white hover:bg-red-800 active:bg-red-800"
 };
 
 export function Button({

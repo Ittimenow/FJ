@@ -65,3 +65,44 @@ test("resuming an automatic break starts the next full period", () => {
   assert.equal(timeline.currentPeriod, 2);
   assert.equal(timeline.periodDeadlineAt?.toISOString(), "2026-08-03T11:05:00.000Z");
 });
+
+test("timeless game never creates a deadline", () => {
+  const startedAt = new Date("2026-08-10T10:00:00.000Z");
+  const started = startGameTimeline(
+    { timeLimitMinutes: null, periodCount: 1 },
+    startedAt
+  );
+  const timeline = gameTimeline(started, startedAt);
+
+  assert.equal(timeline.timeLimitMinutes, null);
+  assert.equal(timeline.periodDeadlineAt, null);
+  assert.equal(timeline.remainingPeriodSeconds, null);
+});
+
+test("player exit pauses and resumes a timeless game without adding a timer", () => {
+  const startedAt = new Date("2026-08-10T10:00:00.000Z");
+  const started = startGameTimeline(
+    { timeLimitMinutes: null, periodCount: 1 },
+    startedAt
+  );
+  const paused = pauseGameTimeline(
+    started,
+    startedAt,
+    new Date("2026-08-10T10:15:00.000Z"),
+    "player_left"
+  );
+  const pausedTimeline = gameTimeline(paused, startedAt);
+
+  assert.equal(pausedTimeline.pauseReason, "player_left");
+  assert.equal(pausedTimeline.remainingPeriodSeconds, null);
+
+  const resumed = resumeGameTimeline(
+    paused,
+    startedAt,
+    new Date("2026-08-10T11:00:00.000Z")
+  );
+  const resumedTimeline = gameTimeline(resumed.settings, startedAt);
+  assert.equal(resumed.startsNextPeriod, false);
+  assert.equal(resumedTimeline.periodDeadlineAt, null);
+  assert.equal(resumedTimeline.pauseReason, null);
+});

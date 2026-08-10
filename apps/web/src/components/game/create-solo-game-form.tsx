@@ -2,15 +2,50 @@
 
 import { Bot, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
+
+type GameCardSet = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+};
 
 export function CreateSoloGameForm({ token }: { token: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cardSets, setCardSets] = useState<GameCardSet[]>([]);
+  const [cardSetId, setCardSetId] = useState("");
+  const [cardSetsLoading, setCardSetsLoading] = useState(true);
+  const [cardSetsError, setCardSetsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`${publicApiBaseUrl()}/api/games/card-sets`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error();
+        const sets = (await response.json()) as GameCardSet[];
+        if (cancelled) return;
+        setCardSets(sets);
+        setCardSetId(sets.find((set) => set.isDefault)?.id ?? sets[0]?.id ?? "");
+      } catch {
+        if (!cancelled) {
+          setCardSetsError("Не удалось загрузить наборы. Будет использован основной набор.");
+        }
+      } finally {
+        if (!cancelled) setCardSetsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,7 +61,7 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         },
         body: JSON.stringify({
           botCount: Number(form.get("botCount") ?? 1),
-          timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90)
+          ...(cardSetId ? { cardSetId } : {})
         })
       });
       if (!response.ok) {
@@ -73,20 +108,31 @@ export function CreateSoloGameForm({ token }: { token: string }) {
           </select>
         </div>
         <div>
-          <label htmlFor="solo-duration" className="mb-2 block text-sm font-extrabold text-ink">
-            Длительность
+          <label htmlFor="solo-card-set" className="mb-2 block text-sm font-extrabold text-ink">
+            Набор карточек
           </label>
           <select
-            id="solo-duration"
-            name="timeLimitMinutes"
-            defaultValue="90"
+            id="solo-card-set"
+            value={cardSetId}
+            onChange={(event) => setCardSetId(event.target.value)}
+            disabled={cardSetsLoading || cardSets.length === 0}
             className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
           >
-            <option value="45">45 минут</option>
-            <option value="60">1 час</option>
-            <option value="90">1 час 30 минут</option>
-            <option value="120">2 часа</option>
+            {cardSetsLoading ? <option value="">Загружаем наборы…</option> : null}
+            {!cardSetsLoading && cardSets.length === 0 ? (
+              <option value="">Основной набор</option>
+            ) : null}
+            {cardSets.map((set) => (
+              <option key={set.id} value={set.id}>
+                {set.name}{set.isDefault ? " — основной" : ""}
+              </option>
+            ))}
           </select>
+          {cardSetsError ? (
+            <p className="mt-2 text-xs font-medium leading-5 text-red-700" role="alert">
+              {cardSetsError}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -99,7 +145,13 @@ export function CreateSoloGameForm({ token }: { token: string }) {
           {error}
         </p>
       ) : null}
-      <Button type="submit" variant="action" className="w-full" disabled={loading} aria-busy={loading}>
+      <Button
+        type="submit"
+        variant="action"
+        className="w-full"
+        disabled={loading || cardSetsLoading}
+        aria-busy={loading || cardSetsLoading}
+      >
         {loading ? "Готовим соперников..." : "Начать одиночную игру"}
       </Button>
     </form>

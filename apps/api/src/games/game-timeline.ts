@@ -3,10 +3,10 @@ import { Prisma } from "@prisma/client";
 export const defaultGameTimeLimitMinutes = 90;
 export const defaultGamePeriodCount = 1;
 
-export type GamePauseReason = "manual" | "period_complete";
+export type GamePauseReason = "manual" | "period_complete" | "player_left";
 
 export interface GameTimeline {
-  timeLimitMinutes: number;
+  timeLimitMinutes: number | null;
   periodCount: number;
   currentPeriod: number;
   periodDeadlineAt: Date | null;
@@ -52,22 +52,23 @@ export function gameTimeline(
   startedAt: Date | null
 ): GameTimeline {
   const record = settingsRecord(settings);
-  const timeLimitMinutes = positiveInteger(
-    record.timeLimitMinutes,
-    defaultGameTimeLimitMinutes
-  );
+  const timeLimitMinutes =
+    record.timeLimitMinutes === null
+      ? null
+      : positiveInteger(record.timeLimitMinutes, defaultGameTimeLimitMinutes);
   const periodCount = positiveInteger(record.periodCount, defaultGamePeriodCount);
   const currentPeriod = Math.min(
     positiveInteger(record.currentPeriod, 1),
     periodCount
   );
   const storedDeadline = dateValue(record.periodDeadlineAt);
-  const fallbackDeadline = startedAt
-    ? new Date(
-        startedAt.getTime() +
-          periodDurationSeconds(timeLimitMinutes, periodCount, currentPeriod) * 1000
-      )
-    : null;
+  const fallbackDeadline =
+    startedAt && timeLimitMinutes !== null
+      ? new Date(
+          startedAt.getTime() +
+            periodDurationSeconds(timeLimitMinutes, periodCount, currentPeriod) * 1000
+        )
+      : null;
   const remainingPeriodSeconds =
     typeof record.remainingPeriodSeconds === "number" &&
     Number.isFinite(record.remainingPeriodSeconds) &&
@@ -75,7 +76,9 @@ export function gameTimeline(
       ? Math.ceil(record.remainingPeriodSeconds)
       : null;
   const pauseReason =
-    record.pauseReason === "manual" || record.pauseReason === "period_complete"
+    record.pauseReason === "manual" ||
+    record.pauseReason === "period_complete" ||
+    record.pauseReason === "player_left"
       ? record.pauseReason
       : null;
 
@@ -92,6 +95,16 @@ export function gameTimeline(
 
 export function startGameTimeline(settings: Prisma.JsonValue, now: Date) {
   const timeline = gameTimeline(settings, null);
+  if (timeline.timeLimitMinutes === null) {
+    return {
+      ...settingsRecord(settings),
+      currentPeriod: 1,
+      periodDeadlineAt: null,
+      remainingPeriodSeconds: null,
+      pauseReason: null,
+      pausedAt: null
+    } as Prisma.JsonObject;
+  }
   const duration = periodDurationSeconds(
     timeline.timeLimitMinutes,
     timeline.periodCount,
@@ -115,12 +128,18 @@ export function pauseGameTimeline(
 ) {
   const timeline = gameTimeline(settings, startedAt);
   const remaining =
-    reason === "period_complete"
-      ? 0
-      : Math.max(
-          0,
-          Math.ceil(((timeline.periodDeadlineAt?.getTime() ?? now.getTime()) - now.getTime()) / 1000)
-        );
+    timeline.timeLimitMinutes === null
+      ? null
+      : reason === "period_complete"
+        ? 0
+        : Math.max(
+            0,
+            Math.ceil(
+              ((timeline.periodDeadlineAt?.getTime() ?? now.getTime()) -
+                now.getTime()) /
+                1000
+            )
+          );
   return {
     ...settingsRecord(settings),
     currentPeriod: timeline.currentPeriod,
@@ -141,24 +160,30 @@ export function resumeGameTimeline(
   const currentPeriod = startsNextPeriod
     ? Math.min(timeline.currentPeriod + 1, timeline.periodCount)
     : timeline.currentPeriod;
-  const remainingSeconds = startsNextPeriod
-    ? periodDurationSeconds(
-        timeline.timeLimitMinutes,
-        timeline.periodCount,
-        currentPeriod
-      )
-    : timeline.remainingPeriodSeconds ??
-      periodDurationSeconds(
-        timeline.timeLimitMinutes,
-        timeline.periodCount,
-        currentPeriod
-      );
+  const remainingSeconds =
+    timeline.timeLimitMinutes === null
+      ? null
+      : startsNextPeriod
+        ? periodDurationSeconds(
+            timeline.timeLimitMinutes,
+            timeline.periodCount,
+            currentPeriod
+          )
+        : timeline.remainingPeriodSeconds ??
+          periodDurationSeconds(
+            timeline.timeLimitMinutes,
+            timeline.periodCount,
+            currentPeriod
+          );
 
   return {
     settings: {
       ...settingsRecord(settings),
       currentPeriod,
-      periodDeadlineAt: new Date(now.getTime() + remainingSeconds * 1000).toISOString(),
+      periodDeadlineAt:
+        remainingSeconds === null
+          ? null
+          : new Date(now.getTime() + remainingSeconds * 1000).toISOString(),
       remainingPeriodSeconds: null,
       pauseReason: null,
       pausedAt: null

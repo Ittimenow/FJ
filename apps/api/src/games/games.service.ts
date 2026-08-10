@@ -47,6 +47,7 @@ import { DrawCardDto } from "./dto/draw-card.dto";
 import { missingCardTypes } from "./card-set";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { MarketSaleDecisionDto } from "./dto/market-sale.dto";
 import { nextAvailableSeat } from "./game-seating";
 import {
   gameTimeline,
@@ -174,12 +175,12 @@ type GamePendingAction =
 
 interface GameSettings {
   pendingAction?: GamePendingAction | null;
-  timeLimitMinutes?: number;
+  timeLimitMinutes?: number | null;
   periodCount?: number;
   currentPeriod?: number;
   periodDeadlineAt?: string | null;
   remainingPeriodSeconds?: number | null;
-  pauseReason?: "manual" | "period_complete" | null;
+  pauseReason?: "manual" | "period_complete" | "player_left" | null;
   pausedAt?: string | null;
   cardDecks?: Partial<Record<CardType, CardDeckState>>;
 }
@@ -216,6 +217,33 @@ const botActorPrefix = "bot:";
 const botNames = ["Марина", "Алексей", "София"];
 const preferredBotFigurines = ["robot", "detective", "owl"];
 
+function createBotPlayers(botCount: number, occupiedFigurines = new Set<string>()) {
+  const availableFigurines = figurines
+    .map((figurine) => figurine.id)
+    .filter((figurine) => !occupiedFigurines.has(figurine));
+
+  return preferredBotFigurines.slice(0, botCount).map((preferred, index) => {
+    const figurine = !occupiedFigurines.has(preferred)
+      ? preferred
+      : availableFigurines.find((candidate) => !occupiedFigurines.has(candidate));
+    if (!figurine) {
+      throw new BadRequestException("Не хватает свободных фигурок для ботов");
+    }
+    occupiedFigurines.add(figurine);
+    return {
+      guestName: botNames[index] ?? `Бот ${index + 1}`,
+      role: GameRole.PLAYER,
+      controller: PlayerController.BOT,
+      botStrategy: "balanced_v1",
+      seat: index + 1,
+      color: playerColors[index] ?? null,
+      figurine,
+      isReady: true,
+      position: -1
+    };
+  });
+}
+
 @Injectable()
 export class GamesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -233,6 +261,8 @@ export class GamesService {
       creator.role === SystemRole.ADMIN ? dto.cardSetId : undefined
     );
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
+    const botCount = dto.botCount ?? 0;
+    const botPlayers = createBotPlayers(botCount);
 
     const code = await this.generateGameCode();
     const game = await this.prisma.game.create({
@@ -249,14 +279,17 @@ export class GamesService {
         } as unknown as Prisma.InputJsonValue,
         createdById: userId,
         players: {
-          create: {
-            userId,
-            role: GameRole.HOST,
-            seat: null,
-            color: null,
-            isReady: true,
-            position: -1
-          }
+          create: [
+            {
+              userId,
+              role: GameRole.HOST,
+              seat: null,
+              color: null,
+              isReady: true,
+              position: -1
+            },
+            ...botPlayers
+          ]
         }
       }
     });
@@ -271,7 +304,8 @@ export class GamesService {
           code: game.code,
           title: game.title,
           cardSetId: cardSet.id,
-          cardSetName: cardSet.name
+          cardSetName: cardSet.name,
+          botCount
         })
       }
     });
@@ -312,26 +346,18 @@ export class GamesService {
     }
 
     const botCount = dto.botCount;
-    const cardSet = await this.requirePlayableCardSet();
+    const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const code = await this.generateGameCode();
     const occupiedFigurines = new Set<string>();
     if (user.figurine && isFigurineId(user.figurine)) {
       occupiedFigurines.add(user.figurine);
     }
-    const availableFigurines = figurines
-      .map((figurine) => figurine.id)
-      .filter((figurine) => !occupiedFigurines.has(figurine));
-    const botFigurines = preferredBotFigurines.slice(0, botCount).map((preferred, index) => {
-      const figurine = !occupiedFigurines.has(preferred)
-        ? preferred
-        : availableFigurines.find((candidate) => !occupiedFigurines.has(candidate));
-      if (!figurine) {
-        throw new BadRequestException("Не хватает свободных фигурок для ботов");
-      }
-      occupiedFigurines.add(figurine);
-      return { figurine, index };
-    });
+    const botPlayers = createBotPlayers(botCount, occupiedFigurines).map((player, index) => ({
+      ...player,
+      seat: index + 2,
+      color: playerColors[index + 1] ?? null
+    }));
 
     const game = await this.prisma.game.create({
       data: {
@@ -341,7 +367,7 @@ export class GamesService {
         maxPlayers: botCount + 1,
         cardSetId: cardSet.id,
         settings: {
-          timeLimitMinutes: dto.timeLimitMinutes ?? 90,
+          timeLimitMinutes: null,
           periodCount: 1,
           cardDecks
         } as unknown as Prisma.InputJsonValue,
@@ -360,17 +386,7 @@ export class GamesService {
               isReady: Boolean(user.figurine && isFigurineId(user.figurine)),
               position: -1
             },
-            ...botFigurines.map(({ figurine, index }) => ({
-              guestName: botNames[index] ?? `Бот ${index + 1}`,
-              role: GameRole.PLAYER,
-              controller: PlayerController.BOT,
-              botStrategy: "balanced_v1",
-              seat: index + 2,
-              color: playerColors[index + 1] ?? null,
-              figurine,
-              isReady: true,
-              position: -1
-            }))
+            ...botPlayers
           ]
         }
       }
@@ -386,12 +402,41 @@ export class GamesService {
           code: game.code,
           title: game.title,
           mode: GameMode.SOLO,
-          botCount
+          botCount,
+          cardSetId: cardSet.id,
+          cardSetName: cardSet.name
         })
       }
     });
 
     return this.getGame(game.id, userId);
+  }
+
+  async listPlayableCardSets() {
+    const [sets, counts] = await Promise.all([
+      this.prisma.cardSet.findMany({
+        select: { id: true, name: true, isDefault: true },
+        orderBy: [{ isDefault: "desc" }, { name: "asc" }]
+      }),
+      this.prisma.card.groupBy({
+        by: ["cardSetId", "cardType"],
+        where: { isActive: true },
+        _count: { _all: true }
+      })
+    ]);
+
+    return sets.flatMap((set) => {
+      const setCounts = counts
+        .filter((row) => row.cardSetId === set.id)
+        .map((row) => ({ cardType: row.cardType, count: row._count._all }));
+      if (missingCardTypes(setCounts).length > 0) return [];
+      return [{
+        ...set,
+        counts: Object.fromEntries(
+          setCounts.map((row) => [row.cardType, row.count])
+        )
+      }];
+    });
   }
 
   async listGames(userId: string) {
@@ -675,6 +720,7 @@ export class GamesService {
 
   async startGame(gameId: string, userId: string) {
     await this.ensureCanManageGame(gameId, userId);
+    const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
       const game = await tx.game.findUniqueOrThrow({
@@ -692,6 +738,9 @@ export class GamesService {
       }
       if (game.players.length < 2) {
         throw new BadRequestException("Для начала игры нужно не менее двух игроков");
+      }
+      if (game.players.every((player) => player.controller === PlayerController.BOT)) {
+        throw new BadRequestException("Для начала игры нужен хотя бы один человек");
       }
       if (game.players.some((player) => !player.figurine)) {
         throw new BadRequestException("Все игроки должны выбрать фигурки");
@@ -736,31 +785,28 @@ export class GamesService {
 
       const timeline = gameTimeline(game.settings, null);
 
-      await this.appendEvents(tx, gameId, userId, [
-        {
-          type: "game:started",
-          payload: {
-            playerCount: game.players.length,
-            timeLimitMinutes: timeline.timeLimitMinutes,
-            periodCount: timeline.periodCount
-          }
-        },
-        {
+      emittedEvents.push({
+        type: "game:started",
+        payload: {
+          playerCount: game.players.length,
+          timeLimitMinutes: timeline.timeLimitMinutes,
+          periodCount: timeline.timeLimitMinutes === null ? null : timeline.periodCount
+        }
+      });
+      if (timeline.timeLimitMinutes !== null) {
+        emittedEvents.push({
           type: realtimeEvents.gamePeriodStarted,
           payload: { currentPeriod: 1, periodCount: timeline.periodCount }
-        },
-        {
-          type: realtimeEvents.stateUpdate,
-          payload: { reason: "game_started" }
-        }
-      ]);
+        });
+      }
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "game_started" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
 
-    return this.actionResult(gameId, [
-      { type: "game:started", payload: {} },
-      { type: realtimeEvents.gamePeriodStarted, payload: { currentPeriod: 1 } },
-      { type: realtimeEvents.stateUpdate, payload: {} }
-    ]);
+    return this.actionResult(gameId, emittedEvents);
   }
 
   async pauseGame(gameId: string, userId: string) {
@@ -790,6 +836,7 @@ export class GamesService {
         type: realtimeEvents.gamePaused,
         payload: {
           reason: "manual",
+          hasTimeLimit: timeline.timeLimitMinutes !== null,
           currentPeriod: timeline.currentPeriod,
           periodCount: timeline.periodCount
         }
@@ -802,6 +849,62 @@ export class GamesService {
     });
 
     return this.actionResult(gameId, emittedEvents);
+  }
+
+  async pauseSoloGameWhenUnattended(gameId: string) {
+    const emittedEvents: PendingEvent[] = [];
+    const paused = await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.findUnique({ where: { id: gameId } });
+      if (
+        !game ||
+        game.mode !== GameMode.SOLO ||
+        game.status !== GameStatus.IN_PROGRESS
+      ) {
+        return false;
+      }
+
+      const now = new Date();
+      const timeline = gameTimeline(game.settings, game.startedAt);
+      const update = await tx.game.updateMany({
+        where: {
+          id: gameId,
+          mode: GameMode.SOLO,
+          status: GameStatus.IN_PROGRESS
+        },
+        data: {
+          status: GameStatus.PAUSED,
+          settings: pauseGameTimeline(
+            game.settings,
+            game.startedAt,
+            now,
+            "player_left"
+          ),
+          botLeaseToken: null,
+          botLeaseUntil: null
+        }
+      });
+      if (update.count === 0) return false;
+
+      emittedEvents.push(
+        {
+          type: realtimeEvents.gamePaused,
+          payload: {
+            reason: "player_left",
+            hasTimeLimit: timeline.timeLimitMinutes !== null,
+            currentPeriod: timeline.currentPeriod,
+            periodCount: timeline.periodCount
+          }
+        },
+        {
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "player_left" }
+        }
+      );
+      await this.appendEvents(tx, gameId, null, emittedEvents);
+      return true;
+    });
+
+    return paused ? this.actionResult(gameId, emittedEvents) : null;
   }
 
   async resumeGame(gameId: string, userId: string) {
@@ -828,6 +931,7 @@ export class GamesService {
       emittedEvents.push({
         type: realtimeEvents.gameResumed,
         payload: {
+          hasTimeLimit: timeline.timeLimitMinutes !== null,
           currentPeriod: timeline.currentPeriod,
           periodCount: timeline.periodCount,
           startsNextPeriod: resumed.startsNextPeriod
@@ -1842,7 +1946,7 @@ export class GamesService {
     return this.actionResult(gameId, emittedEvents);
   }
 
-  async sellMarketAsset(gameId: string, userId: string) {
+  async sellMarketAsset(gameId: string, userId: string, dto: MarketSaleDecisionDto) {
     const expirationEvents = await this.expireGameIfNeeded(gameId);
     if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
@@ -1885,6 +1989,7 @@ export class GamesService {
       if (proceeds < 0n && state.cashCents < proceeds * -1n) {
         throw new BadRequestException("Не хватает наличных для завершения продажи");
       }
+      const nextPending = await this.claimMarketSaleDecision(tx, game, pending, dto.assetId);
 
       await tx.playerFinancialState.update({
         where: { gamePlayerId: player.id },
@@ -1932,10 +2037,10 @@ export class GamesService {
         await this.appendEvents(tx, gameId, userId, emittedEvents);
         return;
       }
-      await this.continueMarketSaleQueue(
+      await this.completeMarketSaleDecision(
         tx,
         game,
-        pending,
+        nextPending,
         emittedEvents,
         "market_sale_completed_turn_ended"
       );
@@ -1945,7 +2050,7 @@ export class GamesService {
     return this.actionResult(gameId, emittedEvents);
   }
 
-  async declineMarketSale(gameId: string, userId: string) {
+  async declineMarketSale(gameId: string, userId: string, dto: MarketSaleDecisionDto) {
     const expirationEvents = await this.expireGameIfNeeded(gameId);
     if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
@@ -1968,6 +2073,7 @@ export class GamesService {
       ) {
         throw new ForbiddenException("Сейчас нет предложения рынка, требующего вашего решения");
       }
+      const nextPending = await this.claimMarketSaleDecision(tx, game, pending, dto.assetId);
 
       emittedEvents.push({
         type: "market:sale_declined",
@@ -1984,10 +2090,10 @@ export class GamesService {
           totalOffers: pending.totalOffers
         }
       });
-      await this.continueMarketSaleQueue(
+      await this.completeMarketSaleDecision(
         tx,
         game,
-        pending,
+        nextPending,
         emittedEvents,
         "market_sale_declined_turn_ended"
       );
@@ -1997,29 +2103,52 @@ export class GamesService {
     return this.actionResult(gameId, emittedEvents);
   }
 
-  private async continueMarketSaleQueue(
+  private async claimMarketSaleDecision(
+    tx: Tx,
+    game: { id: string; settings: Prisma.JsonValue },
+    pending: Extract<GamePendingAction, { type: "market_sale" }>,
+    assetId: string
+  ) {
+    if (pending.assetId !== assetId) {
+      throw new ConflictException(
+        "Предложение рынка уже изменилось. Проверьте текущий объект и повторите решение"
+      );
+    }
+    const nextPending = pending.remainingOffers.length > 0
+      ? this.marketPendingAction(
+          { id: pending.cardId, title: pending.title },
+          pending.remainingOffers,
+          pending.offerNumber + 1
+        )
+      : null;
+    const claimed = await tx.game.updateMany({
+      where: {
+        id: game.id,
+        settings: { equals: game.settings as Prisma.InputJsonValue }
+      },
+      data: { settings: this.settingsWithPending(game.settings, nextPending) }
+    });
+    if (claimed.count !== 1) {
+      throw new ConflictException(
+        "Решение по этому предложению уже принято. Проверьте следующий объект"
+      );
+    }
+    return nextPending;
+  }
+
+  private async completeMarketSaleDecision(
     tx: Tx,
     game: {
       id: string;
-      settings: Prisma.JsonValue;
       currentRound: number;
       currentTurnIndex: number;
       players: Array<{ id: string }>;
     },
-    pending: Extract<GamePendingAction, { type: "market_sale" }>,
+    nextPending: Extract<GamePendingAction, { type: "market_sale" }> | null,
     emittedEvents: PendingEvent[],
     completedReason: string
   ) {
-    if (pending.remainingOffers.length > 0) {
-      const nextPending = this.marketPendingAction(
-        { id: pending.cardId, title: pending.title },
-        pending.remainingOffers,
-        pending.offerNumber + 1
-      );
-      await tx.game.update({
-        where: { id: game.id },
-        data: { settings: this.settingsWithPending(game.settings, nextPending) }
-      });
+    if (nextPending) {
       this.emitMarketSaleOffer(nextPending, emittedEvents);
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
@@ -2028,10 +2157,6 @@ export class GamesService {
       return;
     }
 
-    await tx.game.update({
-      where: { id: game.id },
-      data: { settings: this.settingsWithPending(game.settings, null) }
-    });
     const activeIndex = game.currentTurnIndex % game.players.length;
     await this.advanceTurn(tx, game, activeIndex);
     emittedEvents.push({

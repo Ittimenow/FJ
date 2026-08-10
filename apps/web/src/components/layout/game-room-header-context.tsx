@@ -88,7 +88,7 @@ export function GameRoomHeaderSlot() {
       {state ? (
         <div className="flex max-w-full items-center gap-1.5 text-xs text-muted sm:gap-2">
           <MobileTimelineControl state={state} />
-          {state.remainingSeconds !== null ? (
+          {!state.isSolo && state.remainingSeconds !== null ? (
             <span
               className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 font-extrabold tabular-nums text-ink md:inline-flex"
               aria-label={timelineAriaLabel(state)}
@@ -103,7 +103,7 @@ export function GameRoomHeaderSlot() {
             messages={state.chatMessages}
             onSend={state.onSendChat}
           />
-          {state.status !== "WAITING" && state.status !== "ENDED" ? (
+          {!state.isSolo && state.status !== "WAITING" && state.status !== "ENDED" ? (
             <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink md:inline">
               Период {state.currentPeriod}/{state.periodCount}
             </span>
@@ -298,6 +298,7 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const canControl = Boolean(state.onPause || state.onResume);
+  const hasTimer = !state.isSolo && state.remainingSeconds !== null;
 
   useEffect(() => {
     if (!open) return;
@@ -315,7 +316,13 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
     };
   }, [open]);
 
-  if (state.remainingSeconds === null) return null;
+  if (!hasTimer && !canControl) return null;
+
+  const controlLabel = state.isSolo
+    ? state.onResume
+      ? "Игра на паузе"
+      : "Управление игрой"
+    : timelineAriaLabel(state);
 
   return (
     <div ref={rootRef} className="relative md:hidden">
@@ -324,34 +331,50 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
           type="button"
           onClick={() => setOpen((value) => !value)}
           className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-card px-1.5 font-extrabold tabular-nums text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 min-[360px]:px-2"
-          aria-label={timelineAriaLabel(state)}
+          aria-label={controlLabel}
           aria-haspopup="dialog"
           aria-expanded={open}
         >
-          <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
-          <span>{formatRemainingTime(state.remainingSeconds)}</span>
+          {state.isSolo ? (
+            <Pause size={14} aria-hidden="true" />
+          ) : (
+            <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
+          )}
+          <span>
+            {state.isSolo
+              ? state.onResume ? "Пауза" : "Игра"
+              : formatRemainingTime(state.remainingSeconds ?? 0)}
+          </span>
         </button>
       ) : (
         <span
           className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-card px-1.5 font-extrabold tabular-nums text-ink min-[360px]:px-2"
-          aria-label={timelineAriaLabel(state)}
+          aria-label={controlLabel}
         >
           <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
-          <span>{formatRemainingTime(state.remainingSeconds)}</span>
+          <span>{formatRemainingTime(state.remainingSeconds ?? 0)}</span>
         </span>
       )}
       {open && canControl ? (
         <div
           role="dialog"
-          aria-label="Управление временем партии"
+          aria-label={state.isSolo ? "Управление игрой" : "Управление временем партии"}
           className="absolute left-0 top-[calc(100%+.5rem)] z-[70] w-56 rounded-xl bg-white p-3 text-left shadow-[0_18px_48px_rgba(5,18,45,.2)]"
         >
-          <div className="text-xs font-bold text-muted">
-            Период {state.currentPeriod}/{state.periodCount}
-          </div>
-          <div className="mt-1 text-sm font-extrabold tabular-nums text-ink">
-            {formatRemainingTime(state.remainingSeconds)}
-          </div>
+          {state.isSolo ? (
+            <div className="text-sm font-bold leading-5 text-ink">
+              Без ограничения времени
+            </div>
+          ) : (
+            <>
+              <div className="text-xs font-bold text-muted">
+                Период {state.currentPeriod}/{state.periodCount}
+              </div>
+              <div className="mt-1 text-sm font-extrabold tabular-nums text-ink">
+                {formatRemainingTime(state.remainingSeconds ?? 0)}
+              </div>
+            </>
+          )}
           {state.onPause ? (
             <Button
               type="button"

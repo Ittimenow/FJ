@@ -3,7 +3,13 @@ import { SystemRole } from "@prisma/client";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { CreateAnnouncementDto, UpdateAnnouncementDto, UpdateSummaryDto } from "./publications.dto";
+import {
+  CreateAnnouncementDto,
+  CreateTelegramChannelPostDto,
+  UpdateAnnouncementDto,
+  UpdateSummaryDto,
+  UpdateTelegramChannelPostDto
+} from "./publications.dto";
 import { PublicationsService } from "./publications.service";
 
 @Controller("results")
@@ -24,6 +30,16 @@ export class PublicResultsController {
   @Get(":id/card")
   card(@Param("id") id: string) {
     return this.publications.cardData(id);
+  }
+}
+
+@Controller("telegram-publications")
+export class PublicTelegramPublicationsController {
+  constructor(private readonly publications: PublicationsService) {}
+
+  @Get(":id/card")
+  card(@Param("id") id: string) {
+    return this.publications.channelPostCardData(id);
   }
 }
 
@@ -61,5 +77,20 @@ export class AdminPublicationsController {
   @Post("summaries/:id/publish")
   publish(@Param("id") id: string) {
     return this.publications.publish(id);
+  }
+
+  @Post("channel-posts")
+  createChannelPost(@Body() dto: CreateTelegramChannelPostDto) {
+    return this.publications.createChannelPost(dto);
+  }
+
+  @Patch("channel-posts/:id")
+  updateChannelPost(@Param("id") id: string, @Body() dto: UpdateTelegramChannelPostDto) {
+    return this.publications.updateChannelPost(id, dto);
+  }
+
+  @Post("channel-posts/:id/publish")
+  publishChannelPost(@Param("id") id: string) {
+    return this.publications.publishChannelPost(id);
   }
 }

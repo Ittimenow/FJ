@@ -16,6 +16,7 @@ import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
+import { MarketSaleDecisionDto } from "./dto/market-sale.dto";
 import { SearchGameUsersDto } from "./dto/search-game-users.dto";
 import { UpdateHostParticipationDto } from "./dto/update-host-participation.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
@@ -58,6 +59,11 @@ export class GamesController {
     @Body() dto: CreateSoloGameDto
   ) {
     return this.games.createSoloGame(user.userId, dto);
+  }
+
+  @Get("card-sets")
+  listPlayableCardSets() {
+    return this.games.listPlayableCardSets();
   }
 
   @Post("join")
@@ -197,15 +203,23 @@ export class GamesController {
   }
 
   @Post(":id/market/sell")
-  async sellMarketAsset(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    const result = await this.games.sellMarketAsset(id, user.userId);
+  async sellMarketAsset(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: MarketSaleDecisionDto
+  ) {
+    const result = await this.games.sellMarketAsset(id, user.userId, dto);
     this.realtime.broadcastAction(id, result);
     return result;
   }
 
   @Post(":id/market/decline")
-  async declineMarketSale(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    const result = await this.games.declineMarketSale(id, user.userId);
+  async declineMarketSale(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: MarketSaleDecisionDto
+  ) {
+    const result = await this.games.declineMarketSale(id, user.userId, dto);
     this.realtime.broadcastAction(id, result);
     return result;
   }
