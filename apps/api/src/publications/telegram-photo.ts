@@ -1,5 +1,12 @@
 type FetchImplementation = typeof fetch;
 
+type PublicationCardBaseUrlOptions = {
+  publicUrl: string;
+  internalUrl?: string | undefined;
+  webHost?: string | undefined;
+  webPort?: string | undefined;
+};
+
 type TelegramPhotoOptions = {
   chatId: string;
   photoUrl: string;
@@ -17,6 +24,26 @@ export type TelegramPhotoResult = {
     username?: string;
   };
 };
+
+export function resolvePublicationCardBaseUrl(options: PublicationCardBaseUrlOptions) {
+  const explicitInternalUrl = options.internalUrl?.trim();
+  if (explicitInternalUrl) return explicitInternalUrl.replace(/\/+$/, "");
+
+  const webHost = options.webHost?.trim();
+  const webPort = options.webPort?.trim();
+  if (webHost && webPort) {
+    const connectHost = webHost === "0.0.0.0"
+      ? "127.0.0.1"
+      : webHost === "::"
+        ? "[::1]"
+        : webHost.includes(":") && !webHost.startsWith("[")
+          ? `[${webHost}]`
+          : webHost;
+    return `http://${connectHost}:${webPort}`;
+  }
+
+  return options.publicUrl.replace(/\/+$/, "");
+}
 
 export async function sendTelegramPhoto(
   botToken: string,

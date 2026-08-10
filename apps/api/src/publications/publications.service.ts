@@ -20,10 +20,9 @@ import { toSerializable } from "../common/json";
 import {
   composeGameSummary,
   GameSummaryFacts,
-  SummaryHighlight,
-  SummaryPlayerFacts,
-  money
+  SummaryPlayerFacts
 } from "./game-summary.logic";
+import { selectGameHighlights } from "./game-summary-highlights.logic";
 import {
   CreateAnnouncementDto,
   CreateTelegramChannelPostDto,
@@ -32,7 +31,7 @@ import {
   UpdateTelegramChannelPostDto
 } from "./publications.dto";
 import { composeSeriesPost, type TelegramPostSource } from "./telegram-post.logic";
-import { sendTelegramPhoto } from "./telegram-photo";
+import { resolvePublicationCardBaseUrl, sendTelegramPhoto } from "./telegram-photo";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -41,6 +40,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PublicationsService.name);
   private readonly botToken: string;
   private readonly publicUrl: string;
+  private readonly publicationCardBaseUrl: string;
   private timer: NodeJS.Timeout | null = null;
   private draining = false;
 
@@ -50,6 +50,12 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
   ) {
     this.botToken = (config.get<string>("TELEGRAM_BOT_TOKEN") ?? "").trim();
     this.publicUrl = (config.get<string>("APP_PUBLIC_URL") ?? "http://localhost:3000").replace(/\/+$/, "");
+    this.publicationCardBaseUrl = resolvePublicationCardBaseUrl({
+      publicUrl: this.publicUrl,
+      internalUrl: config.get<string>("WEB_INTERNAL_URL"),
+      webHost: config.get<string>("WEB_HOST"),
+      webPort: config.get<string>("WEB_PORT")
+    });
   }
 
   onModuleInit() {
@@ -318,7 +324,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await sendTelegramPhoto(this.botToken, {
         chatId: summary.announcement.discussionChatId,
-        photoUrl: `${this.publicUrl}/results/${summary.id}/opengraph-image`,
+        photoUrl: `${this.publicationCardBaseUrl}/results/${summary.id}/opengraph-image`,
         caption: telegramCaption(summary.body),
         replyParameters: {
           message_id: summary.announcement.discussionMessageId,
@@ -433,7 +439,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await sendTelegramPhoto(this.botToken, {
         chatId: post.channelChatId,
-        photoUrl: `${this.publicUrl}/telegram-publications/${post.id}/opengraph-image`,
+        photoUrl: `${this.publicationCardBaseUrl}/telegram-publications/${post.id}/opengraph-image`,
         caption: post.body
       });
       const username = result.chat?.username
@@ -571,7 +577,7 @@ function buildFacts(game: {
   const winnerGamePlayerId = typeof endPayload?.winnerGamePlayerId === "string"
     ? endPayload.winnerGamePlayerId
     : null;
-  const highlights = selectHighlights(game.events, players, winnerGamePlayerId);
+  const highlights = selectGameHighlights(game.events, players, winnerGamePlayerId);
   return {
     gameId: game.id,
     title: game.title,
@@ -585,59 +591,6 @@ function buildFacts(game: {
     players,
     highlights
   };
-}
-
-function selectHighlights(
-  events: Array<{ type: string; gamePlayerId: string | null; payload: Prisma.JsonValue }>,
-  players: SummaryPlayerFacts[],
-  winnerId: string | null
-) {
-  const result: SummaryHighlight[] = [];
-  const seen = new Set<string>();
-  const player = (id: string | null) => players.find((item) => item.id === id);
-  const add = (highlight: SummaryHighlight) => {
-    const key = `${highlight.playerId ?? "game"}:${highlight.kind}`;
-    if (seen.has(key) || result.length >= 3) return;
-    seen.add(key);
-    result.push(highlight);
-  };
-
-  const escaped = events.find((event) => event.type === "player:escaped_rat_race");
-  if (escaped) {
-    const target = player(escaped.gamePlayerId);
-    if (target && target.id !== winnerId) add({
-      playerId: target.id,
-      kind: "escaped_rat_race",
-      text: `${target.mention} вышел на Скоростную дорожку.`
-    });
-  }
-  const growth = [...players]
-    .filter((item) => item.cashflowDeltaCents > 0 && item.id !== winnerId)
-    .sort((left, right) => right.cashflowDeltaCents - left.cashflowDeltaCents)[0];
-  if (growth) add({
-    playerId: growth.id,
-    kind: "cashflow_growth",
-    text: `${growth.mention} увеличил денежный поток на ${money(growth.cashflowDeltaCents)} в месяц.`
-  });
-
-  const eventLabels: Record<string, (name: string, payload: JsonRecord | null) => string> = {
-    "bankruptcy:recovered": (name) => `${name} восстановился после банкротства и продолжил игру.`,
-    "deal:buy": (name, payload) => `${name} приобрёл актив «${String(payload?.name ?? payload?.title ?? "новый актив")}».`,
-    "deal:sell": (name, payload) => `${name} удачно завершил продажу актива «${String(payload?.name ?? "актив")}».`,
-    "player:baby": (name) => `${name} встретил важное семейное событие и перестроил финансовый план.`,
-    "player:downsized": (name) => `${name} пережил потерю работы и продолжил маршрут.`,
-    "network_marketing:level_applied": (name) => `${name} развил направление сетевого маркетинга.`
-  };
-  for (const event of [...events].reverse()) {
-    const format = eventLabels[event.type];
-    const target = player(event.gamePlayerId);
-    if (format && target) add({
-      playerId: target.id,
-      kind: event.type,
-      text: format(target.mention, record(event.payload))
-    });
-  }
-  return result;
 }
 
 function record(value: unknown): JsonRecord | null {

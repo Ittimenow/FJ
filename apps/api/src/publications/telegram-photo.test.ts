@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sendTelegramPhoto } from "./telegram-photo";
+import { resolvePublicationCardBaseUrl, sendTelegramPhoto } from "./telegram-photo";
+
+test("production card URL uses the internal web server instead of the public proxy", () => {
+  assert.equal(resolvePublicationCardBaseUrl({
+    publicUrl: "https://gamefj.ru",
+    webHost: "127.0.0.1",
+    webPort: "3011"
+  }), "http://127.0.0.1:3011");
+});
+
+test("explicit internal card URL takes priority and local setup falls back to public URL", () => {
+  assert.equal(resolvePublicationCardBaseUrl({
+    publicUrl: "https://gamefj.ru",
+    internalUrl: "http://web:3000/",
+    webHost: "127.0.0.1",
+    webPort: "3011"
+  }), "http://web:3000");
+  assert.equal(resolvePublicationCardBaseUrl({
+    publicUrl: "http://localhost:3000/"
+  }), "http://localhost:3000");
+});
 
 test("Telegram photo is downloaded by the app and uploaded as a file", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];

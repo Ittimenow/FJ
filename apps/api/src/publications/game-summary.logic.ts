@@ -35,36 +35,35 @@ export type GameSummaryFacts = {
 export function composeGameSummary(facts: GameSummaryFacts) {
   const winner = facts.players.find((player) => player.id === facts.winnerGamePlayerId);
   const headline = winner
-    ? `${winner.name} завершает финансовое путешествие первым`
+    ? `«${facts.title}»: ${winner.name} достигает финансовой свободы`
     : facts.endReason === "time_limit"
-      ? `Партия «${facts.title}» завершена по времени`
+      ? `«${facts.title}»: итоги ${facts.rounds} ${plural(facts.rounds, "раунда", "раундов", "раундов")}`
       : facts.endReason === "all_players_bankrupt"
-        ? `Партия «${facts.title}» завершена после непростого маршрута`
-        : `Партия «${facts.title}» завершена`;
+        ? `«${facts.title}»: партия с непростым финалом`
+        : `«${facts.title}»: главные решения партии`;
 
-  const intro = winner
-    ? `${winner.mention} первым достиг финансовой свободы. Финальный пассивный доход — ${money(winner.finalPassiveIncomeCents)} в месяц.`
+  const progress = facts.durationMinutes !== null && facts.durationMinutes >= 1
+    ? `За ${duration(facts.durationMinutes)} участники прошли ${facts.rounds} ${plural(facts.rounds, "раунд", "раунда", "раундов")}.`
+    : `Участники прошли ${facts.rounds} ${plural(facts.rounds, "раунд", "раунда", "раундов")}.`;
+  const outcome = winner
+    ? `${winner.mention} выходит на уровень финансовой свободы раньше остальных: пассивный доход к финалу составил ${money(winner.finalPassiveIncomeCents)} в месяц.`
     : facts.endReason === "time_limit"
-      ? "Игроки дошли до финала отведённого времени — фиксируем решения и результаты этого маршрута."
-      : "Финансовый маршрут завершён — сохраняем его главные решения и поворотные моменты.";
+      ? "Время партии завершилось, и результат зафиксирован на достигнутых позициях."
+      : facts.endReason === "all_players_bankrupt"
+        ? "Финал оказался непростым: финансовые испытания остановили всех участников."
+        : "Финальный результат сложился из решений, сделок и поворотных событий партии.";
   const highlights = facts.highlights.slice(0, 3).map((highlight) => `• ${highlight.text}`);
-  const roster = facts.players.map((player) => player.mention).join(", ");
-  const stats = [
-    `${facts.players.length} ${plural(facts.players.length, "игрок", "игрока", "игроков")}`,
-    `${facts.rounds} ${plural(facts.rounds, "раунд", "раунда", "раундов")}`,
-    duration(facts.durationMinutes)
-  ].filter(Boolean).join(" · ");
+  const roster = naturalList(facts.players.map((player) => player.mention));
 
   return {
     headline,
     body: [
       `🎲 Итоги игры «${facts.title}»`,
       "",
-      intro,
-      ...(highlights.length ? ["", ...highlights] : []),
+      `${progress} ${outcome}`,
+      ...(highlights.length ? ["", "Главные повороты:", ...highlights] : []),
       "",
-      `Играли: ${roster || "состав не указан"}`,
-      stats,
+      `За столом: ${roster || "состав не указан"}.`,
       "",
       "Следующая игра → gamefj.ru"
     ].join("\n")
@@ -83,8 +82,17 @@ function duration(minutes: number | null) {
   if (minutes === null || minutes < 1) return null;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (!hours) return `${rest} мин`;
-  return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+  if (!hours) return `${rest} ${plural(rest, "минуту", "минуты", "минут")}`;
+  const hoursText = `${hours} ${plural(hours, "час", "часа", "часов")}`;
+  return rest
+    ? `${hoursText} ${rest} ${plural(rest, "минуту", "минуты", "минут")}`
+    : hoursText;
+}
+
+function naturalList(values: string[]) {
+  if (values.length < 2) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} и ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")} и ${values[values.length - 1]}`;
 }
 
 function plural(value: number, one: string, few: string, many: string) {
