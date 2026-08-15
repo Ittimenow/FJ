@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "restore-vps-telegram-connection",
+          "category": "fix",
+          "summary": "Публикация в Telegram снова работает с VPS, на котором сетевой маршрут к стандартному адресу Telegram завершался таймаутом."
+        },
+        {
           "id": "retry-and-explain-telegram-publication-errors",
           "category": "fix",
           "summary": "Публикация в Telegram повторяет временно оборвавшийся запрос и сообщает, на каком этапе возникла сетевая ошибка."
