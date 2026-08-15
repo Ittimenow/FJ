@@ -1,5 +1,8 @@
 type FetchImplementation = typeof fetch;
 
+const TELEGRAM_REQUEST_TIMEOUT_MS = 15_000;
+const NETWORK_REQUEST_ATTEMPTS = 2;
+
 type PublicationCardBaseUrlOptions = {
   publicUrl: string;
   internalUrl?: string | undefined;
@@ -50,9 +53,12 @@ export async function sendTelegramPhoto(
   options: TelegramPhotoOptions,
   fetchImplementation: FetchImplementation = fetch
 ): Promise<TelegramPhotoResult> {
-  const imageResponse = await fetchImplementation(options.photoUrl, {
-    signal: AbortSignal.timeout(15_000)
-  });
+  const imageResponse = await fetchWithRetry(
+    fetchImplementation,
+    options.photoUrl,
+    {},
+    "Не удалось загрузить карточку публикации"
+  );
   if (!imageResponse.ok) {
     throw new Error(`Карточка публикации недоступна: HTTP ${imageResponse.status}`);
   }
@@ -75,22 +81,88 @@ export async function sendTelegramPhoto(
     form.set("reply_parameters", JSON.stringify(options.replyParameters));
   }
 
-  const response = await fetchImplementation(
+  const response = await fetchWithRetry(
+    fetchImplementation,
     `https://api.telegram.org/bot${botToken}/sendPhoto`,
     {
       method: "POST",
-      body: form,
-      signal: AbortSignal.timeout(15_000)
-    }
+      body: form
+    },
+    "Не удалось связаться с Telegram"
   );
-  const payload = await response.json() as {
-    ok?: boolean;
-    description?: string;
-    result?: TelegramPhotoResult;
-  };
+  const payload = await telegramResponsePayload(response);
   if (!response.ok || !payload.ok || !payload.result?.message_id) {
     throw new Error(payload.description || `Telegram вернул статус ${response.status}`);
   }
 
   return payload.result;
+}
+
+async function fetchWithRetry(
+  fetchImplementation: FetchImplementation,
+  input: string,
+  init: RequestInit,
+  failureMessage: string
+) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < NETWORK_REQUEST_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchImplementation(input, {
+        ...init,
+        signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS)
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(`${failureMessage}: ${networkErrorDetails(lastError)}`);
+}
+
+async function telegramResponsePayload(response: Response) {
+  try {
+    return await response.json() as {
+      ok?: boolean;
+      description?: string;
+      result?: TelegramPhotoResult;
+    };
+  } catch {
+    throw new Error(`Telegram вернул некорректный ответ (HTTP ${response.status})`);
+  }
+}
+
+function networkErrorDetails(error: unknown) {
+  const cause = errorCause(error);
+  const code = errorCode(cause) ?? errorCode(error);
+  const descriptions: Record<string, string> = {
+    ABORT_ERR: "истекло время ожидания ответа",
+    ECONNREFUSED: "соединение отклонено сервером",
+    ECONNRESET: "соединение было сброшено",
+    ENETUNREACH: "сеть недоступна",
+    ENOTFOUND: "не удалось определить адрес сервера",
+    ETIMEDOUT: "истекло время ожидания соединения",
+    UND_ERR_CONNECT_TIMEOUT: "истекло время ожидания соединения"
+  };
+  if (code && descriptions[code]) return `${descriptions[code]} (${code})`;
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return "истекло время ожидания ответа";
+  }
+
+  const message = errorMessage(cause) ?? errorMessage(error);
+  return message && message !== "fetch failed" ? message : "сетевая ошибка";
+}
+
+function errorCause(error: unknown) {
+  if (!error || typeof error !== "object" || !("cause" in error)) return undefined;
+  return error.cause;
+}
+
+function errorCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+  return typeof error.code === "string" ? error.code : undefined;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error && error.message.trim() ? error.message.trim() : undefined;
 }

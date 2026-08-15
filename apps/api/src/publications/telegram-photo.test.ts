@@ -100,3 +100,76 @@ test("non-image response is rejected before publication", async () => {
     /вернула не изображение/
   );
 });
+
+test("temporary card download failure is retried", async () => {
+  let requests = 0;
+  const fetchImplementation: typeof fetch = async () => {
+    requests += 1;
+    if (requests === 1) throw new TypeError("fetch failed");
+    if (requests === 2) {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png" }
+      });
+    }
+    return Response.json({ ok: true, result: { message_id: 42 } });
+  };
+
+  const result = await sendTelegramPhoto("test-token", {
+    chatId: "@fj_channel",
+    photoUrl: "https://gamefj.ru/card.png",
+    caption: "Итоги игры"
+  }, fetchImplementation);
+
+  assert.equal(requests, 3);
+  assert.equal(result.message_id, 42);
+});
+
+test("Telegram network failure reports its stage and connection cause", async () => {
+  let requests = 0;
+  const connectionError = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+    code: "ECONNREFUSED"
+  });
+  const fetchError = Object.assign(new TypeError("fetch failed"), { cause: connectionError });
+  const fetchImplementation: typeof fetch = async () => {
+    requests += 1;
+    if (requests === 1) {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png" }
+      });
+    }
+    throw fetchError;
+  };
+
+  await assert.rejects(
+    sendTelegramPhoto("test-token", {
+      chatId: "@fj_channel",
+      photoUrl: "https://gamefj.ru/card.png",
+      caption: "Итоги игры"
+    }, fetchImplementation),
+    /Не удалось связаться с Telegram: соединение отклонено сервером \(ECONNREFUSED\)/
+  );
+  assert.equal(requests, 3);
+});
+
+test("invalid Telegram response has a clear error", async () => {
+  let requests = 0;
+  const fetchImplementation: typeof fetch = async () => {
+    requests += 1;
+    if (requests === 1) {
+      return new Response(new Uint8Array([137, 80, 78, 71]), {
+        headers: { "content-type": "image/png" }
+      });
+    }
+    return new Response("upstream error", { status: 502 });
+  };
+
+  await assert.rejects(
+    sendTelegramPhoto("test-token", {
+      chatId: "@fj_channel",
+      photoUrl: "https://gamefj.ru/card.png",
+      caption: "Итоги игры"
+    }, fetchImplementation),
+    /Telegram вернул некорректный ответ \(HTTP 502\)/
+  );
+  assert.equal(requests, 2);
+});

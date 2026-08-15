@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "retry-and-explain-telegram-publication-errors",
+          "category": "fix",
+          "summary": "Публикация в Telegram повторяет временно оборвавшийся запрос и сообщает, на каком этапе возникла сетевая ошибка."
+        },
+        {
           "id": "auction-real-estate-opportunities",
           "category": "feature",
           "summary": "Игрок может выставить возможность покупки недвижимости на аукцион, получить закрытые предложения остальных участников и передать актив выбранному покупателю."
