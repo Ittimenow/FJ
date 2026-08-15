@@ -5,6 +5,7 @@ import {
   botStockSaleQuantity,
   chooseBotDoodadPayment,
   chooseBotDealType,
+  decideBotAuctionBid,
   decideBotDeal,
   shouldAcceptBotCharity
 } from "./bot-strategy";
@@ -87,5 +88,28 @@ test("balanced bot sells all shares only at a meaningful profit", () => {
       salePriceCents: 11
     }).quantity,
     0
+  );
+});
+
+test("balanced bot bids for a profitable opportunity without spending its reserve", () => {
+  assert.deepEqual(
+    decideBotAuctionBid(stableState, {
+      downPaymentCents: 4_000,
+      cashflowCents: 300
+    }),
+    {
+      amountCents: 1_800,
+      reason: "цена возможности сохраняет резерв и соответствует доходу сделки"
+    }
+  );
+});
+
+test("balanced bot declines an auction when the down payment consumes free cash", () => {
+  assert.equal(
+    decideBotAuctionBid(stableState, {
+      downPaymentCents: 6_000,
+      cashflowCents: 300
+    }).amountCents,
+    null
   );
 });

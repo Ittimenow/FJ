@@ -208,6 +208,20 @@ export function eventHeadline(event: GameEvent) {
       return "Отказ от сделки";
     case "deal:sell":
       return typeof payload.name === "string" ? `Продан актив «${payload.name}»` : "Продан актив";
+    case "deal:auction_start":
+      return typeof payload.title === "string"
+        ? `Начат аукцион «${payload.title}»`
+        : "Начат аукцион возможности";
+    case "deal:auction_bid":
+      return "Сделано закрытое предложение";
+    case "deal:auction_decline":
+      return "Отказ от участия в аукционе";
+    case "deal:auction_select":
+      return typeof payload.title === "string"
+        ? `Возможность «${payload.title}» продана`
+        : "Возможность продана";
+    case "deal:auction_cancel":
+      return "Аукцион завершён без продажи";
     case "paycheck:receive":
       return "Получен расчётный чек";
     case "loan:take":

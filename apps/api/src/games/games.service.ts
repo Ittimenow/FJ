@@ -43,6 +43,11 @@ import { AddGameUserDto } from "./dto/add-game-user.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
+import {
+  DealAuctionBidDto,
+  SelectDealAuctionOfferDto,
+  StartDealAuctionDto
+} from "./dto/deal-auction.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
@@ -142,6 +147,17 @@ type GamePendingAction =
       salePriceCents: number;
       sellerGamePlayerIds: string[];
       resolvedGamePlayerIds: string[];
+    }
+  | {
+      type: "deal_auction";
+      gamePlayerId: string;
+      cardId: number;
+      cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      bidderGamePlayerIds: string[];
+      responses: Array<{
+        gamePlayerId: string;
+        amountCents: number | null;
+      }>;
     }
   | {
       type: "charity_choice";
@@ -1743,6 +1759,388 @@ export class GamesService {
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
         payload: { reason: "deal_declined_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async startDealAuction(
+    gameId: string,
+    userId: string,
+    dto: StartDealAuctionDto
+  ) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const seller = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED },
+            include: { financialState: true },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== seller.id ||
+        pending?.type !== "deal_card_drawn" ||
+        pending.gamePlayerId !== seller.id ||
+        pending.cardId !== dto.cardId
+      ) {
+        throw new ForbiddenException("Эту возможность сейчас нельзя выставить на аукцион");
+      }
+
+      const card = await tx.card.findUnique({
+        where: { id: dto.cardId },
+        include: { meta: true, effects: true, conditions: true }
+      });
+      if (!card) throw new NotFoundException("Карточка не найдена");
+      if (!this.isDealAuctionEligible(card)) {
+        throw new BadRequestException("На аукцион можно выставить только возможность с недвижимостью");
+      }
+
+      const bidderGamePlayerIds = game.players
+        .filter(
+          (candidate) =>
+            candidate.id !== seller.id &&
+            candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
+        )
+        .map((candidate) => candidate.id);
+      if (bidderGamePlayerIds.length === 0) {
+        throw new BadRequestException("В игре нет участников, которым можно предложить возможность");
+      }
+
+      const nextPending: GamePendingAction = {
+        type: "deal_auction",
+        gamePlayerId: seller.id,
+        cardId: card.id,
+        cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
+        bidderGamePlayerIds,
+        responses: []
+      };
+      const started = await tx.game.updateMany({
+        where: {
+          id: gameId,
+          settings: { equals: game.settings as Prisma.InputJsonValue }
+        },
+        data: { settings: this.settingsWithPending(game.settings, nextPending) }
+      });
+      if (started.count !== 1) {
+        throw new ConflictException("Состояние сделки изменилось. Повторите действие");
+      }
+      emittedEvents.push({
+        type: realtimeEvents.dealAuctionStart,
+        gamePlayerId: seller.id,
+        payload: {
+          cardId: card.id,
+          title: card.title,
+          bidderGamePlayerIds
+        }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "deal_auction_started" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async bidOnDealAuction(gameId: string, userId: string, dto: DealAuctionBidDto) {
+    return this.respondToDealAuction(gameId, userId, dto.amountCents);
+  }
+
+  async declineDealAuction(gameId: string, userId: string) {
+    return this.respondToDealAuction(gameId, userId, null);
+  }
+
+  private async respondToDealAuction(
+    gameId: string,
+    userId: string,
+    amountCents: number | null
+  ) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const bidder = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      const pending = this.pendingAction(game.settings);
+      if (
+        pending?.type !== "deal_auction" ||
+        !pending.bidderGamePlayerIds.includes(bidder.id)
+      ) {
+        throw new ForbiddenException("Сейчас вам не предложена возможность на аукционе");
+      }
+      if (pending.responses.some((response) => response.gamePlayerId === bidder.id)) {
+        throw new ConflictException("Вы уже ответили на это предложение");
+      }
+
+      if (amountCents !== null) {
+        const card = await tx.card.findUnique({
+          where: { id: pending.cardId },
+          include: { meta: true, effects: true }
+        });
+        if (!card) throw new NotFoundException("Карточка не найдена");
+        const state = await tx.playerFinancialState.findUniqueOrThrow({
+          where: { gamePlayerId: bidder.id }
+        });
+        const downPaymentCents = this.dealDownPaymentCents(card);
+        if (state.cashCents < downPaymentCents + BigInt(amountCents)) {
+          throw new BadRequestException(
+            "Не хватает наличных на первоначальный взнос и предложенную цену"
+          );
+        }
+      }
+
+      const responses = [
+        ...pending.responses,
+        { gamePlayerId: bidder.id, amountCents }
+      ];
+      const allResponded = pending.bidderGamePlayerIds.every((playerId) =>
+        responses.some((response) => response.gamePlayerId === playerId)
+      );
+      const noOffers = allResponded && responses.every((response) => response.amountCents === null);
+      const nextPending: GamePendingAction = noOffers
+        ? {
+            type: "deal_card_drawn",
+            gamePlayerId: pending.gamePlayerId,
+            cardId: pending.cardId,
+            cardType: pending.cardType
+          }
+        : { ...pending, responses };
+      const updated = await tx.game.updateMany({
+        where: {
+          id: gameId,
+          settings: { equals: game.settings as Prisma.InputJsonValue }
+        },
+        data: { settings: this.settingsWithPending(game.settings, nextPending) }
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException("Состояние аукциона изменилось. Повторите действие");
+      }
+
+      emittedEvents.push({
+        type:
+          amountCents === null
+            ? realtimeEvents.dealAuctionDecline
+            : realtimeEvents.dealAuctionBid,
+        gamePlayerId: bidder.id,
+        payload: { cardId: pending.cardId }
+      });
+      if (noOffers) {
+        emittedEvents.push({
+          type: realtimeEvents.dealAuctionCancel,
+          gamePlayerId: pending.gamePlayerId,
+          payload: { cardId: pending.cardId, reason: "no_offers" }
+        });
+      }
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: {
+          reason: noOffers ? "deal_auction_no_offers" : "deal_auction_response_recorded"
+        }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async selectDealAuctionOffer(
+    gameId: string,
+    userId: string,
+    dto: SelectDealAuctionOfferDto
+  ) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const seller = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({
+        where: { id: gameId },
+        include: {
+          players: {
+            where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED },
+            orderBy: { seat: "asc" }
+          }
+        }
+      });
+      const pending = this.pendingAction(game.settings);
+      const activeIndex = game.currentTurnIndex % game.players.length;
+      const currentPlayer = game.players[activeIndex];
+      if (
+        !currentPlayer ||
+        currentPlayer.id !== seller.id ||
+        pending?.type !== "deal_auction" ||
+        pending.gamePlayerId !== seller.id
+      ) {
+        throw new ForbiddenException("Вы не можете выбрать победителя этого аукциона");
+      }
+      if (!this.dealAuctionResolved(pending)) {
+        throw new BadRequestException("Сначала дождитесь решений всех игроков");
+      }
+      const selected = pending.responses.find(
+        (response) =>
+          response.gamePlayerId === dto.buyerGamePlayerId &&
+          response.amountCents !== null
+      );
+      if (!selected || selected.amountCents === null) {
+        throw new BadRequestException("Выбранное предложение недоступно");
+      }
+      const buyer = game.players.find((candidate) => candidate.id === dto.buyerGamePlayerId);
+      if (!buyer) throw new BadRequestException("Покупатель больше не участвует в игре");
+
+      const card = await tx.card.findUnique({
+        where: { id: pending.cardId },
+        include: { meta: true, effects: true, conditions: true }
+      });
+      if (!card || !this.isDealAuctionEligible(card)) {
+        throw new BadRequestException("Карточка больше недоступна для аукциона");
+      }
+      const buyerState = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: buyer.id }
+      });
+      const sellerState = await tx.playerFinancialState.findUniqueOrThrow({
+        where: { gamePlayerId: seller.id }
+      });
+      const meta = this.metaMap(card.meta);
+      const downPaymentCents = this.dealDownPaymentCents(card);
+      const cashflowCents =
+        this.buyableCardActionAmount(card.effects, cardActionTypes.cashflowAdjust) ??
+        BigInt(Math.round(Number(meta.cashflow_monthly ?? "0")));
+      const unitPriceCents = this.dealUnitPriceCents(card, meta, false);
+      const totalRequiredCents = downPaymentCents + BigInt(selected.amountCents);
+      if (buyerState.cashCents < totalRequiredCents) {
+        throw new BadRequestException(
+          "У покупателя больше не хватает наличных на сделку и цену аукциона"
+        );
+      }
+
+      const claimed = await tx.game.updateMany({
+        where: {
+          id: gameId,
+          settings: { equals: game.settings as Prisma.InputJsonValue }
+        },
+        data: { settings: this.settingsWithPending(game.settings, null) }
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException("Победитель аукциона уже выбран");
+      }
+
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: buyer.id },
+        data: { cashCents: { decrement: totalRequiredCents } }
+      });
+      await tx.playerFinancialState.update({
+        where: { gamePlayerId: seller.id },
+        data: { cashCents: { increment: BigInt(selected.amountCents) } }
+      });
+      await tx.playerAsset.create({
+        data: {
+          gamePlayerId: buyer.id,
+          sourceCardId: card.id,
+          type: card.category ?? card.cardType.toLowerCase(),
+          name: card.title,
+          symbol: meta.symbol ?? null,
+          quantity: 1,
+          units: 1,
+          costBasisCents: unitPriceCents,
+          marketValueCents: unitPriceCents,
+          downPaymentCents,
+          cashflowCents
+        }
+      });
+
+      await this.recalculatePlayer(tx, buyer.id, emittedEvents);
+      await this.recalculatePlayer(tx, seller.id, emittedEvents);
+      emittedEvents.push({
+        type: realtimeEvents.dealAuctionSelect,
+        gamePlayerId: buyer.id,
+        payload: {
+          cardId: card.id,
+          title: card.title,
+          sellerGamePlayerId: seller.id,
+          buyerGamePlayerId: buyer.id,
+          bidAmountCents: selected.amountCents,
+          downPaymentCents: Number(downPaymentCents),
+          buyerBeforeCashCents: cents(buyerState.cashCents),
+          buyerAfterCashCents: cents(buyerState.cashCents - totalRequiredCents),
+          sellerBeforeCashCents: cents(sellerState.cashCents),
+          sellerAfterCashCents: cents(sellerState.cashCents + BigInt(selected.amountCents)),
+          cashflowCents: Number(cashflowCents)
+        }
+      });
+      const gameWon = await this.checkGameWon(tx, buyer.id, emittedEvents);
+      if (gameWon) {
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
+      await this.advanceTurn(tx, game, activeIndex);
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "deal_auction_completed_turn_ended" }
+      });
+      await this.appendEvents(tx, gameId, userId, emittedEvents);
+    });
+
+    return this.actionResult(gameId, emittedEvents);
+  }
+
+  async cancelDealAuction(gameId: string, userId: string) {
+    const expirationEvents = await this.expireGameIfNeeded(gameId);
+    if (expirationEvents) return this.actionResult(gameId, expirationEvents);
+    const emittedEvents: PendingEvent[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      const seller = await this.requirePlayer(tx, gameId, userId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      const pending = this.pendingAction(game.settings);
+      if (
+        pending?.type !== "deal_auction" ||
+        pending.gamePlayerId !== seller.id ||
+        !this.dealAuctionResolved(pending)
+      ) {
+        throw new ForbiddenException("Сейчас аукцион нельзя отменить");
+      }
+      const cancelled = await tx.game.updateMany({
+        where: {
+          id: gameId,
+          settings: { equals: game.settings as Prisma.InputJsonValue }
+        },
+        data: {
+          settings: this.settingsWithPending(game.settings, {
+            type: "deal_card_drawn",
+            gamePlayerId: pending.gamePlayerId,
+            cardId: pending.cardId,
+            cardType: pending.cardType
+          })
+        }
+      });
+      if (cancelled.count !== 1) {
+        throw new ConflictException("Состояние аукциона изменилось. Повторите действие");
+      }
+      emittedEvents.push({
+        type: realtimeEvents.dealAuctionCancel,
+        gamePlayerId: seller.id,
+        payload: { cardId: pending.cardId, reason: "seller_cancelled" }
+      });
+      emittedEvents.push({
+        type: realtimeEvents.stateUpdate,
+        payload: { reason: "deal_auction_cancelled" }
       });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
@@ -4884,6 +5282,56 @@ export class GamesService {
     return this.metaMoneyCents(meta, "price");
   }
 
+  private dealDownPaymentCents(card: {
+    title: string;
+    bodyText: string;
+    category: string | null;
+    subcategory: string | null;
+    meta: Array<{ metaKey: string; metaValue: string }>;
+    effects: Array<{
+      effectType: string;
+      amountCents: bigint | number | null;
+      payload: Prisma.JsonValue;
+    }>;
+  }) {
+    const meta = this.metaMap(card.meta);
+    const cashEffectAmount = this.buyableCardActionAmount(
+      card.effects,
+      cardActionTypes.cashAdjust
+    );
+    if (cashEffectAmount !== null) {
+      return BigInt(Math.abs(cents(cashEffectAmount)));
+    }
+    return BigInt(
+      dealDownPaymentAmount(meta, Number(this.dealUnitPriceCents(card, meta, false)))
+    );
+  }
+
+  private isDealAuctionEligible(card: CardWithRules) {
+    if (card.cardType !== CardType.SMALL_DEAL && card.cardType !== CardType.BIG_DEAL) {
+      return false;
+    }
+    const meta = this.metaMap(card.meta);
+    if (
+      this.isStockDeal(card, meta) ||
+      this.networkMarketingCard(card) ||
+      this.hasAutomaticCardEffects(card)
+    ) {
+      return false;
+    }
+    return isRentalRealEstateAsset(
+      `${card.category ?? ""} ${card.subcategory ?? ""} ${card.title} ${card.bodyText}`
+    );
+  }
+
+  private dealAuctionResolved(
+    pending: Extract<GamePendingAction, { type: "deal_auction" }>
+  ) {
+    return pending.bidderGamePlayerIds.every((playerId) =>
+      pending.responses.some((response) => response.gamePlayerId === playerId)
+    );
+  }
+
   private metaMoneyCents(meta: Record<string, string>, key: string) {
     const value = meta[key];
     if (!value) return 0n;
@@ -4983,6 +5431,42 @@ export class GamesService {
         resolvedGamePlayerIds: value.resolvedGamePlayerIds.filter(
           (item): item is string => typeof item === "string"
         )
+      };
+    }
+    if (
+      value.type === "deal_auction" &&
+      typeof value.gamePlayerId === "string" &&
+      typeof value.cardId === "number" &&
+      (value.cardType === "SMALL_DEAL" ||
+        value.cardType === "BIG_DEAL" ||
+        value.cardType === "FAST_TRACK") &&
+      Array.isArray(value.bidderGamePlayerIds) &&
+      Array.isArray(value.responses)
+    ) {
+      return {
+        type: "deal_auction",
+        gamePlayerId: value.gamePlayerId,
+        cardId: value.cardId,
+        cardType: value.cardType,
+        bidderGamePlayerIds: value.bidderGamePlayerIds.filter(
+          (item): item is string => typeof item === "string"
+        ),
+        responses: value.responses.flatMap((candidate) => {
+          if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+            return [];
+          }
+          const response = candidate as Record<string, unknown>;
+          if (
+            typeof response.gamePlayerId !== "string" ||
+            (response.amountCents !== null && typeof response.amountCents !== "number")
+          ) {
+            return [];
+          }
+          return [{
+            gamePlayerId: response.gamePlayerId,
+            amountCents: response.amountCents as number | null
+          }];
+        })
       };
     }
     if (

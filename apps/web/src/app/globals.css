@@ -122,6 +122,25 @@ body.game-room-viewport-locked {
   place-items: center;
 }
 
+.deal-auction-overlay {
+  top: var(--app-shell-header-bottom);
+  display: grid;
+  overflow: hidden;
+  padding-top: clamp(0.5rem, 1.5vh, 1rem);
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  place-items: center;
+}
+
+.deal-auction-panel {
+  max-height: 100%;
+}
+
+.deal-auction-scroll {
+  scrollbar-gutter: stable;
+}
+
 .bank-dialog-panel {
   max-height: 100%;
 }
@@ -177,6 +196,19 @@ body.game-room-viewport-locked {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  .deal-auction-overlay {
+    top: 0;
+    padding-top: var(--app-shell-mobile-overlay-top);
+    padding-bottom: var(--app-shell-mobile-overlay-bottom);
+  }
+
+  .deal-auction-panel {
+    max-width: 100%;
+    max-height: calc(
+      100dvh - var(--app-shell-mobile-overlay-top) - var(--app-shell-mobile-overlay-bottom)
+    );
   }
 }
 

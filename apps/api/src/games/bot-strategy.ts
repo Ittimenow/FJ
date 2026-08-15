@@ -21,6 +21,32 @@ export interface BotDealDecision {
   reason: string;
 }
 
+export function decideBotAuctionBid(
+  state: BotFinancialSnapshot,
+  deal: { downPaymentCents: number; cashflowCents: number }
+) {
+  const availableForBid =
+    state.cashCents - botCashReserve(state) - Math.max(0, deal.downPaymentCents);
+  if (availableForBid < 100 || deal.cashflowCents <= 0) {
+    return {
+      amountCents: null,
+      reason: "после покупки не останется безопасного резерва наличных"
+    };
+  }
+
+  const valueBasedBid = Math.max(500, deal.cashflowCents * 6);
+  const amountCents = Math.floor(Math.min(availableForBid, valueBasedBid) / 100) * 100;
+  return amountCents >= 100
+    ? {
+        amountCents,
+        reason: "цена возможности сохраняет резерв и соответствует доходу сделки"
+      }
+    : {
+        amountCents: null,
+        reason: "для безопасной ставки недостаточно свободных наличных"
+      };
+}
+
 export function botCashReserve(state: BotFinancialSnapshot) {
   return Math.max(
     1_000,

@@ -9,6 +9,11 @@ import { AddGameUserDto } from "./dto/add-game-user.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
+import {
+  DealAuctionBidDto,
+  SelectDealAuctionOfferDto,
+  StartDealAuctionDto
+} from "./dto/deal-auction.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
@@ -198,6 +203,59 @@ export class GamesController {
   @Post(":id/deals/decline")
   async declineDeal(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     const result = await this.games.declineDeal(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/deals/auction/start")
+  async startDealAuction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: StartDealAuctionDto
+  ) {
+    const result = await this.games.startDealAuction(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/deals/auction/bid")
+  async bidOnDealAuction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: DealAuctionBidDto
+  ) {
+    const result = await this.games.bidOnDealAuction(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/deals/auction/decline")
+  async declineDealAuction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string
+  ) {
+    const result = await this.games.declineDealAuction(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/deals/auction/select")
+  async selectDealAuctionOffer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: SelectDealAuctionOfferDto
+  ) {
+    const result = await this.games.selectDealAuctionOffer(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/deals/auction/cancel")
+  async cancelDealAuction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string
+  ) {
+    const result = await this.games.cancelDealAuction(id, user.userId);
     this.realtime.broadcastAction(id, result);
     return result;
   }

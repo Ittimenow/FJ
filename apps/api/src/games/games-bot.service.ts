@@ -21,6 +21,7 @@ import {
   chooseBotDealType,
   chooseBotDoodadPayment,
   decideBotDeal,
+  decideBotAuctionBid,
   shouldAcceptBotCharity,
   shouldSellBotMarketAsset,
   type BotFinancialSnapshot
@@ -47,6 +48,14 @@ type BotPendingAction =
       symbol: string;
       sellerGamePlayerIds: string[];
       resolvedGamePlayerIds: string[];
+    }
+  | {
+      type: "deal_auction";
+      gamePlayerId: string;
+      cardId: number;
+      cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      bidderGamePlayerIds: string[];
+      responses: Array<{ gamePlayerId: string; amountCents: number | null }>;
     }
   | {
       type: "charity_choice";
@@ -81,6 +90,10 @@ type BotAction =
   | { type: "take_loan"; playerId: string; amountCents: number; reason: string }
   | { type: "repay_loan"; playerId: string; liabilityId: string; amountCents: number; reason: string }
   | { type: "decline_deal"; playerId: string; reason: string }
+  | { type: "bid_auction"; playerId: string; amountCents: number; reason: string }
+  | { type: "decline_auction"; playerId: string; reason: string }
+  | { type: "select_auction"; playerId: string; buyerGamePlayerId: string; reason: string }
+  | { type: "cancel_auction"; playerId: string; reason: string }
   | { type: "sell_stock"; playerId: string; quantity: number; reason: string }
   | { type: "decline_stock"; playerId: string; reason: string }
   | { type: "sell_market"; playerId: string; assetId: string; reason: string }
@@ -264,6 +277,41 @@ export class GamesBotService implements OnModuleInit {
       }
       return this.pendingActionForBot(offeredPlayer, pending);
     }
+    if (pending?.type === "deal_auction") {
+      const unresolvedBotBidder = game.players.find(
+        (player) =>
+          player.controller === PlayerController.BOT &&
+          pending.bidderGamePlayerIds.includes(player.id) &&
+          !pending.responses.some((response) => response.gamePlayerId === player.id)
+      );
+      if (unresolvedBotBidder) {
+        return this.dealAuctionBidAction(unresolvedBotBidder, pending);
+      }
+      const resolved = pending.bidderGamePlayerIds.every((playerId) =>
+        pending.responses.some((response) => response.gamePlayerId === playerId)
+      );
+      if (!resolved) return null;
+      const seller = game.players.find((player) => player.id === pending.gamePlayerId);
+      if (!seller || seller.controller !== PlayerController.BOT) return null;
+      const bestOffer = [...pending.responses]
+        .filter(
+          (response): response is { gamePlayerId: string; amountCents: number } =>
+            response.amountCents !== null
+        )
+        .sort((left, right) => right.amountCents - left.amountCents)[0];
+      return bestOffer
+        ? {
+            type: "select_auction",
+            playerId: seller.id,
+            buyerGamePlayerId: bestOffer.gamePlayerId,
+            reason: "выбрано самое высокое доступное предложение"
+          } satisfies BotAction
+        : {
+            type: "cancel_auction",
+            playerId: seller.id,
+            reason: "другие игроки отказались от покупки возможности"
+          } satisfies BotAction;
+    }
 
     const current = game.players[game.currentTurnIndex % game.players.length];
     if (!current || current.controller !== PlayerController.BOT || !current.financialState) {
@@ -416,6 +464,44 @@ export class GamesBotService implements OnModuleInit {
         } satisfies BotAction;
   }
 
+  private async dealAuctionBidAction(
+    player: BotPlayer,
+    pending: Extract<BotPendingAction, { type: "deal_auction" }>
+  ) {
+    const card = await this.prisma.card.findUnique({
+      where: { id: pending.cardId },
+      include: { meta: true, effects: true }
+    });
+    if (!card) {
+      return {
+        type: "decline_auction",
+        playerId: player.id,
+        reason: "данные возможности недоступны"
+      } satisfies BotAction;
+    }
+    const meta = Object.fromEntries(card.meta.map((item) => [item.metaKey, item.metaValue]));
+    const downPaymentCents = this.dealUnitCost(card, meta, false);
+    const cashflowCents =
+      this.effectAmount(card.effects, cardActionTypes.cashflowAdjust) ??
+      this.metaAmount(meta.cashflow_monthly);
+    const decision = decideBotAuctionBid(this.financialSnapshot(player), {
+      downPaymentCents,
+      cashflowCents
+    });
+    return decision.amountCents === null
+      ? {
+          type: "decline_auction",
+          playerId: player.id,
+          reason: decision.reason
+        } satisfies BotAction
+      : {
+          type: "bid_auction",
+          playerId: player.id,
+          amountCents: decision.amountCents,
+          reason: decision.reason
+        } satisfies BotAction;
+  }
+
   private bankruptcyAction(player: BotPlayer): BotAction | null {
     const asset = [...player.assets].sort((left, right) => {
       const leftFlow = Number(left.cashflowCents) / Math.max(1, left.quantity);
@@ -470,6 +556,18 @@ export class GamesBotService implements OnModuleInit {
         });
       case "decline_deal":
         return this.games.declineDeal(gameId, actorId);
+      case "bid_auction":
+        return this.games.bidOnDealAuction(gameId, actorId, {
+          amountCents: action.amountCents
+        });
+      case "decline_auction":
+        return this.games.declineDealAuction(gameId, actorId);
+      case "select_auction":
+        return this.games.selectDealAuctionOffer(gameId, actorId, {
+          buyerGamePlayerId: action.buyerGamePlayerId
+        });
+      case "cancel_auction":
+        return this.games.cancelDealAuction(gameId, actorId);
       case "sell_stock":
         return this.games.sellStockFromDeal(gameId, actorId, action.quantity);
       case "decline_stock":

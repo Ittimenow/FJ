@@ -854,6 +854,7 @@ const pendingActionLabels: Record<string, string> = {
   choose_deal: "выбор сделки",
   deal_card_drawn: "решение по сделке",
   stock_sale_window: "продажа акций",
+  deal_auction: "аукцион возможности",
   charity_choice: "благотворительность",
   doodad_payment_choice: "выбор оплаты",
   market_sale: "предложение рынка"

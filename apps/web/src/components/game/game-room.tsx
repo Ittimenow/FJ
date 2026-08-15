@@ -70,6 +70,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FigurinePicker } from "@/components/figurine-picker";
 import {
+  DealAuctionDialog,
+  type DealAuctionPlayerRow
+} from "@/components/game/deal-auction-dialog";
+import {
   GameRoomVariantTwo,
   type GameRoomView
 } from "@/components/game/game-room-variant-two";
@@ -139,6 +143,11 @@ type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed";
 type DecisionSubmission =
   | "deal_buy"
   | "deal_decline"
+  | "deal_auction_start"
+  | "deal_auction_bid"
+  | "deal_auction_decline"
+  | "deal_auction_select"
+  | "deal_auction_cancel"
   | "market_sell"
   | "market_decline"
   | "stock_sell"
@@ -191,6 +200,7 @@ export function GameRoom({
   const [loanAmount, setLoanAmount] = useState(1000);
   const [loanSubmitting, setLoanSubmitting] = useState(false);
   const [dealQuantity, setDealQuantity] = useState<number | "">("");
+  const [dealAuctionBid, setDealAuctionBid] = useState<number | "">("");
   const [turnAnimationPhase, setTurnAnimationPhase] = useState<TurnAnimationPhase>("ready");
   const [turnTabRequest, setTurnTabRequest] = useState(0);
   const [rollingDice, setRollingDice] = useState(false);
@@ -526,6 +536,46 @@ export function GameRoom({
     ownPendingAction?.type === "stock_sale_window"
       ? latestBuyableCard
       : null;
+  const dealAuction = pendingAction?.type === "deal_auction" ? pendingAction : null;
+  const dealAuctionCard = useMemo(
+    () => latestDealCard(snapshot.events, dealAuction),
+    [dealAuction, snapshot.events]
+  );
+  const dealAuctionResponse =
+    dealAuction && me
+      ? dealAuction.responses.find((response) => response.gamePlayerId === me.id) ?? null
+      : null;
+  const isDealAuctionBidder = Boolean(
+    dealAuction && me && dealAuction.bidderGamePlayerIds.includes(me.id)
+  );
+  const isDealAuctionSeller = Boolean(dealAuction && me?.id === dealAuction.gamePlayerId);
+  const dealAuctionResolved = Boolean(
+    dealAuction &&
+      dealAuction.bidderGamePlayerIds.every((playerId) =>
+        dealAuction.responses.some((response) => response.gamePlayerId === playerId)
+      )
+  );
+  const dealAuctionRows: DealAuctionPlayerRow[] = dealAuction
+    ? dealAuction.bidderGamePlayerIds.map((playerId) => {
+        const player = gamePlayers.find((candidate) => candidate.id === playerId);
+        const response = dealAuction.responses.find(
+          (candidate) => candidate.gamePlayerId === playerId
+        );
+        return {
+          id: playerId,
+          name: gamePlayerName(player),
+          status: !response
+            ? "waiting"
+            : response.amountCents === null
+              ? "declined"
+              : "offered",
+          amountCents: response?.amountCents ?? null
+        };
+      })
+    : [];
+  useEffect(() => {
+    setDealAuctionBid("");
+  }, [dealAuction?.cardId]);
   const waitingStockSellerNames =
     ownPendingAction?.type === "stock_sale_window"
       ? unresolvedStockSellerNames(
@@ -1038,6 +1088,53 @@ export function GameRoom({
     );
   }
 
+  function startLatestDealAuction() {
+    if (!latestDealDecisionCard) return;
+    void submitDecision(
+      "deal_auction_start",
+      realtimeEvents.dealAuctionStart,
+      { cardId: latestDealDecisionCard.cardId },
+      "Не удалось начать аукцион"
+    );
+  }
+
+  function bidOnLatestDealAuction() {
+    if (typeof dealAuctionBid !== "number" || dealAuctionBid < 1) return;
+    void submitDecision(
+      "deal_auction_bid",
+      realtimeEvents.dealAuctionBid,
+      { amountCents: dealAuctionBid },
+      "Не удалось отправить предложение"
+    );
+  }
+
+  function declineLatestDealAuction() {
+    void submitDecision(
+      "deal_auction_decline",
+      realtimeEvents.dealAuctionDecline,
+      {},
+      "Не удалось отказаться от аукциона"
+    );
+  }
+
+  function selectLatestDealAuctionOffer(buyerGamePlayerId: string) {
+    void submitDecision(
+      "deal_auction_select",
+      realtimeEvents.dealAuctionSelect,
+      { buyerGamePlayerId },
+      "Не удалось выбрать покупателя"
+    );
+  }
+
+  function cancelLatestDealAuction() {
+    void submitDecision(
+      "deal_auction_cancel",
+      realtimeEvents.dealAuctionCancel,
+      {},
+      "Не удалось закрыть аукцион"
+    );
+  }
+
   function sellMarketAsset() {
     if (!marketSaleOffer) return;
     void submitDecision(
@@ -1367,6 +1464,24 @@ export function GameRoom({
         loanSubmitting={loanSubmitting}
         onClose={() => setBankDialogOpen(false)}
       />
+      <DealAuctionDialog
+        open={Boolean(
+          dealAuction && dealAuctionCard && (isDealAuctionSeller || isDealAuctionBidder)
+        )}
+        role={isDealAuctionSeller ? "seller" : "bidder"}
+        card={dealAuctionCard}
+        rows={dealAuctionRows}
+        resolved={dealAuctionResolved}
+        hasResponded={Boolean(dealAuctionResponse)}
+        bidDraft={dealAuctionBid}
+        currentCashCents={me?.financialState?.cashCents ?? 0}
+        submitting={Boolean(decisionSubmission?.startsWith("deal_auction_"))}
+        onBidDraftChange={setDealAuctionBid}
+        onBid={bidOnLatestDealAuction}
+        onDecline={declineLatestDealAuction}
+        onSelect={selectLatestDealAuctionOffer}
+        onCancel={cancelLatestDealAuction}
+      />
       {snapshot.game.status === "IN_PROGRESS" &&
       me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
@@ -1455,6 +1570,7 @@ export function GameRoom({
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
               onBuyLatest={buyLatestDeal}
+              onStartAuction={startLatestDealAuction}
               onDeclineLatest={declineLatestDeal}
               onSellMarketAsset={sellMarketAsset}
               onDeclineMarketSale={declineMarketSale}
@@ -1523,6 +1639,7 @@ export function GameRoom({
               dealQuantity={dealQuantity}
               setDealQuantity={updateDealQuantity}
               onBuyLatest={buyLatestDeal}
+              onStartAuction={startLatestDealAuction}
               onDeclineLatest={declineLatestDeal}
               onSellMarketAsset={sellMarketAsset}
               onDeclineMarketSale={declineMarketSale}
@@ -1588,6 +1705,7 @@ export function GameRoom({
                   dealQuantity={dealQuantity}
                   setDealQuantity={updateDealQuantity}
                   onBuyLatest={buyLatestDeal}
+                  onStartAuction={startLatestDealAuction}
                   onDeclineLatest={declineLatestDeal}
                   onSellMarketAsset={sellMarketAsset}
                   onDeclineMarketSale={declineMarketSale}
@@ -4561,6 +4679,7 @@ function ActionsPanel({
   dealQuantity,
   setDealQuantity,
   onBuyLatest,
+  onStartAuction,
   onDeclineLatest,
   onSellMarketAsset,
   onDeclineMarketSale,
@@ -4598,6 +4717,7 @@ function ActionsPanel({
   dealQuantity: number | "";
   setDealQuantity: (value: number | "") => void;
   onBuyLatest: () => void;
+  onStartAuction: () => void;
   onDeclineLatest: () => void;
   onSellMarketAsset: () => void;
   onDeclineMarketSale: () => void;
@@ -4651,7 +4771,9 @@ function ActionsPanel({
     marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
   const canResolveLatestDeal = waitingStockSellerNames.length === 0;
   const dealDecisionSubmitting =
-    decisionSubmission === "deal_buy" || decisionSubmission === "deal_decline";
+    decisionSubmission === "deal_buy" ||
+    decisionSubmission === "deal_decline" ||
+    decisionSubmission === "deal_auction_start";
   const stockDecisionSubmission =
     decisionSubmission === "stock_sell" || decisionSubmission === "stock_decline"
       ? decisionSubmission
@@ -5082,7 +5204,11 @@ function ActionsPanel({
             <div
               className={[
                 "mt-3 grid w-full min-w-0 gap-2",
-                embedded ? "grid-cols-1" : "sm:grid-cols-3"
+                embedded
+                  ? "grid-cols-1"
+                  : latestCard.isAuctionEligible
+                    ? "sm:grid-cols-2"
+                    : "sm:grid-cols-3"
               ].join(" ")}
             >
               <Button
@@ -5098,6 +5224,19 @@ function ActionsPanel({
               >
                 {decisionSubmission === "deal_buy" ? "Покупаем…" : "Купить"}
               </Button>
+              {latestCard.isAuctionEligible ? (
+                <Button
+                  className="w-full min-w-0"
+                  variant="action"
+                  onClick={onStartAuction}
+                  disabled={!canResolveLatestDeal || dealDecisionSubmitting}
+                  aria-busy={decisionSubmission === "deal_auction_start"}
+                >
+                  {decisionSubmission === "deal_auction_start"
+                    ? "Открываем аукцион…"
+                    : "Предложить игрокам"}
+                </Button>
+              ) : null}
               <Button
                 className="w-full min-w-0"
                 variant="secondary"
@@ -6031,6 +6170,7 @@ const eventTitleIcons = {
   "loan:repay": Landmark,
   "paycheck:receive": Banknote,
   "deal:buy": Handshake,
+  "deal:auction_select": HandCoins,
   "deal:sell": HandCoins
 } as const;
 
@@ -6359,6 +6499,11 @@ const eventTitles: Record<string, string> = {
   "deal:buy": "Покупка актива",
   "deal:decline": "Отказ от покупки",
   "deal:sell": "Продажа актива",
+  "deal:auction_start": "Аукцион возможности",
+  "deal:auction_bid": "Предложение на аукционе",
+  "deal:auction_decline": "Отказ от аукциона",
+  "deal:auction_select": "Возможность продана",
+  "deal:auction_cancel": "Аукцион завершён без продажи",
   "market:sale_offer": "Предложение рынка",
   "market:sale_declined": "Отказ от продажи",
   "market:no_effect": "Карточка рынка не сработала",
@@ -6640,6 +6785,31 @@ function eventDetails(event: GameEvent) {
         moneyDetail("После покупки актива осталось", payload.afterCashCents),
         moneyDetail("Денежный поток", payload.cashflowCents, "/мес")
       ]);
+    case "deal:auction_start":
+      return compactDetails([
+        textDetail("Возможность", payload.title),
+        numericDetail(
+          "Приглашено игроков",
+          Array.isArray(payload.bidderGamePlayerIds) ? payload.bidderGamePlayerIds.length : null
+        )
+      ]);
+    case "deal:auction_bid":
+      return ["Игрок отправил закрытое предложение."];
+    case "deal:auction_decline":
+      return ["Игрок отказался от покупки возможности."];
+    case "deal:auction_select":
+      return compactDetails([
+        textDetail("Возможность", payload.title),
+        moneyDetail("Цена аукциона", payload.bidAmountCents),
+        moneyDetail("Первоначальный взнос", payload.downPaymentCents),
+        moneyDetail("Денежный поток покупателя", payload.cashflowCents, "/мес")
+      ]);
+    case "deal:auction_cancel":
+      return [
+        payload.reason === "no_offers"
+          ? "Все приглашённые игроки отказались."
+          : "Владелец хода решил не продавать возможность."
+      ];
     case "deal:decline":
       return compactDetails([
         textDetail("Тип", cardTypes[String(payload.cardType)] ?? "Карточка"),
@@ -7630,7 +7800,8 @@ function latestDealCard(
 ) {
   if (
     pendingAction?.type !== "deal_card_drawn" &&
-    pendingAction?.type !== "stock_sale_window"
+    pendingAction?.type !== "stock_sale_window" &&
+    pendingAction?.type !== "deal_auction"
   ) {
     return null;
   }
@@ -7679,8 +7850,25 @@ function latestDealCard(
     priceCents,
     downPaymentCents,
     cashflowCents: cashflowDelta || metaCents(meta, "cashflow_monthly"),
-    isStock
+    isStock,
+    isAuctionEligible:
+      !isStock &&
+      isRentalRealEstateText(`${category} ${subcategory} ${title} ${bodyText}`)
   };
+}
+
+function isRentalRealEstateText(value: string) {
+  const normalized = value.toLowerCase().replace(/ё/g, "е");
+  if (
+    /part\s*time|брат\s+просит|другу\s+срочно|монет|гектар|свободная\s+земл|циркониев/.test(
+      normalized
+    )
+  ) {
+    return false;
+  }
+  return /(?:^|\s)(?:2у|3m|3м)(?:\s|$)|plex|duplex|коттедж|таунхаус|апартамент|квартирн(?:ый|ого)\s+(?:дом|комплекс)|дом:\s*\$/.test(
+    normalized
+  );
 }
 
 function stockSaleOfferForPlayer(

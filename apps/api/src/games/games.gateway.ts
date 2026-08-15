@@ -13,6 +13,11 @@ import {
 import { realtimeEvents } from "@cashflow/shared";
 import { Server, Socket } from "socket.io";
 import { BuyDealDto } from "./dto/buy-deal.dto";
+import {
+  DealAuctionBidDto,
+  SelectDealAuctionOfferDto,
+  StartDealAuctionDto
+} from "./dto/deal-auction.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { ChatDto } from "./dto/chat.dto";
@@ -243,6 +248,64 @@ export class GamesGateway
     @MessageBody() body: { gameId: string }
   ) {
     const result = await this.games.declineDeal(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("deal:auction_start")
+  async startDealAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & StartDealAuctionDto
+  ) {
+    const result = await this.games.startDealAuction(body.gameId, this.userId(client), {
+      cardId: body.cardId
+    });
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("deal:auction_bid")
+  async bidOnDealAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & DealAuctionBidDto
+  ) {
+    const result = await this.games.bidOnDealAuction(body.gameId, this.userId(client), {
+      amountCents: body.amountCents
+    });
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("deal:auction_decline")
+  async declineDealAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.declineDealAuction(body.gameId, this.userId(client));
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("deal:auction_select")
+  async selectDealAuctionOffer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string } & SelectDealAuctionOfferDto
+  ) {
+    const result = await this.games.selectDealAuctionOffer(
+      body.gameId,
+      this.userId(client),
+      { buyerGamePlayerId: body.buyerGamePlayerId }
+    );
+    this.realtime.broadcastAction(body.gameId, result);
+    return result;
+  }
+
+  @SubscribeMessage("deal:auction_cancel")
+  async cancelDealAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { gameId: string }
+  ) {
+    const result = await this.games.cancelDealAuction(body.gameId, this.userId(client));
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }

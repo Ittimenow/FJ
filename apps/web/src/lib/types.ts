@@ -335,6 +335,17 @@ export type GamePendingAction =
       resolvedGamePlayerIds: string[];
     }
   | {
+      type: "deal_auction";
+      gamePlayerId: string;
+      cardId: number;
+      cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      bidderGamePlayerIds: string[];
+      responses: Array<{
+        gamePlayerId: string;
+        amountCents: number | null;
+      }>;
+    }
+  | {
       type: "charity_choice";
       gamePlayerId: string;
       donationCents: number;
