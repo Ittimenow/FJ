@@ -1,5 +1,6 @@
 export * from "./board";
 export * from "./baby-gifts";
+export * from "./bank-loans";
 export * from "./card-actions";
 export * from "./engine";
 export * from "./events";

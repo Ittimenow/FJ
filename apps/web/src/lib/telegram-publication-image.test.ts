@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { ImageResponse } from "next/og";
 import {
+  loadPublicationFigurines,
   size,
   TelegramPublicationCard
 } from "../app/telegram-publications/[id]/opengraph-image";
@@ -38,7 +39,7 @@ test("Telegram publication card renders a real PNG with summary data", async () 
             name: "Макс",
             mention: "Макс",
             profession: null,
-            figurine: null,
+            figurine: "rubber-duck",
             finalCashCents: 0,
             finalCashflowCents: 8500,
             finalPassiveIncomeCents: 8500,
@@ -54,8 +55,11 @@ test("Telegram publication card renders a real PNG with summary data", async () 
     }]
   };
 
+  const figurineSources = await loadPublicationFigurines(post);
+  assert.match(figurineSources["rubber-duck"] ?? "", /^data:image\/png;base64,/);
+
   const response = new ImageResponse(
-    createElement(TelegramPublicationCard, { post }),
+    createElement(TelegramPublicationCard, { post, figurineSources }),
     size
   );
   const png = new Uint8Array(await response.arrayBuffer());

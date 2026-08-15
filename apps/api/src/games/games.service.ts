@@ -20,6 +20,9 @@ import {
   SystemRole
 } from "@prisma/client";
 import {
+  availableBankLoanCents,
+  bankLoanIncrementCents,
+  bankLoanPaymentCents,
   cardActionTypes,
   dealDownPaymentAmount,
   isBabyGiftWindowOpen,
@@ -2495,11 +2498,11 @@ export class GamesService {
 
     await this.prisma.$transaction(async (tx) => {
       const player = await this.requirePlayer(tx, gameId, userId);
-      const bankruptcyState = await tx.playerFinancialState.findUnique({
+      const financialState = await tx.playerFinancialState.findUniqueOrThrow({
         where: { gamePlayerId: player.id },
-        select: { bankruptcyStatus: true }
+        select: { bankruptcyStatus: true, monthlyCashflowCents: true }
       });
-      if (bankruptcyState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
+      if (financialState.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) {
         throw new BadRequestException("Во время банкротства нельзя брать новые кредиты");
       }
       const game = await tx.game.findUniqueOrThrow({
@@ -2509,10 +2512,37 @@ export class GamesService {
         throw new ForbiddenException("Кредиты доступны только во время игры");
       }
       const amount = BigInt(dto.amountCents);
-      if (dto.amountCents < 1000 || dto.amountCents % 1000 !== 0) {
+      if (
+        dto.amountCents < bankLoanIncrementCents ||
+        dto.amountCents % bankLoanIncrementCents !== 0
+      ) {
         throw new BadRequestException("Сумма кредита должна быть кратна 1 000");
       }
-      const payment = amount / 10n;
+      const availableAmount = availableBankLoanCents(
+        financialState.monthlyCashflowCents
+      );
+      if (amount > availableAmount) {
+        throw new BadRequestException(
+          `Доступно не более $${availableAmount.toLocaleString("ru-RU")}: больший кредит сделает денежный поток отрицательным`
+        );
+      }
+      const payment = bankLoanPaymentCents(amount);
+
+      const reservedCapacity = await tx.playerFinancialState.updateMany({
+        where: {
+          gamePlayerId: player.id,
+          bankruptcyStatus: { not: BankruptcyStatus.LIQUIDATING },
+          monthlyCashflowCents: { gte: payment }
+        },
+        data: {
+          cashCents: { increment: amount }
+        }
+      });
+      if (reservedCapacity.count !== 1) {
+        throw new BadRequestException(
+          "Доступная сумма кредита изменилась. Проверьте финансовый отчёт и повторите попытку"
+        );
+      }
 
       await tx.playerLiability.create({
         data: {
@@ -2521,12 +2551,6 @@ export class GamesService {
           name: "Bank loan",
           balanceCents: amount,
           paymentCents: payment
-        }
-      });
-      await tx.playerFinancialState.update({
-        where: { gamePlayerId: player.id },
-        data: {
-          cashCents: { increment: amount }
         }
       });
       await this.recalculatePlayer(tx, player.id, emittedEvents);
@@ -4479,7 +4503,13 @@ export class GamesService {
         role: GameRole.PLAYER,
         status: GamePlayerStatus.JOINED
       },
-      include: { financialState: true },
+      include: {
+        financialState: true,
+        liabilities: {
+          where: { type: "bank_loan", balanceCents: { gt: 0n } },
+          select: { id: true }
+        }
+      },
       orderBy: { seat: "asc" }
     });
     const winner = players.find((player) => {
@@ -4489,7 +4519,8 @@ export class GamesService {
         !state.wonAt &&
         canEscapeRatRace(
           cents(state.passiveIncomeCents),
-          cents(state.totalExpensesCents)
+          cents(state.totalExpensesCents),
+          player.liabilities.length > 0
         )
       );
     });
@@ -4505,7 +4536,14 @@ export class GamesService {
   ) {
     const player = await tx.gamePlayer.findUniqueOrThrow({
       where: { id: gamePlayerId },
-      include: { financialState: true, game: true }
+      include: {
+        financialState: true,
+        game: true,
+        liabilities: {
+          where: { type: "bank_loan", balanceCents: { gt: 0n } },
+          select: { id: true }
+        }
+      }
     });
     const state = player.financialState;
     if (
@@ -4518,7 +4556,8 @@ export class GamesService {
     if (
       canEscapeRatRace(
         cents(state.passiveIncomeCents),
-        cents(state.totalExpensesCents)
+        cents(state.totalExpensesCents),
+        player.liabilities.length > 0
       )
     ) {
       const wonAt = new Date();

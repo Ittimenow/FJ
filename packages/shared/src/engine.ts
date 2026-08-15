@@ -50,9 +50,10 @@ export function recalculateFinancials(input: FinancialInput): FinancialTotals {
 
 export function canEscapeRatRace(
   passiveIncomeCents: number,
-  totalExpensesCents: number
+  totalExpensesCents: number,
+  hasOutstandingBankLoan: boolean
 ): boolean {
-  return passiveIncomeCents > totalExpensesCents;
+  return passiveIncomeCents > totalExpensesCents && !hasOutstandingBankLoan;
 }
 
 export function normalizeCardTypeForCell(cellType: string) {

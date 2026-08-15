@@ -1,6 +1,9 @@
 "use client";
 
-import { figurineImagePath } from "@cashflow/shared";
+import {
+  figurineImagePath,
+  outstandingBankLoanBalanceCents
+} from "@cashflow/shared";
 import {
   Baby,
   Banknote,
@@ -461,14 +464,23 @@ function JourneyLiabilities({ player }: { player: GamePlayer | undefined }) {
 
 function JourneyGoals({ player }: { player: GamePlayer | undefined }) {
   const state = player?.financialState;
+  const bankLoanBalanceCents = outstandingBankLoanBalanceCents(
+    player?.liabilities ?? []
+  );
   const goals = [
     {
       label: "Положительный денежный поток",
       complete: Boolean(state && state.monthlyCashflowCents > 0)
     },
     {
-      label: "Пассивный доход покрывает расходы",
-      complete: Boolean(state && state.passiveIncomeCents >= state.totalExpensesCents)
+      label: "Пассивный доход выше расходов",
+      complete: Boolean(state && state.passiveIncomeCents > state.totalExpensesCents)
+    },
+    {
+      label: bankLoanBalanceCents > 0
+        ? `Погасить банковские кредиты — осталось ${money(bankLoanBalanceCents)}`
+        : "Погасить банковские кредиты",
+      complete: Boolean(player && bankLoanBalanceCents === 0)
     },
     { label: "Достичь финансовой свободы", complete: Boolean(state?.wonAt) }
   ];

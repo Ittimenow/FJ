@@ -1,9 +1,14 @@
 "use client";
 
 import {
+  availableBankLoanCents,
+  bankLoanIncrementCents,
+  bankLoanPaymentCents,
+  canEscapeRatRace,
   dealDownPaymentAmount,
   figurineImagePath,
   isBabyGiftWindowOpen,
+  outstandingBankLoanBalanceCents,
   realtimeEvents,
   type FigurineId
 } from "@cashflow/shared";
@@ -92,6 +97,11 @@ import {
   stockQuantityForCostCents
 } from "@/components/game/stock-purchase-calculation";
 import {
+  gamePlayerForEvent,
+  groupTurnEventsByPlayer,
+  shouldShowTurnEventGroupIdentity
+} from "@/components/game/game-journal";
+import {
   normalizeStockSaleQuantity,
   stockSaleResetKey,
   type StockSaleQuantity
@@ -107,7 +117,7 @@ import {
   socketOptions,
   type ConnectionDiagnostics
 } from "@/lib/connection-health";
-import { money, shortDate } from "@/lib/format";
+import { money } from "@/lib/format";
 import { gamePlayerName, unresolvedStockSellerNames } from "@/lib/game-player";
 import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
 import { cn } from "@/lib/utils";
@@ -179,6 +189,7 @@ export function GameRoom({
   );
   const [error, setError] = useState<string | null>(null);
   const [loanAmount, setLoanAmount] = useState(1000);
+  const [loanSubmitting, setLoanSubmitting] = useState(false);
   const [dealQuantity, setDealQuantity] = useState<number | "">("");
   const [turnAnimationPhase, setTurnAnimationPhase] = useState<TurnAnimationPhase>("ready");
   const [turnTabRequest, setTurnTabRequest] = useState(0);
@@ -485,6 +496,23 @@ export function GameRoom({
     snapshot.game.status === "IN_PROGRESS" &&
     Boolean(me) &&
     me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
+  const availableLoanAmountCents = availableBankLoanCents(
+    me?.financialState?.monthlyCashflowCents ?? 0
+  );
+
+  useEffect(() => {
+    if (availableLoanAmountCents < bankLoanIncrementCents) return;
+    setLoanAmount((current) =>
+      Math.min(
+        Math.max(
+          Math.floor(current / bankLoanIncrementCents) * bankLoanIncrementCents,
+          bankLoanIncrementCents
+        ),
+        availableLoanAmountCents
+      )
+    );
+  }, [availableLoanAmountCents]);
+
   const activeDiceCount = (me?.financialState?.charityTurns ?? 0) > 0
     ? 2
     : 1;
@@ -1111,7 +1139,9 @@ export function GameRoom({
   }
 
   async function takeLoan() {
+    if (loanSubmitting) return false;
     setError(null);
+    setLoanSubmitting(true);
     try {
       const result = await emitWithAck(realtimeEvents.loanTake, { amountCents: loanAmount });
       applyActionResult(result);
@@ -1119,6 +1149,8 @@ export function GameRoom({
     } catch (event) {
       setError(gameErrorMessage(event, "Не удалось взять кредит"));
       return false;
+    } finally {
+      setLoanSubmitting(false);
     }
   }
 
@@ -1151,13 +1183,24 @@ export function GameRoom({
   function changeLoanAmount(delta: number) {
     setLoanAmount((current) => {
       const next = current + delta;
-      return Math.max(next, 1000);
+      return Math.min(
+        Math.max(next, bankLoanIncrementCents),
+        Math.max(availableLoanAmountCents, bankLoanIncrementCents)
+      );
     });
   }
 
   function updateLoanAmount(value: number) {
-    const normalized = Math.max(Math.floor((Number(value) || 0) / 1000) * 1000, 1000);
-    setLoanAmount(normalized);
+    const normalized = Math.max(
+      Math.floor((Number(value) || 0) / bankLoanIncrementCents) * bankLoanIncrementCents,
+      bankLoanIncrementCents
+    );
+    setLoanAmount(
+      Math.min(
+        normalized,
+        Math.max(availableLoanAmountCents, bankLoanIncrementCents)
+      )
+    );
   }
 
   function updateDealQuantity(value: number | "") {
@@ -1310,16 +1353,18 @@ export function GameRoom({
       <BankDialog
         open={bankDialogOpen}
         loanAmount={loanAmount}
+        availableLoanAmountCents={availableLoanAmountCents}
         currentCashCents={me?.financialState?.cashCents ?? 0}
         currentMonthlyCashflowCents={me?.financialState?.monthlyCashflowCents ?? 0}
-        onLoanDecrease={() => changeLoanAmount(-1000)}
-        onLoanIncrease={() => changeLoanAmount(1000)}
+        onLoanDecrease={() => changeLoanAmount(-bankLoanIncrementCents)}
+        onLoanIncrease={() => changeLoanAmount(bankLoanIncrementCents)}
         onLoanAmountChange={updateLoanAmount}
         onTakeLoan={async () => {
           const loanTaken = await takeLoan();
           if (loanTaken) setBankDialogOpen(false);
         }}
         canTakeLoan={canTakeLoan}
+        loanSubmitting={loanSubmitting}
         onClose={() => setBankDialogOpen(false)}
       />
       {snapshot.game.status === "IN_PROGRESS" &&
@@ -2984,6 +3029,7 @@ function DesktopFinancialPanel({
               className="mt-3"
               passiveIncomeCents={state.passiveIncomeCents}
               totalExpensesCents={state.totalExpensesCents}
+              bankLoanBalanceCents={outstandingBankLoanBalanceCents(player.liabilities)}
             />
             <CashflowEquation className="mt-3" state={state} />
             {outsidePlayers.length > 0 ? (
@@ -3467,7 +3513,7 @@ function PlayerIdentityMark({
   size = "md"
 }: {
   player: GamePlayer;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
 }) {
   const name = gamePlayerName(player);
   const figurine = player.figurine ?? player.user?.figurine;
@@ -3481,14 +3527,18 @@ function PlayerIdentityMark({
   const sizeClass = figurine
     ? size === "lg"
       ? "h-24 w-24"
-      : size === "sm"
-        ? "h-10 w-10"
-        : "h-12 w-12"
+      : size === "xs"
+        ? "h-8 w-8"
+        : size === "sm"
+          ? "h-10 w-10"
+          : "h-12 w-12"
     : size === "lg"
       ? "h-20 w-20 text-xl"
-      : size === "sm"
-        ? "h-9 w-9 text-xs"
-        : "h-11 w-11 text-sm";
+      : size === "xs"
+        ? "h-8 w-8 text-[10px]"
+        : size === "sm"
+          ? "h-9 w-9 text-xs"
+          : "h-11 w-11 text-sm";
 
   return (
     <span
@@ -3668,6 +3718,9 @@ function OtherPlayersList({
                   <PlayerFreedomMini
                     passiveIncomeCents={state.passiveIncomeCents}
                     totalExpensesCents={state.totalExpensesCents}
+                    bankLoanBalanceCents={outstandingBankLoanBalanceCents(
+                      otherPlayer.liabilities
+                    )}
                   />
                 ) : null}
               </li>
@@ -3874,6 +3927,7 @@ function MobileGameTabs({
             <FinancialFreedomProgress
               passiveIncomeCents={state.passiveIncomeCents}
               totalExpensesCents={state.totalExpensesCents}
+              bankLoanBalanceCents={outstandingBankLoanBalanceCents(player.liabilities)}
             />
             <CashflowEquation state={state} />
             <OtherPlayersList
@@ -4018,15 +4072,18 @@ function assetUnitCostCents(asset: GamePlayer["assets"][number]) {
 
 function LoanPanel({
   loanAmount,
+  availableLoanAmountCents,
   currentCashCents,
   currentMonthlyCashflowCents,
   onLoanDecrease,
   onLoanIncrease,
   onLoanAmountChange,
   onTakeLoan,
-  canTakeLoan
+  canTakeLoan,
+  loanSubmitting
 }: {
   loanAmount: number;
+  availableLoanAmountCents: number;
   currentCashCents: number;
   currentMonthlyCashflowCents: number;
   onLoanDecrease: () => void;
@@ -4034,48 +4091,77 @@ function LoanPanel({
   onLoanAmountChange: (value: number) => void;
   onTakeLoan: () => void;
   canTakeLoan: boolean;
+  loanSubmitting: boolean;
 }) {
+  const loanAvailable =
+    canTakeLoan && availableLoanAmountCents >= bankLoanIncrementCents;
+
   return (
     <div className="rounded-xl bg-surface p-3">
-      <div className="text-sm font-medium">Взять кредит</div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="text-sm font-medium">Взять кредит</div>
+        <div className="text-xs text-muted" aria-live="polite">
+          Доступно: <strong className="text-ink">{money(availableLoanAmountCents)}</strong>
+        </div>
+      </div>
       <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
         <Button
           variant="secondary"
           className="px-3"
           onClick={onLoanDecrease}
-          disabled={!canTakeLoan || loanAmount <= 1000}
+          disabled={!loanAvailable || loanSubmitting || loanAmount <= bankLoanIncrementCents}
+          aria-label={`Уменьшить сумму кредита на ${money(bankLoanIncrementCents)}`}
         >
-          &lt;
+          <ChevronLeft size={18} aria-hidden="true" />
         </Button>
         <Input
           type="number"
-          min={1000}
-          step={1000}
+          min={bankLoanIncrementCents}
+          max={availableLoanAmountCents || undefined}
+          step={bankLoanIncrementCents}
           value={loanAmount}
           onChange={(event) => onLoanAmountChange(Number(event.target.value))}
-          disabled={!canTakeLoan}
+          disabled={!loanAvailable || loanSubmitting}
+          aria-label="Сумма кредита"
           className="text-center font-semibold"
         />
         <Button
           variant="secondary"
           className="px-3"
           onClick={onLoanIncrease}
-          disabled={!canTakeLoan}
+          disabled={
+            !loanAvailable ||
+            loanSubmitting ||
+            loanAmount >= availableLoanAmountCents
+          }
+          aria-label={`Увеличить сумму кредита на ${money(bankLoanIncrementCents)}`}
         >
-          &gt;
+          <ChevronRight size={18} aria-hidden="true" />
         </Button>
       </div>
-      <LoanPreview
-        loanAmountCents={loanAmount}
-        currentCashCents={currentCashCents}
-        currentMonthlyCashflowCents={currentMonthlyCashflowCents}
-      />
-      <Button className="mt-3 w-full" variant="secondary" onClick={onTakeLoan} disabled={!canTakeLoan}>
-        Взять кредит
+      {loanAvailable ? (
+        <LoanPreview
+          loanAmountCents={loanAmount}
+          currentCashCents={currentCashCents}
+          currentMonthlyCashflowCents={currentMonthlyCashflowCents}
+        />
+      ) : (
+        <div role="status" className="mt-3 rounded-xl bg-white p-3 text-sm leading-5 text-muted">
+          Лимит исчерпан. Увеличьте месячный денежный поток или погасите долг,
+          чтобы снова получить доступ к кредиту.
+        </div>
+      )}
+      <Button
+        className="mt-3 w-full"
+        variant="secondary"
+        onClick={onTakeLoan}
+        disabled={!loanAvailable || loanSubmitting}
+      >
+        {loanSubmitting ? "Оформляем кредит…" : "Взять кредит"}
       </Button>
       <p className="mt-2 text-xs text-neutral-500">
-        Доступен во время активной партии. Сумма должна быть кратна{" "}
-        <strong>{money(1000)}</strong>.
+        Лимит рассчитан так, чтобы новый платёж не сделал месячный денежный
+        поток отрицательным. Сумма кратна <strong>{money(bankLoanIncrementCents)}</strong>.
       </p>
     </div>
   );
@@ -4084,6 +4170,7 @@ function LoanPanel({
 function BankDialog({
   open,
   loanAmount,
+  availableLoanAmountCents,
   currentCashCents,
   currentMonthlyCashflowCents,
   onLoanDecrease,
@@ -4091,10 +4178,12 @@ function BankDialog({
   onLoanAmountChange,
   onTakeLoan,
   canTakeLoan,
+  loanSubmitting,
   onClose
 }: {
   open: boolean;
   loanAmount: number;
+  availableLoanAmountCents: number;
   currentCashCents: number;
   currentMonthlyCashflowCents: number;
   onLoanDecrease: () => void;
@@ -4102,6 +4191,7 @@ function BankDialog({
   onLoanAmountChange: (value: number) => void;
   onTakeLoan: () => Promise<void>;
   canTakeLoan: boolean;
+  loanSubmitting: boolean;
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -4186,6 +4276,7 @@ function BankDialog({
         <div className="bank-dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5 sm:pb-5">
           <LoanPanel
             loanAmount={loanAmount}
+            availableLoanAmountCents={availableLoanAmountCents}
             currentCashCents={currentCashCents}
             currentMonthlyCashflowCents={currentMonthlyCashflowCents}
             onLoanDecrease={onLoanDecrease}
@@ -4193,6 +4284,7 @@ function BankDialog({
             onLoanAmountChange={onLoanAmountChange}
             onTakeLoan={() => void onTakeLoan()}
             canTakeLoan={canTakeLoan}
+            loanSubmitting={loanSubmitting}
           />
         </div>
       </div>
@@ -4209,7 +4301,7 @@ function LoanPreview({
   currentCashCents: number;
   currentMonthlyCashflowCents: number;
 }) {
-  const paymentCents = Math.floor(loanAmountCents / 10);
+  const paymentCents = bankLoanPaymentCents(loanAmountCents);
   const cashAfterCents = currentCashCents + loanAmountCents;
   const cashflowAfterCents = currentMonthlyCashflowCents - paymentCents;
 
@@ -5451,6 +5543,7 @@ function GameTurnFeed({
               key={`current-turn-${currentTurnIndex}-${currentTurnPlayer.id}`}
               entry={null}
               player={currentTurnPlayer}
+              players={players}
               pendingSequence={currentTurnIndex + 1}
               allEvents={historyEvents}
               currentGamePlayerId={currentGamePlayerId}
@@ -5487,6 +5580,7 @@ function GameTurnFeed({
                 <TurnJournalCard
                   entry={entry}
                   player={player}
+                  players={players}
                   newEventSequenceFloor={animateCard ? null : newEventSequenceFloor}
                   allEvents={historyEvents}
                   currentGamePlayerId={currentGamePlayerId}
@@ -5543,6 +5637,7 @@ function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
 function TurnJournalCard({
   entry,
   player,
+  players,
   pendingSequence,
   newEventSequenceFloor = null,
   allEvents,
@@ -5553,6 +5648,7 @@ function TurnJournalCard({
 }: {
   entry: TurnJournalEntry | null;
   player: GamePlayer | undefined;
+  players: GamePlayer[];
   pendingSequence?: number;
   newEventSequenceFloor?: number | null;
   allEvents: GameEvent[];
@@ -5562,8 +5658,6 @@ function TurnJournalCard({
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
 }) {
   const actor = entry ? journalEntryActor(entry) : null;
-  const firstEvent = entry?.events[0];
-  const lastEvent = entry?.events[entry.events.length - 1];
   const visibleTurnEvents = (entry?.events ?? [])
     .filter(
       (event) =>
@@ -5571,9 +5665,9 @@ function TurnJournalCard({
         event.type !== realtimeEvents.babyGift
     )
     .reverse();
+  const playerEventGroups = groupTurnEventsByPlayer(visibleTurnEvents, players);
   const complete = entry ? isJournalTurnComplete(entry) : false;
   const playerName = player ? gamePlayerName(player) : actor?.displayName ?? "Игрок";
-  const eventTime = firstEvent?.createdAt ?? lastEvent?.createdAt;
 
   return (
     <article
@@ -5583,59 +5677,83 @@ function TurnJournalCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           {player ? <PlayerIdentityMark player={player} /> : null}
-          <div className="min-w-0">
-            <div className="text-sm font-extrabold">Ход игрока</div>
-            <div className="mt-0.5 truncate text-xs text-muted">
-              {playerName}{eventTime ? ` · ${shortDate(eventTime)}` : ""}
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <div className="truncate text-sm font-extrabold">
+              {playerName}
             </div>
+            <span
+              className={[
+                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold",
+                complete ? "bg-green-100 text-success" : "bg-[#e8effe] text-[#174397]"
+              ].join(" ")}
+            >
+              {complete ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleDot size={12} aria-hidden="true" />}
+              {complete ? "Завершён" : "В процессе"}
+            </span>
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <span className="text-xs text-muted">
-            {entry ? turnSequenceLabel(entry) : `Ход ${pendingSequence ?? "—"}`}
-          </span>
-          <span
-            className={[
-              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold",
-              complete ? "bg-green-100 text-success" : "bg-[#e8effe] text-[#174397]"
-            ].join(" ")}
-          >
-            {complete ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleDot size={12} aria-hidden="true" />}
-            {complete ? "Завершён" : "В процессе"}
-          </span>
-        </div>
+        <span className="shrink-0 text-xs text-muted">
+          {entry ? turnSequenceLabel(entry) : `Ход ${pendingSequence ?? "—"}`}
+        </span>
       </div>
-      {visibleTurnEvents.length > 0 ? (
-        <div className="mt-3 min-w-0 max-w-full space-y-3">
-          {visibleTurnEvents.map((event) => {
-            const content =
-              event.type === realtimeEvents.cardDraw ? (
-                <JournalCardDraw event={event} />
-              ) : event.type === "player:baby" ? (
-                <BabyJournalEvent
-                  event={event}
-                  allEvents={allEvents}
-                  recipient={player}
-                  currentGamePlayerId={currentGamePlayerId}
-                  currentGamePlayer={currentGamePlayer}
-                  gameStatus={gameStatus}
-                  onSendBabyGift={onSendBabyGift}
-                />
-              ) : (
-                <div className="text-sm">
-                  <GameEventPresentation event={event} />
-                </div>
-              );
+      {playerEventGroups.length > 0 ? (
+        <div className="mt-3 min-w-0 max-w-full divide-y divide-line/70">
+          {playerEventGroups.map((group) => {
+            const groupName = group.player
+              ? gamePlayerName(group.player)
+              : group.events[0]?.actor?.displayName ?? "События партии";
+            const showGroupIdentity = shouldShowTurnEventGroupIdentity(group, player?.id);
+
             return (
-              <JournalMotionItem
-                key={event.id}
-                animate={Boolean(
-                  newEventSequenceFloor !== null &&
-                  event.sequence > newEventSequenceFloor
-                )}
+              <section
+                key={group.key}
+                className="min-w-0 py-3 first:pt-0 last:pb-0"
+                aria-label={`Действия: ${groupName}`}
               >
-                {content}
-              </JournalMotionItem>
+                {showGroupIdentity && group.player ? (
+                  <div className="mb-2 flex min-w-0 items-center gap-2">
+                    <PlayerIdentityMark player={group.player} size="xs" />
+                    <span className="truncate text-xs font-extrabold text-ink">
+                      {groupName}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="min-w-0 space-y-3">
+                  {group.events.map((event) => {
+                    const content =
+                      event.type === realtimeEvents.cardDraw ? (
+                        <JournalCardDraw event={event} />
+                      ) : event.type === "player:baby" ? (
+                        <BabyJournalEvent
+                          event={event}
+                          allEvents={allEvents}
+                          players={players}
+                          recipient={player}
+                          currentGamePlayerId={currentGamePlayerId}
+                          currentGamePlayer={currentGamePlayer}
+                          gameStatus={gameStatus}
+                          onSendBabyGift={onSendBabyGift}
+                        />
+                      ) : (
+                        <div className="text-sm">
+                          <GameEventPresentation event={event} />
+                        </div>
+                      );
+
+                    return (
+                      <JournalMotionItem
+                        key={event.id}
+                        animate={Boolean(
+                          newEventSequenceFloor !== null &&
+                          event.sequence > newEventSequenceFloor
+                        )}
+                      >
+                        {content}
+                      </JournalMotionItem>
+                    );
+                  })}
+                </div>
+              </section>
             );
           })}
         </div>
@@ -5649,6 +5767,7 @@ function TurnJournalCard({
 function BabyJournalEvent({
   event,
   allEvents,
+  players,
   recipient,
   currentGamePlayerId,
   currentGamePlayer,
@@ -5657,6 +5776,7 @@ function BabyJournalEvent({
 }: {
   event: GameEvent;
   allEvents: GameEvent[];
+  players: GamePlayer[];
   recipient: GamePlayer | undefined;
   currentGamePlayerId: string | null;
   currentGamePlayer: GamePlayer | undefined;
@@ -5705,17 +5825,7 @@ function BabyJournalEvent({
       {gifts.length > 0 ? (
         <div className="mt-3 space-y-1.5" aria-label="Полученные поздравления">
           {gifts.map((gift) => (
-            <div
-              key={gift.id}
-              className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2"
-            >
-              <span className="min-w-0 truncate text-xs font-bold text-[#5d4a27]">
-                {gift.actor?.displayName ?? "Игрок"}
-              </span>
-              <strong className="shrink-0 text-sm text-success">
-                +{money(toNumber(gift.payload.amountCents))}
-              </strong>
-            </div>
+            <BabyGiftJournalRow key={gift.id} gift={gift} players={players} />
           ))}
         </div>
       ) : null}
@@ -5728,6 +5838,31 @@ function BabyJournalEvent({
           onSend={onSendBabyGift}
         />
       ) : null}
+    </div>
+  );
+}
+
+function BabyGiftJournalRow({
+  gift,
+  players
+}: {
+  gift: GameEvent;
+  players: GamePlayer[];
+}) {
+  const sender = gamePlayerForEvent(gift, players);
+  const senderName = sender ? gamePlayerName(sender) : gift.actor?.displayName ?? "Игрок";
+
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        {sender ? <PlayerIdentityMark player={sender} size="xs" /> : null}
+        <span className="min-w-0 truncate text-xs font-bold text-[#5d4a27]">
+          {senderName}
+        </span>
+      </div>
+      <strong className="shrink-0 text-sm text-success">
+        +{money(toNumber(gift.payload.amountCents))}
+      </strong>
     </div>
   );
 }
@@ -7016,34 +7151,49 @@ function ProgressBar({
 function FinancialFreedomProgress({
   passiveIncomeCents,
   totalExpensesCents,
+  bankLoanBalanceCents,
   className = ""
 }: {
   passiveIncomeCents: number;
   totalExpensesCents: number;
+  bankLoanBalanceCents: number;
   className?: string;
 }) {
-  const reached = passiveIncomeCents >= totalExpensesCents;
-  const target = Math.max(1, totalExpensesCents);
-  const percentage = reached
+  const incomeTargetCents = Math.max(1, totalExpensesCents + 1);
+  const incomeReached = passiveIncomeCents > totalExpensesCents;
+  const reached = canEscapeRatRace(
+    passiveIncomeCents,
+    totalExpensesCents,
+    bankLoanBalanceCents > 0
+  );
+  const percentage = incomeReached
     ? 100
-    : Math.round(Math.min(100, Math.max(0, (passiveIncomeCents / target) * 100)));
-  const missingCents = Math.max(0, totalExpensesCents - passiveIncomeCents);
+    : Math.round(
+        Math.min(100, Math.max(0, (passiveIncomeCents / incomeTargetCents) * 100))
+      );
+  const missingCents = Math.max(0, incomeTargetCents - passiveIncomeCents);
   const label = reached
-    ? "Финансовая свобода достигнута"
-    : `До финансовой свободы не хватает ${money(missingCents)} в месяц`;
+    ? "Условия выхода с малого круга выполнены"
+    : !incomeReached
+      ? `Пассивному доходу не хватает ${money(missingCents)} в месяц`
+      : `Осталось погасить банковские кредиты на ${money(bankLoanBalanceCents)}`;
 
   return (
     <div className={`rounded-md bg-surface px-3 py-2.5 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className="font-medium text-neutral-700">Финансовая свобода</span>
         <span className={reached ? "font-semibold text-success" : "font-semibold text-neutral-700"}>
-          {percentage}%
+          {reached
+            ? "Готово"
+            : incomeReached && bankLoanBalanceCents > 0
+              ? "Остался кредит"
+              : `${percentage}%`}
         </span>
       </div>
       <ProgressBar
         className="mt-2"
-        value={reached ? target : passiveIncomeCents}
-        max={target}
+        value={incomeReached ? incomeTargetCents : passiveIncomeCents}
+        max={incomeTargetCents}
         label={label}
         tone={reached ? "success" : "neutral"}
       />
@@ -7055,41 +7205,85 @@ function FinancialFreedomProgress({
           Расходы: <strong>{money(totalExpensesCents)}</strong>/мес
         </span>
       </div>
-      <div className={`mt-1 text-xs ${reached ? "text-success" : "text-neutral-600"}`}>
-        {label}
-      </div>
+      <ul className="mt-2 space-y-1 text-xs" aria-label="Условия выхода с малого круга">
+        <li className="flex items-start gap-1.5">
+          {incomeReached ? (
+            <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={14} aria-hidden="true" />
+          ) : (
+            <Circle className="mt-0.5 shrink-0 text-neutral-500" size={14} aria-hidden="true" />
+          )}
+          <span className={incomeReached ? "text-success" : "text-neutral-600"}>
+            {incomeReached
+              ? "Пассивный доход выше расходов"
+              : `Увеличьте пассивный доход ещё на ${money(missingCents)}/мес`}
+          </span>
+        </li>
+        <li className="flex items-start gap-1.5">
+          {bankLoanBalanceCents <= 0 ? (
+            <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={14} aria-hidden="true" />
+          ) : (
+            <Circle className="mt-0.5 shrink-0 text-neutral-500" size={14} aria-hidden="true" />
+          )}
+          <span className={bankLoanBalanceCents <= 0 ? "text-success" : "text-neutral-600"}>
+            {bankLoanBalanceCents <= 0
+              ? "Банковские кредиты погашены"
+              : `Погасите банковские кредиты на ${money(bankLoanBalanceCents)}`}
+          </span>
+        </li>
+      </ul>
     </div>
   );
 }
 
 function PlayerFreedomMini({
   passiveIncomeCents,
-  totalExpensesCents
+  totalExpensesCents,
+  bankLoanBalanceCents
 }: {
   passiveIncomeCents: number;
   totalExpensesCents: number;
+  bankLoanBalanceCents: number;
 }) {
-  const target = Math.max(1, totalExpensesCents);
-  const reached = passiveIncomeCents >= totalExpensesCents;
-  const percentage = reached
+  const target = Math.max(1, totalExpensesCents + 1);
+  const incomeReached = passiveIncomeCents > totalExpensesCents;
+  const reached = canEscapeRatRace(
+    passiveIncomeCents,
+    totalExpensesCents,
+    bankLoanBalanceCents > 0
+  );
+  const percentage = incomeReached
     ? 100
     : Math.round(Math.min(100, Math.max(0, (passiveIncomeCents / target) * 100)));
+  const label = reached
+    ? "Условия выхода с малого круга выполнены"
+    : bankLoanBalanceCents > 0 && incomeReached
+      ? `Пассивный доход выше расходов, осталось погасить банковские кредиты на ${money(bankLoanBalanceCents)}`
+      : `Прогресс игрока к выходу с малого круга ${percentage}%`;
 
   return (
     <div className="mt-3">
       <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
         <span>Финансовая свобода</span>
         <strong className={reached ? "text-success" : "text-neutral-700"}>
-          {percentage}%
+          {reached
+            ? "Готово"
+            : incomeReached && bankLoanBalanceCents > 0
+              ? "Остался кредит"
+              : `${percentage}%`}
         </strong>
       </div>
       <ProgressBar
         className="mt-1.5"
-        value={reached ? target : passiveIncomeCents}
+        value={incomeReached ? target : passiveIncomeCents}
         max={target}
-        label={`Прогресс игрока к финансовой свободе ${percentage}%`}
+        label={label}
         tone={reached ? "success" : "neutral"}
       />
+      {bankLoanBalanceCents > 0 ? (
+        <div className="mt-1.5 text-xs text-neutral-600">
+          Кредиты к погашению: <strong>{money(bankLoanBalanceCents)}</strong>
+        </div>
+      ) : null}
     </div>
   );
 }

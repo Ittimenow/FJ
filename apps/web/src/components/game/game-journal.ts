@@ -6,6 +6,12 @@ export type PlayerTurn = {
   complete: boolean;
 };
 
+export type TurnEventPlayerGroup = {
+  key: string;
+  player: GamePlayer | null;
+  events: GameEvent[];
+};
+
 const turnStartEventTypes = new Set([
   "player:roll_dice",
   "turn:skipped",
@@ -112,6 +118,52 @@ export function latestGameTurn(snapshot: GameSnapshot) {
 
 export function visibleTurnEvents(turn: PlayerTurn) {
   return turn.events.filter((event) => event.type !== "state:update");
+}
+
+export function gamePlayerForEvent(event: GameEvent, players: GamePlayer[]) {
+  const payloadPlayerId = [event.payload.gamePlayerId, event.payload.senderGamePlayerId]
+    .find((value): value is string => typeof value === "string");
+
+  return (
+    players.find((player) => player.id === event.gamePlayer?.id) ??
+    players.find((player) => player.id === payloadPlayerId) ??
+    players.find((player) => player.userId === event.actor?.id) ??
+    null
+  );
+}
+
+export function groupTurnEventsByPlayer(
+  events: GameEvent[],
+  players: GamePlayer[]
+): TurnEventPlayerGroup[] {
+  const groups = new Map<string, TurnEventPlayerGroup>();
+
+  for (const event of events) {
+    const player = gamePlayerForEvent(event, players);
+    const key = player
+      ? `player:${player.id}`
+      : event.gamePlayer?.id
+        ? `game-player:${event.gamePlayer.id}`
+        : event.actor?.id
+          ? `actor:${event.actor.id}`
+          : "system";
+    const existingGroup = groups.get(key);
+
+    if (existingGroup) {
+      existingGroup.events.push(event);
+    } else {
+      groups.set(key, { key, player, events: [event] });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+export function shouldShowTurnEventGroupIdentity(
+  group: TurnEventPlayerGroup,
+  turnPlayerId: string | null | undefined
+) {
+  return Boolean(group.player && group.player.id !== turnPlayerId);
 }
 
 export function turnSequence(turn: PlayerTurn) {
