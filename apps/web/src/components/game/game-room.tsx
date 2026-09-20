@@ -2,6 +2,8 @@
 
 import { fastTrackCells, isDreamCell } from "@cashflow/shared";
 import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
+import { DiceAction, DiceFace } from "./dice-action";
+import { GameActionHistory } from "./game-action-history";
 
 import {
   availableBankLoanCents,
@@ -29,7 +31,6 @@ import {
   ChevronsRight,
   Circle,
   CircleAlert,
-  CircleDot,
   CircleOff,
   Dices,
   Gift,
@@ -99,11 +100,7 @@ import {
   stockPurchaseCostCents,
   stockQuantityForCostCents
 } from "@/components/game/stock-purchase-calculation";
-import {
-  gamePlayerForEvent,
-  groupTurnEventsByPlayer,
-  shouldShowTurnEventGroupIdentity
-} from "@/components/game/game-journal";
+import { gamePlayerForEvent } from "@/components/game/game-journal";
 import {
   normalizeStockSaleQuantity,
   stockSaleResetKey,
@@ -225,7 +222,6 @@ export function GameRoom({
   const [figurineSaving, setFigurineSaving] = useState(false);
   const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
-  const [journalOnlyMine, setJournalOnlyMine] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mobileBoardRef = useRef<HTMLDivElement>(null);
@@ -570,29 +566,6 @@ export function GameRoom({
     [me, pendingAction]
   );
   const currentStockSaleResetKey = stockSaleResetKey(stockSaleOffer);
-  const unresolvedBotStockSeller =
-    pendingAction?.type === "stock_sale_window"
-      ? gamePlayers.find(
-          (player) =>
-            player.controller === "BOT" &&
-            pendingAction.sellerGamePlayerIds.includes(player.id) &&
-            !pendingAction.resolvedGamePlayerIds.includes(player.id)
-        )
-      : null;
-  const botWaitingForMe =
-    pendingAction?.type === "stock_sale_window" &&
-    Boolean(
-      me &&
-        pendingAction.sellerGamePlayerIds.includes(me.id) &&
-        !pendingAction.resolvedGamePlayerIds.includes(me.id)
-    );
-  const botTurnMessage = unresolvedBotStockSeller
-    ? `${gamePlayerName(unresolvedBotStockSeller)} оценивает предложение по акциям.`
-    : snapshot.game.status === "IN_PROGRESS" && currentPlayer?.controller === "BOT"
-      ? botWaitingForMe
-        ? `${gamePlayerName(currentPlayer)} ожидает вашего решения по продаже акций.`
-        : `${gamePlayerName(currentPlayer)} обдумывает ход.`
-      : null;
   useEffect(() => {
     if (snapshot.game.status !== "WAITING" || !me) {
       setFigurinePickerOpen(false);
@@ -626,6 +599,8 @@ export function GameRoom({
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
       hostDisplayView: canManage && !isSolo ? gameRoomView : null,
+      trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
+      onTrackChange: setTrackView,
       onCheckConnection: () => void refreshConnection()
     });
   }, [
@@ -646,6 +621,8 @@ export function GameRoom({
     snapshot.game.status,
     snapshot.game.title,
     gameRoomView,
+    showFastTrack,
+    snapshot.game.rulesVersion,
     snapshot.chatMessages,
     remainingSeconds,
     timelineLoading
@@ -1271,25 +1248,13 @@ export function GameRoom({
       token={token}
       events={snapshot.events}
       players={gamePlayers}
-      currentUserId={currentUserId}
       currentGamePlayerId={me?.id ?? null}
-      currentTurnPlayer={currentPlayer}
-      currentTurnIndex={snapshot.game.currentTurnIndex}
       gameStatus={snapshot.game.status}
       onSendBabyGift={sendBabyGift}
-      onlyMine={journalOnlyMine}
-      onToggleOnlyMine={() => setJournalOnlyMine((value) => !value)}
       showHeader={showHeader}
-      botStatusMessage={botTurnMessage}
     />
   );
 
-  const renderJournalFilterButton = () => (
-    <JournalFilterButton
-      onlyMine={journalOnlyMine}
-      onToggle={() => setJournalOnlyMine((value) => !value)}
-    />
-  );
 
   return (
     <div
@@ -1382,13 +1347,7 @@ export function GameRoom({
         </div>
       ) : null}
       {snapshot.game.rulesVersion === 2 && snapshot.game.status === "WAITING" && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => void fastAction("dream", { cellIndex })} /> : null}
-      {snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" ? <div className="flex flex-wrap items-center gap-3">
-        <div role="group" aria-label="Выбрать круг" className="flex gap-2">
-          <Button variant={showFastTrack ? "secondary" : "primary"} onClick={() => setTrackView("RAT_RACE")}>Малый круг</Button>
-          <Button variant={showFastTrack ? "primary" : "secondary"} onClick={() => setTrackView("FAST_TRACK")}>Большой круг</Button>
-        </div>
-        {canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>Перейти на большой круг</Button> : null}
-      </div> : null}
+      {snapshot.game.rulesVersion === 2 && canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>Перейти на большой круг</Button> : null}
 
       {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
@@ -1410,7 +1369,7 @@ export function GameRoom({
         />
       ) : null}
 
-      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} rolling={rollingDice} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed()}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} rolling={rollingDice} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={snapshot}
           currentUserId={currentUserId}
@@ -1418,11 +1377,13 @@ export function GameRoom({
           turnTabRequest={turnTabRequest}
           actions={
             <>
-              <div className="hidden xl:block">
+              <div>
                 <DiceAction
                   canRoll={canRoll && !pendingAction}
                   rolling={rollingDice}
                   phase={turnAnimationPhase}
+                  statusLabel={canRoll ? "Ваш ход" : undefined}
+                  idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
                   diceValues={diceFaces}
                   onRoll={rollDice}
                   onSkip={skipTurn}
@@ -1492,6 +1453,8 @@ export function GameRoom({
               canRoll={canRoll && !pendingAction}
               rolling={rollingDice}
               phase={turnAnimationPhase}
+              statusLabel={canRoll ? "Ваш ход" : undefined}
+              idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
               diceValues={diceFaces}
               onRoll={rollDice}
               onSkip={skipTurn}
@@ -1531,7 +1494,6 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              headerControl={renderJournalFilterButton()}
               pinnedHeader
               activityFeed={renderTurnFeed(false)}
               embedded
@@ -1563,6 +1525,9 @@ export function GameRoom({
               turnTabRequest={turnTabRequest}
               actions={
                 <>
+                  <DiceAction canRoll={canRoll && !pendingAction} rolling={rollingDice} phase={turnAnimationPhase}
+                    statusLabel={canRoll ? "Ваш ход" : undefined} idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
+                    diceValues={diceFaces} onRoll={rollDice} onSkip={skipTurn} />
                   <ActionsPanel
                   canChooseDeal={canChooseDeal}
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
@@ -1597,7 +1562,6 @@ export function GameRoom({
                   onDeclineStockSale={declineStockSale}
                   canTakeLoan={canTakeLoan}
                   onOpenBank={() => setBankDialogOpen(true)}
-                  headerControl={renderJournalFilterButton()}
                   activityFeed={renderTurnFeed(false)}
                     embedded
                   />
@@ -1725,85 +1689,6 @@ function BankruptcyPanel({
         </div>
       </div>
     </div>
-  );
-}
-
-function DiceAction({
-  canRoll,
-  rolling,
-  phase,
-  diceValues,
-  onRoll,
-  onSkip,
-  pinnedToPanel = false
-}: {
-  canRoll: boolean;
-  rolling: boolean;
-  phase: TurnAnimationPhase;
-  diceValues: number[];
-  onRoll: () => void;
-  onSkip: () => void;
-  pinnedToPanel?: boolean;
-}) {
-  const status = rolling
-    ? "Бросаем кубик…"
-    : phase === "moving"
-      ? "Фишка движется по полю…"
-      : phase === "landed"
-        ? "Ход выполнен"
-        : canRoll
-          ? "Ваш ход"
-          : "Ожидайте своего хода";
-
-  return (
-    <section
-      className={cn(
-        "mb-3 rounded-xl bg-[#fff5ed] px-2",
-        pinnedToPanel &&
-          "sticky top-0 z-10 -mx-3 mb-0 h-[4.5rem] rounded-none px-3"
-      )}
-      aria-label="Бросок кубика"
-    >
-      <div
-        className={cn(
-          "flex h-12 items-center gap-2",
-          pinnedToPanel && "h-full"
-        )}
-      >
-        <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0">
-          <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
-          {canRoll && !rolling ? (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="mt-0.5 rounded-md text-xs font-medium text-[#7b3f17] underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
-            >
-              Пропустить ход
-            </button>
-          ) : null}
-        </div>
-        <Button
-          className="h-12 min-w-0 flex-1 px-3 text-base text-white"
-          variant="action"
-          onClick={onRoll}
-          disabled={!canRoll || rolling}
-          aria-busy={rolling}
-        >
-          {rolling
-            ? "Бросаем…"
-            : canRoll
-              ? diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"
-              : "Ожидайте ход"}
-        </Button>
-        <div className="flex shrink-0 gap-2" aria-live="polite">
-          {diceValues.map((diceValue, index) => (
-            <div key={index} className="scale-[.58] -m-4">
-              <DiceFace value={diceValue} rolling={rolling} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -2280,49 +2165,6 @@ function StockSalePanel({
     </section>
   );
 }
-
-function DiceFace({ value, rolling }: { value: number; rolling: boolean }) {
-  const dots = diceDots[Math.min(Math.max(value, 1), 6)] ?? diceDots[6] ?? [];
-
-  return (
-    <div
-      className={[
-        "relative h-20 w-20 rounded-xl border-2 border-ink bg-white shadow-panel transition-transform",
-        rolling ? "rotate-6 scale-105" : ""
-      ].join(" ")}
-      aria-label={`На кубике ${value}`}
-    >
-      {dots.map((position) => (
-        <span
-          key={position}
-          className={[
-            "absolute h-3 w-3 rounded-full bg-ink",
-            diceDotClasses[position]
-          ].join(" ")}
-        />
-      ))}
-    </div>
-  );
-}
-
-const diceDots: Record<number, Array<keyof typeof diceDotClasses>> = {
-  1: ["center"],
-  2: ["topLeft", "bottomRight"],
-  3: ["topLeft", "center", "bottomRight"],
-  4: ["topLeft", "topRight", "bottomLeft", "bottomRight"],
-  5: ["topLeft", "topRight", "center", "bottomLeft", "bottomRight"],
-  6: ["topLeft", "middleLeft", "bottomLeft", "topRight", "middleRight", "bottomRight"]
-};
-
-const diceDotClasses = {
-  topLeft: "left-4 top-4",
-  topRight: "right-4 top-4",
-  middleLeft: "left-4 top-1/2 -translate-y-1/2",
-  middleRight: "right-4 top-1/2 -translate-y-1/2",
-  center: "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-  bottomLeft: "bottom-4 left-4",
-  bottomRight: "bottom-4 right-4"
-};
 
 function diceValuesFromActionResult(result: GameActionResult) {
   const diceEvent = result.events?.find((event) => event.type === realtimeEvents.playerRollDice);
@@ -5096,7 +4938,7 @@ function ActionsPanel({
       className={cn(
         "flex items-center justify-between gap-3",
         pinnedHeader &&
-          "sticky top-[4.5rem] z-[9] -mx-3 h-12 bg-white px-3"
+          "sticky top-[var(--dice-action-height,4.5rem)] z-[9] -mx-3 h-12 bg-white px-3"
       )}
     >
       <h2 className="text-lg font-semibold">Действия</h2>
@@ -5137,600 +4979,39 @@ function ActionsPanel({
   );
 }
 
-type JournalEntry =
-  | {
-      kind: "event";
-      id: string;
-      event: GameEvent;
-    }
-  | {
-      kind: "turn";
-      id: string;
-      events: GameEvent[];
-      complete: boolean;
-    };
-
-const turnStartEventTypes = new Set([
-  realtimeEvents.playerRollDice,
-  "turn:skipped",
-  "bankruptcy:turn_skipped"
-]);
-
-const turnEndingStateReasons = new Set([
-  "roll_resolved",
-  "turn_skipped",
-  "bankruptcy_turn_skipped",
-  "financial_freedom_reached",
-  "time_limit_reached"
-]);
-
-const nonGameplayPlayerEventTypes = new Set([
-  "player:joined",
-  "player:added",
-  "player:removed",
-  "player:role_changed",
-  "player:figurine_selected"
-]);
-
-function journalEntries(events: GameEvent[]) {
-  const entries: JournalEntry[] = [];
-  let activeTurn: GameEvent[] | null = null;
-
-  const finishActiveTurn = (complete = false) => {
-    if (!activeTurn || activeTurn.length === 0) return;
-    entries.push({
-      kind: "turn",
-      id: `turn-${activeTurn[0]?.id ?? activeTurn[0]?.sequence ?? entries.length}`,
-      events: activeTurn,
-      complete
-    });
-    activeTurn = null;
-  };
-
-  for (const event of [...events].sort(
-    (left, right) => left.sequence - right.sequence
-  )) {
-    if (turnStartEventTypes.has(event.type)) {
-      const activePlayerId = activeTurn?.find((activeEvent) => activeEvent.gamePlayer?.id)
-        ?.gamePlayer?.id;
-      const activeHasTurnStart = activeTurn?.some((activeEvent) =>
-        turnStartEventTypes.has(activeEvent.type)
-      );
-      if (
-        activeTurn &&
-        !activeHasTurnStart &&
-        activePlayerId &&
-        activePlayerId === event.gamePlayer?.id
-      ) {
-        activeTurn.push(event);
-        continue;
-      }
-
-      finishActiveTurn(true);
-      activeTurn = [event];
-      continue;
-    }
-
-    if (event.type === realtimeEvents.stateUpdate) {
-      if (activeTurn) {
-        activeTurn.push(event);
-        if (isTurnEndingStateEvent(event)) finishActiveTurn(true);
-      }
-      continue;
-    }
-
-    if (activeTurn) {
-      const activeHasTurnStart = activeTurn.some((activeEvent) =>
-        turnStartEventTypes.has(activeEvent.type)
-      );
-      const activePlayerId = activeTurn.find((activeEvent) => activeEvent.gamePlayer?.id)
-        ?.gamePlayer?.id;
-      if (
-        !activeHasTurnStart &&
-        isPlayerGameplayEvent(event) &&
-        activePlayerId &&
-        activePlayerId !== event.gamePlayer?.id
-      ) {
-        finishActiveTurn(true);
-        activeTurn = [event];
-        continue;
-      }
-
-      activeTurn.push(event);
-      if (event.type === realtimeEvents.gameEnded) finishActiveTurn(true);
-      continue;
-    }
-
-    if (isPlayerGameplayEvent(event)) {
-      activeTurn = [event];
-      continue;
-    }
-
-    entries.push({ kind: "event", id: event.id, event });
-  }
-
-  finishActiveTurn();
-  return entries;
-}
-
-function isPlayerGameplayEvent(event: GameEvent) {
-  return Boolean(event.gamePlayer?.id) && !nonGameplayPlayerEventTypes.has(event.type);
-}
-
-function isTurnEndingStateEvent(event: GameEvent) {
-  const reason = String(event.payload.reason ?? "");
-  return turnEndingStateReasons.has(reason) || reason.endsWith("_turn_ended");
-}
-
-function journalEntrySequence(entry: JournalEntry) {
-  if (entry.kind === "event") return entry.event.sequence;
-  return entry.events[entry.events.length - 1]?.sequence ?? 0;
-}
-
-function journalEntryActor(entry: JournalEntry) {
-  if (entry.kind === "event") return entry.event.actor;
-  return (
-    entry.events.find((event) => turnStartEventTypes.has(event.type))?.actor ??
-    entry.events.find((event) => event.actor)?.actor
-  );
-}
-
-function turnSequenceLabel(entry: Extract<JournalEntry, { kind: "turn" }>) {
-  const firstSequence = entry.events[0]?.sequence;
-  const lastSequence = entry.events[entry.events.length - 1]?.sequence;
-  if (firstSequence === undefined || lastSequence === undefined) return "";
-  return firstSequence === lastSequence
-    ? `#${firstSequence}`
-    : `#${firstSequence}–${lastSequence}`;
-}
-
-type TurnJournalEntry = Extract<JournalEntry, { kind: "turn" }>;
-
-function journalEntryGamePlayerId(entry: TurnJournalEntry) {
-  return (
-    entry.events.find((event) => turnStartEventTypes.has(event.type))?.gamePlayer?.id ??
-    entry.events.find((event) => event.gamePlayer?.id)?.gamePlayer?.id ??
-    null
-  );
-}
-
-function isJournalTurnComplete(entry: TurnJournalEntry) {
-  return entry.complete || entry.events.some(
-    (event) =>
-      (event.type === realtimeEvents.stateUpdate && isTurnEndingStateEvent(event)) ||
-      event.type === realtimeEvents.gameEnded
-  );
-}
-
-function JournalFilterButton({
-  onlyMine,
-  onToggle
-}: {
-  onlyMine: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      className="h-9 bg-surface px-3 text-xs text-muted shadow-none hover:bg-card hover:text-ink"
-      aria-pressed={onlyMine}
-      onClick={onToggle}
-    >
-      {onlyMine ? "Показать всех" : "Только мои"}
-    </Button>
-  );
-}
-
-function BotJournalStatus({ message }: { message: string }) {
-  return (
-    <div
-      role="status"
-      className="flex items-center gap-3 rounded-2xl bg-[#f4f0ff] px-4 py-3 text-sm font-bold text-[#513393] shadow-[0_10px_28px_rgba(118,85,199,.12)]"
-    >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-[#7655c7] shadow-[0_5px_14px_rgba(118,85,199,.14)]">
-        <Bot size={18} aria-hidden="true" />
-      </span>
-      <span>{message}</span>
-    </div>
-  );
-}
-
 function GameTurnFeed({
-  gameId,
-  token,
-  events,
-  players,
-  currentUserId,
-  currentGamePlayerId,
-  currentTurnPlayer,
-  currentTurnIndex,
-  gameStatus,
-  onSendBabyGift,
-  onlyMine,
-  onToggleOnlyMine,
-  showHeader,
-  botStatusMessage
+  gameId, token, events, players, currentGamePlayerId, gameStatus,
+  onSendBabyGift, showHeader
 }: {
   gameId: string;
   token: string;
   events: GameEvent[];
   players: GamePlayer[];
-  currentUserId: string;
   currentGamePlayerId: string | null;
-  currentTurnPlayer: GamePlayer | undefined;
-  currentTurnIndex: number;
   gameStatus: GameSnapshot["game"]["status"];
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
-  onlyMine: boolean;
-  onToggleOnlyMine: () => void;
   showHeader: boolean;
-  botStatusMessage: string | null;
 }) {
-  const [historyEvents, setHistoryEvents] = useState(events);
-  const [visibleCount, setVisibleCount] = useState(10);
-  const [replayLoaded, setReplayLoaded] = useState(events.length < 80);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [newEventSequenceFloor, setNewEventSequenceFloor] = useState<number | null>(null);
-  const [enteringPendingTurnIndex, setEnteringPendingTurnIndex] = useState<number | null>(null);
-  const latestRealtimeSequenceRef = useRef(
-    events.reduce((latest, event) => Math.max(latest, event.sequence), 0)
-  );
-  const previousTurnIndexRef = useRef(currentTurnIndex);
-
-  useEffect(() => {
-    setHistoryEvents(events);
-    setVisibleCount(10);
-    setReplayLoaded(events.length < 80);
-    setLoadError(null);
-    setNewEventSequenceFloor(null);
-    setEnteringPendingTurnIndex(null);
-    latestRealtimeSequenceRef.current = events.reduce(
-      (latest, event) => Math.max(latest, event.sequence),
-      0
-    );
-    previousTurnIndexRef.current = currentTurnIndex;
-  }, [gameId]);
-
-  useEffect(() => {
-    setHistoryEvents((current) => mergeGameEvents(current, events));
-  }, [events]);
-
-  useEffect(() => {
-    const latestSequence = events.reduce(
-      (latest, event) => Math.max(latest, event.sequence),
-      0
-    );
-    const previousSequence = latestRealtimeSequenceRef.current;
-    if (latestSequence <= previousSequence) return;
-
-    latestRealtimeSequenceRef.current = latestSequence;
-    setNewEventSequenceFloor((current) => current ?? previousSequence);
-    const resetTimer = window.setTimeout(() => setNewEventSequenceFloor(null), 600);
-    return () => window.clearTimeout(resetTimer);
-  }, [events]);
-
-  useEffect(() => {
-    const previousTurnIndex = previousTurnIndexRef.current;
-    previousTurnIndexRef.current = currentTurnIndex;
-    if (currentTurnIndex === previousTurnIndex) return;
-
-    setEnteringPendingTurnIndex(currentTurnIndex);
-    const resetTimer = window.setTimeout(() => setEnteringPendingTurnIndex(null), 600);
-    return () => window.clearTimeout(resetTimer);
-  }, [currentTurnIndex]);
-
-  useEffect(() => {
-    setVisibleCount(10);
-    setNewEventSequenceFloor(null);
-    setEnteringPendingTurnIndex(null);
-  }, [onlyMine]);
-
-  const turns = useMemo(() => {
-    const historyTurns = journalEntries(historyEvents)
-      .filter((entry): entry is TurnJournalEntry => entry.kind === "turn")
-      .sort((left, right) => journalEntrySequence(right) - journalEntrySequence(left));
-
-    return historyTurns.filter((entry) => {
-      if (!onlyMine) return true;
-      const gamePlayerId = journalEntryGamePlayerId(entry);
-      return gamePlayerId
-        ? gamePlayerId === currentGamePlayerId
-        : journalEntryActor(entry)?.id === currentUserId;
-    });
-  }, [currentGamePlayerId, currentUserId, historyEvents, onlyMine]);
   const viewingPlayer = players.find((player) => player.id === currentGamePlayerId);
-  const hasOpenCurrentTurn = turns.some(
-    (entry) =>
-      !isJournalTurnComplete(entry) &&
-      journalEntryGamePlayerId(entry) === currentTurnPlayer?.id
-  );
-  const showPendingTurn =
-    (gameStatus === "IN_PROGRESS" || gameStatus === "PAUSED") &&
-    Boolean(currentTurnPlayer) &&
-    !hasOpenCurrentTurn &&
-    (!onlyMine || currentTurnPlayer?.id === currentGamePlayerId);
-  const totalVisibleItems = turns.length + (showPendingTurn ? 1 : 0);
-  const visibleTurns = turns.slice(0, Math.max(0, visibleCount - (showPendingTurn ? 1 : 0)));
-  const canLoadArchive = !replayLoaded && events.length >= 80;
-  const hasMore = visibleCount < totalVisibleItems || canLoadArchive;
-
-  async function loadMore() {
-    setLoadError(null);
-    setNewEventSequenceFloor(null);
-    setEnteringPendingTurnIndex(null);
-    if (visibleCount < totalVisibleItems) {
-      setVisibleCount((count) => count + 10);
-      return;
-    }
-    if (!canLoadArchive || loadingMore) return;
-
-    setLoadingMore(true);
-    try {
-      const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  return <GameActionHistory
+    key={gameId}
+    gameId={gameId}
+    events={events}
+    players={players}
+    loadEarlier={async () => {
+      const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Не удалось загрузить историю партии");
-      const data = (await response.json()) as { events?: GameEvent[] };
-      setHistoryEvents((current) => mergeGameEvents(current, data.events ?? []));
-      setReplayLoaded(true);
-      setVisibleCount((count) => count + 10);
-    } catch (event) {
-      setLoadError(event instanceof Error ? event.message : "Не удалось загрузить историю партии");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  return (
-    <section className="w-full min-w-0 max-w-full" aria-label="Лента ходов">
-      {showHeader ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-base font-extrabold">Лента ходов</h3>
-            <p className="mt-0.5 text-xs text-muted">Новые события дополняют текущий ход автоматически.</p>
-          </div>
-          <JournalFilterButton onlyMine={onlyMine} onToggle={onToggleOnlyMine} />
-        </div>
-      ) : null}
-
-      <div
-        className={cn(
-          "w-full min-w-0 max-w-full space-y-3",
-          showHeader ? "mt-3" : null
-        )}
-        role="feed"
-        aria-live="polite"
-        aria-relevant="additions text"
-        aria-busy={loadingMore}
-      >
-        {botStatusMessage ? <BotJournalStatus message={botStatusMessage} /> : null}
-        {showPendingTurn && currentTurnPlayer ? (
-          <JournalMotionItem animate={enteringPendingTurnIndex === currentTurnIndex}>
-            <TurnJournalCard
-              key={`current-turn-${currentTurnIndex}-${currentTurnPlayer.id}`}
-              entry={null}
-              player={currentTurnPlayer}
-              players={players}
-              pendingSequence={currentTurnIndex + 1}
-              allEvents={historyEvents}
-              currentGamePlayerId={currentGamePlayerId}
-              currentGamePlayer={viewingPlayer}
-              gameStatus={gameStatus}
-              onSendBabyGift={onSendBabyGift}
-            />
-          </JournalMotionItem>
-        ) : null}
-        {visibleTurns.length === 0 && !showPendingTurn && !botStatusMessage ? (
-          <p className="rounded-xl bg-surface p-3 text-sm text-muted">
-            {onlyMine ? "Ваших ходов пока нет." : "Ходов пока нет."}
-          </p>
-        ) : (
-          visibleTurns.map((entry) => {
-            const gamePlayerId = journalEntryGamePlayerId(entry);
-            const actor = journalEntryActor(entry);
-            const player =
-              players.find((candidate) => candidate.id === gamePlayerId) ??
-              players.find((candidate) => candidate.userId === actor?.id);
-            const entryKey =
-              player &&
-              !isJournalTurnComplete(entry) &&
-              player.id === currentTurnPlayer?.id
-                ? `current-turn-${currentTurnIndex}-${player.id}`
-                : entry.id;
-            const animateCard = Boolean(
-              newEventSequenceFloor !== null &&
-              entry.events[0] &&
-              entry.events[0].sequence > newEventSequenceFloor
-            );
-            return (
-              <JournalMotionItem key={entryKey} animate={animateCard}>
-                <TurnJournalCard
-                  entry={entry}
-                  player={player}
-                  players={players}
-                  newEventSequenceFloor={animateCard ? null : newEventSequenceFloor}
-                  allEvents={historyEvents}
-                  currentGamePlayerId={currentGamePlayerId}
-                  currentGamePlayer={viewingPlayer}
-                  gameStatus={gameStatus}
-                  onSendBabyGift={onSendBabyGift}
-                />
-              </JournalMotionItem>
-            );
-          })
-        )}
-      </div>
-
-      {loadError ? (
-        <p className="mt-3 text-sm text-red-700" role="alert">
-          {loadError}. Попробуйте ещё раз.
-        </p>
-      ) : null}
-      {hasMore ? (
-        <Button
-          type="button"
-          variant="secondary"
-          className="mt-4 w-full"
-          onClick={() => void loadMore()}
-          disabled={loadingMore}
-        >
-          {loadingMore ? "Загружаем…" : "Показать ещё"}
-        </Button>
-      ) : null}
-    </section>
-  );
-}
-
-function JournalMotionItem({
-  animate,
-  children
-}: {
-  animate: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("turn-feed-motion-item", animate && "turn-feed-motion-item--enter")}>
-      <div className="turn-feed-motion-item__inner">{children}</div>
-    </div>
-  );
-}
-
-function mergeGameEvents(current: GameEvent[], incoming: GameEvent[]) {
-  const eventsById = new Map(current.map((event) => [event.id, event]));
-  for (const event of incoming) eventsById.set(event.id, event);
-  return [...eventsById.values()].sort((left, right) => left.sequence - right.sequence);
-}
-
-function TurnJournalCard({
-  entry,
-  player,
-  players,
-  pendingSequence,
-  newEventSequenceFloor = null,
-  allEvents,
-  currentGamePlayerId,
-  currentGamePlayer,
-  gameStatus,
-  onSendBabyGift
-}: {
-  entry: TurnJournalEntry | null;
-  player: GamePlayer | undefined;
-  players: GamePlayer[];
-  pendingSequence?: number;
-  newEventSequenceFloor?: number | null;
-  allEvents: GameEvent[];
-  currentGamePlayerId: string | null;
-  currentGamePlayer: GamePlayer | undefined;
-  gameStatus: GameSnapshot["game"]["status"];
-  onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
-}) {
-  const actor = entry ? journalEntryActor(entry) : null;
-  const visibleTurnEvents = (entry?.events ?? [])
-    .filter(
-      (event) =>
-        event.type !== realtimeEvents.stateUpdate &&
-        event.type !== realtimeEvents.babyGift
-    )
-    .reverse();
-  const playerEventGroups = groupTurnEventsByPlayer(visibleTurnEvents, players);
-  const complete = entry ? isJournalTurnComplete(entry) : false;
-  const playerName = player ? gamePlayerName(player) : actor?.displayName ?? "Игрок";
-
-  return (
-    <article
-      className="w-full min-w-0 max-w-full rounded-xl bg-surface p-3 [overflow-wrap:anywhere]"
-      aria-label={`Ход игрока ${playerName}, ${complete ? "завершён" : "в процессе"}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {player ? <PlayerIdentityMark player={player} /> : null}
-          <div className="flex min-w-0 flex-col items-start gap-1.5">
-            <div className="truncate text-sm font-extrabold">
-              {playerName}
-            </div>
-            <span
-              className={[
-                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold",
-                complete ? "bg-green-100 text-success" : "bg-[#e8effe] text-[#174397]"
-              ].join(" ")}
-            >
-              {complete ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleDot size={12} aria-hidden="true" />}
-              {complete ? "Завершён" : "В процессе"}
-            </span>
-          </div>
-        </div>
-        <span className="shrink-0 text-xs text-muted">
-          {entry ? turnSequenceLabel(entry) : `Ход ${pendingSequence ?? "—"}`}
-        </span>
-      </div>
-      {playerEventGroups.length > 0 ? (
-        <div className="mt-3 min-w-0 max-w-full divide-y divide-line/70">
-          {playerEventGroups.map((group) => {
-            const groupName = group.player
-              ? gamePlayerName(group.player)
-              : group.events[0]?.actor?.displayName ?? "События партии";
-            const showGroupIdentity = shouldShowTurnEventGroupIdentity(group, player?.id);
-
-            return (
-              <section
-                key={group.key}
-                className="min-w-0 py-3 first:pt-0 last:pb-0"
-                aria-label={`Действия: ${groupName}`}
-              >
-                {showGroupIdentity && group.player ? (
-                  <div className="mb-2 flex min-w-0 items-center gap-2">
-                    <PlayerIdentityMark player={group.player} size="xs" />
-                    <span className="truncate text-xs font-extrabold text-ink">
-                      {groupName}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="min-w-0 space-y-3">
-                  {group.events.map((event) => {
-                    const content =
-                      event.type === realtimeEvents.cardDraw ? (
-                        <JournalCardDraw event={event} />
-                      ) : event.type === "player:baby" ? (
-                        <BabyJournalEvent
-                          event={event}
-                          allEvents={allEvents}
-                          players={players}
-                          recipient={player}
-                          currentGamePlayerId={currentGamePlayerId}
-                          currentGamePlayer={currentGamePlayer}
-                          gameStatus={gameStatus}
-                          onSendBabyGift={onSendBabyGift}
-                        />
-                      ) : (
-                        <div className="text-sm">
-                          <GameEventPresentation event={event} />
-                        </div>
-                      );
-
-                    return (
-                      <JournalMotionItem
-                        key={event.id}
-                        animate={Boolean(
-                          newEventSequenceFloor !== null &&
-                          event.sequence > newEventSequenceFloor
-                        )}
-                      >
-                        {content}
-                      </JournalMotionItem>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-muted">Ожидаем действие игрока.</p>
-      )}
-    </article>
-  );
+      const data = await response.json() as { events: GameEvent[] };
+      return data.events;
+    }}
+    header={showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}
+    renderAction={(event, allEvents) => event.type === realtimeEvents.cardDraw ? <JournalCardDraw event={event} /> : event.type === "player:baby" ? <BabyJournalEvent
+      event={event} allEvents={allEvents} players={players}
+      recipient={gamePlayerForEvent(event, players) ?? undefined}
+      currentGamePlayerId={currentGamePlayerId} currentGamePlayer={viewingPlayer}
+      gameStatus={gameStatus} onSendBabyGift={onSendBabyGift}
+    /> : <div className="text-sm"><GameEventPresentation event={event} /></div>}
+  />;
 }
 
 function BabyJournalEvent({

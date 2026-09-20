@@ -1,4 +1,5 @@
 import { figurineImagePath } from "@cashflow/shared";
+import { UserRound } from "lucide-react";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer } from "@/lib/types";
 
@@ -14,12 +15,6 @@ export function GamePlayerMark({
   const name = gamePlayerName(player);
   const figurine = player.figurine ?? player.user?.figurine;
   const avatar = player.user?.avatarUrl;
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
   const sizeClass = {
     sm: "h-8 w-8 text-xs",
     md: "h-11 w-11 text-xs",
@@ -43,7 +38,7 @@ export function GamePlayerMark({
       ) : avatar ? (
         <img src={avatar} alt="" className="h-full w-full object-cover" />
       ) : (
-        initials
+        <UserRound className="h-2/3 w-2/3" aria-hidden="true" />
       )}
       {active ? (
         <span className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-action ring-2 ring-white" />

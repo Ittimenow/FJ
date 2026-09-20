@@ -54,6 +54,8 @@ export interface GameRoomHeaderState {
   onPause: (() => void) | null;
   onResume: (() => void) | null;
   hostDisplayView: "classic" | "journey" | null;
+  trackView: "RAT_RACE" | "FAST_TRACK" | null;
+  onTrackChange: (track: "RAT_RACE" | "FAST_TRACK") => void;
   onCheckConnection: () => void;
 }
 
@@ -84,6 +86,7 @@ export function GameRoomHeaderSlot() {
   const state = context?.state ?? null;
   const rootRef = useRef<HTMLDivElement>(null);
   const hasHostLinks = Boolean(state?.hostDisplayView);
+  const hasExtraControls = hasHostLinks || Boolean(state?.trackView);
 
   useEffect(() => {
     const header = rootRef.current?.closest("header");
@@ -99,12 +102,19 @@ export function GameRoomHeaderSlot() {
       if (previous) style.setProperty("--app-shell-header-bottom", previous);
       else style.removeProperty("--app-shell-header-bottom");
     };
-  }, [hasHostLinks]);
+  }, [hasExtraControls]);
 
   return (
-    <div ref={rootRef} className={`flex min-w-0 justify-center${hasHostLinks ? " col-span-3 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1" : ""}`}>
+    <div ref={rootRef} className={`flex min-w-0 justify-center${hasExtraControls ? " col-span-3 row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1" : ""}`}>
       {state ? (
-        <div className="flex max-w-full items-center gap-1.5 text-xs text-muted sm:gap-2">
+        <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 text-xs text-muted sm:gap-2">
+          {state.trackView ? <div className="flex w-full justify-center sm:w-auto" role="group" aria-label="Показать круг">
+            <div className="flex rounded-xl bg-card p-1">
+              {([['RAT_RACE', 'Малый круг'], ['FAST_TRACK', 'Большой круг']] as const).map(([track, label]) => <button
+                key={track} type="button" aria-pressed={state.trackView === track} onClick={() => state.onTrackChange(track)}
+                className={`min-h-11 rounded-lg px-3 font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${state.trackView === track ? "bg-white text-journey shadow-sm" : "text-muted hover:text-ink"}`}>{label}</button>)}
+            </div>
+          </div> : null}
           {state.hostDisplayView ? (
             <nav className="flex shrink-0 items-center" aria-label="Экраны ведущего">
               <a href={`/games/${state.gameId}/host`} aria-label="Пульт ведущего" title="Пульт ведущего"

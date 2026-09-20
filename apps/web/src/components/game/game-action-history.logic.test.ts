@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createRequire } from 'node:module';
+import { mergeActionEvents, playerActionEvents } from './game-action-history.logic';
+import type { GameEvent, GamePlayer } from '../../lib/types';
+// Shared is a CommonJS workspace; load its runtime exports through the same boundary.
+const require = createRequire(import.meta.url);
+const { purchasedFastTrackCells, fastTrackCellEffect } = require('./fast-track-presentation') as typeof import('./fast-track-presentation');
+const { fastTrackCells } = require('@cashflow/shared') as typeof import('@cashflow/shared');
+const players=[{id:'anna',userId:'u1'},{id:'boris',userId:'u2'}] as GamePlayer[];
+const event=(sequence:number,type:string,id='anna',payload={}):GameEvent=>({id:`e${sequence}`,sequence,type,payload,createdAt:'2026-09-20T10:00:00Z',gamePlayer:{id,seat:1,role:'PLAYER'}});
+test('history selects actions of all players, ordered newest first, without administrative or preparation messages',()=>{
+  const events=[event(1,'player:joined'),event(2,'player:roll_dice'),event(3,'state:update'),event(4,'fast_track:purchased','boris'),event(5,'game:paused'),event(6,'player:dream_chosen')];
+  assert.deepEqual(playerActionEvents(events,players).map(e=>e.sequence),[4,2]);
+});
+test('replay overlap and repeated snapshots preserve every action once',()=>{
+  const fresh=event(3,'player:move','anna',{position:7});
+  const result=mergeActionEvents([event(3,'player:move'),event(4,'player:roll_dice')],[event(1,'player:roll_dice'),fresh]);
+  assert.deepEqual(result.map(e=>e.sequence),[4,3,1]);assert.equal(result[1]?.payload.position,7);
+});
+test('history identifies actions with only a payload player id or an actor user id',()=>{
+  const payloadEvent={...event(2,'baby:gift'),gamePlayer:null,payload:{senderGamePlayerId:'boris'}};
+  const actorEvent={...event(1,'player:roll_dice'),gamePlayer:null,actor:{id:'u1',displayName:'Анна'}};
+  assert.deepEqual(playerActionEvents([payloadEvent,actorEvent],players).map(e=>e.sequence),[2,1]);
+});
+test('purchased cards reflect owned businesses, purchased dreams and paid charity, excluding other players',()=>{
+  const player={...players[0],financialState:{fastTrackCharity:true}} as GamePlayer;
+  const cells=purchasedFastTrackCells(player,{owners:{1:'anna',3:'boris'},dreamPurchases:{0:['anna'],4:['boris']},influence:{}});
+  assert.deepEqual(cells.map(c=>c.index),[0,1,7]);
+  assert.equal(purchasedFastTrackCells({...player,financialState:null},{owners:{},dreamPurchases:{},influence:{}}).length,0);
+});
+test('cell effects expose payout thresholds and losses without a separate detail panel',()=>{
+  assert.match(fastTrackCellEffect(fastTrackCells[23]!)!,/4–6/);
+  assert.match(fastTrackCellEffect(fastTrackCells[29]!)!,/при 6$/);
+  assert.equal(fastTrackCellEffect(fastTrackCells[15]!), '−50% наличных');
+  assert.equal(fastTrackCellEffect(fastTrackCells[0]!),null);
+});

@@ -1,9 +1,10 @@
 "use client";
 
 import { fastTrackCells, fastTrackDreams } from "@cashflow/shared";
-import { Check, Dices, Heart, Target } from "lucide-react";
+import { Check, Heart, Target } from "lucide-react";
 import { type ReactNode } from "react";
 import { FastTrackBoard } from "./fast-track-board";
+import { DiceAction } from "./dice-action";
 export { FastTrackBoard } from "./fast-track-board";
 import { money } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
@@ -46,7 +47,7 @@ export function FastTrackFinances({ player }: { player: GamePlayer }) {
     <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-3 text-sm">
       <div><dt>Наличные</dt><dd className="text-xl font-extrabold tabular-nums">{money(state?.cashCents ?? 0)}</dd></div>
       <div><dt>Доход CASHFLOW</dt><dd className="text-xl font-extrabold tabular-nums">{money(income)}</dd></div>
-      <div><dt>До победы по доходу</dt><dd className="text-xl font-extrabold tabular-nums">+{money(Math.max(0, initial + 50_000 - income))}</dd></div>
+      <div><dt>Прирост дохода</dt><dd className="text-xl font-extrabold tabular-nums">{income >= initial ? "+" : "−"}{money(Math.abs(income - initial))}</dd></div>
     </dl>
     <progress className="fast-track-progress mt-4 h-2 w-full" value={Math.max(0, income - initial)} max={50_000} aria-label="Прирост дохода к победе" />
     <p className="mt-2 text-sm"><Target className="mr-1 inline" size={16} aria-hidden="true" /> Мечта: <strong>{dream?.label ?? "Не выбрана"}</strong></p>
@@ -63,20 +64,18 @@ export function FastTrackPanel({ snapshot, player, onRoll, rolling, diceValues, 
   const mine = pending?.type === "fast_track_choice" && pending.gamePlayerId === player?.id ? pending : null;
   const isTurn = snapshot.game.status === "IN_PROGRESS" && snapshot.game.currentPlayerId === player?.id && player?.track === "FAST_TRACK";
   const choiceCell = mine ? fastTrackCells[mine.cellIndex]! : null;
-  const actions = <div className="turn-decision" aria-label="Действия большого круга">
-    {isTurn && !pending ? <>
-      <div className="turn-decision-heading"><strong>Ваш ход</strong><span>Бросьте кубики</span></div>
-      {player?.financialState?.fastTrackCharity ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
-      <div className="turn-actions"><button type="button" className="turn-action action-roll" disabled={rolling || busy} onClick={onRoll}><Dices size={16} aria-hidden="true" />{rolling ? "Бросаем…" : `Бросить ${diceCount} ${diceCount === 1 ? "кубик" : "кубика"}`}</button></div>
-    </> : null}
-    {mine ? <>
+  const statusLabel = snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : isTurn ? "Ваш ход" : `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}`;
+  const actions = <div aria-label="Действия большого круга">
+    <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} disabled={busy}
+      statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
+      diceValues={diceValues.length ? diceValues : Array.from({ length: diceCount }, () => 1)} onRoll={onRoll} />
+    {isTurn && !pending && player?.financialState?.fastTrackCharity ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
+    {mine ? <div className="turn-decision">
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
       {choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo" ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}
-      <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
+      <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
-    </> : null}
-    {!isTurn ? <p className="turn-decision-note">{snapshot.game.status === "IN_PROGRESS" ? `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}` : snapshot.game.status === "ENDED" ? "Партия завершена" : "Партия на паузе"}</p> : null}
-    {diceValues.length ? <output className="turn-decision-note" aria-live="polite">Кубики: {diceValues.join(" + ")}</output> : null}
+    </div> : null}
   </div>;
-  return <div className="min-w-0 space-y-4"><FastTrackBoard snapshot={snapshot} player={player} actions={actions} />{children}</div>;
+  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} />;
 }

@@ -1,423 +1,63 @@
-const cells = [
-  { n: 1, l: "м", type: "dream", title: "Купите лес", cost: 250000, rule: "Купите выбранную мечту при наличии наличных. Чужие жетоны увеличивают цену для выбравшего её игрока." },
-  { n: 2, l: "б", type: "business", title: "Семейная сеть ресторанов", cost: 300000, flow: 14000, roi: "56%", rule: "Добровольная покупка при остановке. После покупки денежный поток прибавляется к доходу Дня CASHFLOW.", state: "Куплен игроком Анна", mark: "Куплен" },
-  { n: 3, l: "м", type: "dream", title: "Ложа на стадионе профессиональной команды", cost: 200000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 4, l: "б", type: "business", title: "Франшиза закусочной", cost: 300000, flow: 9500, roi: "38%", rule: "Добровольная покупка при остановке; после покупки клетка закрывается для других игроков." },
-  { n: 5, l: "м", type: "dream", title: "Древние города Азии", cost: 150000, rule: "Целевая мечта игрока. Два чужих жетона увеличили цену до тройной первоначальной стоимости.", state: "Целевая мечта · текущая цена $450 000", mark: "Мечта ×3", markType: "target" },
-  { n: 6, l: "б", type: "business", title: "Ресторан быстрого питания (3 торговые точки)", shortTitle: "Фастфуд ×3", cost: 120000, flow: 5000, roi: "50%", rule: "Три торговые точки. Покупка увеличивает доход Дня CASHFLOW на $5 000." },
-  { n: 7, l: "м", type: "dream", title: "Фондовая биржа детей", cost: 125000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 8, l: "о", type: "positive", title: "Благотворительность", cost: 100000, flowText: "1–3 кубика", rule: "Добровольная оплата даёт право до конца игры выбирать один, два или три кубика перед каждым ходом." },
-  { n: 9, l: "б", type: "business", title: "Компания коммунальных услуг", cost: 200000, flow: 10000, roi: "66%*", rule: "На поле указано 66% ROI, но расчёт по стоимости и потоку даёт 60%.", verification: "Требует подтверждения: ROI нужно сверить с фотографией клетки.", tokens: ["И"] },
-  { n: 10, l: "м", type: "dream", title: "Гонки на яхтах", cost: 150000, rule: "Покупка мечты доступна при остановке на клетке.", verification: "Требует подтверждения: в исходном тексте указан «Перт (Австрия)»." },
-  { n: 11, l: "б", type: "business", title: "Завод запчастей для грузовиков", cost: 150000, flow: 5000, roi: "40%", rule: "Добровольная покупка при остановке; после покупки клетка закрывается." },
-  { n: 12, l: "о", type: "positive", title: "День CASHFLOW", flowText: "Текущий доход", rule: "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW." },
-  { n: 13, l: "м", type: "dream", title: "Кинофестиваль в Каннах", cost: 125000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 14, l: "б", type: "business", title: "Купите золотой рудник", cost: 150000, flow: 25000, roi: "200% при успехе", rule: "После оплаты бросьте одну кость. Результат 3–6 даёт денежный поток; при неудаче выплата равна нулю, клетка остаётся открытой." },
-  { n: 15, l: "м", type: "dream", title: "Частная рыбацкая хижина на горном озере", shortTitle: "Рыбацкая хижина", cost: 100000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 16, l: "ф", type: "expense", title: "Налоговая проверка!", flowText: "−50% наличных", rule: "Заплатите Банку половину имеющихся наличных. Баланс не может стать отрицательным.", verification: "Требует решения: правило округления половины нечётной суммы ещё не утверждено." },
-  { n: 17, l: "м", type: "dream", title: "Парк развлечений в вашу честь", cost: 225000, rule: "Исправленная позиция: эта мечта следует сразу после клетки 16ф." },
-  { n: 18, l: "б", type: "business", title: "Франшиза куриных гриль-баров (2 торговые точки)", shortTitle: "Гриль-бары ×2", cost: 300000, flow: 10000, roi: "40%", rule: "Две торговые точки. После покупки клетка закрывается для других игроков." },
-  { n: 19, l: "м", type: "dream", title: "Баллотируйтесь в мэры", cost: 125000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 20, l: "б", type: "business", title: "Салоны красоты (3 кабинета)", shortTitle: "Салоны ×3", cost: 250000, flow: 10000, roi: "48%", rule: "Три кабинета. Покупка увеличивает доход Дня CASHFLOW на $10 000." },
-  { n: 21, l: "м", type: "dream", title: "Дар церкви", cost: 175000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 22, l: "б", type: "business", title: "Авторемонтная мастерская", cost: 150000, flow: 6000, roi: "48%", rule: "Отдельный объект владения; не связан с одноимённой клеткой 26." },
-  { n: 23, l: "м", type: "dream", title: "Прыжки на лыжах с вертолёта", cost: 150000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 24, l: "б", type: "business", title: "Нефтяная сделка в России", cost: 300000, flow: 75000, roi: "300% при успехе", rule: "После оплаты бросьте одну кость. Результат 4–6 даёт денежный поток; при неудаче выплата равна нулю, клетка остаётся открытой.", state: "Текущая клетка · требуется решение игрока", tokens: ["А", "В"], current: true },
-  { n: 25, l: "м", type: "dream", title: "Ужин с президентом!", cost: 100000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 26, l: "б", type: "business", title: "Авторемонтная мастерская", cost: 150000, flow: 6000, roi: "48%", rule: "Отдельный объект владения; не связан с одноимённой клеткой 22." },
-  { n: 27, l: "м", type: "dream", title: "Научный центр рака и СПИДа", cost: 225000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 28, l: "о", type: "positive", title: "День CASHFLOW", flowText: "Текущий доход", rule: "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW." },
-  { n: 29, l: "м", type: "dream", title: "7 чудес света", cost: 200000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 30, l: "б", type: "business", title: "IPO компании программных продуктов", cost: 25000, flowText: "$500 000 при успехе", rule: "После оплаты бросьте одну кость. Только 6 даёт выплату $500 000. Денежный поток не меняется; после успеха возможность закрывается.", state: "Возможность уже закрыта", mark: "Закрыто", markType: "closed" },
-  { n: 31, l: "м", type: "dream", title: "Спасение морских животных", cost: 125000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 32, l: "ф", type: "expense", title: "Развод", flowText: "Все наличные", rule: "Игрок теряет все наличные. Итоговый баланс равен нулю." },
-  { n: 33, l: "м", type: "dream", title: "Войдите в круг «реактивной» публики", shortTitle: "Частный самолёт", cost: 250000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 34, l: "б", type: "business", title: "60-квартирный доходный дом", cost: 300000, flow: 8000, roi: "32%", rule: "После покупки денежный поток прибавляется к доходу Дня CASHFLOW.", state: "Куплен игроком Виктор", mark: "Куплен" },
-  { n: 35, l: "м", type: "dream", title: "Гольф вокруг света", cost: 150000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 36, l: "б", type: "business", title: "Франшиза пиццерий (2 торговые точки)", shortTitle: "Пиццерии ×2", cost: 225000, flow: 7000, roi: "37%", rule: "Две торговые точки. Точный расчёт ROI равен 37,33%, на поле округлено до 37%." },
-  { n: 37, l: "м", type: "dream", title: "Детская библиотека", cost: 175000, rule: "Покупка мечты доступна при остановке на клетке.", verification: "Требует подтверждения: название не соответствует распознанному описанию научного центра." },
-  { n: 38, l: "б", type: "business", title: "Склад на 200 мини-хранилищ", cost: 200000, flow: 6000, roi: "36%", rule: "После покупки денежный поток прибавляется к доходу Дня CASHFLOW." },
-  { n: 39, l: "м", type: "dream", title: "Остров мечты в Южном море", cost: 100000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 40, l: "б", type: "business", title: "IPO биотехнологической компании", cost: 50000, flowText: "$500 000 при успехе", rule: "После оплаты бросьте одну кость. Результат 5–6 даёт выплату $500 000. Денежный поток не меняется." },
-  { n: 41, l: "м", type: "dream", title: "Капиталистический конкурс мира", cost: 200000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 42, l: "б", type: "business", title: "Химчистка (2 цеха)", shortTitle: "Химчистка ×2", cost: 100000, flow: 3000, roi: "36%", rule: "Два цеха. После покупки клетка закрывается для других игроков." },
-  { n: 43, l: "м", type: "dream", title: "Круиз по Средиземноморью на частной яхте", shortTitle: "Круиз на яхте", cost: 100000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 44, l: "о", type: "positive", title: "День CASHFLOW", flowText: "Текущий доход", rule: "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW." },
-  { n: 45, l: "м", type: "dream", title: "Мини-ферма в городе", cost: 150000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 46, l: "б", type: "business", title: "Рекламное агентство кухонной посуды", cost: 225000, flow: 50000, roi: "266,67% при успехе", rule: "После оплаты бросьте одну кость. Результат 4–6 даёт денежный поток; при неудаче клетка остаётся открытой." },
-  { n: 47, l: "м", type: "dream", title: "Фотоохота в Африке", cost: 100000, rule: "Покупка мечты доступна при остановке на клетке." },
-  { n: 48, l: "ф", type: "expense", title: "Судебный иск!!!", flowText: "−50% наличных", rule: "Заплатите Банку половину имеющихся наличных. После клетки маршрут возвращается к клетке 1.", verification: "Требует решения: правило округления половины нечётной суммы ещё не утверждено." }
-];
-
-const typeLabels = {
-  business: "Бизнес",
-  dream: "Место / мечта",
-  expense: "Расход",
-  positive: "Положительный эффект"
-};
-
-const tokenColors = ["#2967df", "#c9505f", "#5f8e42"];
-const classicBoard = document.querySelector("#classic-board");
-const mobileDetail = document.querySelector("#mobile-detail-content");
-const liveDetail = document.querySelector("#cell-detail-live");
-let selectedCellNumber = 24;
-
-function money(value) {
-  if (value == null) return "—";
-  return `$${new Intl.NumberFormat("ru-RU").format(value)}`;
+// Demonstration data mirrors the production cells; no game state is persisted.
+const cells = [{"index":0,"code":"1м","type":"dream","label":"Купите лес","description":"остановите вырубку вековых деревьев, пожертвуйте 1000 акров леса и создайте прогулочные маршруты.","cost":250000,"income":0,"rule":{"kind":"dream"}},{"index":1,"code":"2б","type":"business","label":"Семейная сеть ресторанов","description":"Добровольная покупка при остановке. После покупки денежный поток прибавляется к доходу Дня CASHFLOW.","cost":300000,"income":14000,"rule":{"kind":"business"},"roi":"56%"},{"index":2,"code":"3м","type":"dream","label":"Ложа на стадионе профессиональной команды","description":"годовой абонемент в частную ложу на 12 персон с едой и напитками.","cost":200000,"income":0,"rule":{"kind":"dream"}},{"index":3,"code":"4б","type":"business","label":"Франшиза закусочной","description":"Добровольная покупка при остановке; после покупки клетка закрывается для других игроков.","cost":300000,"income":9500,"rule":{"kind":"business"},"roi":"38%"},{"index":4,"code":"5м","type":"dream","label":"Древние города Азии","description":"путешествие на частном самолёте с частным гидом для игрока и пяти друзей.","cost":150000,"income":0,"rule":{"kind":"dream"}},{"index":5,"code":"6б","type":"business","label":"Ресторан быстрого питания (3 торговые точки)","description":"Три торговые точки. Покупка увеличивает доход Дня CASHFLOW на $5 000.","cost":120000,"income":5000,"rule":{"kind":"business"},"roi":"50%"},{"index":6,"code":"7м","type":"dream","label":"Фондовая биржа детей","description":"открыть школу бизнеса и инвестирования с учебной фондовой биржей.","cost":125000,"income":0,"rule":{"kind":"dream"}},{"index":7,"code":"8о","type":"positive","label":"Благотворительность","description":"Добровольная оплата даёт право до конца игры выбирать один, два или три кубика перед каждым ходом.","cost":100000,"income":0,"rule":{"kind":"charity"}},{"index":8,"code":"9б","type":"business","label":"Компания коммунальных услуг","description":"Покупка увеличивает доход Дня CASHFLOW на $10 000.","cost":200000,"income":10000,"rule":{"kind":"business"},"roi":"66%*","sourceNote":"Требует подтверждения: ROI нужно сверить с фотографией клетки."},{"index":9,"code":"10м","type":"dream","label":"Гонки на яхтах","description":"участие в недельной регате 12-метровых гоночных яхт в Перте.","cost":150000,"income":0,"rule":{"kind":"dream"},"sourceNote":"Требует подтверждения: в исходном тексте указан «Перт (Австрия)»."},{"index":10,"code":"11б","type":"business","label":"Завод запчастей для грузовиков","description":"Добровольная покупка при остановке; после покупки клетка закрывается.","cost":150000,"income":5000,"rule":{"kind":"business"},"roi":"40%"},{"index":11,"code":"12о","type":"positive","label":"День CASHFLOW","description":"При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.","cost":0,"income":0,"rule":{"kind":"cashflow"}},{"index":12,"code":"13м","type":"dream","label":"Кинофестиваль в Каннах","description":"тур по Франции и неделя на кинофестивале в Каннах.","cost":125000,"income":0,"rule":{"kind":"dream"}},{"index":13,"code":"14б","type":"business","label":"Купите золотой рудник","description":"После оплаты бросьте одну кость. Результат 3–6 даёт денежный поток; при неудаче выплата равна нулю, клетка остаётся открытой.","cost":150000,"income":25000,"rule":{"kind":"chance_business","minimum":3},"roi":"200% при успехе"},{"index":14,"code":"15м","type":"dream","label":"Частная рыбацкая хижина на горном озере","description":"шесть месяцев отдыха в удалённой хижине; гидросамолёт включён.","cost":100000,"income":0,"rule":{"kind":"dream"}},{"index":15,"code":"16ф","type":"expense","label":"Налоговая проверка!","description":"Заплатите Банку половину имеющихся наличных. Баланс не может стать отрицательным.","cost":0,"income":0,"rule":{"kind":"half_cash"},"sourceNote":"Половина наличных округляется вниз: нечётный доллар остаётся игроку."},{"index":16,"code":"17м","type":"dream","label":"Парк развлечений в вашу честь","description":"снести заброшенный склад, построить парк отдыха и поддержать обеспечение порядка.","cost":225000,"income":0,"rule":{"kind":"dream"}},{"index":17,"code":"18б","type":"business","label":"Франшиза куриных гриль-баров (2 торговые точки)","description":"Две торговые точки. После покупки клетка закрывается для других игроков.","cost":300000,"income":10000,"rule":{"kind":"business"},"roi":"40%"},{"index":18,"code":"19м","type":"dream","label":"Баллотируйтесь в мэры","description":"профинансировать победную избирательную кампанию на пост мэра.","cost":125000,"income":0,"rule":{"kind":"dream"}},{"index":19,"code":"20б","type":"business","label":"Салоны красоты (3 кабинета)","description":"Три кабинета. Покупка увеличивает доход Дня CASHFLOW на $10 000.","cost":250000,"income":10000,"rule":{"kind":"business"},"roi":"48%"},{"index":20,"code":"21м","type":"dream","label":"Дар церкви","description":"пожертвование религиозной общине на приобретение новой земли.","cost":175000,"income":0,"rule":{"kind":"dream"}},{"index":21,"code":"22б","type":"business","label":"Авторемонтная мастерская","description":"Отдельный объект владения; не связан с одноимённой клеткой 26.","cost":150000,"income":6000,"rule":{"kind":"business"},"roi":"48%"},{"index":22,"code":"23м","type":"dream","label":"Прыжки на лыжах с вертолёта","description":"сезон лыжных прыжков с вертолёта в Швейцарских Альпах.","cost":150000,"income":0,"rule":{"kind":"dream"}},{"index":23,"code":"24б","type":"business","label":"Нефтяная сделка в России","description":"После оплаты бросьте одну кость. Результат 4–6 даёт денежный поток; при неудаче выплата равна нулю, клетка остаётся открытой.","cost":300000,"income":75000,"rule":{"kind":"chance_business","minimum":4},"roi":"300% при успехе"},{"index":24,"code":"25м","type":"dream","label":"Ужин с президентом!","description":"торжественный ужин для игрока и десяти друзей.","cost":100000,"income":0,"rule":{"kind":"dream"}},{"index":25,"code":"26б","type":"business","label":"Авторемонтная мастерская","description":"Отдельный объект владения; не связан с одноимённой клеткой 22.","cost":150000,"income":6000,"rule":{"kind":"business"},"roi":"48%"},{"index":26,"code":"27м","type":"dream","label":"Научный центр рака и СПИДа","description":"объединить ведущих исследователей и врачей в одном научном центре.","cost":225000,"income":0,"rule":{"kind":"dream"}},{"index":27,"code":"28о","type":"positive","label":"День CASHFLOW","description":"При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.","cost":0,"income":0,"rule":{"kind":"cashflow"}},{"index":28,"code":"29м","type":"dream","label":"7 чудес света","description":"кругосветное путешествие разными видами транспорта с обслуживанием высшего класса.","cost":200000,"income":0,"rule":{"kind":"dream"}},{"index":29,"code":"30б","type":"business","label":"IPO компании программных продуктов","description":"После оплаты бросьте одну кость. Только 6 даёт выплату $500 000. Денежный поток не меняется; после успеха возможность закрывается.","cost":25000,"income":0,"rule":{"kind":"ipo","minimum":6,"payout":500000}},{"index":30,"code":"31м","type":"dream","label":"Спасение морских животных","description":"участие в месячной исследовательской экспедиции по спасению исчезающих видов.","cost":125000,"income":0,"rule":{"kind":"dream"}},{"index":31,"code":"32ф","type":"expense","label":"Развод","description":"Игрок теряет все наличные. Итоговый баланс равен нулю.","cost":0,"income":0,"rule":{"kind":"lose_cash"}},{"index":32,"code":"33м","type":"dream","label":"Войдите в круг «реактивной» публики","description":"аренда частного реактивного самолёта на один год.","cost":250000,"income":0,"rule":{"kind":"dream"}},{"index":33,"code":"34б","type":"business","label":"60-квартирный доходный дом","description":"После покупки денежный поток прибавляется к доходу Дня CASHFLOW.","cost":300000,"income":8000,"rule":{"kind":"business"},"roi":"32%"},{"index":34,"code":"35м","type":"dream","label":"Гольф вокруг света","description":"тур для игрока и трёх друзей по 50 лучшим полям для гольфа.","cost":150000,"income":0,"rule":{"kind":"dream"}},{"index":35,"code":"36б","type":"business","label":"Франшиза пиццерий (2 торговые точки)","description":"Две торговые точки. Покупка увеличивает доход Дня CASHFLOW на $7 000.","cost":225000,"income":7000,"rule":{"kind":"business"},"roi":"37%"},{"index":36,"code":"37м","type":"dream","label":"Детская библиотека","description":"Покупка мечты доступна при остановке на клетке.","cost":175000,"income":0,"rule":{"kind":"dream"},"sourceNote":"Требует подтверждения: название не соответствует распознанному описанию научного центра."},{"index":37,"code":"38б","type":"business","label":"Склад на 200 мини-хранилищ","description":"После покупки денежный поток прибавляется к доходу Дня CASHFLOW.","cost":200000,"income":6000,"rule":{"kind":"business"},"roi":"36%"},{"index":38,"code":"39м","type":"dream","label":"Остров мечты в Южном море","description":"два месяца отдыха на уединённом острове.","cost":100000,"income":0,"rule":{"kind":"dream"}},{"index":39,"code":"40б","type":"business","label":"IPO биотехнологической компании","description":"После оплаты бросьте одну кость. Результат 5–6 даёт выплату $500 000. Денежный поток не меняется.","cost":50000,"income":0,"rule":{"kind":"ipo","minimum":5,"payout":500000}},{"index":40,"code":"41м","type":"dream","label":"Капиталистический конкурс мира","description":"открыть школы предпринимательства в странах третьего мира.","cost":200000,"income":0,"rule":{"kind":"dream"}},{"index":41,"code":"42б","type":"business","label":"Химчистка (2 цеха)","description":"Два цеха. После покупки клетка закрывается для других игроков.","cost":100000,"income":3000,"rule":{"kind":"business"},"roi":"36%"},{"index":42,"code":"43м","type":"dream","label":"Круиз по Средиземноморью на частной яхте","description":"месячный круиз с двенадцатью друзьями по гаваням Италии, Франции и Греции.","cost":100000,"income":0,"rule":{"kind":"dream"}},{"index":43,"code":"44о","type":"positive","label":"День CASHFLOW","description":"При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.","cost":0,"income":0,"rule":{"kind":"cashflow"}},{"index":44,"code":"45м","type":"dream","label":"Мини-ферма в городе","description":"создать экологичную городскую ферму для обучения детей заботе о животных и растениях.","cost":150000,"income":0,"rule":{"kind":"dream"}},{"index":45,"code":"46б","type":"business","label":"Рекламное агентство кухонной посуды","description":"После оплаты бросьте одну кость. Результат 4–6 даёт денежный поток; при неудаче клетка остаётся открытой.","cost":225000,"income":50000,"rule":{"kind":"chance_business","minimum":4},"roi":"266,67% при успехе"},{"index":46,"code":"47м","type":"dream","label":"Фотоохота в Африке","description":"сафари для игрока и шести друзей с пятизвёздочным размещением.","cost":100000,"income":0,"rule":{"kind":"dream"}},{"index":47,"code":"48ф","type":"expense","label":"Судебный иск!!!","description":"Заплатите Банку половину имеющихся наличных. После клетки маршрут возвращается к клетке 1.","cost":0,"income":0,"rule":{"kind":"half_cash"},"sourceNote":"Половина наличных округляется вниз: нечётный доллар остаётся игроку."}];
+const board = document.querySelector('#classic-board');
+const money = value => `$${new Intl.NumberFormat('ru-RU').format(value)}`;
+function position(index) {
+  const columns = [4,144,264,384,504,624,744,864,984,1124], rows = [4,108,192,276,360,444,528,632];
+  if (index < 4) return [columns[4-index], rows[1]];
+  if (index < 8) return [columns[1], rows[index-2]];
+  if (index < 11) return [columns[index-7], rows[6]];
+  if (index < 14) return [columns[14-index],632];
+  if (index < 20) return [4,rows[20-index]];
+  if (index < 28) return [columns[index-19],4];
+  if (index < 34) return [1124,rows[index-27]];
+  if (index < 37) return [columns[42-index],632];
+  if (index < 40) return [columns[index-31],rows[6]];
+  if (index < 44) return [columns[8],rows[45-index]];
+  return [columns[52-index],rows[1]];
 }
-
-function cellFlow(cell) {
-  if (cell.flowText) return cell.flowText;
-  if (cell.flow) return `+$${new Intl.NumberFormat("ru-RU").format(cell.flow)} / мес`;
-  return "—";
-}
-
-function classicPosition(index) {
-  const columns = [4, 144, 264, 384, 504, 624, 744, 864, 984, 1124];
-  const rows = [4, 108, 192, 276, 360, 444, 528, 632];
-  const outer = { left: 4, right: 1124, top: 4, bottom: 632 };
-
-  if (index < 4) return { x: columns[4 - index], y: rows[1] };
-  if (index < 8) return { x: columns[1], y: rows[index - 2] };
-  if (index < 11) return { x: columns[index - 7], y: rows[6] };
-  if (index < 14) return { x: columns[14 - index], y: outer.bottom };
-  if (index < 20) return { x: outer.left, y: rows[20 - index] };
-  if (index < 28) return { x: columns[index - 19], y: outer.top };
-  if (index < 34) return { x: outer.right, y: rows[index - 27] };
-  if (index < 37) return { x: columns[42 - index], y: outer.bottom };
-  if (index < 40) return { x: columns[index - 31], y: rows[6] };
-  if (index < 44) return { x: columns[8], y: rows[45 - index] };
-  return { x: columns[52 - index], y: rows[1] };
-}
-
-function accessibleCellLabel(cell) {
-  const status = [
-    cell.current ? "текущая позиция" : null,
-    cell.state,
-    cell.mark,
-    cell.tokens?.length ? `игроков на клетке: ${cell.tokens.length}` : null,
-    cell.verification
-  ].filter(Boolean);
-  return `Клетка ${cell.n}${cell.l}. ${typeLabels[cell.type]}. ${cell.title}${status.length ? `. ${status.join(". ")}` : ""}`;
-}
-
-function createCellButton(cell, position) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = `board-cell cell-${cell.type}${cell.current ? " is-current" : ""}`;
-  button.style.left = `${position.x}px`;
-  button.style.top = `${position.y}px`;
-  button.dataset.cell = String(cell.n);
-  button.tabIndex = cell.n === selectedCellNumber ? 0 : -1;
-  button.setAttribute("aria-pressed", String(cell.n === selectedCellNumber));
-  button.setAttribute("aria-label", accessibleCellLabel(cell));
-  button.setAttribute("aria-controls", "cell-detail-live");
-
-  const number = document.createElement("span");
-  number.className = "cell-number";
-  number.textContent = String(cell.n);
-
-  const letter = document.createElement("span");
-  letter.className = "cell-letter";
-  letter.textContent = cell.l;
-  letter.setAttribute("aria-hidden", "true");
-
-  const title = document.createElement("span");
-  title.className = "cell-short-title";
-  title.textContent = cell.shortTitle ?? cell.title;
-
-  button.append(number, letter, title);
-
-  if (cell.mark) {
-    const mark = document.createElement("span");
-    mark.className = `cell-state-mark ${cell.markType ?? ""}`;
-    mark.textContent = cell.mark;
-    button.append(mark);
+function effect(cell) {
+  switch(cell.rule.kind) {
+    case 'business': return `+${money(cell.income)} CASHFLOW`;
+    case 'chance_business': return `+${money(cell.income)} при ${cell.rule.minimum}–6`;
+    case 'ipo': return `+${money(cell.rule.payout)} при ${cell.rule.minimum === 6 ? '6' : `${cell.rule.minimum}–6`}`;
+    case 'cashflow': return '+Доход CASHFLOW';
+    case 'charity': return '1–3 кубика до конца игры';
+    case 'half_cash': return '−50% наличных';
+    case 'lose_cash': return 'Все наличные теряются';
+    default: return '';
   }
-
-  if (cell.tokens?.length) {
-    const tokens = document.createElement("span");
-    tokens.className = "cell-tokens";
-    tokens.setAttribute("aria-label", `Игроков на клетке: ${cell.tokens.length}`);
-    cell.tokens.forEach((token, tokenIndex) => {
-      const tokenElement = document.createElement("span");
-      tokenElement.className = "player-token";
-      tokenElement.style.setProperty("--token-color", tokenColors[tokenIndex % tokenColors.length]);
-      tokenElement.textContent = token;
-      tokenElement.setAttribute("aria-hidden", "true");
-      tokens.append(tokenElement);
-    });
-    button.append(tokens);
+}
+const avatar = '<span class="demo-avatar" role="img" aria-label="Аватар игрока"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#bbccf3"/><circle cx="32" cy="24" r="12" fill="#946746"/><ellipse cx="32" cy="65" rx="26" ry="28" fill="#2967df"/></svg></span>';
+function token(id,name) { return `<span><img src="../../apps/web/public/figurines/${id}.png" alt="Фишка: ${name}" /></span>`; }
+for(const cell of cells) {
+  const element=document.createElement('article'), [x,y]=position(cell.index);
+  element.className=`board-cell cell-${cell.type}`;
+  element.style.left=`${x}px`; element.style.top=`${y}px`;element.setAttribute('aria-label',cell.label);
+  element.innerHTML=`<h3 class="cell-title">${cell.label}</h3>${cell.cost ? `<span class="cell-price">${money(cell.index===4?450000:cell.cost)}</span>`:''}${effect(cell)?`<span class="cell-effect">${effect(cell)}</span>`:''}${cell.index===1?`<span class="cell-owner"><span aria-label="Владелец: Анна">${avatar}</span></span>`:''}${cell.index===23?`<span class="cell-tokens">${token('rubber-duck','Анна')}${token('cat-in-box','Борис')}</span>`:''}`;
+  board.append(element);
+}
+const panels=document.createElement('div');panels.className='central-panel';
+panels.innerHTML=`<section class="player-overview" aria-label="Финансы большого круга: Анна">
+  <div class="player-identity">${avatar}<div><h3 class="player-name">Анна</h3><p class="player-profession">Предприниматель</p></div></div>
+  <dl class="player-metrics"><div><dt>Наличные</dt><dd>$450 000</dd></div><div><dt>Доход CASHFLOW</dt><dd>$139 000</dd></div><div class="is-positive"><dt>Прирост дохода</dt><dd>+$39 000</dd></div></dl>
+  <div class="player-goal"><div class="player-goal-row"><span>Финансовая цель</span><strong>+$50 000 к доходу</strong></div><div class="player-goal-row"><span>Целевая мечта</span><strong>Древние города Азии · $450 000</strong></div></div>
+  <section class="player-assets"><h4 class="player-section-heading">Активы большого круга · 1</h4><div class="purchased-cards"><article class="purchased-card cell-business"><h5>Семейная сеть ресторанов</h5><dl><div><dt>Стоимость</dt><dd>$300 000</dd></div><div><dt>Эффект</dt><dd>+$14 000 CASHFLOW</dd></div></dl></article></div></section>
+</section>
+<section class="turn-activity" aria-label="Ход и история игроков"><div class="demo-dice"><strong>Ваш ход</strong><button id="roll">Бросить кубики</button><output id="dice">⚃ ⚄</output></div><ol class="demo-history"></ol><button class="demo-more">Показать ещё</button></section>`;
+board.append(panels);
+const history=panels.querySelector('.demo-history');let shown=0;
+function showMore() {
+  for(let i=shown;i<Math.min(shown+10,25);i++) {
+    const entry=document.createElement('li');entry.innerHTML=`<div class="demo-player">${avatar}<strong>${i%2?'Борис':'Анна'}</strong></div><p>Бросок кубиков: ${i%6+1} + ${(i+2)%6+1}</p>`;history.append(entry);
   }
-
-  button.addEventListener("click", () => selectCell(cell.n));
-  button.addEventListener("keydown", (event) => moveCellFocus(event, cell.n, button));
-  return button;
+  shown=Math.min(shown+10,25);panels.querySelector('.demo-more').hidden=shown===25;
 }
-
-function moveCellFocus(event, cellNumber, sourceButton) {
-  const delta = {
-    ArrowRight: 1,
-    ArrowDown: 1,
-    ArrowLeft: -1,
-    ArrowUp: -1
-  }[event.key];
-  let nextNumber = null;
-  if (delta) nextNumber = ((cellNumber - 1 + delta + cells.length) % cells.length) + 1;
-  if (event.key === "Home") nextNumber = 1;
-  if (event.key === "End") nextNumber = cells.length;
-  if (nextNumber == null) return;
-
-  event.preventDefault();
-  selectCell(nextNumber);
-  sourceButton.closest(".board")?.querySelector(`[data-cell="${nextNumber}"]`)?.focus();
-}
-
-function createPlayerOverview() {
-  const overview = document.createElement("section");
-  overview.className = "player-overview";
-  overview.setAttribute("aria-label", "Финансовая информация игрока Анна");
-  overview.innerHTML = `
-    <div class="player-heading">
-      <div class="player-identity">
-        <span class="player-avatar" aria-hidden="true">А</span>
-        <div>
-          <h2 class="player-name">Анна</h2>
-          <p class="player-profession">Предприниматель</p>
-        </div>
-      </div>
-      <span class="player-turn-tag">Ваш ход</span>
-    </div>
-    <div class="player-tabs" role="tablist" aria-label="Информация об игроке">
-      <button type="button" role="tab" aria-selected="true" tabindex="0" data-player-tab="player">Игрок</button>
-      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="assets">Активы <span>3</span></button>
-      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="expenses">Расходы</button>
-      <button type="button" role="tab" aria-selected="false" tabindex="-1" data-player-tab="liabilities">Долги <span>1</span></button>
-    </div>
-    <div class="player-tab-panel" role="tabpanel"></div>
-  `;
-
-  const tabContent = {
-    player: `
-      <dl class="player-metrics">
-        <div><dt>Наличные</dt><dd>$147 000</dd></div>
-        <div><dt>Общий доход</dt><dd>$89 000 / мес</dd></div>
-        <div class="is-positive"><dt>Денежный поток</dt><dd>+$27 000 / мес</dd></div>
-        <div><dt>Расходы</dt><dd>$62 000 / мес</dd></div>
-      </dl>
-      <div class="player-assets">
-        <div class="player-section-heading">Активы · 3</div>
-        <p>Сеть ресторанов · коммунальная компания · золотой рудник</p>
-      </div>
-      <div class="player-goal">
-        <div class="player-goal-row"><span>Финансовая цель</span><strong>+$50 000 / мес</strong></div>
-        <div class="player-goal-row"><span>Целевая мечта</span><strong>Древние города Азии · $450 000</strong></div>
-      </div>
-    `,
-    assets: `
-      <div class="player-list-heading"><strong>Активы</strong><span>+$21 000 / мес</span></div>
-      <ul class="player-list">
-        <li><span>Сеть ресторанов</span><strong>+$14 000</strong></li>
-        <li><span>Коммунальная компания</span><strong>+$10 000</strong></li>
-        <li><span>Золотой рудник</span><strong>−$3 000</strong></li>
-      </ul>
-    `,
-    expenses: `
-      <div class="player-list-heading"><strong>Расходы</strong><span>$62 000 / мес</span></div>
-      <ul class="player-list">
-        <li><span>Налоги и жильё</span><strong>$31 000</strong></li>
-        <li><span>Кредиты</span><strong>$18 000</strong></li>
-        <li><span>Прочие расходы</span><strong>$13 000</strong></li>
-      </ul>
-    `,
-    liabilities: `
-      <div class="player-list-heading"><strong>Долги</strong><span>$180 000</span></div>
-      <ul class="player-list">
-        <li><span>Банковский кредит</span><strong>$18 000 / мес</strong></li>
-      </ul>
-    `
-  };
-  const panel = overview.querySelector(".player-tab-panel");
-  const tabs = [...overview.querySelectorAll("[data-player-tab]")];
-
-  function selectPlayerTab(tab) {
-    tabs.forEach((candidate) => {
-      const active = candidate === tab;
-      candidate.setAttribute("aria-selected", String(active));
-      candidate.tabIndex = active ? 0 : -1;
-    });
-    panel.innerHTML = tabContent[tab.dataset.playerTab];
-  }
-
-  tabs.forEach((tab, index) => {
-    tab.addEventListener("click", () => selectPlayerTab(tab));
-    tab.addEventListener("keydown", (event) => {
-      let nextIndex = index;
-      if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-      if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
-      if (event.key === "Home") nextIndex = 0;
-      if (event.key === "End") nextIndex = tabs.length - 1;
-      if (nextIndex === index) return;
-      event.preventDefault();
-      selectPlayerTab(tabs[nextIndex]);
-      tabs[nextIndex].focus();
-    });
-  });
-  selectPlayerTab(tabs[0]);
-  return overview;
-}
-
-function createTurnActivity() {
-  const activity = document.createElement("section");
-  activity.className = "turn-activity";
-  activity.setAttribute("aria-label", "История и действия текущего хода");
-  activity.innerHTML = `
-    <div class="turn-heading">
-      <div>
-        <h2>Ход игрока</h2>
-        <p>Анна · ход 8</p>
-      </div>
-      <span class="turn-status">В процессе</span>
-    </div>
-    <ol class="turn-timeline">
-      <li class="turn-event"><strong>Начало хода · клетка 22</strong><span>Авторемонтная мастерская</span></li>
-      <li class="turn-event"><strong>Бросок кубика · 2</strong><span>Игрок перемещается на две клетки</span></li>
-      <li class="turn-event"><strong>Перемещение · 22 → 24</strong><span>Пройдена клетка 23 «Прыжки на лыжах»</span></li>
-      <li class="turn-event is-current"><strong>Открыта клетка 24</strong><span>Нефтяная сделка в России · требуется решение</span></li>
-    </ol>
-    <div class="turn-decision">
-      <div class="turn-decision-heading"><strong>Выберите действие</strong><span>Нужно $300 000</span></div>
-      <div class="turn-actions" role="group" aria-label="Демонстрационные действия">
-        <button class="turn-action" type="button" data-demo-action="Купить сделку">Купить</button>
-        <button class="turn-action" type="button" data-demo-action="Взять кредит">Кредит</button>
-        <button class="turn-action" type="button" data-demo-action="Отказаться от сделки">Отказаться</button>
-      </div>
-      <p class="turn-decision-note" aria-live="polite">Выбор изменит только демонстрацию прототипа.</p>
-    </div>
-  `;
-
-  const note = activity.querySelector(".turn-decision-note");
-  activity.querySelectorAll(".turn-action").forEach((button) => {
-    button.setAttribute("aria-pressed", "false");
-    button.addEventListener("click", () => {
-      activity.querySelectorAll(".turn-action").forEach((candidate) => {
-        candidate.setAttribute("aria-pressed", String(candidate === button));
-      });
-      note.textContent = `Демонстрационный выбор: ${button.dataset.demoAction}.`;
-    });
-  });
-  return activity;
-}
-
-function detailFor(cell) {
-  const detail = document.querySelector("#detail-template").content.firstElementChild.cloneNode(true);
-  detail.classList.add(`detail-${cell.type}`);
-  detail.querySelector(".detail-code").textContent = `${cell.n}${cell.l}`;
-  detail.querySelector(".detail-type").textContent = typeLabels[cell.type];
-  detail.querySelector(".detail-title").textContent = cell.title;
-  const metrics = detail.querySelector(".detail-metrics");
-  metricDescriptors(cell).forEach(({ label, value }) => {
-    const wrapper = document.createElement("div");
-    const term = document.createElement("dt");
-    const description = document.createElement("dd");
-    term.textContent = label;
-    description.textContent = value;
-    wrapper.append(term, description);
-    metrics.append(wrapper);
-  });
-  detail.querySelector(".detail-rule").textContent = cell.rule;
-  detail.querySelector(".detail-state").textContent = [cell.state, cell.verification].filter(Boolean).join(" · ");
-  return detail;
-}
-
-function metricDescriptors(cell) {
-  if (cell.type === "dream") {
-    return [
-      { label: "Стоимость мечты", value: money(cell.cost) },
-      { label: "Игровой эффект", value: "Покупка мечты" },
-      { label: "Денежный поток", value: "Не изменяется" }
-    ];
-  }
-  if (cell.type === "expense") {
-    return [
-      { label: "Потеря наличных", value: cellFlow(cell) },
-      { label: "Обязательность", value: "Обязательно" },
-      { label: "Нижняя граница", value: "$0" }
-    ];
-  }
-  if (cell.type === "positive") {
-    return [
-      { label: cell.cost ? "Стоимость" : "Стоимость", value: money(cell.cost) },
-      { label: cell.n === 8 ? "Постоянный эффект" : "Выплата", value: cellFlow(cell) },
-      { label: "Денежный поток", value: cell.n === 8 ? "Не изменяется" : "Текущий доход" }
-    ];
-  }
-  const isIpo = cell.title.startsWith("IPO");
-  return [
-    { label: isIpo || cell.rule.includes("бросьте") ? "Инвестиция" : "Первоначальный взнос", value: money(cell.cost) },
-    { label: isIpo ? "Выплата при успехе" : "Денежный поток", value: cellFlow(cell) },
-    { label: "ROI", value: cell.roi ?? "—" }
-  ];
-}
-
-function renderBoards() {
-  const classicRoute = classicBoard.querySelector(".classic-route");
-  classicBoard.replaceChildren(classicRoute);
-  cells.forEach((cell, index) => classicBoard.append(createCellButton(cell, classicPosition(index))));
-  const panel = document.createElement("div");
-  panel.className = "central-panel";
-  panel.append(createPlayerOverview(), createTurnActivity());
-  classicBoard.append(panel);
-  renderMobileDetail();
-  announceSelectedCell();
-}
-
-function renderMobileDetail() {
-  const cell = cells.find((item) => item.n === selectedCellNumber) ?? cells[0];
-  mobileDetail.replaceChildren(detailFor(cell));
-}
-
-function selectCell(cellNumber) {
-  selectedCellNumber = cellNumber;
-  document.querySelectorAll(".board-cell").forEach((button) => {
-    const selected = Number(button.dataset.cell) === cellNumber;
-    button.setAttribute("aria-pressed", String(selected));
-    button.tabIndex = selected ? 0 : -1;
-  });
-  document.querySelectorAll(".central-panel").forEach((panel) => {
-    const currentDetail = panel.querySelector(".cell-detail");
-    currentDetail?.replaceWith(detailFor(cells.find((cell) => cell.n === cellNumber)));
-  });
-  renderMobileDetail();
-  announceSelectedCell();
-  centerSelectedCell();
-}
-
-function announceSelectedCell() {
-  const cell = cells.find((item) => item.n === selectedCellNumber) ?? cells[0];
-  liveDetail.textContent = `${accessibleCellLabel(cell)}. Стоимость: ${money(cell.cost)}. ${metricDescriptors(cell).map((metric) => `${metric.label}: ${metric.value}`).join(". ")}. ${cell.rule}`;
-}
-
-function centerSelectedCell() {
-  const selected = classicBoard.querySelector(`[data-cell="${selectedCellNumber}"]`);
-  const boardScroll = document.querySelector(".board-scroll");
-  if (!selected || boardScroll.scrollWidth <= boardScroll.clientWidth + 1) return;
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  boardScroll.scrollTo({
-    left: selected.offsetLeft - boardScroll.clientWidth / 2 + selected.offsetWidth / 2,
-    behavior: reduceMotion ? "auto" : "smooth"
-  });
-}
-
-function fitBoards() {
-  document.body.classList.toggle("scroll-board", window.innerWidth < 1280);
-}
-
-renderBoards();
-fitBoards();
-requestAnimationFrame(centerSelectedCell);
-window.addEventListener("resize", () => {
-  fitBoards();
-  requestAnimationFrame(centerSelectedCell);
-});
+panels.querySelector('.demo-more').addEventListener('click',showMore);showMore();
+panels.querySelector('#roll').addEventListener('click',()=>panels.querySelector('#dice').textContent='⚅ ⚂');
+const outside=document.querySelector('.mobile-controls');
+new ResizeObserver(()=>{
+  const external=document.querySelector('.fast-track').clientWidth<1264;
+  if(external && panels.parentElement!==outside) {outside.append(panels);panels.className='demo-external';}
+  else if(!external && panels.parentElement!==board) {board.append(panels);panels.className='central-panel';}
+}).observe(document.querySelector('.fast-track'));

@@ -10,6 +10,7 @@ function MenuContent() {
   const setHeader = useSetGameRoomHeader();
   const role = new URLSearchParams(location.search).get("role") ?? "host";
   const [status, setStatus] = useState("IN_PROGRESS");
+  const [track, setTrack] = useState<"RAT_RACE" | "FAST_TRACK">("FAST_TRACK");
   const [events, setEvents] = useState([{ id: "start", type: "game:started", createdAt: new Date("2026-09-20T10:01:00Z"), gamePlayerId: null, payload: {} }]);
   const [sent, setSent] = useState<ChatMessage[]>([]);
   const [sync, setSync] = useState(0);
@@ -33,14 +34,16 @@ function MenuContent() {
       connected: true, connection: { ...initialConnectionDiagnostics(), phase: "connected" }, isSolo: role === "solo",
       currentPeriod: 1, periodCount: 4, remainingSeconds: null, timelineLoading: false, startsNextPeriod: false,
       chatMessages: messages, hostDisplayView: role === "host" ? "classic" : null,
+      trackView: track, onTrackChange: setTrack,
       onSendChat: (body) => setSent((current) => [...current, { id: `human-${current.length}`, body, createdAt: new Date().toISOString(), user: { id: "admin", displayName: "Макс" } }]),
       onPause: role !== "player" && status === "IN_PROGRESS" ? () => changeStatus("PAUSED") : null,
       onResume: role !== "player" && status === "PAUSED" ? () => changeStatus("IN_PROGRESS") : null,
       onCheckConnection: () => {}
     });
-  }, [setHeader, messages, status, role]);
+  }, [setHeader, messages, status, role, track]);
   return <AppShell userName="Макс" userInitials="М">
     <p>Демонстрационная партия</p>
+    <output aria-label="Открытый круг">{track}</output>
     <button type="button" onClick={() => setSync((value) => value + 1)}>Синхронизировать</button>
   </AppShell>;
 }

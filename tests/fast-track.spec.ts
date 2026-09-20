@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 const output = join(tmpdir(), 'fj-game-ui');
 test.beforeAll(() => {
   mkdirSync(output, { recursive: true });
-  buildSync({ entryPoints: ['tests/fixtures/fast-track-ui.tsx'], outfile: join(output, 'app.js'), bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', tsconfig: 'apps/web/tsconfig.json', loader: { '.svg': 'dataurl' }, alias: { 'next/navigation': resolve('tests/fixtures/navigation.ts'), 'next/link': resolve('tests/fixtures/link.tsx'), '@sentry/nextjs': '@sentry/browser' } });
+  buildSync({ entryPoints: ['tests/fixtures/fast-track-ui.tsx'], outfile: join(output, 'app.js'), bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', tsconfig: 'apps/web/tsconfig.json', loader: { '.svg': 'dataurl', '.png': 'dataurl' }, alias: { 'next/navigation': resolve('tests/fixtures/navigation.ts'), 'next/link': resolve('tests/fixtures/link.tsx'), '@sentry/nextjs': '@sentry/browser' } });
   execFileSync(process.execPath, ['node_modules/tailwindcss/lib/cli.js', '-c', 'apps/web/tailwind.config.ts', '-i', 'apps/web/src/app/globals.css', '-o', join(output, 'style.css'), '--content', 'apps/web/src/**/*.{ts,tsx}', '--minify']);
   let fonts = '';
   try {
@@ -30,16 +30,28 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.goto(url);
     await expect(page.locator('[data-fast-cell]')).toHaveCount(48);
     await expect(page.getByRole('button', { name: /Оплатить/ })).toBeVisible();
-    await page.getByRole('tab', { name: /Активы/ }).click();
-    await expect(page.getByText('Бизнесы большого круга', { exact: true })).toBeVisible();
-    await page.getByRole('tab', { name: 'Игрок', exact: true }).click();
-    await page.locator('[data-fast-cell="1"]').click();
-    await expect(page.getByRole('heading', { name: /Семейная сеть ресторанов/ }).first()).toBeVisible();
+    await expect(page.getByRole('tab')).toHaveCount(0);
+    await expect(page.locator('.cell-number,.cell-letter,.mobile-detail,.is-selected')).toHaveCount(0);
+    await expect(page.locator('[data-fast-cell] button,[data-fast-cell][aria-pressed]')).toHaveCount(0);
+    await expect(page.locator('.player-identity img')).toHaveCount(1);
+    await expect(page.locator('.cell-tokens img')).toHaveCount(2);
+    await expect(page.locator('[data-fast-cell="1"]').getByRole('img', { name: 'Владелец: Анна', exact: true })).toHaveCount(1);
+    await expect(page.locator('.purchased-card')).toHaveCount(3);
+    await expect(page.getByRole('article', {name:'Приобретено: Семейная сеть ресторанов'})).toHaveCount(1);
+    expect(await page.locator('.player-metrics > div').evaluateAll(items => new Set(items.map(item => item.getBoundingClientRect().top)).size)).toBe(1);
+    expect(await page.locator('.player-overview').evaluate(el => Boolean(el.querySelector('.player-goal')!.compareDocumentPosition(el.querySelector('.player-assets')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+    await expect(page.getByText('До победы по доходу', {exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button', {name:'Выберите действие',exact:true})).toBeDisabled();
+    await expect(page.locator('.game-action-entry')).toHaveCount(10);
+    await expect(page.locator('.game-action-entry').first()).toContainText('Анна');
+    await expect(page.locator('.game-action-entry').nth(1)).toContainText('Борис');
+    const overflow = await page.locator('[data-fast-cell]').evaluateAll(cells => cells.filter(cell => [...cell.querySelectorAll('.cell-title,.cell-price,.cell-effect')].some(content => { const a=cell.getBoundingClientRect(),b=content.getBoundingClientRect();return b.top < a.top || b.bottom > a.bottom || b.right > a.right; })).map(cell => cell.getAttribute('aria-label')));
+    expect(overflow).toEqual([]);
     await page.screenshot({ path: join(output, `classic-${size.width}.png`), fullPage: true });
     await expect(page.getByRole('group', { name: 'Вариант игрового поля' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Скоростная дорожка' })).toHaveCount(0);
     await expect(page.locator('.board-journey')).toHaveCount(0);
-    // All 48 cells remain independently reachable.
+    // Route cards keep their geometry and never overlap.
     const overlap = await page.locator('[data-fast-cell]').evaluateAll((cells) => cells.some((cell, i) => cells.slice(i + 1).some((other) => {
       const a = cell.getBoundingClientRect(), b = other.getBoundingClientRect();
       return Math.min(a.right, b.right) > Math.max(a.left, b.left) && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top);
@@ -48,7 +60,8 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.getByRole('button', { name: 'Отказаться и завершить ход' }).click();
     await expect(page.getByText('Отказ принят', { exact: true })).toBeVisible();
     await page.getByLabel('Количество кубиков').selectOption('3');
-    await page.getByRole('button', { name: 'Бросить 3 кубика' }).click();
+    await page.screenshot({path:join(output,`roll-${size.width}.png`),fullPage:true});
+    await page.getByRole('button', { name: 'Бросить кубики' }).click();
     await expect(page.getByText('Бросок принят', { exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.goto(`${url}?mode=occupied`);
@@ -88,10 +101,12 @@ test('the remaining route preserves the approved prototype geometry and colors',
       return { x: (cell as HTMLElement).offsetLeft, y: (cell as HTMLElement).offsetTop, width: s.width, height: s.height, background: s.backgroundColor, radius: s.borderRadius };
     }))).toEqual(reference[view]);
     await page.screenshot({ path: join(output, `approved-${view}-1440.png`), fullPage: true });
-    await page.locator('[data-fast-cell="23"]').focus();
-    await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-fast-cell="24"]')).toBeFocused();
-    await expect(page.locator('[data-fast-cell="24"]')).toHaveAttribute('aria-pressed', 'true');
+    const cell = page.locator('[data-fast-cell="23"]');
+    const before = await cell.evaluate(el => ({shadow:getComputedStyle(el).boxShadow,transform:getComputedStyle(el).transform,background:getComputedStyle(el).backgroundColor}));
+    await cell.hover();
+    await cell.click();
+    expect(await cell.evaluate(el => ({shadow:getComputedStyle(el).boxShadow,transform:getComputedStyle(el).transform,background:getComputedStyle(el).backgroundColor}))).toEqual(before);
+    await expect(page.locator('[data-fast-cell][aria-pressed],.cell-detail')).toHaveCount(0);
   }
   await page.goto(source);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -105,6 +120,11 @@ for (const width of [1440, 768, 390, 320]) {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${pathToFileURL(resolve(output, 'index.html')).href}?mode=menu`);
     const header = page.locator('header');
+    await expect(header.getByRole('button', {name:'Большой круг',exact:true})).toHaveAttribute('aria-pressed','true');
+    await header.getByRole('button', {name:'Малый круг',exact:true}).click();
+    await expect(page.getByLabel('Открытый круг')).toHaveText('RAT_RACE');
+    await header.getByRole('button', {name:'Большой круг',exact:true}).click();
+    await expect(page.getByLabel('Открытый круг')).toHaveText('FAST_TRACK');
     await expect(header.getByRole('link', { name: 'Пульт ведущего', exact: true })).toHaveAttribute('href', '/games/synthetic/host');
     await expect(header.getByRole('link', { name: 'Открыть поле', exact: true })).toHaveAttribute('href', '/games/synthetic/display?view=classic');
     await expect(header.getByRole('link', { name: 'Открыть поле', exact: true })).toHaveAttribute('target', '_blank');
@@ -114,7 +134,7 @@ for (const width of [1440, 768, 390, 320]) {
     await expect(page.getByRole('button', { name: 'Открыть чат, непрочитанных сообщений: 2' })).toBeVisible();
     const brand = await header.getByRole('link', { name: 'Финансовое путешествие — личный кабинет' }).boundingBox();
     const shortcuts = await header.getByRole('navigation', { name: 'Экраны ведущего' }).boundingBox();
-    if (width >= 768) expect(brand!.x + brand!.width).toBeLessThanOrEqual(shortcuts!.x);
+    if (width >= 1280) expect(brand!.x + brand!.width).toBeLessThanOrEqual(shortcuts!.x);
     else expect(brand!.y + brand!.height).toBeLessThanOrEqual(shortcuts!.y);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: join(output, `menu-${width}.png`), fullPage: true });
@@ -167,5 +187,44 @@ test('host shortcuts stay hidden for players and solo games', async ({ page }) =
     await expect(page.getByRole('button', { name: /Открыть чат/ })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Экраны ведущего' })).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+});
+
+for (const mode of ['', 'small']) {
+  test(`shared action history loads ten at a time: ${mode || 'large'}`, async ({page}) => {
+    await page.setViewportSize({width:390,height:844});
+    await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=${mode}`);
+    await expect(page.locator('.game-action-entry')).toHaveCount(10);
+    if(mode === 'small') {
+      await expect(page.getByRole('heading',{name:'Ваш ход',exact:true})).toBeVisible();
+      await page.screenshot({path:join(output,'small-turn-390.png'),fullPage:true});
+    }
+    await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+    await expect(page.locator('.game-action-entry')).toHaveCount(20);
+    await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+    await expect(page.locator('.game-action-entry')).toHaveCount(25);
+    await expect(page.getByRole('button',{name:'Показать ещё',exact:true})).toHaveCount(0);
+  });
+}
+
+test('archive retries without losing recent actions or duplicating events', async ({page}) => {
+  await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=archive`);
+  await expect(page.locator('.game-action-entry')).toHaveCount(5);
+  await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Не удалось загрузить');
+  await expect(page.locator('.game-action-entry')).toHaveCount(5);
+  await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.game-action-entry')).toHaveCount(20);
+  await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+  await expect(page.locator('.game-action-entry')).toHaveCount(25);
+});
+
+test('decisions stay disabled on pause and during another player’s turn', async ({page}) => {
+  for(const mode of ['paused','waiting']) {
+    await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=${mode}`);
+    await expect(page.getByRole('button',{name:/Оплатить/})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'Отказаться и завершить ход'})).toBeDisabled();
+    await expect(page.getByRole('button',{name:'Ожидайте ход'})).toBeDisabled();
   }
 });
