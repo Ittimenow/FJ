@@ -3550,3 +3550,17 @@ footer p {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The large track keeps its route scroll separate from the room's vertical flow. */
+.game-room.game-room--fast-track-active {
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.game-room.game-room--fast-track-active > * + * { margin-top: 1rem; }
+
+.fast-track-progress { appearance: none; border: 0; background: #dfcebb; border-radius: 4px; overflow: hidden; }
+.fast-track-progress::-webkit-progress-bar { background: #dfcebb; }
+.fast-track-progress::-webkit-progress-value { background: #587424; }
+.fast-track-progress::-moz-progress-bar { background: #587424; }

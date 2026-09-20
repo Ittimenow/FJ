@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarDays, Clock3, TrendingUp, UsersRound, WalletCards } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, TrendingUp, Trophy, UsersRound, WalletCards } from "lucide-react";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { money } from "@/lib/format";
 import { publicResult } from "@/lib/results";
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!result) return { title: "Итоги игры не найдены" };
   return {
     title: `${result.headline} — Финансовое путешествие`,
-    description: result.facts.highlights[0]?.text ?? "Итоги завершённой финансовой игры.",
+    description: result.facts.awards?.[0]?.text ?? result.facts.highlights[0]?.text ?? "Итоги завершённой финансовой игры.",
     openGraph: { images: [`/results/${id}/opengraph-image`] },
     twitter: { card: "summary_large_image", images: [`/results/${id}/opengraph-image`] }
   };
@@ -55,6 +55,31 @@ export default async function ResultPage({ params }: PageProps) {
             <ul className="mt-5 grid gap-4 md:grid-cols-3">
               {facts.highlights.map((highlight) => <li key={`${highlight.kind}-${highlight.playerId}`} className="rounded-xl bg-white/10 p-4 text-sm leading-6 text-white/80">{highlight.text}</li>)}
             </ul>
+          </section>
+        ) : null}
+
+        {facts.awards?.length ? (
+          <section className="mt-12 overflow-hidden rounded-2xl bg-[#fff0cf] shadow-[0_20px_48px_rgba(125,87,18,.12)]" aria-labelledby="result-awards-title">
+            <div className="flex items-center gap-4 px-6 pb-5 pt-6 sm:px-8 sm:pt-8">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#f5aa24] text-ink shadow-[0_10px_24px_rgba(155,99,11,.2)]">
+                <Trophy size={23} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 id="result-awards-title" className="text-2xl font-extrabold">Награды партии</h2>
+                <p className="mt-1 text-sm font-semibold text-[#715719]">В каждой номинации — минимум три действия и только один лидер</p>
+              </div>
+            </div>
+            <ol className="divide-y divide-[#ead49b] bg-white/55 px-6 sm:px-8">
+              {facts.awards.slice(0, 7).map((award) => (
+                <li key={award.kind} className="grid gap-1 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-6">
+                  <span className="min-w-0">
+                    <span className="block text-base font-extrabold text-ink">{award.title}</span>
+                    <span className="mt-1 block text-sm font-semibold text-muted">{mention(award.mention)}</span>
+                  </span>
+                  <span className="text-sm font-extrabold text-[#8a5a08] sm:text-right">{award.result}</span>
+                </li>
+              ))}
+            </ol>
           </section>
         ) : null}
 

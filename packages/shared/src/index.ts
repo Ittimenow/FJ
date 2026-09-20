@@ -8,3 +8,4 @@ export * from "./figurines";
 export * from "./privacy";
 export * from "./registration";
 export * from "./types";
+export * from "./fast-track";

@@ -1,3 +1,4 @@
+import { ChooseDreamDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { CardType } from "@prisma/client";
 import {
@@ -164,9 +165,30 @@ export class GamesController {
     return result;
   }
 
+  @Post(":id/dream")
+  async chooseDream(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: ChooseDreamDto) {
+    const result = await this.games.chooseDream(id, user.userId, dto.cellIndex);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/fast-track/enter")
+  async enterFastTrack(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.enterFastTrack(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/fast-track/decision")
+  async decideFastTrack(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: FastTrackDecisionDto) {
+    const result = await this.games.decideFastTrack(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
   @Post(":id/roll")
-  async roll(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    const result = await this.games.rollDice(id, user.userId);
+  async roll(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: RollDiceDto) {
+    const result = await this.games.rollDice(id, user.userId, dto);
     this.realtime.broadcastAction(id, result);
     return result;
   }

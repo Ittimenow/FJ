@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "simplify-active-game-menu-and-chat",
+          "category": "improvement",
+          "summary": "Во время игры кнопки ведущего перенесены в меню, служебные сообщения появляются в чате от администратора, а лишние элементы меню, верхняя панель большого круга и вариант поля «Кольцо» удалены."
+        },
+        {
+          "id": "game-end-awards-in-publications",
+          "category": "feature",
+          "summary": "После партии игроки получают награды за заметные повторяющиеся достижения, а лучшие номинации появляются в итогах на сайте и в публикациях Telegram."
+        },
+        {
           "id": "restore-vps-telegram-connection",
           "category": "fix",
           "summary": "Публикация в Telegram снова работает с VPS, на котором сетевой маршрут к стандартному адресу Telegram завершался таймаутом."
@@ -822,6 +832,39 @@
           "id": "admin-recent-changes",
           "category": "feature",
           "summary": "В панели администратора появился журнал последних изменений системы."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+fast-track-design.20260920",
+      "releasedAt": "2026-09-20T07:33:08Z",
+      "changes": [
+        {
+          "id": "fast-track-approved-prototype-design",
+          "category": "improvement",
+          "summary": "Оба поля большого круга получили готовый дизайн с наглядными маршрутами, финансами игрока, действиями хода и удобным просмотром клеток на телефоне."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+fast-track.20260919.b3a0cfa.1",
+      "releasedAt": "2026-09-19T13:02:54Z",
+      "changes": [
+        {
+          "id": "accept-existing-card-set-identifiers",
+          "category": "fix",
+          "summary": "Исправлено создание партий с существующими наборами карточек, включая тестовый запуск большого круга."
+        }
+      ]
+    },
+    {
+      "version": "0.1.0+fast-track.20260919.b3a0cfa",
+      "releasedAt": "2026-09-19T12:31:13Z",
+      "changes": [
+        {
+          "id": "full-game-fast-track-and-admin-testing",
+          "category": "feature",
+          "summary": "Новые партии включают большой круг с выбором мечты до старта, бизнесами и двумя способами победы, а администратор может запускать тестовые партии сразу на большом круге."
         }
       ]
     },

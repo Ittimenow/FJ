@@ -1,3 +1,5 @@
+import { fastTrackCells, fastTrackDreams, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
+import { TestGameOptionsDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import {
   BadRequestException,
   ConflictException,
@@ -36,9 +38,11 @@ import {
   isFigurineId,
   figurines
 } from "@cashflow/shared";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
+import { selectGameAwards } from "./game-awards.logic";
+import { gameChatNotices, gameChatNoticeTypes } from "./game-chat-notices";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
@@ -127,6 +131,7 @@ type MarketSaleOfferState = {
 };
 
 type GamePendingAction =
+  | { type: "fast_track_choice"; gamePlayerId: string; cellIndex: number; decisionId: string; priceCents: number }
   | {
       type: "choose_deal";
       gamePlayerId: string;
@@ -250,6 +255,7 @@ function createBotPlayers(botCount: number, occupiedFigurines = new Set<string>(
     }
     occupiedFigurines.add(figurine);
     return {
+      dreamCellIndex: fastTrackDreams[index % fastTrackDreams.length]!.index,
       guestName: botNames[index] ?? `Бот ${index + 1}`,
       role: GameRole.PLAYER,
       controller: PlayerController.BOT,
@@ -273,6 +279,7 @@ export class GamesService {
 
   async createGame(userId: string, dto: CreateGameDto) {
     const creator = await this.ensureHostOrAdmin(userId);
+    const testSettings = this.testGameSettings(creator.role, dto);
     if (dto.cardSetId && creator.role !== SystemRole.ADMIN) {
       throw new ForbiddenException("Выбирать набор карточек может только администратор");
     }
@@ -289,10 +296,13 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Новая партия",
         mode: GameMode.MULTIPLAYER,
+        rulesVersion: 2,
+        isTest: Boolean(dto.testing),
         maxPlayers: null,
         cardSetId: cardSet.id,
         settings: {
-          timeLimitMinutes: dto.timeLimitMinutes ?? 90,
+          ...testSettings,
+          timeLimitMinutes: dto.testing ? null : dto.timeLimitMinutes ?? 90,
           periodCount: dto.periodCount ?? 1,
           cardDecks
         } as unknown as Prisma.InputJsonValue,
@@ -358,12 +368,13 @@ export class GamesService {
   async createSoloGame(userId: string, dto: CreateSoloGameDto) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { status: true, figurine: true }
+      select: { status: true, figurine: true, role: true }
     });
     if (user.status !== AccountStatus.ACTIVE) {
       throw new ForbiddenException("Одиночная игра доступна только активным пользователям");
     }
 
+    const testSettings = this.testGameSettings(user.role, dto);
     const botCount = dto.botCount;
     const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
@@ -383,9 +394,12 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Одиночное путешествие",
         mode: GameMode.SOLO,
+        rulesVersion: 2,
+        isTest: Boolean(dto.testing),
         maxPlayers: botCount + 1,
         cardSetId: cardSet.id,
         settings: {
+          ...testSettings,
           timeLimitMinutes: null,
           periodCount: 1,
           cardDecks
@@ -429,6 +443,171 @@ export class GamesService {
     });
 
     return this.getGame(game.id, userId);
+  }
+
+  private testGameSettings(role: SystemRole, dto: TestGameOptionsDto) {
+    if (dto.testing || dto.testCashCents !== undefined || dto.testIncomeCents !== undefined) {
+      if (role !== SystemRole.ADMIN) throw new ForbiddenException("Тестовая партия доступна только администратору");
+      if (!dto.testing) throw new BadRequestException("Стартовые суммы доступны только в тестовой партии");
+      const cash = dto.testCashCents ?? 500_000;
+      const income = dto.testIncomeCents ?? 100_000;
+      if (!Number.isSafeInteger(cash) || cash < 0 || cash > 10_000_000 || !Number.isSafeInteger(income) || income < 1 || income > 1_000_000) {
+        throw new BadRequestException("Некорректные стартовые суммы тестовой партии");
+      }
+      return { testCashCents: cash, testIncomeCents: income };
+    }
+    return {};
+  }
+
+  private async lockGame(tx: Tx, gameId: string) {
+    await tx.$queryRaw`SELECT id FROM games WHERE id = ${gameId}::uuid FOR UPDATE`;
+  }
+
+  async chooseDream(gameId: string, userId: string, cellIndex: number) {
+    if (!isDreamCell(cellIndex)) throw new BadRequestException("Выберите клетку мечты большого круга");
+    const events: PendingEvent[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      if (game.status !== GameStatus.WAITING || game.rulesVersion !== 2) throw new BadRequestException("Мечту можно выбрать только до старта полной партии");
+      const player = await tx.gamePlayer.findFirst({ where: { gameId, userId, role: GameRole.PLAYER, status: GamePlayerStatus.JOINED, controller: PlayerController.HUMAN } });
+      if (!player) throw new ForbiddenException("Вы не играете в этой партии");
+      await tx.gamePlayer.update({ where: { id: player.id }, data: { dreamCellIndex: cellIndex } });
+      events.push({ type: "player:dream_chosen", gamePlayerId: player.id, payload: { cellIndex, title: fastTrackCells[cellIndex]!.label } });
+      events.push({ type: realtimeEvents.stateUpdate, payload: { reason: "fast_track_updated" } });
+      await this.appendEvents(tx, gameId, userId, events);
+    });
+    return this.actionResult(gameId, events);
+  }
+
+  private async initializeFastTrack(tx: Tx, playerId: string, income: number, events: PendingEvent[], testCash?: number) {
+    await tx.gamePlayer.update({ where: { id: playerId }, data: { track: BoardTrack.FAST_TRACK, fastTrackPosition: -1 } });
+    await tx.playerFinancialState.update({ where: { gamePlayerId: playerId }, data: {
+      fastTrackStartIncomeCents: BigInt(income), fastTrackIncomeCents: BigInt(income), fastTrackCharity: false,
+      cashCents: testCash === undefined ? { increment: BigInt(income) } : BigInt(testCash),
+      escapedRatRaceAt: new Date(), charityTurns: 0, downsizedTurns: 0, bankruptcyTurns: 0, bankruptcyStatus: BankruptcyStatus.NONE
+    } });
+    events.push({ type: "player:escaped_rat_race", gamePlayerId: playerId, payload: {
+      incomeCents: income, targetIncomeCents: income + 50_000, amountCents: testCash ?? income, testing: testCash !== undefined
+    } });
+  }
+
+  async enterFastTrack(gameId: string, userId: string) {
+    const expiration = await this.expireGameIfNeeded(gameId);
+    if (expiration) return this.actionResult(gameId, expiration);
+    const events: PendingEvent[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: {
+        players: { where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }, include: { financialState: true, liabilities: true }, orderBy: { seat: "asc" } }
+      } });
+      const player = game.players[game.currentTurnIndex % game.players.length];
+      if (!player || !this.playerControlledBy(player, userId)) throw new ForbiddenException("Сейчас ход другого игрока");
+      if (game.rulesVersion !== 2 || game.status !== GameStatus.IN_PROGRESS || this.pendingAction(game.settings)) throw new BadRequestException("Перейти можно только в начале своего хода");
+      const state = player.financialState;
+      if (!state || player.track !== BoardTrack.RAT_RACE || !isDreamCell(player.dreamCellIndex) || !canEscapeRatRace(Number(state.passiveIncomeCents), Number(state.totalExpensesCents), player.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n))) {
+        throw new BadRequestException("Для перехода нужен пассивный доход выше расходов и погашенные банковские кредиты");
+      }
+      if (state.bankruptcyStatus === BankruptcyStatus.LIQUIDATING) throw new BadRequestException("Сначала завершите банкротство");
+      await this.initializeFastTrack(tx, player.id, Number(state.passiveIncomeCents) * 100, events);
+      events.push({ type: realtimeEvents.stateUpdate, payload: { reason: "fast_track_updated" } });
+      await this.appendEvents(tx, gameId, userId, events);
+    });
+    return this.actionResult(gameId, events);
+  }
+
+  private async rollFastTrack(
+    tx: Tx,
+    game: { id: string; currentRound: number; currentTurnIndex: number; settings: Prisma.JsonValue; fastTrackWorld: Prisma.JsonValue; players: Array<{ id: string; dreamCellIndex: number | null }> },
+    player: { id: string; fastTrackPosition: number; dreamCellIndex: number | null; financialState: NonNullable<Prisma.PlayerFinancialStateGetPayload<{}>> | null },
+    activeIndex: number, requestedCount: number | undefined, events: PendingEvent[]
+  ) {
+    const state = player.financialState!;
+    let count: number;
+    try { count = fastTrackDiceCount(state.fastTrackCharity, requestedCount); }
+    catch (error) { throw new BadRequestException((error as Error).message); }
+    const diceValues = Array.from({ length: count }, () => rollDie());
+    const steps = diceValues.reduce((sum, value) => sum + value, 0);
+    const route = fastTrackRoute(player.fastTrackPosition, steps);
+    const cell = route[route.length - 1]!;
+    let cash = Number(state.cashCents);
+    events.push({ type: realtimeEvents.playerRollDice, gamePlayerId: player.id, payload: { dice: steps, diceValues, diceCount: count, track: "FAST_TRACK" } });
+    events.push({ type: realtimeEvents.playerMove, gamePlayerId: player.id, payload: { from: player.fastTrackPosition, to: cell.index, steps, cell, track: "FAST_TRACK", route: route.map((item) => item.index) } });
+    for (const crossed of route.filter((item) => item.rule.kind === "cashflow")) {
+      const before = cash;
+      cash += Number(state.fastTrackIncomeCents);
+      events.push({ type: "fast_track:cashflow", gamePlayerId: player.id, payload: { cellIndex: crossed.index, amountCents: Number(state.fastTrackIncomeCents), beforeCashCents: before, afterCashCents: cash } });
+    }
+    const world = readFastTrackWorld(game.fastTrackWorld);
+    if (cell.rule.kind === "dream" && game.players.some((other) => other.id !== player.id && other.dreamCellIndex === cell.index)) {
+      const ids = world.influence[cell.index] ?? [];
+      if (!ids.includes(player.id)) {
+        world.influence[cell.index] = [...ids, player.id];
+        events.push({ type: "fast_track:dream_influence", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label } });
+      }
+    }
+    if (cell.rule.kind === "half_cash" || cell.rule.kind === "lose_cash") {
+      const amount = fastTrackExpense(cash, cell.rule.kind);
+      cash -= amount;
+      events.push({ type: "fast_track:expense", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, amountCents: amount, beforeCashCents: cash + amount, afterCashCents: cash } });
+    }
+    await tx.gamePlayer.update({ where: { id: player.id }, data: { fastTrackPosition: cell.index, lastTurnAt: new Date() } });
+    await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(cash) } });
+    const available = ["business", "chance_business", "ipo", "dream", "charity"].includes(cell.rule.kind)
+      && !world.owners[cell.index] && !world.dreamPurchases[cell.index]?.includes(player.id)
+      && !(cell.rule.kind === "charity" && state.fastTrackCharity);
+    const pending: GamePendingAction | null = available ? {
+      type: "fast_track_choice", gamePlayerId: player.id, cellIndex: cell.index, decisionId: randomUUID(),
+      priceCents: fastTrackPrice(cell, player.id, player.dreamCellIndex, world)
+    } : null;
+    await tx.game.update({ where: { id: game.id }, data: {
+      fastTrackWorld: world as unknown as Prisma.InputJsonValue,
+      settings: this.settingsWithPending(game.settings, pending)
+    } });
+    if (!pending) await this.advanceTurn(tx, game, activeIndex);
+  }
+
+  async decideFastTrack(gameId: string, userId: string, dto: FastTrackDecisionDto) {
+    const expiration = await this.expireGameIfNeeded(gameId);
+    if (expiration) return this.actionResult(gameId, expiration);
+    const events: PendingEvent[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: {
+        players: { where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }, include: { financialState: true }, orderBy: { seat: "asc" } }
+      } });
+      const index = game.currentTurnIndex % game.players.length;
+      const player = game.players[index];
+      if (!player || !this.playerControlledBy(player, userId)) throw new ForbiddenException("Сейчас ход другого игрока");
+      const pending = this.pendingAction(game.settings);
+      if (game.rulesVersion !== 2 || game.status !== GameStatus.IN_PROGRESS || player.track !== BoardTrack.FAST_TRACK || !player.financialState || pending?.type !== "fast_track_choice" || pending.gamePlayerId !== player.id || pending.decisionId !== dto.decisionId || player.fastTrackPosition !== pending.cellIndex) {
+        throw new ConflictException("Это решение уже принято или недоступно");
+      }
+      const cell = fastTrackCells[pending.cellIndex]!;
+      const state = player.financialState;
+      let won: "dream" | "fast_track_income" | null = null;
+      if (dto.buy) {
+        const die = cell.rule.kind === "chance_business" || cell.rule.kind === "ipo" ? rollDie() : undefined;
+        let result: ReturnType<typeof settleFastTrackPurchase>;
+        try { result = settleFastTrackPurchase({ cell, playerId: player.id, dreamCellIndex: player.dreamCellIndex,
+          cash: Number(state.cashCents), income: Number(state.fastTrackIncomeCents), initialIncome: Number(state.fastTrackStartIncomeCents),
+          charity: state.fastTrackCharity, world: readFastTrackWorld(game.fastTrackWorld), die
+        }); } catch (error) { throw new BadRequestException((error as Error).message); }
+        await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(result.cash), fastTrackIncomeCents: BigInt(result.income), fastTrackCharity: result.charity } });
+        await tx.game.update({ where: { id: gameId }, data: { fastTrackWorld: result.world as unknown as Prisma.InputJsonValue } });
+        if (die) events.push({ type: "fast_track:investment_roll", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, die, success: result.success } });
+        events.push({ type: "fast_track:purchased", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, costCents: result.cost, success: result.success, incomeCents: result.income, beforeCashCents: Number(state.cashCents), afterCashCents: result.cash, kind: cell.rule.kind } });
+        won = result.won;
+      } else events.push({ type: "fast_track:declined", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label } });
+      await tx.game.update({ where: { id: gameId }, data: { settings: this.settingsWithPending(game.settings, null), ...(won ? { status: GameStatus.ENDED, endedAt: new Date() } : {}) } });
+      if (won) {
+        await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { wonAt: new Date() } });
+        events.push({ type: realtimeEvents.gameEnded, gamePlayerId: player.id, payload: { reason: won, winnerGamePlayerId: player.id, dream: won === "dream" ? cell.label : null } });
+      } else await this.advanceTurn(tx, game, index);
+      events.push({ type: realtimeEvents.stateUpdate, payload: { reason: "fast_track_turn_ended" } });
+      await this.appendEvents(tx, gameId, userId, events);
+    });
+    return this.actionResult(gameId, events);
   }
 
   async listPlayableCardSets() {
@@ -742,7 +921,7 @@ export class GamesService {
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
-      const game = await tx.game.findUniqueOrThrow({
+      let game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: {
           players: {
@@ -751,6 +930,18 @@ export class GamesService {
           }
         }
       });
+      if (game.rulesVersion === 2) {
+        await this.lockGame(tx, gameId);
+        game = await tx.game.findUniqueOrThrow({
+          where: { id: gameId },
+          include: {
+            players: {
+              where: { role: GameRole.PLAYER, status: "JOINED" },
+              orderBy: { seat: "asc" }
+            }
+          }
+        });
+      }
 
       if (game.status !== GameStatus.WAITING) {
         throw new BadRequestException("Игра уже началась");
@@ -763,6 +954,14 @@ export class GamesService {
       }
       if (game.players.some((player) => !player.figurine)) {
         throw new BadRequestException("Все игроки должны выбрать фигурки");
+      }
+
+      if (game.rulesVersion === 2 && game.players.some((player) => !isDreamCell(player.dreamCellIndex))) {
+        throw new BadRequestException("Все игроки должны выбрать мечту большого круга");
+      }
+      if (game.isTest) {
+        const admin = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true, status: true } });
+        if (admin.role !== SystemRole.ADMIN || admin.status !== AccountStatus.ACTIVE) throw new ForbiddenException("Запуск тестовой партии доступен только администратору");
       }
 
       const professions = await tx.profession.findMany({
@@ -787,6 +986,10 @@ export class GamesService {
           }
         });
         await this.createInitialFinancialState(tx, player.id, profession);
+        if (game.isTest) {
+          const options = game.settings as Record<string, number>;
+          await this.initializeFastTrack(tx, player.id, options.testIncomeCents ?? 100_000, emittedEvents, options.testCashCents ?? 500_000);
+        }
       }
 
       const startedAt = new Date();
@@ -993,7 +1196,7 @@ export class GamesService {
         role: GameRole.PLAYER,
         status: GamePlayerStatus.JOINED
       },
-      include: { game: { select: { status: true } } }
+      include: { game: { select: { status: true, rulesVersion: true } } }
     });
     if (!membership) throw new ForbiddenException("Вы не участвуете в этой игре");
     if (membership.game.status !== GameStatus.WAITING) {
@@ -1105,13 +1308,13 @@ export class GamesService {
     ]);
   }
 
-  async rollDice(gameId: string, userId: string) {
+  async rollDice(gameId: string, userId: string, options: RollDiceDto = {}) {
     const expirationEvents = await this.expireGameIfNeeded(gameId);
     if (expirationEvents) return this.actionResult(gameId, expirationEvents);
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
-      const game = await tx.game.findUniqueOrThrow({
+      let game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: {
           players: {
@@ -1121,6 +1324,19 @@ export class GamesService {
           }
         }
       });
+      if (game.rulesVersion === 2) {
+        await this.lockGame(tx, gameId);
+        game = await tx.game.findUniqueOrThrow({
+          where: { id: gameId },
+          include: {
+            players: {
+              where: { role: GameRole.PLAYER, status: "JOINED" },
+              include: { financialState: true },
+              orderBy: { seat: "asc" }
+            }
+          }
+        });
+      }
       if (game.status !== GameStatus.IN_PROGRESS) {
         throw new BadRequestException("Игра сейчас не идёт");
       }
@@ -1138,6 +1354,16 @@ export class GamesService {
       }
       if (!currentPlayer.financialState) {
         throw new BadRequestException("Финансовый отчёт ещё не подготовлен");
+      }
+
+      if (game.rulesVersion === 2 && !this.botGamePlayerId(userId) && options.expectedTurn !== `${game.currentRound}:${game.currentTurnIndex}`) {
+        throw new ConflictException("Ход уже изменился. Обновите состояние игры");
+      }
+      if (currentPlayer.track === BoardTrack.FAST_TRACK) {
+        await this.rollFastTrack(tx, game, currentPlayer, activeIndex, options.diceCount, emittedEvents);
+        emittedEvents.push({ type: realtimeEvents.stateUpdate, payload: { reason: this.pendingAction((await tx.game.findUniqueOrThrow({ where: { id: gameId } })).settings) ? "fast_track_choice_required" : "fast_track_turn_ended" } });
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
       }
 
       if (
@@ -1812,6 +2038,7 @@ export class GamesService {
       const bidderGamePlayerIds = game.players
         .filter(
           (candidate) =>
+            candidate.track !== BoardTrack.FAST_TRACK &&
             candidate.id !== seller.id &&
             candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
         )
@@ -3682,6 +3909,7 @@ export class GamesService {
         ...(rule.scope === "current" ? { gamePlayerId: currentGamePlayerId } : {}),
         gamePlayer: {
           gameId,
+          track: BoardTrack.RAT_RACE,
           role: GameRole.PLAYER,
           status: GamePlayerStatus.JOINED
         }
@@ -3753,6 +3981,7 @@ export class GamesService {
         type: "business",
         gamePlayer: {
           gameId,
+          track: BoardTrack.RAT_RACE,
           role: GameRole.PLAYER,
           status: GamePlayerStatus.JOINED
         }
@@ -4477,7 +4706,7 @@ export class GamesService {
       where: {
         status: AssetStatus.ACTIVE,
         symbol: normalizedSymbol,
-        gamePlayer: { gameId }
+        gamePlayer: { gameId, track: BoardTrack.RAT_RACE }
       },
       select: {
         id: true,
@@ -4809,7 +5038,7 @@ export class GamesService {
     const [game, activePlayers] = await Promise.all([
       tx.game.findUniqueOrThrow({
         where: { id: playerBeforeElimination.gameId },
-        select: { currentTurnIndex: true, mode: true, settings: true }
+        select: { currentTurnIndex: true, mode: true, settings: true, rulesVersion: true }
       }),
       tx.gamePlayer.findMany({
         where: {
@@ -4863,6 +5092,7 @@ export class GamesService {
       game.mode === GameMode.SOLO &&
       playerBeforeElimination.controller === PlayerController.HUMAN;
     const soloBotsEliminated =
+      game.rulesVersion !== 2 &&
       game.mode === GameMode.SOLO &&
       remainingPlayers.some((candidate) => candidate.controller === PlayerController.HUMAN) &&
       remainingPlayers.every((candidate) => candidate.controller !== PlayerController.BOT);
@@ -4944,6 +5174,7 @@ export class GamesService {
       }
     });
     const state = player.financialState;
+    if (player.game.rulesVersion === 2) return false;
     if (
       !state ||
       state.wonAt ||
@@ -5229,6 +5460,7 @@ export class GamesService {
         quantity: { gt: 0 },
         gamePlayer: {
           gameId,
+          track: BoardTrack.RAT_RACE,
           role: GameRole.PLAYER,
           status: GamePlayerStatus.JOINED
         }
@@ -5383,6 +5615,9 @@ export class GamesService {
       return null;
     }
     const value = pending as Record<string, unknown>;
+    if (value.type === "fast_track_choice" && typeof value.gamePlayerId === "string" && typeof value.cellIndex === "number" && typeof value.decisionId === "string" && typeof value.priceCents === "number") {
+      return { type: "fast_track_choice", gamePlayerId: value.gamePlayerId, cellIndex: value.cellIndex, decisionId: value.decisionId, priceCents: value.priceCents };
+    }
     if (value.type === "choose_deal" && typeof value.gamePlayerId === "string") {
       return {
         type: "choose_deal",
@@ -5701,7 +5936,7 @@ export class GamesService {
     allowLiquidation = false
   ) {
     const botGamePlayerId = this.botGamePlayerId(userId);
-    const player = await tx.gamePlayer.findFirst({
+    let player = await tx.gamePlayer.findFirst({
       where: botGamePlayerId
         ? {
             id: botGamePlayerId,
@@ -5717,10 +5952,21 @@ export class GamesService {
           },
       include: {
         financialState: true,
-        game: { select: { status: true } }
+        game: { select: { status: true, rulesVersion: true } }
       }
     });
     if (!player) throw new ForbiddenException("Вы не участвуете в этой игре");
+    if (player.game.rulesVersion === 2) {
+      await this.lockGame(tx, gameId);
+      player = await tx.gamePlayer.findUniqueOrThrow({
+        where: { id: player.id },
+        include: { financialState: true, game: { select: { status: true, rulesVersion: true } } }
+      });
+      if (player.status !== GamePlayerStatus.JOINED) throw new ForbiddenException("Вы не участвуете в этой игре");
+    }
+    if (player.track === BoardTrack.FAST_TRACK) {
+      throw new BadRequestException("Это действие малого круга недоступно на Скоростной дорожке");
+    }
     if (player.role !== GameRole.PLAYER) {
       throw new ForbiddenException("Это действие доступно только игрокам");
     }
@@ -5881,6 +6127,8 @@ export class GamesService {
     }
 
     if (events.some((event) => event.type === realtimeEvents.gameEnded)) {
+      const endedGame = await tx.game.findUniqueOrThrow({ where: { id: gameId }, select: { isTest: true } });
+      if (endedGame.isTest) return;
       const announcement = await tx.telegramAnnouncement.findFirst({
         where: { isActive: true },
         select: { id: true },
@@ -5923,7 +6171,11 @@ export class GamesService {
         id: game.id,
         status: game.status,
         currentTurnIndex: game.currentTurnIndex,
-        currentRound: game.currentRound
+        currentRound: game.currentRound,
+        rulesVersion: game.rulesVersion,
+        isTest: game.isTest,
+        fastTrackWorld: game.fastTrackWorld,
+        settings: game.settings
       },
       players: game.players.map((player) => ({
         id: player.id,
@@ -5933,6 +6185,7 @@ export class GamesService {
         track: player.track,
         position: player.position,
         fastTrackPosition: player.fastTrackPosition,
+        dreamCellIndex: player.dreamCellIndex,
         financialState: player.financialState,
         assets: player.assets,
         liabilities: player.liabilities
@@ -5994,6 +6247,28 @@ export class GamesService {
         ? activePlayers[game.currentTurnIndex % activePlayers.length]
         : null;
     const timeline = gameTimeline(game.settings, game.startedAt);
+    const noticeEvents = await this.prisma.gameEvent.findMany({
+      where: { gameId, type: { in: gameChatNoticeTypes } },
+      select: { id: true, type: true, createdAt: true, gamePlayerId: true, payload: true },
+      orderBy: { sequence: "desc" },
+      take: 50
+    });
+    const awardEvents = game.status === GameStatus.ENDED
+      ? await this.prisma.gameEvent.findMany({
+          where: { gameId },
+          select: { sequence: true, type: true, gamePlayerId: true, payload: true },
+          orderBy: { sequence: "asc" }
+        })
+      : [];
+    const awards = selectGameAwards(
+      awardEvents,
+      game.players
+        .filter((player) => player.role === GameRole.PLAYER)
+        .map((player) => {
+          const name = player.user?.displayName ?? player.guestName ?? "Игрок";
+          return { id: player.id, name, mention: name };
+        })
+    );
 
     return toSerializable({
       game: {
@@ -6018,12 +6293,20 @@ export class GamesService {
         remainingPeriodSeconds: timeline.remainingPeriodSeconds,
         pauseReason: timeline.pauseReason,
         pausedAt: timeline.pausedAt,
+        rulesVersion: game.rulesVersion,
+        isTest: game.isTest,
+        fastTrackWorld: readFastTrackWorld(game.fastTrackWorld),
         pendingAction: this.pendingAction(game.settings)
       },
       board: ratRaceBoard,
+      fastTrackBoard: fastTrackCells,
       players: game.players,
       events: [...game.events].reverse(),
-      chatMessages: [...game.chatMessages].reverse()
+      chatMessages: [
+        ...game.chatMessages,
+        ...gameChatNotices(game, noticeEvents.reverse(), game.players)
+      ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+      awards
     });
   }
 

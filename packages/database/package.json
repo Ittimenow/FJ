@@ -25,7 +25,8 @@
     "prisma:sync-cards": "tsx prisma/seed.ts --sync-cards",
     "prisma:import-cards": "tsx prisma/import-cards.ts",
     "test": "node --import tsx --test src/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prisma:prepare-full-game": "prisma db execute --file prisma/deploy/20260919_add_full_game.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

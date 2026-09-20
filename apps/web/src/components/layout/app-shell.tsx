@@ -36,7 +36,7 @@ export function AppShell({
           <Link
             href="/dashboard"
             aria-label="Финансовое путешествие — личный кабинет"
-            className="flex min-h-11 min-w-11 items-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
+            className="col-start-1 row-start-1 flex min-h-11 min-w-11 items-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
           >
             <BrandLogo
               markClassName="h-10 w-10"
@@ -45,7 +45,7 @@ export function AppShell({
           </Link>
           <GameRoomHeaderSlot />
           {userName ? (
-            <div className="flex items-center justify-self-end gap-0 min-[420px]:gap-2">
+            <div className="col-start-3 row-start-1 flex items-center justify-self-end gap-0 min-[420px]:gap-2">
               <GuideLink />
               <Link
                 href="/profile"

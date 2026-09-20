@@ -1,5 +1,7 @@
 "use client";
 
+import { FastTrackFinances } from "./fast-track-panel";
+
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -163,6 +165,7 @@ export function HostControlRoom({
       </header>
 
       <main className="mx-auto max-w-[1760px] px-3 py-4 sm:px-5">
+        {snapshot.game.isTest ? <p className="mb-3 font-bold">Тестовая партия · без статистики и публикаций</p> : null}
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#17243f] px-4 py-3 text-white shadow-[0_12px_32px_rgba(23,36,63,.2)]">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-action text-ink">
@@ -170,11 +173,11 @@ export function HostControlRoom({
             </span>
             <div>
               <h2 className="text-sm font-extrabold">Экран для трансляции</h2>
-              <p className="text-xs text-white/70">Выберите вид поля и откройте его на втором экране.</p>
+              <p className="text-xs text-white/70">Откройте игровое поле на втором экране.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="grid grid-cols-2 rounded-xl bg-white/10 p-1" role="group" aria-label="Вариант игрового поля">
+            {currentPlayer?.track !== "FAST_TRACK" ? <div className="grid grid-cols-2 rounded-xl bg-white/10 p-1" role="group" aria-label="Вариант игрового поля">
               {(["classic", "journey"] as DisplayFieldView[]).map((view, index) => (
                 <button
                   key={view}
@@ -189,7 +192,7 @@ export function HostControlRoom({
                   Поле {index + 1}
                 </button>
               ))}
-            </div>
+            </div> : null}
             <button
               type="button"
               onClick={openDisplay}
@@ -312,8 +315,8 @@ function HostPlayerCard({
       {state ? (
         <dl className="mt-2 grid h-10 shrink-0 grid-cols-3 gap-1.5">
           <PlayerMetric label="Наличные" value={money(state.cashCents)} />
-          <PlayerMetric label="Денежный поток" value={signedMoney(state.monthlyCashflowCents)} tone={state.monthlyCashflowCents >= 0 ? "positive" : "negative"} />
-          <PlayerMetric label="Пассивный доход" value={`${money(state.passiveIncomeCents)}/мес`} />
+          <PlayerMetric label={player.track === "FAST_TRACK" ? "Доход CASHFLOW" : "Денежный поток"} value={signedMoney(player.track === "FAST_TRACK" ? state.fastTrackIncomeCents ?? 0 : state.monthlyCashflowCents)} tone="positive" />
+          <PlayerMetric label={player.track === "FAST_TRACK" ? "До победы" : "Пассивный доход"} value={player.track === "FAST_TRACK" ? money(Math.max(0, (state.fastTrackStartIncomeCents ?? 0) + 50_000 - (state.fastTrackIncomeCents ?? 0))) : `${money(state.passiveIncomeCents)}/мес`} />
         </dl>
       ) : <p className="mt-3 rounded-xl bg-card p-3 text-xs text-muted">Финансы появятся после старта партии.</p>}
 
@@ -464,6 +467,7 @@ function PlayerDetailsDrawer({
                 <DetailMetric icon={<BriefcaseBusiness size={16} />} label="Активы" value={String(player.assets.length)} />
                 <DetailMetric icon={<Landmark size={16} />} label="Обязательства" value={money(player.liabilities.reduce((sum, item) => sum + item.balanceCents, 0))} />
               </div>
+              {player.track === "FAST_TRACK" ? <FastTrackFinances player={player} /> : null}
               <div className="mt-3 rounded-2xl bg-white p-4 shadow-[0_7px_18px_rgba(23,36,63,.07)]">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-bold text-muted">Путь к финансовой свободе</span>

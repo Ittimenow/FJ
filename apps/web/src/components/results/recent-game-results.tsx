@@ -40,7 +40,7 @@ export function RecentGameResults() {
               <div>
                 <span>{formatDate(facts.endedAt)}</span>
                 <h3>{result.headline}</h3>
-                <p>{winner ? `${winner.mention} первым достиг финансовой свободы.` : facts.highlights[0]?.text ?? "Главные решения партии сохранены."}</p>
+                <p>{facts.awards?.[0]?.text ?? (winner ? `${winner.mention} первым достиг финансовой свободы.` : facts.highlights[0]?.text ?? "Главные решения партии сохранены.")}</p>
                 <strong><Trophy size={16} aria-hidden="true" /> {facts.players.length} игроков · {facts.rounds} раундов</strong>
               </div>
             </Link>

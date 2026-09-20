@@ -49,7 +49,8 @@ test("Telegram publication card renders a real PNG with summary data", async () 
             track: "FAST_TRACK",
             status: "JOINED"
           }],
-          highlights: [{ playerId: "max", kind: "win", text: "Макс достиг финансовой свободы." }]
+          highlights: [{ playerId: "max", kind: "win", text: "Макс достиг финансовой свободы." }],
+          awards: [{ kind: "deal_hunter", title: "Охотник за сделками", playerId: "max", playerName: "Макс", mention: "Макс", actionCount: 3, metricValue: 3, metricUnit: "count", result: "3 покупки", text: "Охотник за сделками — Макс: 3 покупки" }]
         }
       }
     }]

@@ -1,3 +1,5 @@
+import type { GameAward } from "../games/game-awards.logic";
+
 export type SummaryPlayerFacts = {
   id: string;
   name: string;
@@ -30,12 +32,13 @@ export type GameSummaryFacts = {
   winnerGamePlayerId: string | null;
   players: SummaryPlayerFacts[];
   highlights: SummaryHighlight[];
+  awards: GameAward[];
 };
 
 export function composeGameSummary(facts: GameSummaryFacts) {
   const winner = facts.players.find((player) => player.id === facts.winnerGamePlayerId);
   const headline = winner
-    ? `«${facts.title}»: ${winner.name} достигает финансовой свободы`
+    ? `«${facts.title}»: ${winner.name} ${facts.endReason === "dream" ? "исполняет свою мечту" : facts.endReason === "fast_track_income" ? "побеждает на большом круге" : "достигает финансовой свободы"}`
     : facts.endReason === "time_limit"
       ? `«${facts.title}»: итоги ${facts.rounds} ${plural(facts.rounds, "раунда", "раундов", "раундов")}`
       : facts.endReason === "all_players_bankrupt"
@@ -46,13 +49,16 @@ export function composeGameSummary(facts: GameSummaryFacts) {
     ? `За ${duration(facts.durationMinutes)} участники прошли ${facts.rounds} ${plural(facts.rounds, "раунд", "раунда", "раундов")}.`
     : `Участники прошли ${facts.rounds} ${plural(facts.rounds, "раунд", "раунда", "раундов")}.`;
   const outcome = winner
-    ? `${winner.mention} выходит на уровень финансовой свободы раньше остальных: пассивный доход к финалу составил ${money(winner.finalPassiveIncomeCents)} в месяц.`
+    ? facts.endReason === "dream" ? `${winner.mention} покупает выбранную перед стартом мечту и побеждает.`
+      : facts.endReason === "fast_track_income" ? `${winner.mention} увеличивает доход на большом круге как минимум на $50 000 и побеждает.`
+      : `${winner.mention} выходит на уровень финансовой свободы раньше остальных: пассивный доход к финалу составил ${money(winner.finalPassiveIncomeCents)} в месяц.`
     : facts.endReason === "time_limit"
       ? "Время партии завершилось, и результат зафиксирован на достигнутых позициях."
       : facts.endReason === "all_players_bankrupt"
         ? "Финал оказался непростым: финансовые испытания остановили всех участников."
         : "Финальный результат сложился из решений, сделок и поворотных событий партии.";
   const highlights = facts.highlights.slice(0, 3).map((highlight) => `• ${highlight.text}`);
+  const awards = facts.awards.slice(0, 3).map((award) => `• ${award.text}`);
   const roster = naturalList(facts.players.map((player) => player.mention));
 
   return {
@@ -61,6 +67,7 @@ export function composeGameSummary(facts: GameSummaryFacts) {
       `🎲 Итоги игры «${facts.title}»`,
       "",
       `${progress} ${outcome}`,
+      ...(awards.length ? ["", "Награды партии:", ...awards] : []),
       ...(highlights.length ? ["", "Главные повороты:", ...highlights] : []),
       "",
       `За столом: ${roster || "состав не указан"}.`,

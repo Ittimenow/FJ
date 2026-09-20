@@ -15,6 +15,7 @@ export function composeSeriesPost(sources: TelegramPostSource[]) {
     return winner ? [`${winner.mention} — «${source.facts.title}»`] : [];
   });
   const highlights = unique(sources.flatMap((source) => source.facts.highlights.map((highlight) => highlight.text)));
+  const awards = unique(sources.flatMap((source) => (source.facts.awards ?? []).slice(0, 1).map((award) => award.text)));
   const title = `Серия из ${gamesCount} ${plural(gamesCount, "игры", "игр", "игр")}: главные финансовые маршруты`;
   const fixed = [
     "🎲 Итоги серии игр",
@@ -27,6 +28,7 @@ export function composeSeriesPost(sources: TelegramPostSource[]) {
   ];
   const optional: string[][] = [];
   if (winners.length) optional.push(["Финансовой свободы достигли:", ...winners.map((winner) => `• ${winner}`), ""]);
+  if (awards.length) optional.push(["Награды игр:", ...awards.map((award) => `• ${award}`), ""]);
   if (highlights.length) optional.push(["Главные моменты:", ...highlights.slice(0, 3).map((highlight) => `• ${highlight}`), ""]);
 
   const body = fitOptional(fixed, optional);

@@ -151,9 +151,9 @@ export class GamesGateway
   @SubscribeMessage("player:roll_dice")
   async rollDice(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { gameId: string }
+    @MessageBody() body: { gameId: string; diceCount?: number; expectedTurn?: string }
   ) {
-    const result = await this.games.rollDice(body.gameId, this.userId(client));
+    const result = await this.games.rollDice(body.gameId, this.userId(client), body);
     this.realtime.broadcastAction(body.gameId, result);
     return result;
   }

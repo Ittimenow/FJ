@@ -45,7 +45,7 @@ export class UsersService {
 
     const [history, states] = await Promise.all([
       this.prisma.gamePlayer.findMany({
-        where: { userId, game: { status: { not: "CANCELLED" } } },
+        where: { userId, game: { status: { not: "CANCELLED" }, isTest: false } },
         include: {
           game: {
             include: {
@@ -63,7 +63,7 @@ export class UsersService {
         take: 20
       }),
       this.prisma.playerFinancialState.findMany({
-        where: { gamePlayer: { userId } }
+        where: { gamePlayer: { userId, game: { isTest: false } } }
       })
     ]);
 
@@ -111,13 +111,13 @@ export class UsersService {
           endedAt: player.game.endedAt,
           wonAt: player.financialState?.wonAt ?? null,
           escapedRatRaceAt: player.financialState?.escapedRatRaceAt ?? null,
-          monthlyCashflowCents: player.financialState?.monthlyCashflowCents ?? 0,
+          monthlyCashflowCents: (player.track === "FAST_TRACK" ? player.financialState?.fastTrackIncomeCents : player.financialState?.monthlyCashflowCents) ?? 0,
           gameMode: player.game.mode,
           outcome: player.financialState?.wonAt || endReason === "bots_eliminated"
             ? "WIN"
             : endReason === "human_bankrupt" ||
                 (player.game.mode === "SOLO" &&
-                  endReason === "financial_freedom" &&
+                  ["financial_freedom", "dream", "fast_track_income"].includes(endReason ?? "") &&
                   winnerGamePlayerId !== null &&
                   winnerGamePlayerId !== player.id)
               ? "LOSS"

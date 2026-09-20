@@ -1,5 +1,8 @@
 "use client";
 
+import { fastTrackCells, isDreamCell } from "@cashflow/shared";
+import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
+
 import {
   availableBankLoanCents,
   bankLoanIncrementCents,
@@ -16,7 +19,6 @@ import {
   ArrowRightToLine,
   Baby,
   Banknote,
-  BellRing,
   Bot,
   BriefcaseBusiness,
   CheckCircle2,
@@ -36,15 +38,12 @@ import {
   Heart,
   Hourglass,
   Landmark,
-  LayoutDashboard,
-  MonitorUp,
   Minus,
   MoveRight,
-  PauseCircle,
-  Play,
   Plus,
   ReceiptText,
   ShieldCheck,
+  Trophy,
   UserRound,
   UserX,
   UsersRound,
@@ -127,6 +126,7 @@ import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
 import { cn } from "@/lib/utils";
 import type {
   FinancialState,
+  GameAward,
   GameEvent,
   GamePlayer,
   GameSnapshot,
@@ -181,6 +181,9 @@ export function GameRoom({
   currentUserRole: "USER" | "HOST" | "ADMIN";
 }) {
   const router = useRouter();
+  const [trackView, setTrackView] = useState<"RAT_RACE" | "FAST_TRACK" | null>(null);
+  const [fastDiceCount, setFastDiceCount] = useState(2);
+  const [fastBusy, setFastBusy] = useState(false);
   const initialMe = initialSnapshot.players.find(
     (player) => player.userId === currentUserId && player.role === "PLAYER"
   );
@@ -209,7 +212,6 @@ export function GameRoom({
   const [decisionSubmission, setDecisionSubmission] = useState<DecisionSubmission | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
-  const [gameAnnouncement, setGameAnnouncement] = useState<string | null>(null);
   const [changingParticipation, setChangingParticipation] = useState(false);
   const [figurinePickerOpen, setFigurinePickerOpen] = useState(
     initialSnapshot.game.status === "WAITING" && Boolean(initialMe && !initialMe.figurine)
@@ -307,32 +309,12 @@ export function GameRoom({
       setSnapshot(value);
     });
     socket.on("game:deleted", () => leaveGamePage());
-    socket.on(
-      realtimeEvents.gamePaused,
-      (payload: { reason?: string; currentPeriod?: number }) => {
-        showTimelineAnnouncement(
-          payload.reason === "period_complete"
-            ? `Период ${payload.currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
-            : payload.reason === "player_left"
-              ? "Вы вышли из игры. Партия автоматически поставлена на паузу."
-              : "Игра поставлена на паузу."
-        );
-      }
-    );
-    socket.on(
-      realtimeEvents.gameResumed,
-      (payload: { currentPeriod?: number; startsNextPeriod?: boolean }) => {
-        showTimelineAnnouncement(
-          payload.startsNextPeriod
-            ? `Начался период ${payload.currentPeriod ?? ""}.`
-            : "Игра продолжена."
-        );
-      }
-    );
     socket.on(realtimeEvents.chatMessage, (message) => {
       setSnapshot((current) => ({
         ...current,
-        chatMessages: [...current.chatMessages, message]
+        chatMessages: current.chatMessages.some((item) => item.id === message.id)
+          ? current.chatMessages
+          : [...current.chatMessages, message]
       }));
     });
     socket.on("connect_error", (caught) => {
@@ -432,23 +414,19 @@ export function GameRoom({
     token
   ]);
 
-  useEffect(() => {
-    if (!gameAnnouncement) return;
-    const timeout = window.setTimeout(() => setGameAnnouncement(null), 5000);
-    return () => window.clearTimeout(timeout);
-  }, [gameAnnouncement]);
-
   const currentPlayer = snapshot.players.find(
     (player) => player.id === snapshot.game.currentPlayerId
   );
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
   const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
+  const showFastTrack = snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && (trackView ?? me?.track ?? currentPlayer?.track) === "FAST_TRACK";
+  useEffect(() => { setTrackView(null); }, [me?.track, currentPlayer?.track]);
   const takenFigurines = gamePlayers
     .filter((player) => player.id !== me?.id)
     .map((player) => player.figurine)
     .filter((figurine): figurine is string => Boolean(figurine));
-  const playersWithoutFigurines = gamePlayers.filter((player) => !player.figurine);
+  const playersWithoutFigurines = gamePlayers.filter((player) => player.status === "JOINED" && !player.figurine);
   const humanGamePlayers = gamePlayers.filter((player) => player.controller === "HUMAN");
   const startDisabledReason =
     gamePlayers.length < 2
@@ -457,7 +435,9 @@ export function GameRoom({
         ? "Для старта нужен хотя бы один человек."
       : playersWithoutFigurines.length > 0
         ? "Все игроки должны выбрать фигурки."
-        : null;
+        : snapshot.game.rulesVersion === 2 && gamePlayers.some((player) => player.status === "JOINED" && !isDreamCell(player.dreamCellIndex))
+          ? "Все игроки должны выбрать мечту большого круга."
+          : null;
   const gameEndEvent = [...snapshot.events]
     .reverse()
     .find((event) => event.type === realtimeEvents.gameEnded);
@@ -480,7 +460,7 @@ export function GameRoom({
   const canResume = canManage && snapshot.game.status === "PAUSED";
   const canStart =
     snapshot.game.status === "WAITING" &&
-    canManage;
+    canManage && (!snapshot.game.isTest || isAdmin);
   const canChangeHostParticipation =
     !isSolo &&
     snapshot.game.createdById === currentUserId &&
@@ -503,6 +483,7 @@ export function GameRoom({
   const canAnswerMarketSale =
     snapshot.game.status === "IN_PROGRESS" && Boolean(marketSaleOffer);
   const canTakeLoan =
+    me?.track !== "FAST_TRACK" &&
     snapshot.game.status === "IN_PROGRESS" &&
     Boolean(me) &&
     me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
@@ -523,7 +504,7 @@ export function GameRoom({
     );
   }, [availableLoanAmountCents]);
 
-  const activeDiceCount = (me?.financialState?.charityTurns ?? 0) > 0
+  const activeDiceCount = me?.track === "FAST_TRACK" ? (me.financialState?.fastTrackCharity ? fastDiceCount : 2) : (me?.financialState?.charityTurns ?? 0) > 0
     ? 2
     : 1;
   const canChooseDeal = isMyTurn && ownPendingAction?.type === "choose_deal";
@@ -635,8 +616,6 @@ export function GameRoom({
       connection,
       code: snapshot.game.code,
       isSolo,
-      currentRound: snapshot.game.currentRound,
-      currentPlayerName: currentPlayer ? gamePlayerName(currentPlayer) : null,
       currentPeriod: snapshot.game.currentPeriod,
       periodCount: snapshot.game.periodCount,
       remainingSeconds,
@@ -646,7 +625,7 @@ export function GameRoom({
       onSendChat: (body) => emit("chat:send", { body }),
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
-      onDeleteGame: canManage ? deleteGame : null,
+      hostDisplayView: canManage && !isSolo ? gameRoomView : null,
       onCheckConnection: () => void refreshConnection()
     });
   }, [
@@ -662,11 +641,11 @@ export function GameRoom({
     snapshot.game.code,
     snapshot.game.id,
     snapshot.game.currentPeriod,
-    snapshot.game.currentRound,
     snapshot.game.pauseReason,
     snapshot.game.periodCount,
     snapshot.game.status,
     snapshot.game.title,
+    gameRoomView,
     snapshot.chatMessages,
     remainingSeconds,
     timelineLoading
@@ -850,30 +829,6 @@ export function GameRoom({
     }
   }
 
-  async function deleteGame() {
-    setError(null);
-    if (socketRef.current?.connected) {
-      try {
-        await emitWithAck("game:delete", {});
-        leaveGamePage();
-      } catch (event) {
-        setError(gameErrorMessage(event, "Не удалось удалить игру"));
-      }
-      return;
-    }
-
-    const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(gameErrorMessage(result.message, "Не удалось удалить игру"));
-      return;
-    }
-    leaveGamePage();
-  }
-
   function emit(event: string, payload: Record<string, unknown>) {
     setError(null);
     socketRef.current?.emit(event, {
@@ -938,7 +893,6 @@ export function GameRoom({
   }
 
   function applyActionResult(result: GameActionResult) {
-    announceTimelineEvents(result.events);
     if (result.snapshot?.game?.id) {
       if (result.snapshot.game.status === "CANCELLED") {
         leaveGamePage();
@@ -948,43 +902,24 @@ export function GameRoom({
     }
   }
 
-  function announceTimelineEvents(
-    events: Array<{ type: string; payload: Record<string, unknown> }> | undefined
-  ) {
-    const event = events?.find(
-      (candidate) =>
-        candidate.type === realtimeEvents.gamePaused ||
-        candidate.type === realtimeEvents.gameResumed
-    );
-    if (!event) return;
-    const currentPeriod =
-      typeof event.payload.currentPeriod === "number"
-        ? event.payload.currentPeriod
-        : null;
-    if (event.type === realtimeEvents.gamePaused) {
-      showTimelineAnnouncement(
-        event.payload.reason === "period_complete"
-          ? `Период ${currentPeriod ?? ""} завершён. Игра поставлена на паузу.`
-          : event.payload.reason === "player_left"
-            ? "Вы вышли из игры. Партия автоматически поставлена на паузу."
-            : "Игра поставлена на паузу."
-      );
-      return;
-    }
-    showTimelineAnnouncement(
-      event.payload.startsNextPeriod
-        ? `Начался период ${currentPeriod ?? ""}.`
-        : "Игра продолжена."
-    );
-  }
-
-  function showTimelineAnnouncement(message: string) {
-    setGameAnnouncement(message.replace(/\s+\./g, "."));
-  }
-
   function leaveGamePage() {
     router.replace("/dashboard");
     router.refresh();
+  }
+
+  async function fastAction(path: string, body: Record<string, unknown> = {}) {
+    if (fastBusy) return;
+    setFastBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${path}`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body)
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(Array.isArray(result.message) ? result.message.join(". ") : result.message ?? "Не удалось выполнить действие");
+      applyActionResult(result as GameActionResult);
+    } catch (caught) { setError(gameErrorMessage(caught, "Не удалось выполнить действие")); }
+    finally { setFastBusy(false); }
   }
 
   async function rollDice() {
@@ -1000,7 +935,7 @@ export function GameRoom({
     const startedAt = Date.now();
 
     try {
-      const result = await emitWithAck(realtimeEvents.playerRollDice, {});
+      const result = await emitWithAck(realtimeEvents.playerRollDice, { diceCount: activeDiceCount, expectedTurn: `${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}` });
       applyActionResult(result);
       const dice = diceValuesFromActionResult(result) ?? diceFaces;
       const move = moveFromActionResult(result);
@@ -1360,6 +1295,7 @@ export function GameRoom({
     <div
       className={cn(
         "game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5",
+        showFastTrack ? "game-room--fast-track-active" : null,
         gameRoomView === "classic" && snapshot.game.status !== "WAITING"
           ? "game-room--classic-active"
           : null,
@@ -1368,59 +1304,8 @@ export function GameRoom({
           : null
       )}
     >
-      {canManage && !isSolo ? (
-        <nav
-          aria-label="Экраны ведущего"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-3 text-white shadow-[0_12px_32px_rgba(23,36,63,.18)]"
-        >
-          <div className="min-w-0">
-            <div className="text-sm font-extrabold">Рабочее место ведущего</div>
-            <p className="mt-0.5 text-xs text-white/70">Наблюдайте за игроками здесь, а игровое поле вынесите на второй экран.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <a
-              href={`/games/${snapshot.game.id}/host`}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-extrabold text-ink transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/35"
-            >
-              <LayoutDashboard size={16} aria-hidden="true" />
-              Пульт ведущего
-            </a>
-            <a
-              href={`/games/${snapshot.game.id}/display?view=${gameRoomView === "journey" ? "journey" : "classic"}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-action px-3 text-xs font-extrabold text-ink shadow-[0_8px_20px_rgba(249,143,47,.22)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/25"
-            >
-              <MonitorUp size={16} aria-hidden="true" />
-              Открыть поле
-            </a>
-          </div>
-        </nav>
-      ) : null}
-      {gameAnnouncement ? (
-        <div
-          role="status"
-          aria-live="assertive"
-          className="fixed left-1/2 top-20 z-[70] flex w-[min(92vw,520px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm font-bold text-white shadow-[0_18px_48px_rgba(5,18,45,.3)]"
-        >
-          <BellRing className="shrink-0 text-action" size={19} aria-hidden="true" />
-          <span>{gameAnnouncement}</span>
-        </div>
-      ) : null}
-      {snapshot.game.status === "PAUSED" ? (
-        <GamePauseBanner
-          isSolo={isSolo}
-          currentPeriod={snapshot.game.currentPeriod}
-          periodCount={snapshot.game.periodCount}
-          reason={snapshot.game.pauseReason}
-          remainingSeconds={remainingSeconds ?? snapshot.game.remainingPeriodSeconds ?? 0}
-          canManage={canManage}
-          loading={timelineLoading}
-          onResume={resumeGame}
-        />
-      ) : null}
       <MobileTurnDialog
-        open={canRoll && !pendingAction}
+        open={canRoll && !pendingAction && !showFastTrack}
         rolling={rollingDice}
         diceValues={diceFaces}
         diceCount={activeDiceCount}
@@ -1434,6 +1319,7 @@ export function GameRoom({
         open={gameEndOpen && snapshot.game.status === "ENDED"}
         winner={winner}
         player={me}
+        awards={snapshot.awards ?? []}
         reason={typeof gameEndEvent?.payload.reason === "string" ? gameEndEvent.payload.reason : null}
         onClose={() => setGameEndOpen(false)}
       />
@@ -1495,26 +1381,14 @@ export function GameRoom({
           {error}
         </div>
       ) : null}
-      {me?.financialState?.bankruptcyStatus === "RECOVERED" ? (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Банкротство преодолено. Осталось пропустить ходов: {me.financialState.bankruptcyTurns}.
+      {snapshot.game.rulesVersion === 2 && snapshot.game.status === "WAITING" && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => void fastAction("dream", { cellIndex })} /> : null}
+      {snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" ? <div className="flex flex-wrap items-center gap-3">
+        <div role="group" aria-label="Выбрать круг" className="flex gap-2">
+          <Button variant={showFastTrack ? "secondary" : "primary"} onClick={() => setTrackView("RAT_RACE")}>Малый круг</Button>
+          <Button variant={showFastTrack ? "primary" : "secondary"} onClick={() => setTrackView("FAST_TRACK")}>Большой круг</Button>
         </div>
-      ) : me?.financialState?.bankruptcyStatus === "ELIMINATED" ? (
-        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
-          Денежный поток не удалось восстановить — вы выбыли из игры.
-        </div>
-      ) : null}
-      {snapshot.game.status === "ENDED" ? (
-        <div className="rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium md:hidden">
-          {winner
-            ? `Победитель: ${gamePlayerName(winner)}`
-            : gameEndReasonText(
-                typeof gameEndEvent?.payload.reason === "string"
-                  ? gameEndEvent.payload.reason
-                  : null
-              )}
-        </div>
-      ) : null}
+        {canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>Перейти на большой круг</Button> : null}
+      </div> : null}
 
       {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
@@ -1536,7 +1410,7 @@ export function GameRoom({
         />
       ) : null}
 
-      {gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} rolling={rollingDice} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed()}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={snapshot}
           currentUserId={currentUserId}
@@ -1737,89 +1611,6 @@ export function GameRoom({
         </>
       )}
     </div>
-  );
-}
-
-function GamePauseBanner({
-  isSolo,
-  currentPeriod,
-  periodCount,
-  reason,
-  remainingSeconds,
-  canManage,
-  loading,
-  onResume
-}: {
-  isSolo: boolean;
-  currentPeriod: number;
-  periodCount: number;
-  reason: "manual" | "period_complete" | "player_left" | null;
-  remainingSeconds: number;
-  canManage: boolean;
-  loading: boolean;
-  onResume: () => void;
-}) {
-  const periodComplete = reason === "period_complete";
-  const playerLeft = reason === "player_left";
-  const title = playerLeft
-    ? "Игра остановлена после выхода"
-    : periodComplete
-      ? `Период ${currentPeriod} завершён`
-      : "Игра поставлена на паузу";
-  const description = playerLeft
-    ? "Партия автоматически поставлена на паузу. Весь прогресс сохранён — продолжите, когда вернётесь."
-    : canManage
-      ? periodComplete
-        ? `Команда может отдохнуть. Когда будете готовы, начните период ${currentPeriod + 1}.`
-        : isSolo
-          ? "Весь прогресс сохранён. Продолжите игру, когда будете готовы."
-          : "Таймер периода остановлен. Продолжите игру, когда команда будет готова."
-      : periodComplete
-        ? `Следующий период начнёт ведущий или администратор. Все игровые действия временно недоступны.`
-        : "Ожидайте, пока ведущий или администратор продолжит игру. Все игровые действия временно недоступны.";
-
-  return (
-    <section
-      role="alert"
-      aria-live="assertive"
-      className="flex flex-col gap-4 rounded-2xl bg-[#fff0df] p-4 text-[#6f330c] shadow-[0_16px_38px_rgba(138,61,10,.14)] sm:flex-row sm:items-center sm:justify-between sm:p-5"
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#a84b0d] shadow-[0_8px_22px_rgba(138,61,10,.12)]">
-          <PauseCircle size={23} aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-lg font-extrabold tracking-[-0.025em]">{title}</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#7f431c]">{description}</p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2 sm:justify-end">
-        <span className="rounded-xl bg-white px-3 py-2 text-sm font-extrabold tabular-nums text-ink">
-          {isSolo
-            ? "Прогресс сохранён"
-            : periodComplete
-              ? `Период ${currentPeriod}/${periodCount}`
-              : formatPeriodTime(remainingSeconds)}
-        </span>
-        {canManage ? (
-          <Button
-            type="button"
-            variant="action"
-            className="min-w-0 flex-1 gap-2 sm:flex-none"
-            onClick={onResume}
-            disabled={loading}
-            aria-busy={loading}
-          >
-            <Play size={17} aria-hidden="true" />
-            {loading
-              ? "Продолжаем…"
-              : periodComplete
-                ? `Начать период ${currentPeriod + 1}`
-                : "Продолжить игру"}
-          </Button>
-        ) : null}
-      </div>
-    </section>
   );
 }
 
@@ -2088,12 +1879,14 @@ function GameEndPopup({
   open,
   winner,
   player,
+  awards,
   reason,
   onClose
 }: {
   open: boolean;
   winner: GamePlayer | undefined;
   player: GamePlayer | undefined;
+  awards: GameAward[];
   reason: string | null;
   onClose: () => void;
 }) {
@@ -2177,6 +1970,8 @@ function GameEndPopup({
               <ResultFinancialComparison state={playerState} showCash />
             </section>
           ) : null}
+
+          {awards.length ? <GameEndAwards awards={awards.slice(0, 7)} /> : null}
         </div>
 
         <div className="shrink-0 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(27,57,118,.10)] sm:px-6 sm:pb-5 sm:pt-4">
@@ -2186,6 +1981,33 @@ function GameEndPopup({
         </div>
       </div>
     </div>
+  );
+}
+
+function GameEndAwards({ awards }: { awards: GameAward[] }) {
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl bg-[#fff0cf]" aria-labelledby="game-end-awards-title">
+      <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f5aa24] text-[#17243f] shadow-[0_8px_20px_rgba(155,99,11,.18)]">
+          <Trophy size={20} aria-hidden="true" />
+        </span>
+        <div>
+          <h3 id="game-end-awards-title" className="text-lg font-extrabold text-ink">Награды партии</h3>
+          <p className="mt-0.5 text-xs font-semibold text-[#715719]">Только результаты с тремя и более действиями</p>
+        </div>
+      </div>
+      <ol className="divide-y divide-[#ead49b] bg-white/55 px-4 sm:px-5">
+        {awards.map((award) => (
+          <li key={award.kind} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-4">
+            <span className="min-w-0">
+              <span className="block font-extrabold text-ink">{award.title}</span>
+              <span className="mt-0.5 block text-sm font-semibold text-[#657597]">{award.playerName}</span>
+            </span>
+            <span className="text-sm font-extrabold text-[#8a5a08] sm:text-right">{award.result}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -2233,15 +2055,16 @@ const gameEndToneClasses: Record<GameEndTone, string> = {
 };
 
 function GameEndFinancialMetrics({ state }: { state: FinancialState }) {
+  const onFastTrack = (state.fastTrackStartIncomeCents ?? 0) > 0;
   const metrics = [
     {
-      label: "Пассивный доход",
-      value: `${money(state.passiveIncomeCents)}/мес`,
+      label: onFastTrack ? "Доход CASHFLOW" : "Пассивный доход",
+      value: onFastTrack ? money(state.fastTrackIncomeCents) : `${money(state.passiveIncomeCents)}/мес`,
       className: "bg-[#edf6e9] text-[#3f5b35]"
     },
     {
-      label: "Расходы",
-      value: `${money(state.totalExpensesCents)}/мес`,
+      label: onFastTrack ? "Начальный доход" : "Расходы",
+      value: onFastTrack ? money(state.fastTrackStartIncomeCents) : `${money(state.totalExpensesCents)}/мес`,
       className: "bg-[#fff0eb] text-[#9d3c22]"
     },
     {
@@ -2250,8 +2073,8 @@ function GameEndFinancialMetrics({ state }: { state: FinancialState }) {
       className: "bg-[#eaf0fd] text-[#1b3976]"
     },
     {
-      label: "Денежный поток",
-      value: `${money(state.monthlyCashflowCents)}/мес`,
+      label: onFastTrack ? "Прирост дохода" : "Денежный поток",
+      value: onFastTrack ? money((state.fastTrackIncomeCents ?? 0) - (state.fastTrackStartIncomeCents ?? 0)) : `${money(state.monthlyCashflowCents)}/мес`,
       className:
         state.monthlyCashflowCents >= 0
           ? "bg-[#e8f5ef] text-[#216547]"
@@ -2784,8 +2607,9 @@ function WaitingRoomOverview({
   const enoughPlayers = gamePlayers.length >= 2;
   const hasHumanPlayer = humanPlayers.length > 0;
   const figurinesReady = gamePlayers.length > 0 && readyPlayers.length === gamePlayers.length;
+  const dreamsReady = snapshot.game.rulesVersion !== 2 || gamePlayers.every((player) => isDreamCell(player.dreamCellIndex));
   const completedChecks =
-    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(canManage);
+    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(dreamsReady) + Number(canManage);
 
   return (
     <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
@@ -2797,8 +2621,12 @@ function WaitingRoomOverview({
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
               {isSolo
-                ? "Проверьте состав партии и выберите свою фигурку. Вы сделаете первый ход."
-                : "Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужна своя фигурка."}
+                ? snapshot.game.rulesVersion === 2
+                  ? "Проверьте состав партии и выберите свою фигурку и мечту. Вы сделаете первый ход."
+                  : "Проверьте состав партии и выберите свою фигурку. Вы сделаете первый ход."
+                : snapshot.game.rulesVersion === 2
+                  ? "Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужны фигурка и мечта."
+                  : "Участники появятся здесь после входа по коду. Перед стартом каждому игроку нужна своя фигурка."}
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8effe] px-3 py-2 text-sm font-extrabold text-journey">
@@ -2813,7 +2641,7 @@ function WaitingRoomOverview({
           <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {players.map((player) => {
               const isPlayer = player.role === "PLAYER";
-              const ready = !isPlayer || Boolean(player.figurine);
+              const ready = !isPlayer || (Boolean(player.figurine) && (snapshot.game.rulesVersion !== 2 || isDreamCell(player.dreamCellIndex)));
               return (
                 <div key={player.id} className="flex min-w-0 items-center gap-3 rounded-xl bg-card p-3">
                   <PlayerToken player={player} />
@@ -2827,6 +2655,7 @@ function WaitingRoomOverview({
                       {gameRoles[player.role] ?? "Участник"}
                       {player.seat ? ` · место ${player.seat}` : ""}
                     </div>
+                    {isPlayer && snapshot.game.rulesVersion === 2 ? <p className="mt-1 text-xs leading-5 text-[#57378f]">{isDreamCell(player.dreamCellIndex) ? fastTrackCells[player.dreamCellIndex]!.label : "Мечта ещё не выбрана"}</p> : null}
                   </div>
                   <span
                     className={[
@@ -2834,7 +2663,7 @@ function WaitingRoomOverview({
                       ready ? "bg-[#eaf3e0] text-success" : "bg-[#fff0df] text-[#8a3d0a]"
                     ].join(" ")}
                   >
-                    {ready ? "Готов" : "Без фигурки"}
+                    {ready ? "Готов" : !player.figurine ? "Без фигурки" : "Без мечты"}
                   </span>
                 </div>
               );
@@ -2896,6 +2725,7 @@ function WaitingRoomOverview({
             complete={figurinesReady}
             label={figurinesReady ? "Фигурки выбраны" : `Фигурки: ${readyPlayers.length}/${gamePlayers.length}`}
           />
+          {snapshot.game.rulesVersion === 2 ? <LobbyCheck complete={dreamsReady} label={dreamsReady ? "Мечты выбраны" : "Каждый игрок должен выбрать мечту"} /> : null}
           <LobbyCheck
             complete={canManage}
             label={canManage ? "Вы можете запустить партию" : "Старт запустит ведущий"}
@@ -2904,7 +2734,7 @@ function WaitingRoomOverview({
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#dce4ef]">
           <div
             className="h-full rounded-full bg-action transition-[width] duration-300"
-            style={{ width: `${Math.round((completedChecks / 4) * 100)}%` }}
+            style={{ width: `${Math.round((completedChecks / 5) * 100)}%` }}
           />
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
@@ -6465,6 +6295,13 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
 }
 
 const eventTitles: Record<string, string> = {
+  "player:dream_chosen": "Выбрана мечта",
+  "fast_track:cashflow": "Доход большого круга",
+  "fast_track:expense": "Расход большого круга",
+  "fast_track:purchased": "Инвестиция большого круга",
+  "fast_track:investment_roll": "Бросок инвестиции",
+  "fast_track:declined": "Отказ от покупки",
+  "fast_track:dream_influence": "Цена мечты увеличена",
   "game:created": "Игра создана",
   "game:started": "Игра запущена",
   "game:paused": "Игра поставлена на паузу",
@@ -6655,7 +6492,9 @@ function eventDetails(event: GameEvent) {
       return compactDetails([
         textDetail(
           "Причина",
-          payload.reason === "financial_freedom"
+          payload.reason === "dream" ? "Куплена выбранная мечта"
+            : payload.reason === "fast_track_income" ? "Доход большого круга увеличен на $50 000"
+            : payload.reason === "financial_freedom"
             ? "Пассивный доход превысил расходы"
             : payload.reason === "time_limit"
               ? "Истёк лимит времени"
@@ -6954,10 +6793,20 @@ function eventDetails(event: GameEvent) {
         moneyDetail("Расход", payload.amountCents)
       ]);
     case "player:escaped_rat_race":
-      return compactDetails([
-        moneyDetail("Пассивный доход", payload.passiveIncomeCents, "/мес"),
-        moneyDetail("Расходы", payload.totalExpensesCents, "/мес")
-      ]);
+      return typeof payload.incomeCents === "number"
+        ? compactDetails([moneyDetail("Стартовый доход", payload.incomeCents), moneyDetail("Цель", payload.targetIncomeCents)])
+        : compactDetails([moneyDetail("Пассивный доход", payload.passiveIncomeCents, "/мес"), moneyDetail("Расходы", payload.totalExpensesCents, "/мес")]);
+    case "fast_track:purchased":
+      return compactDetails([textDetail("Возможность", payload.title), moneyDetail("Вложено", payload.costCents), moneyDetail("Доход", payload.incomeCents), textDetail("Результат", payload.success ? "Успех" : "Инвестиция не принесла дохода")]);
+    case "fast_track:cashflow":
+    case "fast_track:expense":
+      return compactDetails([textDetail("Клетка", payload.title), moneyDetail("Сумма", payload.amountCents)]);
+    case "fast_track:investment_roll":
+      return compactDetails([textDetail("Клетка", payload.title), numericDetail("Кубик", payload.die), textDetail("Результат", payload.success ? "Успех" : "Неудача")]);
+    case "fast_track:declined":
+    case "fast_track:dream_influence":
+    case "player:dream_chosen":
+      return compactDetails([textDetail("Клетка", payload.title)]);
     case "turn:skipped":
       return compactDetails([textDetail("Причина", eventReasonLabel(payload.reason))]);
     case "state:update":
@@ -7916,14 +7765,4 @@ function effectAmount(effects: unknown, effectType: string) {
     if (!isRecord(effect) || effect.effectType !== effectType) return sum;
     return sum + toNumber(effect.amountCents);
   }, 0);
-}
-
-function formatPeriodTime(totalSeconds: number) {
-  const normalized = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(normalized / 3600);
-  const minutes = Math.floor((normalized % 3600) / 60);
-  const seconds = normalized % 60;
-  return [hours, minutes, seconds]
-    .map((value) => String(value).padStart(2, "0"))
-    .join(":");
 }

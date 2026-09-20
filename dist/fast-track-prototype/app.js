@@ -57,13 +57,9 @@ const typeLabels = {
 };
 
 const tokenColors = ["#2967df", "#c9505f", "#5f8e42"];
-const JOURNEY_BOARD_WIDTH = 1200;
-const JOURNEY_BOARD_HEIGHT = 760;
 const classicBoard = document.querySelector("#classic-board");
-const journeyBoard = document.querySelector("#journey-board");
 const mobileDetail = document.querySelector("#mobile-detail-content");
 const liveDetail = document.querySelector("#cell-detail-live");
-const viewButtons = [...document.querySelectorAll("[data-view]")];
 let selectedCellNumber = 24;
 
 function money(value) {
@@ -93,35 +89,6 @@ function classicPosition(index) {
   if (index < 40) return { x: columns[index - 31], y: rows[6] };
   if (index < 44) return { x: columns[8], y: rows[45 - index] };
   return { x: columns[52 - index], y: rows[1] };
-}
-
-function journeyPosition(index) {
-  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / cells.length;
-  return {
-    x: 600 + Math.cos(angle) * 528 - 22,
-    y: 380 + Math.sin(angle) * 310 - 16
-  };
-}
-
-function compactJourneyPosition(index) {
-  const row = Math.floor(index / 12);
-  const positionInRow = index % 12;
-  const column = row % 2 === 0 ? positionInRow : 11 - positionInRow;
-  return {
-    x: 38 + column * 74,
-    y: 70 + row * 142
-  };
-}
-
-function positionBoardCells(compactJourney) {
-  cells.forEach((cell, index) => {
-    const classicCell = classicBoard.querySelector(`[data-cell="${cell.n}"]`);
-    const journeyCell = journeyBoard.querySelector(`[data-cell="${cell.n}"]`);
-    const classic = classicPosition(index);
-    const journey = compactJourney ? compactJourneyPosition(index) : journeyPosition(index);
-    Object.assign(classicCell.style, { left: `${classic.x}px`, top: `${classic.y}px` });
-    Object.assign(journeyCell.style, { left: `${journey.x}px`, top: `${journey.y}px` });
-  });
 }
 
 function accessibleCellLabel(cell) {
@@ -205,23 +172,6 @@ function moveCellFocus(event, cellNumber, sourceButton) {
   event.preventDefault();
   selectCell(nextNumber);
   sourceButton.closest(".board")?.querySelector(`[data-cell="${nextNumber}"]`)?.focus();
-}
-
-function createTrackSummary() {
-  const summary = document.createElement("section");
-  summary.className = "track-summary";
-  summary.innerHTML = `
-    <div>
-      <h2>Доход Дня CASHFLOW</h2>
-      <p>Показатели демонстрационные и нужны только для проверки состояний поля.</p>
-    </div>
-    <div class="cashflow-progress">
-      <div class="progress-values"><span>+$27 000 из +$50 000</span><strong>$147 000</strong></div>
-      <div class="progress-track" aria-label="Прогресс к финансовой цели: 54 процента"><span></span></div>
-      <div class="target-dream"><span>Целевая мечта</span><strong>Древние города Азии · $450 000</strong></div>
-    </div>
-  `;
-  return summary;
 }
 
 function createPlayerOverview() {
@@ -411,32 +361,14 @@ function metricDescriptors(cell) {
   ];
 }
 
-function createCentralPanel(boardType) {
-  const panel = document.createElement("div");
-  panel.className = "central-panel";
-  if (boardType === "classic") {
-    panel.append(createPlayerOverview(), createTurnActivity());
-  } else {
-    const cell = cells.find((item) => item.n === selectedCellNumber) ?? cells[0];
-    panel.append(createTrackSummary(), detailFor(cell));
-  }
-  panel.dataset.panelFor = boardType;
-  return panel;
-}
-
 function renderBoards() {
   const classicRoute = classicBoard.querySelector(".classic-route");
   classicBoard.replaceChildren(classicRoute);
-  const journeyRoute = journeyBoard.querySelector(".journey-route");
-  journeyBoard.replaceChildren(journeyRoute);
-
-  cells.forEach((cell, index) => {
-    classicBoard.append(createCellButton(cell, classicPosition(index)));
-    journeyBoard.append(createCellButton(cell, journeyPosition(index)));
-  });
-
-  classicBoard.append(createCentralPanel("classic"));
-  journeyBoard.append(createCentralPanel("journey"));
+  cells.forEach((cell, index) => classicBoard.append(createCellButton(cell, classicPosition(index))));
+  const panel = document.createElement("div");
+  panel.className = "central-panel";
+  panel.append(createPlayerOverview(), createTurnActivity());
+  classicBoard.append(panel);
   renderMobileDetail();
   announceSelectedCell();
 }
@@ -468,8 +400,7 @@ function announceSelectedCell() {
 }
 
 function centerSelectedCell() {
-  const visibleBoard = classicBoard.hidden ? journeyBoard : classicBoard;
-  const selected = visibleBoard.querySelector(`[data-cell="${selectedCellNumber}"]`);
+  const selected = classicBoard.querySelector(`[data-cell="${selectedCellNumber}"]`);
   const boardScroll = document.querySelector(".board-scroll");
   if (!selected || boardScroll.scrollWidth <= boardScroll.clientWidth + 1) return;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -480,62 +411,8 @@ function centerSelectedCell() {
 }
 
 function fitBoards() {
-  const boardScroll = document.querySelector(".board-scroll");
-  const classicVisible = !classicBoard.hidden;
-  const scrollMode = window.innerWidth <= 1019 || (classicVisible && window.innerWidth < 1280);
-  const compactJourney = !classicVisible && window.innerWidth >= 1020 && window.innerWidth < 1280;
-  document.body.classList.toggle("scroll-board", scrollMode);
-  document.body.classList.toggle("compact-board", compactJourney);
-  classicBoard.classList.remove("is-compact");
-  journeyBoard.classList.toggle("is-compact", compactJourney);
-  positionBoardCells(compactJourney);
-
-  boardScroll.style.height = "";
-  [classicBoard, journeyBoard].forEach((board) => {
-    board.style.transform = "";
-    board.style.marginLeft = "";
-    board.style.marginBottom = "";
-  });
-
-  if (classicVisible) {
-    boardScroll.style.overflow = "auto";
-    return;
-  }
-
-  if (scrollMode || compactJourney) {
-    boardScroll.style.overflow = scrollMode ? "auto" : "hidden";
-    if (compactJourney) boardScroll.style.height = "656px";
-    return;
-  }
-
-  const availableWidth = Math.max(320, boardScroll.clientWidth - 36);
-  const availableHeight = Math.max(380, window.innerHeight - boardScroll.getBoundingClientRect().top - 20);
-  const scale = Math.min(1, availableWidth / JOURNEY_BOARD_WIDTH, availableHeight / JOURNEY_BOARD_HEIGHT);
-  const renderedWidth = JOURNEY_BOARD_WIDTH * scale;
-  journeyBoard.style.transformOrigin = "top left";
-  journeyBoard.style.transform = `scale(${scale})`;
-  journeyBoard.style.marginLeft = `${Math.max(0, (availableWidth - renderedWidth) / 2)}px`;
-  journeyBoard.style.marginBottom = `${-JOURNEY_BOARD_HEIGHT * (1 - scale)}px`;
-  boardScroll.style.height = `${JOURNEY_BOARD_HEIGHT * scale + 36}px`;
-  boardScroll.style.overflow = "hidden";
+  document.body.classList.toggle("scroll-board", window.innerWidth < 1280);
 }
-
-function setView(view) {
-  const classic = view === "classic";
-  classicBoard.hidden = !classic;
-  journeyBoard.hidden = classic;
-  viewButtons.forEach((button) => {
-    const active = button.dataset.view === view;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-  fitBoards();
-  requestAnimationFrame(centerSelectedCell);
-}
-
-viewButtons.forEach((button) => {
-  button.addEventListener("click", () => setView(button.dataset.view));
-});
 
 renderBoards();
 fitBoards();

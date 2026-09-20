@@ -1,5 +1,7 @@
 "use client";
 
+import { FastTrackBoard } from "./fast-track-panel";
+
 import { CircleDot, Clock3, Expand, MonitorUp } from "lucide-react";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { BroadcastGameSummary } from "@/components/game/broadcast-game-summary";
@@ -23,6 +25,7 @@ export function GameDisplay({
   const { snapshot, connection, error } = useLiveGame(initialSnapshot, token);
   const connectionStatus = connectionPresentation(connection.phase);
   const remaining = useRemainingSeconds(snapshot);
+  const showFastTrack = snapshot.players.find((player) => player.id === snapshot.game.currentPlayerId)?.track === "FAST_TRACK";
   const [view, setView] = useState(initialView);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +63,7 @@ export function GameDisplay({
           </span>
           <div className="min-w-0">
             <h1 className="truncate text-base font-extrabold sm:text-lg">{snapshot.game.title}</h1>
-            <p className="text-xs text-white/70">{view === "classic" ? "Поле 1" : "Поле 2"}</p>
+            <p className="text-xs text-white/70">{showFastTrack ? "Большой круг · 48 клеток" : view === "classic" ? "Поле 1" : "Поле 2"}</p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 text-xs font-bold sm:text-sm">
@@ -94,7 +97,7 @@ export function GameDisplay({
 
       {error ? <p className="mx-auto mt-2 max-w-[1800px] rounded-xl bg-red-950 px-4 py-2 text-sm text-red-100">{error}</p> : null}
       <main className="mx-auto mt-3 flex h-[calc(100vh-5.75rem)] max-w-[1800px] items-center justify-center overflow-auto">
-        {view === "classic" ? <ClassicBroadcastBoard snapshot={snapshot} /> : <JourneyBroadcastBoard snapshot={snapshot} />}
+        {showFastTrack ? <div className="w-full min-w-0"><FastTrackBoard snapshot={snapshot} /></div> : view === "classic" ? <ClassicBroadcastBoard snapshot={snapshot} /> : <JourneyBroadcastBoard snapshot={snapshot} />}
       </main>
     </div>
   );

@@ -8,7 +8,9 @@ import {
   Pause,
   Play,
   Send,
-  Trash2,
+  LayoutDashboard,
+  MonitorUp,
+  ShieldCheck,
   X
 } from "lucide-react";
 import {
@@ -42,8 +44,6 @@ export interface GameRoomHeaderState {
   connection: ConnectionDiagnostics;
   code: string;
   isSolo: boolean;
-  currentRound: number;
-  currentPlayerName: string | null;
   currentPeriod: number;
   periodCount: number;
   remainingSeconds: number | null;
@@ -53,7 +53,7 @@ export interface GameRoomHeaderState {
   onSendChat: (body: string) => void;
   onPause: (() => void) | null;
   onResume: (() => void) | null;
-  onDeleteGame: (() => void) | null;
+  hostDisplayView: "classic" | "journey" | null;
   onCheckConnection: () => void;
 }
 
@@ -82,11 +82,44 @@ export function useSetGameRoomHeader() {
 export function GameRoomHeaderSlot() {
   const context = useContext(GameRoomHeaderContext);
   const state = context?.state ?? null;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hasHostLinks = Boolean(state?.hostDisplayView);
+
+  useEffect(() => {
+    const header = rootRef.current?.closest("header");
+    if (!header) return;
+    const style = document.documentElement.style;
+    const previous = style.getPropertyValue("--app-shell-header-bottom");
+    const measure = () => style.setProperty("--app-shell-header-bottom", `${header.getBoundingClientRect().bottom}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      if (previous) style.setProperty("--app-shell-header-bottom", previous);
+      else style.removeProperty("--app-shell-header-bottom");
+    };
+  }, [hasHostLinks]);
 
   return (
-    <div className="flex min-w-0 justify-center">
+    <div ref={rootRef} className={`flex min-w-0 justify-center${hasHostLinks ? " col-span-3 row-start-2 md:col-span-1 md:col-start-2 md:row-start-1" : ""}`}>
       {state ? (
         <div className="flex max-w-full items-center gap-1.5 text-xs text-muted sm:gap-2">
+          {state.hostDisplayView ? (
+            <nav className="flex shrink-0 items-center" aria-label="Экраны ведущего">
+              <a href={`/games/${state.gameId}/host`} aria-label="Пульт ведущего" title="Пульт ведущего"
+                className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+                <LayoutDashboard size={19} aria-hidden="true" />
+                <span className="hidden xl:inline">Пульт ведущего</span>
+              </a>
+              <a href={`/games/${state.gameId}/display?view=${state.hostDisplayView}`} target="_blank" rel="noreferrer"
+                aria-label="Открыть поле" title="Открыть поле в новом окне"
+                className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+                <MonitorUp size={19} aria-hidden="true" />
+                <span className="hidden xl:inline">Открыть поле</span>
+              </a>
+            </nav>
+          ) : null}
           <MobileTimelineControl state={state} />
           {!state.isSolo && state.remainingSeconds !== null ? (
             <span
@@ -134,52 +167,21 @@ export function GameRoomHeaderSlot() {
               </span>
             </button>
           ) : null}
-          <div className="md:hidden">
-            <ConnectionStatusControl state={state} />
-          </div>
-          <div className="hidden items-center gap-2 md:flex">
-            {state.status === "ENDED" ? (
-              <span className="rounded-lg bg-card px-3 py-2 font-bold text-ink">
-                Партия завершена
-              </span>
-            ) : (
-              <>
-                <span className="hidden max-w-44 truncate font-bold text-ink xl:inline">
-                  {state.title}
+          <ConnectionStatusControl state={state} />
+          {state.status === "WAITING" ? (
+            <div className="hidden items-center gap-2 md:flex">
+              <span className="hidden max-w-44 truncate font-bold text-ink xl:inline">{state.title}</span>
+              {state.isSolo ? (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eee8ff] px-2.5 py-2 font-extrabold text-[#6443b4]">
+                  <Bot size={14} aria-hidden="true" />С ботами
                 </span>
-                {state.isSolo ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eee8ff] px-2.5 py-2 font-extrabold text-[#6443b4]">
-                    <Bot size={14} aria-hidden="true" />
-                    С ботами
-                  </span>
-                ) : (
-                  <RoomInviteActions code={state.code} />
-                )}
-                <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink lg:inline">
-                  {gameStatusLabel(state.status)}
-                </span>
-                <ConnectionStatusControl state={state} />
-                <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink xl:inline">
-                  Раунд {state.currentRound}
-                </span>
-                {state.currentPlayerName ? (
-                  <span className="min-w-0 truncate rounded-lg bg-[#fff0df] px-2.5 py-2 font-extrabold text-[#8a3d0a]">
-                    Ход: {state.currentPlayerName}
-                  </span>
-                ) : null}
-              </>
-            )}
-            {state.onDeleteGame ? (
-              <button
-                type="button"
-                onClick={state.onDeleteGame}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-red-700 transition hover:bg-red-50"
-                aria-label="Удалить игру"
-              >
-                <Trash2 size={15} aria-hidden="true" />
-              </button>
-            ) : null}
-          </div>
+              ) : <RoomInviteActions code={state.code} />}
+            </div>
+          ) : state.status === "PAUSED" || state.status === "ENDED" ? (
+            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink md:inline">
+              {gameStatusLabel(state.status)}
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -318,7 +320,7 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
 
   if (!hasTimer && !canControl) return null;
 
-  const controlLabel = state.isSolo
+  const controlLabel = !hasTimer
     ? state.onResume
       ? "Игра на паузе"
       : "Управление игрой"
@@ -335,13 +337,13 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
           aria-haspopup="dialog"
           aria-expanded={open}
         >
-          {state.isSolo ? (
+          {!hasTimer ? (
             <Pause size={14} aria-hidden="true" />
           ) : (
             <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
           )}
           <span>
-            {state.isSolo
+            {!hasTimer
               ? state.onResume ? "Пауза" : "Игра"
               : formatRemainingTime(state.remainingSeconds ?? 0)}
           </span>
@@ -358,10 +360,10 @@ function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
       {open && canControl ? (
         <div
           role="dialog"
-          aria-label={state.isSolo ? "Управление игрой" : "Управление временем партии"}
+          aria-label={!hasTimer ? "Управление игрой" : "Управление временем партии"}
           className="absolute left-0 top-[calc(100%+.5rem)] z-[70] w-56 rounded-xl bg-white p-3 text-left shadow-[0_18px_48px_rgba(5,18,45,.2)]"
         >
-          {state.isSolo ? (
+          {!hasTimer ? (
             <div className="text-sm font-bold leading-5 text-ink">
               Без ограничения времени
             </div>
@@ -429,10 +431,16 @@ function GameChatControl({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    const readKey = `game-chat-read:${currentUserId}:${gameId}`;
     if (knownGameIdRef.current !== gameId) {
       knownGameIdRef.current = gameId;
       knownMessageIdsRef.current = new Set(messages.map((message) => message.id));
-      setUnreadCount(0);
+      let readIds = new Set<string>();
+      try {
+        const stored: unknown = JSON.parse(window.sessionStorage.getItem(readKey) ?? "[]");
+        if (Array.isArray(stored)) readIds = new Set(stored.filter((id): id is string => typeof id === "string"));
+      } catch { /* Chat remains available when storage is disabled. */ }
+      setUnreadCount(messages.filter((message) => message.sender === "ADMINISTRATOR" && !readIds.has(message.id)).length);
       setOpen(false);
       return;
     }
@@ -445,6 +453,9 @@ function GameChatControl({
     knownMessageIdsRef.current = new Set(messages.map((message) => message.id));
     if (open) {
       setUnreadCount(0);
+      try {
+        window.sessionStorage.setItem(readKey, JSON.stringify(messages.map((message) => message.id)));
+      } catch { /* Reading messages does not depend on browser storage. */ }
     } else if (newUnreadCount > 0) {
       setUnreadCount((count) => count + newUnreadCount);
     }
@@ -538,9 +549,11 @@ function GameChatControl({
                     </div>
                   ) : (
                     orderedMessages.map((message) => (
-                      <div key={message.id} className="rounded-xl bg-surface p-3">
+                      <div key={message.id} className={`rounded-xl p-3 ${message.sender === "ADMINISTRATOR" ? "bg-[#e8effe]" : "bg-surface"}`}>
                         <div className="text-xs text-muted">
-                          {message.user?.displayName ?? "Игрок"} · {shortDate(message.createdAt)}
+                          {message.sender === "ADMINISTRATOR" ? (
+                            <span className="inline-flex items-center gap-1 font-bold text-journey"><ShieldCheck size={13} aria-hidden="true" />Администратор</span>
+                          ) : message.user?.displayName ?? "Игрок"} · {shortDate(message.createdAt)}
                         </div>
                         <div className="mt-1 break-words text-sm text-ink">{message.body}</div>
                       </div>

@@ -9,7 +9,7 @@ export type RatRaceCellType =
   | "baby"
   | "downsized";
 
-export type FastTrackCellType = "fast_track" | "dream" | "cashflow_day";
+export type FastTrackCellType = "business" | "dream" | "expense" | "positive";
 
 export interface BoardCell<TType extends string = string> {
   index: number;
@@ -44,17 +44,4 @@ export const ratRaceBoard: BoardCell<RatRaceCellType>[] = [
   { index: 23, type: "market", label: "Рынок" }
 ];
 
-export const fastTrackBoard: BoardCell<FastTrackCellType>[] = [
-  { index: 0, type: "cashflow_day", label: "День денежного потока" },
-  { index: 1, type: "fast_track", label: "Сделка Скоростной дорожки" },
-  { index: 2, type: "dream", label: "Мечта" },
-  { index: 3, type: "fast_track", label: "Сделка Скоростной дорожки" },
-  { index: 4, type: "cashflow_day", label: "День денежного потока" },
-  { index: 5, type: "dream", label: "Мечта" },
-  { index: 6, type: "fast_track", label: "Сделка Скоростной дорожки" },
-  { index: 7, type: "dream", label: "Мечта" },
-  { index: 8, type: "cashflow_day", label: "День денежного потока" },
-  { index: 9, type: "fast_track", label: "Сделка Скоростной дорожки" },
-  { index: 10, type: "dream", label: "Мечта" },
-  { index: 11, type: "fast_track", label: "Сделка Скоростной дорожки" }
-];
+export { fastTrackCells as fastTrackBoard } from "./fast-track";

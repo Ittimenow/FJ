@@ -40,7 +40,7 @@ export default async function ResultsPage() {
                     <span className="inline-flex items-center gap-1.5"><UsersRound size={14} aria-hidden="true" />{result.facts.players.length} игроков</span>
                   </div>
                   <h2 className="mt-3 text-xl font-extrabold leading-6 tracking-[-0.025em] group-hover:text-journey">{result.headline}</h2>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">{result.facts.highlights[0]?.text ?? "Главные решения и результаты партии."}</p>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted">{result.facts.awards?.[0]?.text ?? result.facts.highlights[0]?.text ?? "Главные решения и результаты партии."}</p>
                 </div>
               </Link>
             ))}

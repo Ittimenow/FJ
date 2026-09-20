@@ -22,6 +22,9 @@ export type CashChangeExpression =
     };
 
 const eventReasonLabels: Record<string, string> = {
+  fast_track_updated: "состояние большого круга обновлено",
+  fast_track_choice_required: "ожидается решение на большом круге",
+  fast_track_turn_ended: "ход большого круга завершён",
   player_added: "игрок добавлен в комнату",
   game_deleted: "игра удалена",
   game_started: "игра запущена",

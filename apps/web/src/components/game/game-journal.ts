@@ -31,7 +31,8 @@ const nonGameplayPlayerEventTypes = new Set([
   "player:added",
   "player:removed",
   "player:role_changed",
-  "player:figurine_selected"
+  "player:figurine_selected",
+  "player:dream_chosen"
 ]);
 
 export function gameTurns(events: GameEvent[]): PlayerTurn[] {
@@ -180,6 +181,14 @@ export function turnHeadline(turn: PlayerTurn) {
 export function eventHeadline(event: GameEvent) {
   const payload = event.payload;
   switch (event.type) {
+    case "player:dream_chosen": return `Выбрана мечта «${payload.title ?? ""}»`;
+    case "fast_track:cashflow": return `Доход CASHFLOW: +${formatWholeMoney(payload.amountCents)}`;
+    case "fast_track:expense": return `${payload.title}: −${formatWholeMoney(payload.amountCents)}`;
+    case "fast_track:purchased": return payload.success === false ? `Инвестиция не принесла доход: ${payload.title}` : `Оплачено: ${payload.title}`;
+    case "fast_track:investment_roll": return `Бросок инвестиции: ${payload.die} · ${payload.success ? "успех" : "неудача"}`;
+    case "fast_track:declined": return `Отказ: ${payload.title}`;
+    case "fast_track:dream_influence": return `Цена чужой мечты увеличена: ${payload.title}`;
+
     case "player:roll_dice": {
       const values = Array.isArray(payload.diceValues) ? payload.diceValues.join(" + ") : payload.dice;
       return `Бросок кубиков: ${values ?? "—"}`;
@@ -303,6 +312,7 @@ export function eventHeadline(event: GameEvent) {
 export function pendingActionLabel(snapshot: GameSnapshot, player: GamePlayer) {
   if (snapshot.game.pendingAction?.gamePlayerId !== player.id) return null;
   const labels: Record<string, string> = {
+    fast_track_choice: "Выбирает действие большого круга",
     choose_deal: "Выбирает сделку",
     deal_card_drawn: "Принимает решение по сделке",
     stock_sale_window: "Решает, продавать ли акции",
@@ -332,3 +342,5 @@ function isTurnEndingStateEvent(event: GameEvent) {
   const reason = String(event.payload.reason ?? "");
   return turnEndingStateReasons.has(reason) || reason.endsWith("_turn_ended");
 }
+
+function formatWholeMoney(value: unknown) { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value ?? 0)); }

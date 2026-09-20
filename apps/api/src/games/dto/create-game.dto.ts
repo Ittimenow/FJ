@@ -1,14 +1,16 @@
+import { TestGameOptionsDto } from "./fast-track.dto";
 import { Type } from "class-transformer";
 import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 
-export class CreateGameDto {
+export class CreateGameDto extends TestGameOptionsDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
   title?: string;
 
   @IsOptional()
-  @IsUUID()
+  // Seeded card sets use canonical PostgreSQL UUIDs without RFC version bits.
+  @IsUUID("loose")
   cardSetId?: string;
 
   @IsOptional()

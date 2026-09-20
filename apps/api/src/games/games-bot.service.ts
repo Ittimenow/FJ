@@ -1,3 +1,4 @@
+import { fastTrackCells, canEscapeRatRace } from "@cashflow/shared";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
   AssetStatus,
@@ -32,6 +33,7 @@ import { MonitoringService } from "../monitoring/monitoring.service";
 import { GamesService } from "./games.service";
 
 type BotPendingAction =
+  | { type: "fast_track_choice"; gamePlayerId: string; cellIndex: number; decisionId: string; priceCents: number }
   | { type: "choose_deal"; gamePlayerId: string }
   | {
       type: "deal_card_drawn";
@@ -84,6 +86,8 @@ type BotPlayer = Prisma.GamePlayerGetPayload<{
 }>;
 
 type BotAction =
+  | { type: "enter_fast_track"; playerId: string; reason: string }
+  | { type: "fast_track_decision"; playerId: string; buy: boolean; decisionId: string; reason: string }
   | { type: "roll"; playerId: string }
   | { type: "draw"; playerId: string; cardType: CardType; reason: string }
   | { type: "buy"; playerId: string; cardId: number; quantity: number; reason: string }
@@ -325,6 +329,11 @@ export class GamesBotService implements OnModuleInit {
       return this.bankruptcyAction(current);
     }
 
+    if (current.track === "FAST_TRACK") return { type: "roll", playerId: current.id } satisfies BotAction;
+    if (game.rulesVersion === 2 && canEscapeRatRace(Number(current.financialState.passiveIncomeCents), Number(current.financialState.totalExpensesCents), current.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n))) {
+      return { type: "enter_fast_track", playerId: current.id, reason: "пассивный доход покрывает расходы, банковские кредиты погашены — перехожу на большой круг" } satisfies BotAction;
+    }
+
     const state = this.financialSnapshot(current);
     const bankLoan = current.liabilities.find((liability) => liability.type === "bank_loan");
     const repayable = Math.floor(
@@ -344,6 +353,13 @@ export class GamesBotService implements OnModuleInit {
   }
 
   private async pendingActionForBot(player: BotPlayer, pending: BotPendingAction) {
+    if (pending.type === "fast_track_choice") {
+      const cell = fastTrackCells[pending.cellIndex]!;
+      const canAfford = Number(player.financialState?.cashCents ?? 0n) >= pending.priceCents;
+      const buy = canAfford && (cell.rule.kind !== "dream" || player.dreamCellIndex === cell.index);
+      return { type: "fast_track_decision", playerId: player.id, buy, decisionId: pending.decisionId,
+        reason: buy ? "наличных достаточно: приближаюсь к своей мечте или увеличению дохода" : "сохраняю наличные для своей мечты и доходных бизнесов" } satisfies BotAction;
+    }
     const state = this.financialSnapshot(player);
     if (pending.type === "choose_deal") {
       const cardType = chooseBotDealType(state) as CardType;
@@ -538,6 +554,8 @@ export class GamesBotService implements OnModuleInit {
   private execute(gameId: string, action: BotAction) {
     const actorId = this.games.botActorId(action.playerId);
     switch (action.type) {
+      case "enter_fast_track": return this.games.enterFastTrack(gameId, actorId);
+      case "fast_track_decision": return this.games.decideFastTrack(gameId, actorId, { buy: action.buy, decisionId: action.decisionId });
       case "roll":
         return this.games.rollDice(gameId, actorId);
       case "draw":

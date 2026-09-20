@@ -15,7 +15,8 @@ test("summary includes every player mention and calculated highlights", () => {
       { id: "p1", name: "Анна", mention: "@anna", profession: "Учитель", figurine: null, finalCashCents: 100, finalCashflowCents: 200, finalPassiveIncomeCents: 300, cashflowDeltaCents: 100, passiveIncomeDeltaCents: 300, assetsCount: 2, track: "FAST_TRACK", status: "JOINED" },
       { id: "p2", name: "Макс", mention: "Макс", profession: "Водитель", figurine: null, finalCashCents: 50, finalCashflowCents: 80, finalPassiveIncomeCents: 20, cashflowDeltaCents: 30, passiveIncomeDeltaCents: 20, assetsCount: 1, track: "RAT_RACE", status: "JOINED" }
     ],
-    highlights: [{ playerId: "p2", kind: "recovered", text: "Макс восстановился после банкротства." }]
+    highlights: [{ playerId: "p2", kind: "recovered", text: "Макс восстановился после банкротства." }],
+    awards: [{ kind: "deal_hunter", title: "Охотник за сделками", playerId: "p2", playerName: "Макс", mention: "Макс", actionCount: 4, metricValue: 4, metricUnit: "count", result: "4 покупки", text: "Охотник за сделками — Макс: 4 покупки" }]
   };
   const summary = composeGameSummary(facts);
   assert.equal(summary.headline, "«Пятничная игра»: Анна достигает финансовой свободы");
@@ -25,6 +26,8 @@ test("summary includes every player mention and calculated highlights", () => {
   assert.match(summary.body, /1 час 42 минуты/);
   assert.match(summary.body, /Главные повороты:/);
   assert.match(summary.body, /восстановился после банкротства/);
+  assert.match(summary.body, /Награды партии:/);
+  assert.match(summary.body, /Охотник за сделками — Макс: 4 покупки/);
   assert.match(summary.body, /За столом: @anna и Макс\./);
 });
 
@@ -45,7 +48,8 @@ test("summary reads as a short story instead of a duplicate statistics block", (
     highlights: [
       { playerId: "denis", kind: "cashflow_growth", text: "Денис: денежный поток вырос на 12 $ в месяц." },
       { playerId: "cat", kind: "deal:buy", text: "Котик: актив «Дом» добавил 300 $ к ежемесячному потоку." }
-    ]
+    ],
+    awards: []
   };
 
   const summary = composeGameSummary(facts);

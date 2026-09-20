@@ -40,6 +40,7 @@ export function TelegramPublicationCard({
   const rounds = facts.reduce((total, item) => total + item.rounds, 0);
   const winners = players.filter((player) => player.winner).map((player) => player.mention);
   const firstHighlight = facts.flatMap((item) => item.highlights)[0]?.text;
+  const awards = facts.flatMap((item) => item.awards ?? []).slice(0, 3);
   const supportingText = winners.length
     ? `Финансовой свободы достигли: ${winners.slice(0, 4).join(", ")}`
     : firstHighlight ?? "Главные решения и результаты сохранены по журналу игры.";
@@ -73,6 +74,15 @@ export function TelegramPublicationCard({
           <Separator />
           <Fact value={rounds} label={plural(rounds, "раунд", "раунда", "раундов")} />
         </div>
+        {awards.length ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            {awards.map((award) => (
+              <div key={`${award.kind}-${award.playerId}`} style={{ maxWidth: 290, display: "flex", borderRadius: 10, background: "#fff0cf", color: "#715719", padding: "8px 11px", fontSize: 13, fontWeight: 800, overflow: "hidden" }}>
+                {award.title}: {award.mention}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div style={{ position: "absolute", left: 54, right: 54, bottom: 42, height: 184, display: "flex", alignItems: "center", borderRadius: 26, background: "#102a5c", padding: "20px 24px", boxShadow: "0 20px 45px rgba(27,57,118,.18)" }}>

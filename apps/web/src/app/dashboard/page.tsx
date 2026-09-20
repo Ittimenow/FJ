@@ -106,7 +106,7 @@ export default async function DashboardPage() {
             <div className="grid min-w-0 gap-4">
               <Card className="rounded-2xl border-0 bg-[#fbf9ff]">
                 <CardContent className="pt-6">
-                  <CreateSoloGameForm token={session.accessToken} />
+                  <CreateSoloGameForm token={session.accessToken} allowTesting={isAdmin} />
                 </CardContent>
               </Card>
 
@@ -118,7 +118,7 @@ export default async function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   {canCreateGames ? (
-                    <CreateGameForm token={session.accessToken} />
+                    <CreateGameForm token={session.accessToken} allowTesting={isAdmin} />
                   ) : (
                     <p className="text-sm leading-6 text-muted">
                       Создавать командные комнаты может ведущий. В готовую комнату можно войти по приглашению.

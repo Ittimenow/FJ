@@ -1,3 +1,4 @@
+import type { FastTrackCell, FastTrackWorld } from "@cashflow/shared";
 export interface ProfileResponse {
   user: {
     id: string;
@@ -81,6 +82,7 @@ export interface PublicGameSummary {
       status: string;
     }>;
     highlights: Array<{ playerId: string | null; kind: string; text: string }>;
+    awards: GameAward[];
   };
 }
 
@@ -205,8 +207,12 @@ export interface GameSnapshot {
     remainingPeriodSeconds: number | null;
     pauseReason: "manual" | "period_complete" | "player_left" | null;
     pausedAt: string | null;
+    rulesVersion?: number;
+    isTest?: boolean;
+    fastTrackWorld?: FastTrackWorld;
     pendingAction: GamePendingAction | null;
   };
+  fastTrackBoard?: FastTrackCell[];
   board: Array<{
     index: number;
     type: string;
@@ -215,6 +221,20 @@ export interface GameSnapshot {
   players: GamePlayer[];
   events: GameEvent[];
   chatMessages: ChatMessage[];
+  awards: GameAward[];
+}
+
+export interface GameAward {
+  kind: string;
+  title: string;
+  playerId: string;
+  playerName: string;
+  mention: string;
+  actionCount: number;
+  metricValue: number;
+  metricUnit: "count" | "money" | "money_monthly";
+  result: string;
+  text: string;
 }
 
 export interface GamePlayer {
@@ -231,6 +251,7 @@ export interface GamePlayer {
   track: "RAT_RACE" | "FAST_TRACK";
   position: number;
   fastTrackPosition: number;
+  dreamCellIndex?: number | null;
   user: {
     id: string;
     displayName: string;
@@ -260,6 +281,9 @@ export interface GamePlayer {
 }
 
 export interface FinancialState {
+  fastTrackStartIncomeCents?: number;
+  fastTrackIncomeCents?: number;
+  fastTrackCharity?: boolean;
   cashCents: number;
   salaryCents: number;
   passiveIncomeCents: number;
@@ -313,6 +337,7 @@ export interface MarketSaleOfferState {
 }
 
 export type GamePendingAction =
+  | { type: "fast_track_choice"; gamePlayerId: string; cellIndex: number; decisionId: string; priceCents: number }
   | {
       type: "choose_deal";
       gamePlayerId: string;
@@ -407,6 +432,7 @@ export interface ChatMessage {
   id: string;
   body: string;
   createdAt: string;
+  sender?: "ADMINISTRATOR";
   user?: {
     id: string;
     displayName: string;

@@ -14,6 +14,7 @@ export default async function ResultImage({ params }: { params: Promise<{ id: st
   }
   const facts = result.facts;
   const winner = facts.players.find((player) => player.id === facts.winnerGamePlayerId);
+  const awards = facts.awards ?? [];
   return new ImageResponse(
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "#faf2e8", color: "#17243f", padding: "54px 60px", fontFamily: "Arial, sans-serif" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -35,10 +36,24 @@ export default async function ResultImage({ params }: { params: Promise<{ id: st
             {winner ? `${winner.mention} · пассивный доход ${money(winner.finalPassiveIncomeCents)}/мес` : facts.highlights[0]?.text ?? "Главные решения партии сохранены."}
           </div>
         </div>
-        <div style={{ width: 250, display: "flex", flexDirection: "column", gap: 12, borderRadius: 22, background: "#fff", padding: 24, boxShadow: "0 20px 45px rgba(27,57,118,.12)" }}>
-          <Stat label="Игроков" value={String(facts.players.length)} />
-          <Stat label="Раундов" value={String(facts.rounds)} />
-          <Stat label="Время" value={duration(facts.durationMinutes)} />
+        <div style={{ width: 300, display: "flex", flexDirection: "column", gap: 12, borderRadius: 22, background: "#fff", padding: 24, boxShadow: "0 20px 45px rgba(27,57,118,.12)" }}>
+          {awards.length ? (
+            <>
+              <span style={{ color: "#8a5a08", fontSize: 17, fontWeight: 800 }}>Награды партии</span>
+              {awards.slice(0, 3).map((award) => (
+                <div key={award.kind} style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 17, fontWeight: 800 }}>{award.title}</span>
+                  <span style={{ marginTop: 2, color: "#657597", fontSize: 14 }}>{award.mention} · {award.result}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              <Stat label="Игроков" value={String(facts.players.length)} />
+              <Stat label="Раундов" value={String(facts.rounds)} />
+              <Stat label="Время" value={duration(facts.durationMinutes)} />
+            </>
+          )}
         </div>
       </div>
 

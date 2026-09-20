@@ -21,7 +21,7 @@ export function gameEndPresentation({
   reason: string | null;
   winnerName?: string | null;
 }): GameEndPresentation {
-  if (winnerName || reason === "financial_freedom") {
+  if (winnerName || reason === "financial_freedom" || reason === "dream" || reason === "fast_track_income") {
     return {
       icon: null,
       tone: "victory",

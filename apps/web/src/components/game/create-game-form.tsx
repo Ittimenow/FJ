@@ -1,5 +1,7 @@
 "use client";
 
+import { TestGameOptions, testOptionsFromForm } from "./test-game-options";
+
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,9 +25,11 @@ const requiredCardTypes = [
 
 export function CreateGameForm({
   token,
+  allowTesting = false,
   allowCardSetSelection = false
 }: {
   token: string;
+  allowTesting?: boolean;
   allowCardSetSelection?: boolean;
 }) {
   const router = useRouter();
@@ -79,6 +83,7 @@ export function CreateGameForm({
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
+          ...(allowTesting ? testOptionsFromForm(form) : {}),
           title: String(form.get("title") ?? ""),
           ...(allowCardSetSelection && cardSetId ? { cardSetId } : {}),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
@@ -214,6 +219,7 @@ export function CreateGameForm({
               Math.floor((timeLimitMinutes * 60) / periodCount)
             )}. Между ними игра автоматически встанет на паузу.`}
       </p>
+      {allowTesting ? <TestGameOptions /> : null}
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">
           {error}

@@ -17,6 +17,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { toSerializable } from "../common/json";
+import { selectGameAwards } from "../games/game-awards.logic";
 import {
   composeGameSummary,
   GameSummaryFacts,
@@ -70,7 +71,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
 
   async publicList(limit = 6) {
     const summaries = await this.prisma.gameSummary.findMany({
-      where: { visibleOnSite: true, status: SummaryStatus.PUBLISHED },
+      where: { visibleOnSite: true, status: SummaryStatus.PUBLISHED, game: { isTest: false } },
       include: { game: { select: { title: true, endedAt: true, currentRound: true } } },
       orderBy: { sitePublishedAt: "desc" },
       take: Math.min(Math.max(limit, 1), 24)
@@ -80,7 +81,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
 
   async publicDetail(id: string) {
     const summary = await this.prisma.gameSummary.findFirst({
-      where: { id, visibleOnSite: true, status: SummaryStatus.PUBLISHED },
+      where: { id, visibleOnSite: true, status: SummaryStatus.PUBLISHED, game: { isTest: false } },
       include: { game: { select: { title: true, endedAt: true, currentRound: true } } }
     });
     if (!summary) throw new NotFoundException("Итоги игры не найдены");
@@ -148,7 +149,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
         take: 100
       }),
       this.prisma.game.findMany({
-        where: { status: GameStatus.ENDED, summary: null },
+        where: { status: GameStatus.ENDED, isTest: false, summary: null },
         select: { id: true, title: true, code: true, endedAt: true, currentRound: true },
         orderBy: { endedAt: "desc" },
         take: 50
@@ -239,6 +240,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
       }
     });
     if (!game) throw new NotFoundException("Игра не найдена");
+    if (game.isTest) throw new BadRequestException("Тестовые партии не публикуются");
     if (game.status !== GameStatus.ENDED || !game.endedAt) {
       throw new BadRequestException("Саммари можно создать только после завершения игры");
     }
@@ -532,6 +534,7 @@ function buildFacts(game: {
   startedAt: Date | null;
   endedAt: Date | null;
   currentRound: number;
+  fastTrackWorld?: Prisma.JsonValue;
   players: Array<{
     id: string;
     guestName: string | null;
@@ -540,7 +543,7 @@ function buildFacts(game: {
     figurine: string | null;
     user: { displayName: string; telegramChannel: string | null; telegramMentionConsent: boolean; figurine: string | null } | null;
     profession: { name: string } | null;
-    financialState: { cashCents: bigint; monthlyCashflowCents: bigint; passiveIncomeCents: bigint } | null;
+    financialState: { cashCents: bigint; monthlyCashflowCents: bigint; passiveIncomeCents: bigint; fastTrackIncomeCents?: bigint } | null;
     assets: Array<{ id: string }>;
   }>;
   events: Array<{ sequence: number; type: string; gamePlayerId: string | null; payload: Prisma.JsonValue; stateSnapshot: Prisma.JsonValue | null }>;
@@ -553,8 +556,8 @@ function buildFacts(game: {
   const endPayload = record(endEvent?.payload);
   const players: SummaryPlayerFacts[] = game.players.map((player) => {
     const start = startingById.get(player.id);
-    const finalCashflowCents = Number(player.financialState?.monthlyCashflowCents ?? 0);
-    const finalPassiveIncomeCents = Number(player.financialState?.passiveIncomeCents ?? 0);
+    const finalCashflowCents = Number((player.track === "FAST_TRACK" ? player.financialState?.fastTrackIncomeCents : player.financialState?.monthlyCashflowCents) ?? 0);
+    const finalPassiveIncomeCents = Number((player.track === "FAST_TRACK" ? player.financialState?.fastTrackIncomeCents : player.financialState?.passiveIncomeCents) ?? 0);
     const name = player.user?.displayName ?? player.guestName ?? "Игрок";
     return {
       id: player.id,
@@ -569,7 +572,7 @@ function buildFacts(game: {
       finalPassiveIncomeCents,
       cashflowDeltaCents: finalCashflowCents - number(start?.monthlyCashflowCents),
       passiveIncomeDeltaCents: finalPassiveIncomeCents - number(start?.passiveIncomeCents),
-      assetsCount: player.assets.length,
+      assetsCount: player.assets.length + Object.values(record(record(game.fastTrackWorld)?.owners) ?? {}).filter((owner) => owner === player.id).length,
       track: player.track,
       status: player.status
     };
@@ -578,6 +581,7 @@ function buildFacts(game: {
     ? endPayload.winnerGamePlayerId
     : null;
   const highlights = selectGameHighlights(game.events, players, winnerGamePlayerId);
+  const awards = selectGameAwards(game.events, players);
   return {
     gameId: game.id,
     title: game.title,
@@ -589,7 +593,8 @@ function buildFacts(game: {
     endReason: typeof endPayload?.reason === "string" ? endPayload.reason : null,
     winnerGamePlayerId,
     players,
-    highlights
+    highlights,
+    awards
   };
 }
 

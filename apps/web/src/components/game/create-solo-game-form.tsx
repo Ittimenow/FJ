@@ -1,5 +1,7 @@
 "use client";
 
+import { TestGameOptions, testOptionsFromForm } from "./test-game-options";
+
 import { Bot, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -13,7 +15,7 @@ type GameCardSet = {
   isDefault: boolean;
 };
 
-export function CreateSoloGameForm({ token }: { token: string }) {
+export function CreateSoloGameForm({ token, allowTesting = false }: { token: string; allowTesting?: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,7 @@ export function CreateSoloGameForm({ token }: { token: string }) {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
+          ...(allowTesting ? testOptionsFromForm(form) : {}),
           botCount: Number(form.get("botCount") ?? 1),
           ...(cardSetId ? { cardSetId } : {})
         })
@@ -140,6 +143,7 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         <ShieldCheck className="mt-0.5 shrink-0 text-[#7655c7]" size={15} aria-hidden="true" />
         Сбалансированные боты видят только открытые карточки и текущее состояние партии.
       </p>
+      {allowTesting ? <TestGameOptions /> : null}
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">
           {error}

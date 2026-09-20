@@ -18,7 +18,8 @@ function facts(id: string, title: string, mention: string): GameSummaryFacts {
       cashflowDeltaCents: 0, passiveIncomeDeltaCents: 100, assetsCount: 1,
       track: "FAST_TRACK", status: "JOINED"
     }],
-    highlights: [{ playerId: `${id}-player`, kind: "win", text: `${mention} достиг финансовой свободы.` }]
+    highlights: [{ playerId: `${id}-player`, kind: "win", text: `${mention} достиг финансовой свободы.` }],
+    awards: [{ kind: "deal_hunter", title: "Охотник за сделками", playerId: `${id}-player`, playerName: mention, mention, actionCount: 3, metricValue: 3, metricUnit: "count", result: "3 покупки", text: `Охотник за сделками — ${mention}: 3 покупки` }]
   };
 }
 
@@ -32,5 +33,6 @@ test("series post combines games, winners and every unique player mention", () =
   assert.match(result.body, /20 раундов/);
   assert.match(result.body, /@anna/);
   assert.match(result.body, /Макс/);
+  assert.match(result.body, /Награды игр:/);
   assert.ok(result.body.length <= 1024);
 });
