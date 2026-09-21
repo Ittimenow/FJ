@@ -1256,6 +1256,7 @@ export function GameRoom({
       gameStatus={snapshot.game.status}
       onSendBabyGift={sendBabyGift}
       showHeader={showHeader}
+      fastTrackOnly={showFastTrack}
     />
   );
 
@@ -1374,7 +1375,7 @@ export function GameRoom({
         />
       ) : null}
 
-      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy} turnTabRequest={turnTabRequest}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={snapshot}
           currentUserId={currentUserId}
@@ -4919,7 +4920,7 @@ function ActionsPanel({
 
 function GameTurnFeed({
   gameId, token, events, players, currentGamePlayerId, gameStatus,
-  onSendBabyGift, showHeader
+  onSendBabyGift, showHeader, fastTrackOnly
 }: {
   gameId: string;
   token: string;
@@ -4929,6 +4930,7 @@ function GameTurnFeed({
   gameStatus: GameSnapshot["game"]["status"];
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
   showHeader: boolean;
+  fastTrackOnly: boolean;
 }) {
   const viewingPlayer = players.find((player) => player.id === currentGamePlayerId);
   return <GameActionHistory
@@ -4936,6 +4938,7 @@ function GameTurnFeed({
     gameId={gameId}
     events={events}
     players={players}
+    fastTrackOnly={fastTrackOnly}
     loadEarlier={async () => {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Не удалось загрузить историю партии");

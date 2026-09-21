@@ -4,7 +4,6 @@ import { GameRoomHeaderProvider, useSetGameRoomHeader } from "../../apps/web/src
 import { initialConnectionDiagnostics } from "../../apps/web/src/lib/connection-health";
 import { gameChatNotices } from "../../apps/api/src/games/game-chat-notices";
 import type { ChatMessage } from "../../apps/web/src/lib/types";
-import logoUrl from "../../apps/web/public/logo.svg";
 
 function MenuContent({ children }: { children?: React.ReactNode }) {
   const setHeader = useSetGameRoomHeader();
@@ -14,11 +13,6 @@ function MenuContent({ children }: { children?: React.ReactNode }) {
   const [events, setEvents] = useState([{ id: "start", type: "game:started", createdAt: new Date("2026-09-20T10:01:00Z"), gamePlayerId: null, payload: {} }]);
   const [sent, setSent] = useState<ChatMessage[]>([]);
   const [sync, setSync] = useState(0);
-  useEffect(() => {
-    // The file:// fixture cannot use the application's root-relative public URL.
-    const logo = document.querySelector<HTMLImageElement>("header img");
-    if (logo) logo.src = logoUrl;
-  }, []);
   const messages = useMemo<ChatMessage[]>(() => [
     ...gameChatNotices({ id: "synthetic", isTest: true, createdAt: new Date("2026-09-20T10:00:00Z") }, events, [])
       .map((message) => ({ ...message, createdAt: message.createdAt.toISOString() })),

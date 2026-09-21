@@ -8,11 +8,12 @@ import { eventHeadline, gamePlayerForEvent } from "./game-journal";
 import { mergeActionEvents, playerActionEvents } from "./game-action-history.logic";
 import { PlayerAvatar } from "./player-avatar";
 
-export function GameActionHistory({ gameId, events, players, onlyPlayerId, loadEarlier, renderAction, header }: {
+export function GameActionHistory({ gameId, events, players, onlyPlayerId, fastTrackOnly = false, loadEarlier, renderAction, header }: {
   gameId: string;
   events: GameEvent[];
   players: GamePlayer[];
   onlyPlayerId?: string | null;
+  fastTrackOnly?: boolean;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
   renderAction?: (event: GameEvent, allEvents: GameEvent[]) => ReactNode;
   header?: ReactNode;
@@ -29,8 +30,8 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, loadE
     setError(null);
   }, [gameId]);
   useEffect(() => { setHistory((current) => mergeActionEvents(current, events)); }, [events]);
-  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId]);
-  const actions = playerActionEvents(history, players, onlyPlayerId);
+  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId, fastTrackOnly]);
+  const actions = playerActionEvents(history, players, onlyPlayerId, fastTrackOnly);
   const canLoadArchive = !archiveLoaded && Boolean(loadEarlier);
 
   async function showMore() {
@@ -52,7 +53,7 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, loadE
     } finally { setLoading(false); }
   }
 
-  return <section className="game-action-history min-w-0" aria-label="История действий игроков">
+  return <section className="game-action-history min-w-0" aria-label={fastTrackOnly ? "История большого круга" : "История действий игроков"}>
     {header}
     <ol className="m-0 list-none space-y-3 p-0" aria-live="polite" aria-busy={loading}>
       {actions.slice(0, visibleCount).map((event) => {

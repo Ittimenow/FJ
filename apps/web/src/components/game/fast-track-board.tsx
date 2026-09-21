@@ -1,7 +1,8 @@
 "use client";
 
 import { fastTrackCells, fastTrackPrice, readFastTrackWorld, type FastTrackCell } from "@cashflow/shared";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { BriefcaseBusiness, Dices, UserRound } from "lucide-react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { money } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer, GameSnapshot } from "@/lib/types";
@@ -30,12 +31,13 @@ function cellPosition(index: number): CSSProperties {
   return at(columns[52 - index]!, rows[1]!);
 }
 
-export function FastTrackBoard({ snapshot, player, actions, history, phase }: {
+export function FastTrackBoard({ snapshot, player, actions, history, phase, turnTabRequest = 0 }: {
   snapshot: GameSnapshot;
   player?: GamePlayer | undefined;
   actions?: ReactNode;
   history?: ReactNode;
   phase?: "ready" | "rolling" | "moving" | "landed";
+  turnTabRequest?: number;
 }) {
   const active = snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId);
   const focusPlayer = player?.track === "FAST_TRACK" ? player : active?.track === "FAST_TRACK" ? active : snapshot.players.find((item) => item.track === "FAST_TRACK");
@@ -45,13 +47,24 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase }: {
   const root = useRef<HTMLElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [externalPanels, setExternalPanels] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState<"turn" | "player" | "assets">("turn");
+  const tabId = useId();
+  const pending = snapshot.game.pendingAction;
+  const decisionId = pending?.type === "fast_track_choice" && pending.gamePlayerId === player?.id ? pending.decisionId : null;
   useEffect(() => {
     const fit = () => { if (root.current) setExternalPanels(root.current.clientWidth < 1264); };
+    const media = window.matchMedia("(max-width: 1023px)");
+    const updateMobile = () => setMobile(media.matches);
     fit();
+    updateMobile();
+    media.addEventListener("change", updateMobile);
     const observer = new ResizeObserver(fit);
     if (root.current) observer.observe(root.current);
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); media.removeEventListener("change", updateMobile); };
   }, []);
+  useEffect(() => { if (decisionId || phase === "rolling") setActiveTab("turn"); }, [decisionId, phase]);
+  useEffect(() => { if (turnTabRequest > 0) setActiveTab("turn"); }, [turnTabRequest]);
   useEffect(() => {
     const container = viewport.current;
     const cell = container?.querySelector<HTMLElement>(`[data-fast-cell="${Math.max(0, position)}"]`);
@@ -64,14 +77,44 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase }: {
   }, [position, followedPlayer?.id, externalPanels]);
   const world = readFastTrackWorld(snapshot.game.fastTrackWorld);
   const players = snapshot.players.filter((item) => item.role === "PLAYER" && item.status === "JOINED");
-  const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} /> : null;
+  const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} mobile={mobile} /> : <p className="turn-waiting">На большом круге пока нет игроков.</p>;
   const turn = <section className="turn-activity" aria-label="Ход и история игроков">
     {actions ?? <p className="turn-waiting">{snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : `Ходит: ${gamePlayerName(active)}`}</p>}
-    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} />}
+    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly />}
   </section>;
+  const tabs = [
+    { id: "turn", label: "Ход", icon: Dices },
+    { id: "player", label: "Игрок", icon: UserRound },
+    { id: "assets", label: "Активы", icon: BriefcaseBusiness }
+  ] as const;
+  const assetCount = focusPlayer ? purchasedFastTrackCells(focusPlayer, world).length : 0;
 
   return <section ref={root} className={`fast-track${externalPanels ? " scroll-board" : ""}`} aria-label="Поле большого круга" data-moving-player={movement.movingPlayerId ?? undefined}>
-    {externalPanels ? <div className="mobile-controls">{overview}{turn}</div> : null}
+    {mobile ? <div className="fast-track-mobile">
+      <FastTrackTimeline players={players} positions={movement.positions} position={position} followedPlayerId={followedPlayer?.id} movingPlayerId={movement.movingPlayerId} currentPlayerId={snapshot.game.currentPlayerId} />
+      <section className="fast-track-tabs" aria-label="Большой круг: ход, игрок и активы">
+        <div className="fast-track-tablist" role="tablist" aria-label="Информация об игроке">
+          {tabs.map((tab, index) => <button key={tab.id} type="button" id={`${tabId}-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`${tabId}-${tab.id}-panel`} tabIndex={activeTab === tab.id ? 0 : -1}
+            onClick={() => setActiveTab(tab.id)} onKeyDown={(event) => {
+              const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+              if (nextIndex === null) return;
+              event.preventDefault();
+              const next = tabs[nextIndex]!;
+              setActiveTab(next.id);
+              document.getElementById(`${tabId}-${next.id}`)?.focus();
+            }}>
+            <tab.icon size={17} aria-hidden="true" /><span>{tab.label}</span>
+            {tab.id === "assets" ? <span className="fast-track-tab-count">{assetCount}</span> : null}
+            {tab.id === "turn" && decisionId ? <span className="fast-track-tab-attention" aria-label="Требуется действие" /> : null}
+          </button>)}
+        </div>
+        <div id={`${tabId}-turn-panel`} role="tabpanel" aria-labelledby={`${tabId}-turn`} hidden={activeTab !== "turn"} tabIndex={0} className="fast-track-tab-panel">{turn}</div>
+        <div id={`${tabId}-player-panel`} role="tabpanel" aria-labelledby={`${tabId}-player`} hidden={activeTab !== "player"} tabIndex={0} className="fast-track-tab-panel">{overview}</div>
+        <div id={`${tabId}-assets-panel`} role="tabpanel" aria-labelledby={`${tabId}-assets`} hidden={activeTab !== "assets"} tabIndex={0} className="fast-track-tab-panel">
+          {focusPlayer ? <PlayerAssets snapshot={snapshot} player={focusPlayer} /> : <p className="empty-assets">На большом круге пока нет игроков.</p>}
+        </div>
+      </section>
+    </div> : externalPanels ? <div className="mobile-controls">{overview}{turn}</div> : null}
     <div className="board-shell"><div className="board-scroll" ref={viewport} tabIndex={0} aria-label="Маршрут большого круга, прокручиваемая область">
       <div className="board board-classic">
         <svg className="classic-route" viewBox="0 0 1240 714" preserveAspectRatio="none" aria-hidden="true"><path className="classic-route-line" vectorEffect="non-scaling-stroke" d="M 620 147 H 200 V 567 H 440 V 671 H 92 Q 60 671 60 639 V 75 Q 60 43 92 43 H 1148 Q 1180 43 1180 75 V 639 Q 1180 671 1148 671 H 800 V 567 H 1040 V 147 H 620" /></svg>
@@ -91,15 +134,43 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase }: {
             {onCell.length ? <span className="cell-tokens">{onCell.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" className={movement.movingPlayerId === item.id ? "timeline-moving-token" : ""} />)}</span> : null}
           </article>;
         })}
-        {!externalPanels ? <div className="central-panel">{overview}{turn}</div> : null}
+        {!externalPanels && !mobile ? <div className="central-panel">{overview}{turn}</div> : null}
       </div>
     </div></div>
   </section>;
 }
 
-function PlayerOverview({ snapshot, player }: { snapshot: GameSnapshot; player: GamePlayer }) {
+function FastTrackTimeline({ players, positions, position, followedPlayerId, movingPlayerId, currentPlayerId }: {
+  players: GamePlayer[];
+  positions: Map<string, number>;
+  position: number;
+  followedPlayerId: string | undefined;
+  movingPlayerId: string | null;
+  currentPlayerId: string | null;
+}) {
+  const viewport = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const container = viewport.current;
+    const cell = container?.querySelector<HTMLElement>(`[data-fast-timeline-cell="${position}"]`);
+    if (!container || !cell) return;
+    container.scrollTo({ left: cell.offsetLeft - container.clientWidth / 2 + cell.clientWidth / 2, behavior: "instant" });
+  }, [position, followedPlayerId]);
+  const cells = [{ index: -1, label: "Старт", type: "start" }, ...fastTrackCells];
+  return <ol ref={viewport} className="fast-track-timeline" aria-label="Ячейки большого круга и позиции игроков" tabIndex={0}>
+    {cells.map((cell) => {
+      const occupants = players.filter((item) => item.track === "FAST_TRACK" && (positions.get(item.id) ?? item.fastTrackPosition ?? -1) === cell.index);
+      const label = cell.index < 0 ? "Старт" : `Клетка ${cell.index + 1}: ${cell.label}`;
+      return <li key={cell.index} className={`fast-track-timeline-cell timeline-${cell.type}`} data-fast-timeline-cell={cell.index} aria-current={position === cell.index ? "location" : undefined} aria-label={`${label}${occupants.length ? ` — ${occupants.map(gamePlayerName).join(", ")}` : ""}`} title={label}>
+        <span className="fast-track-timeline-number">{cell.index < 0 ? "Старт" : cell.index + 1}</span>
+        <span className="fast-track-timeline-line" aria-hidden="true"><span /></span>
+        <span className="fast-track-timeline-players">{occupants.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" active={item.id === currentPlayerId} className={item.id === movingPlayerId ? "timeline-moving-token" : ""} />)}</span>
+      </li>;
+    })}
+  </ol>;
+}
+
+function PlayerOverview({ snapshot, player, mobile }: { snapshot: GameSnapshot; player: GamePlayer; mobile: boolean }) {
   const world = readFastTrackWorld(snapshot.game.fastTrackWorld);
-  const assets = purchasedFastTrackCells(player, world);
   const state = player.financialState;
   const income = state?.fastTrackIncomeCents ?? 0;
   const initial = state?.fastTrackStartIncomeCents ?? 0;
@@ -113,13 +184,27 @@ function PlayerOverview({ snapshot, player }: { snapshot: GameSnapshot; player: 
       <div className="is-positive"><dt>Прирост дохода</dt><dd>{income >= initial ? "+" : "−"}{money(Math.abs(income - initial))}</dd></div>
     </dl>
     <div className="player-goal">
+      {mobile ? <><h4 className="player-section-heading">Цель игры</h4><p className="player-goal-summary">Для победы купите свою мечту или увеличьте доход CASHFLOW на {money(50_000)}.</p></> : null}
       <div className="player-goal-row"><span>Финансовая цель</span><strong>+{money(50_000)} к доходу</strong></div>
+      {mobile ? <>
+        <div className="player-goal-row"><span>Начальный доход</span><strong>{money(initial)}</strong></div>
+        <div className="player-goal-row"><span>Осталось до цели</span><strong>{money(Math.max(0, initial + 50_000 - income))}</strong></div>
+      </> : null}
       <div className="player-goal-row"><span>Целевая мечта</span><strong>{dream ? `${dream.label} · ${money(price)}` : "Не выбрана"}</strong></div>
+      {mobile && dream ? <p className="player-goal-summary">{dream.description}</p> : null}
     </div>
-    <section className="player-assets" aria-label="Активы большого круга">
+    {mobile ? <div className="player-goal">
+      <div className="player-goal-row"><span>Позиция</span><strong>{(player.fastTrackPosition ?? -1) < 0 ? "Старт" : `Клетка ${player.fastTrackPosition! + 1} · ${fastTrackCells[player.fastTrackPosition!]?.label}`}</strong></div>
+      <div className="player-goal-row"><span>Благотворительность</span><strong>{state?.fastTrackCharity ? "Активна · 1–3 кубика" : "Не оплачена · 2 кубика"}</strong></div>
+    </div> : <PlayerAssets snapshot={snapshot} player={player} />}
+  </section>;
+}
+
+function PlayerAssets({ snapshot, player }: { snapshot: GameSnapshot; player: GamePlayer }) {
+  const assets = purchasedFastTrackCells(player, readFastTrackWorld(snapshot.game.fastTrackWorld));
+  return <section className="player-assets" aria-label="Активы большого круга">
       <h4 className="player-section-heading">Активы большого круга · {assets.length}</h4>
       {assets.length ? <div className="purchased-cards">{assets.map((cell) => <PurchasedCard key={cell.index} cell={cell} />)}</div> : <p className="empty-assets">Пока нет приобретённых карточек.</p>}
-    </section>
   </section>;
 }
 

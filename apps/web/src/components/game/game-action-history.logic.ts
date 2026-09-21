@@ -12,10 +12,27 @@ export function mergeActionEvents(current: GameEvent[], incoming: GameEvent[]) {
   return [...events.values()].sort((a, b) => b.sequence - a.sequence);
 }
 
-export function playerActionEvents(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null) {
+export function playerActionEvents(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false) {
+  const fastTrackEntries = new Map<string, number>();
+  if (fastTrackOnly) {
+    for (const event of events) {
+      if (event.type !== "player:escaped_rat_race") continue;
+      const player = gamePlayerForEvent(event, players);
+      if (player) fastTrackEntries.set(player.id, event.sequence);
+    }
+  }
   return mergeActionEvents([], events).filter((event) => {
     if (event.type === "state:update" || event.type.startsWith("game:") || preparationEvents.has(event.type)) return false;
     const player = gamePlayerForEvent(event, players);
-    return Boolean(player && (!onlyPlayerId || player.id === onlyPlayerId));
+    if (!player || (onlyPlayerId && player.id !== onlyPlayerId)) return false;
+    if (!fastTrackOnly) return true;
+    if (event.payload.track === "FAST_TRACK" || event.type.startsWith("fast_track:") || event.type === "player:escaped_rat_race") return true;
+    // Skipped turns have no track in their payload. Use the track at the time
+    // of the event, never the player's current track for older history.
+    if (event.type !== "turn:skipped" || event.payload.track === "RAT_RACE") return false;
+    const entrySequence = fastTrackEntries.get(player.id);
+    if (entrySequence !== undefined) return event.sequence > entrySequence;
+    const enteredAt = player.financialState?.escapedRatRaceAt;
+    return Boolean(enteredAt && Date.parse(event.createdAt) >= Date.parse(enteredAt));
   });
 }

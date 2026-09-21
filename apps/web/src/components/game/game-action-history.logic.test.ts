@@ -35,3 +35,26 @@ test('cell effects expose payout thresholds and losses without a separate detail
   assert.equal(fastTrackCellEffect(fastTrackCells[15]!), '−50% наличных');
   assert.equal(fastTrackCellEffect(fastTrackCells[0]!),null);
 });
+
+test('large-track history excludes earlier small-track actions of players who have since moved to the large track', () => {
+  const events = [
+    event(1, 'player:roll_dice'), event(2, 'turn:skipped'),
+    event(3, 'player:escaped_rat_race'), event(4, 'turn:skipped'),
+    event(5, 'player:roll_dice', 'anna', { track: 'FAST_TRACK' }),
+    event(6, 'player:move', 'anna', { track: 'FAST_TRACK' }),
+    event(7, 'fast_track:purchased', 'boris'), event(8, 'player:move', 'boris', { track: 'RAT_RACE' }),
+    event(9, 'state:update'), event(10, 'game:ended'), event(11, 'player:dream_chosen')
+  ];
+  const currentPlayers = players.map(player => ({ ...player, track: 'FAST_TRACK' as const }));
+  assert.deepEqual(playerActionEvents(events, currentPlayers, null, true).map(event => event.sequence), [7, 6, 5, 4, 3]);
+  assert.deepEqual(playerActionEvents(events, currentPlayers, 'boris', true).map(event => event.sequence), [7]);
+});
+
+test('skipped turns are assigned to the large track even when the entry event is outside the loaded history', () => {
+  const currentPlayers = [{ ...players[0], financialState: { escapedRatRaceAt: '2026-09-20T10:00:00Z' } }] as GamePlayer[];
+  const events = [
+    { ...event(1, 'turn:skipped'), createdAt: '2026-09-20T09:59:59Z' },
+    { ...event(2, 'turn:skipped'), createdAt: '2026-09-20T10:01:00Z' }
+  ];
+  assert.deepEqual(playerActionEvents(events, currentPlayers, null, true).map(event => event.sequence), [2]);
+});

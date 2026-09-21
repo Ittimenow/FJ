@@ -162,6 +162,40 @@
 :where(.fast-track.scroll-board) .board-shell { flex: 0 0 auto; }
 :where(.fast-track.scroll-board) .board-scroll { height: auto; max-height: 440px; }
 :where(.fast-track.scroll-board) .board { width: 1240px; height: 714px; }
+:where(.fast-track) .fast-track-mobile { display: grid; min-width: 0; gap: 8px; margin-bottom: 12px; }
+:where(.fast-track) .fast-track-tabs { min-width: 0; overflow: hidden; border-radius: 16px; background: #fff; box-shadow: var(--panel-shadow); }
+:where(.fast-track) .fast-track-tablist { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; background: #eef3e8; }
+:where(.fast-track) .fast-track-tablist button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; height: 56px; border: 0; border-radius: 8px; background: transparent; color: #61715b; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+:where(.fast-track) .fast-track-tablist button:hover { background: #ffffffb3; color: #3f5b35; }
+:where(.fast-track) .fast-track-tablist button[aria-selected="true"] { background: #dfe9d4; color: #3f5b35; }
+:where(.fast-track) .fast-track-tab-count { position: absolute; top: 4px; right: 4px; min-width: 16px; border-radius: 20px; background: #fff; padding: 0 4px; font-size: 10px; line-height: 16px; }
+:where(.fast-track) [aria-selected="true"] .fast-track-tab-count { background: #718866; color: #fff; }
+:where(.fast-track) .fast-track-tab-attention { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #9d82b8; }
+:where(.fast-track) .fast-track-tab-panel { min-width: 0; }
+:where(.fast-track) .fast-track-tab-panel > .player-assets,
+:where(.fast-track) .fast-track-tab-panel > .empty-assets { margin: 0; padding: 12px; }
+:where(.fast-track) .fast-track-tab-panel .player-overview,
+:where(.fast-track) .fast-track-tab-panel .turn-activity { overflow: visible; border-radius: 0; box-shadow: none; }
+:where(.fast-track) .fast-track-tab-panel .player-goal { margin-top: 20px; }
+:where(.fast-track) .fast-track-tab-panel .player-goal .player-section-heading { margin: 0; }
+:where(.fast-track) .player-goal-summary { margin: 0; color: #405372; font-size: 14px; line-height: 1.5; }
+:where(.fast-track) .fast-track-timeline { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 46px; width: 100%; min-width: 0; margin: 0; padding: 8px calc(50% - 23px) 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: #fff9f199; list-style: none; }
+:where(.fast-track) .fast-track-timeline::-webkit-scrollbar { display: none; }
+:where(.fast-track) .fast-track-timeline-cell { --timeline-color: #657597; min-width: 0; scroll-snap-align: center; text-align: center; }
+:where(.fast-track) .timeline-business { --timeline-color: #587424; }
+:where(.fast-track) .timeline-dream { --timeline-color: #b56f86; }
+:where(.fast-track) .timeline-expense { --timeline-color: #7655c7; }
+:where(.fast-track) .timeline-positive { --timeline-color: #947414; }
+:where(.fast-track) .fast-track-timeline-number { color: #52617c; font-size: 10px; font-weight: 600; }
+:where(.fast-track) [aria-current="location"] .fast-track-timeline-number { color: #426433; }
+:where(.fast-track) .fast-track-timeline-line { position: relative; display: block; height: 12px; margin-top: 4px; }
+:where(.fast-track) .fast-track-timeline-line::before { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: var(--board-route); }
+:where(.fast-track) .fast-track-timeline-line > span { position: absolute; left: calc(50% - 6px); width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; background: var(--timeline-color); }
+:where(.fast-track) [aria-current="location"] .fast-track-timeline-line > span { outline: 2px solid #718866; outline-offset: 1px; }
+:where(.fast-track) .fast-track-timeline-players { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 36px; margin-top: 4px; }
+:where(.fast-track) .fast-track-tablist button:focus-visible,
+:where(.fast-track) .fast-track-tab-panel:focus-visible,
+:where(.fast-track) .fast-track-timeline:focus-visible { outline: 2px solid #718866; outline-offset: -2px; }
 @media (max-width: 860px) {
   :where(.fast-track) .mobile-controls { grid-template-columns: minmax(0, 1fr); }
 }

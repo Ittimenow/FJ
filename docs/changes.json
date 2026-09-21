@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "mobile-fast-track-tabs-and-cell-timeline",
+          "category": "improvement",
+          "summary": "На мобильном большом круге появились зелёные вкладки «Ход», «Игрок» и «Активы», история большого круга и лента ячеек с выбранными фишками всех его игроков."
+        },
+        {
+          "id": "reliable-browser-test-figurine-loading",
+          "category": "technical",
+          "summary": "Автоматические проверки игры теперь надёжно загружают изображения выбранных фишек людей и ботов в разных браузерах."
+        },
+        {
           "id": "keep-selected-figurines-throughout-game",
           "category": "fix",
           "summary": "Выбранные перед стартом фишки людей и ботов теперь отображаются также в панели большого круга, истории действий, отметках владения и игровом меню."

@@ -55,11 +55,12 @@ export function FastTrackFinances({ player }: { player: GamePlayer }) {
   </section>;
 }
 
-export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phase = "ready", diceValues, diceCount, onDiceCount, onDecision, busy, children }: {
+export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phase = "ready", diceValues, diceCount, onDiceCount, onDecision, busy, turnTabRequest = 0, children }: {
   snapshot: GameSnapshot; player?: GamePlayer | undefined;
   onRoll: () => void; rolling: boolean; diceValues: number[]; diceCount: number; onDiceCount: (count: number) => void;
   onSkip: () => void; phase?: "ready" | "rolling" | "moving" | "landed";
   onDecision: (buy: boolean, decisionId: string) => void; busy: boolean; children?: ReactNode;
+  turnTabRequest?: number;
 }) {
   const pending = snapshot.game.pendingAction;
   const mine = pending?.type === "fast_track_choice" && pending.gamePlayerId === player?.id ? pending : null;
@@ -80,5 +81,5 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
     </div> : null}
     </div>
   </>;
-  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} phase={phase} />;
+  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} phase={phase} turnTabRequest={turnTabRequest} />;
 }
