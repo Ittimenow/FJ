@@ -1369,7 +1369,7 @@ export function GameRoom({
         />
       ) : null}
 
-      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} rolling={rollingDice} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={snapshot}
           currentUserId={currentUserId}
@@ -2609,7 +2609,7 @@ function LobbyCheck({ complete, label }: { complete: boolean; label: string }) {
   );
 }
 
-function DesktopGameBoard({
+export function DesktopGameBoard({
   snapshot,
   selectedPlayer,
   players,

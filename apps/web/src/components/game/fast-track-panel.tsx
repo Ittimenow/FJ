@@ -55,9 +55,10 @@ export function FastTrackFinances({ player }: { player: GamePlayer }) {
   </section>;
 }
 
-export function FastTrackPanel({ snapshot, player, onRoll, rolling, diceValues, diceCount, onDiceCount, onDecision, busy, children }: {
+export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phase = "ready", diceValues, diceCount, onDiceCount, onDecision, busy, children }: {
   snapshot: GameSnapshot; player?: GamePlayer | undefined;
   onRoll: () => void; rolling: boolean; diceValues: number[]; diceCount: number; onDiceCount: (count: number) => void;
+  onSkip: () => void; phase?: "ready" | "rolling" | "moving" | "landed";
   onDecision: (buy: boolean, decisionId: string) => void; busy: boolean; children?: ReactNode;
 }) {
   const pending = snapshot.game.pendingAction;
@@ -65,10 +66,11 @@ export function FastTrackPanel({ snapshot, player, onRoll, rolling, diceValues, 
   const isTurn = snapshot.game.status === "IN_PROGRESS" && snapshot.game.currentPlayerId === player?.id && player?.track === "FAST_TRACK";
   const choiceCell = mine ? fastTrackCells[mine.cellIndex]! : null;
   const statusLabel = snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : isTurn ? "Ваш ход" : `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}`;
-  const actions = <div aria-label="Действия большого круга">
-    <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} disabled={busy}
+  const actions = <>
+    <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
       statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
-      diceValues={diceValues.length ? diceValues : Array.from({ length: diceCount }, () => 1)} onRoll={onRoll} />
+      diceValues={diceValues} diceCount={diceCount} onRoll={onRoll} onSkip={onSkip} pinnedToPanel replaceButtonWithDice />
+    <div className="fast-track-turn-options" aria-label="Действия большого круга">
     {isTurn && !pending && player?.financialState?.fastTrackCharity ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
     {mine ? <div className="turn-decision">
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
@@ -76,6 +78,7 @@ export function FastTrackPanel({ snapshot, player, onRoll, rolling, diceValues, 
       <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
     </div> : null}
-  </div>;
+    </div>
+  </>;
   return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} />;
 }

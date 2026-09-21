@@ -230,6 +230,11 @@ body.game-room-viewport-locked {
 }
 
 @media (min-width: 1024px) {
+  :is(.app-shell--game-classic-active, .app-shell--game-journey-active) > .app-shell-main,
+  :is(.app-shell--game-classic-active, .app-shell--game-journey-active) .app-shell-header-content {
+    max-width: none;
+  }
+
   .app-shell--game-classic-active {
     display: flex;
     width: 100%;
@@ -278,9 +283,10 @@ body.game-room-viewport-locked {
   }
 
   .desktop-game-board-grid {
-    width: min(100%, calc(100cqh * 1.814));
-    max-height: 100%;
-    margin-inline: auto;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    overflow: hidden;
   }
 }
 
@@ -3551,14 +3557,21 @@ footer p {
   }
 }
 
-/* The large track keeps its route scroll separate from the room's vertical flow. */
-.game-room.game-room--fast-track-active {
-  display: block;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+/* History must not participate in the room's height calculation. */
+@media (min-width: 1024px) {
+  .game-room.game-room--fast-track-active {
+    display: flex;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .game-room--fast-track-active > .fast-track {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
-.game-room.game-room--fast-track-active > * + * { margin-top: 1rem; }
 
 .fast-track-progress { appearance: none; border: 0; background: #dfcebb; border-radius: 4px; overflow: hidden; }
 .fast-track-progress::-webkit-progress-bar { background: #dfcebb; }

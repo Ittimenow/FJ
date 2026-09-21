@@ -15,17 +15,18 @@ import "./fast-track.css";
 function cellPosition(index: number): CSSProperties {
   const columns = [4, 144, 264, 384, 504, 624, 744, 864, 984, 1124];
   const rows = [4, 108, 192, 276, 360, 444, 528, 632];
-  if (index < 4) return { left: columns[4 - index], top: rows[1] };
-  if (index < 8) return { left: columns[1], top: rows[index - 2] };
-  if (index < 11) return { left: columns[index - 7], top: rows[6] };
-  if (index < 14) return { left: columns[14 - index], top: 632 };
-  if (index < 20) return { left: 4, top: rows[20 - index] };
-  if (index < 28) return { left: columns[index - 19], top: 4 };
-  if (index < 34) return { left: 1124, top: rows[index - 27] };
-  if (index < 37) return { left: columns[42 - index], top: 632 };
-  if (index < 40) return { left: columns[index - 31], top: rows[6] };
-  if (index < 44) return { left: columns[8], top: rows[45 - index] };
-  return { left: columns[52 - index], top: rows[1] };
+  const at = (x: number, y: number): CSSProperties => ({ left: `${x / 1240 * 100}%`, top: `${y / 714 * 100}%` });
+  if (index < 4) return at(columns[4 - index]!, rows[1]!);
+  if (index < 8) return at(columns[1]!, rows[index - 2]!);
+  if (index < 11) return at(columns[index - 7]!, rows[6]!);
+  if (index < 14) return at(columns[14 - index]!, 632);
+  if (index < 20) return at(4, rows[20 - index]!);
+  if (index < 28) return at(columns[index - 19]!, 4);
+  if (index < 34) return at(1124, rows[index - 27]!);
+  if (index < 37) return at(columns[42 - index]!, 632);
+  if (index < 40) return at(columns[index - 31]!, rows[6]!);
+  if (index < 44) return at(columns[8]!, rows[45 - index]!);
+  return at(columns[52 - index]!, rows[1]!);
 }
 
 export function FastTrackBoard({ snapshot, player, actions, history }: {
@@ -69,7 +70,8 @@ export function FastTrackBoard({ snapshot, player, actions, history }: {
     {externalPanels ? <div className="mobile-controls">{overview}{turn}</div> : null}
     <div className="board-shell"><div className="board-scroll" ref={viewport} tabIndex={0} aria-label="Маршрут большого круга, прокручиваемая область">
       <div className="board board-classic">
-        <svg className="classic-route" viewBox="0 0 1240 714" aria-hidden="true"><path className="classic-route-line" d="M 620 147 H 200 V 567 H 440 V 671 H 92 Q 60 671 60 639 V 75 Q 60 43 92 43 H 1148 Q 1180 43 1180 75 V 639 Q 1180 671 1148 671 H 800 V 567 H 1040 V 147 H 620" /><text className="classic-start-label" x="594" y="98">СТАРТ</text></svg>
+        <svg className="classic-route" viewBox="0 0 1240 714" preserveAspectRatio="none" aria-hidden="true"><path className="classic-route-line" vectorEffect="non-scaling-stroke" d="M 620 147 H 200 V 567 H 440 V 671 H 92 Q 60 671 60 639 V 75 Q 60 43 92 43 H 1148 Q 1180 43 1180 75 V 639 Q 1180 671 1148 671 H 800 V 567 H 1040 V 147 H 620" /></svg>
+        <span className="classic-start-label">СТАРТ</span>
         {fastTrackCells.map((cell) => {
           const onCell = players.filter((item) => item.track === "FAST_TRACK" && item.fastTrackPosition === cell.index);
           const owners = snapshot.players.filter((item) => world.owners[cell.index] === item.id || world.dreamPurchases[cell.index]?.includes(item.id)
@@ -87,7 +89,6 @@ export function FastTrackBoard({ snapshot, player, actions, history }: {
         {!externalPanels ? <div className="central-panel">{overview}{turn}</div> : null}
       </div>
     </div></div>
-    <div className="player-status" aria-label="Позиции игроков">{players.map((item) => <span key={item.id}><GamePlayerMark player={item} size="sm" /><strong>{gamePlayerName(item)}</strong> · {item.track === "FAST_TRACK" ? fastTrackCells[item.fastTrackPosition]?.label ?? "Вход на большой круг" : "Малый круг"}</span>)}</div>
   </section>;
 }
 

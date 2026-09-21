@@ -10,23 +10,27 @@ export function DiceAction({
   rolling,
   phase = "ready",
   diceValues,
+  diceCount = diceValues.length,
   onRoll,
   onSkip,
   statusLabel,
   idleLabel = "Ожидайте ход",
   disabled = false,
-  pinnedToPanel = false
+  pinnedToPanel = false,
+  replaceButtonWithDice = false
 }: {
   canRoll: boolean;
   rolling: boolean;
   phase?: "ready" | "rolling" | "moving" | "landed";
   diceValues: number[];
+  diceCount?: number;
   onRoll: () => void;
   onSkip?: (() => void) | undefined;
   statusLabel?: string | undefined;
   idleLabel?: string | undefined;
   disabled?: boolean;
   pinnedToPanel?: boolean;
+  replaceButtonWithDice?: boolean;
 }) {
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -48,6 +52,7 @@ export function DiceAction({
         : statusLabel ?? (canRoll
           ? "Ваш ход"
           : "Ожидайте своего хода");
+  const showDice = !replaceButtonWithDice || rolling || phase !== "ready";
 
   return (
     <section
@@ -62,6 +67,7 @@ export function DiceAction({
       <div
         className={cn(
           "dice-action-row",
+          replaceButtonWithDice && "dice-action-row--replace",
           diceValues.length > 1 && "has-many-dice",
           pinnedToPanel && "min-h-[4.5rem]"
         )}
@@ -72,13 +78,14 @@ export function DiceAction({
             <button
               type="button"
               onClick={onSkip}
+              disabled={disabled}
               className="mt-0.5 rounded-md text-xs font-medium text-[#7b3f17] underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
             >
               Пропустить ход
             </button>
           ) : null}
         </div>
-        <Button
+        {!replaceButtonWithDice || !showDice ? <Button
           className="h-12 min-w-0 flex-1 px-3 text-base text-white"
           variant="action"
           onClick={onRoll}
@@ -88,16 +95,16 @@ export function DiceAction({
           {rolling
             ? "Бросаем…"
             : canRoll
-              ? diceValues.length > 1 ? "Бросить кубики" : "Бросить кубик"
+              ? diceCount > 1 ? "Бросить кубики" : "Бросить кубик"
               : idleLabel}
-        </Button>
-        <div className="dice-action-values flex shrink-0 gap-2" aria-live="polite">
+        </Button> : null}
+        {showDice ? <div className="dice-action-values flex shrink-0 gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="scale-[.58] -m-4">
               <DiceFace value={diceValue} rolling={rolling} />
             </div>
           ))}
-        </div>
+        </div> : null}
       </div>
     </section>
   );

@@ -1,7 +1,12 @@
 .dice-action { container-type: inline-size; }
 .dice-action-row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding-block: 6px; }
 .dice-action-row > button { min-width: 96px; font-size: 14px; }
+.dice-action-row--replace .dice-action-values { flex: 1 1 0; min-width: 0; justify-content: center; }
 @container (max-width: 360px) {
-  .dice-action-row.has-many-dice { flex-wrap: wrap; }
-  .has-many-dice .dice-action-values { width: 100%; justify-content: center; padding-block: 4px; }
+  .dice-action-row.has-many-dice:not(.dice-action-row--replace) { flex-wrap: wrap; }
+  .has-many-dice:not(.dice-action-row--replace) .dice-action-values { width: 100%; justify-content: center; padding-block: 4px; }
+}
+@container (max-width: 290px) {
+  .dice-action-row--replace { flex-wrap: wrap; }
+  .dice-action-row--replace .dice-action-values { flex-basis: 100%; padding-block: 4px; }
 }

@@ -82,23 +82,28 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
   });
 }
 
-// Compare the approved artifact itself, so changes to route geometry cannot silently drift.
-test('the remaining route preserves the approved prototype geometry and colors', async ({ page }) => {
+// Resizing preserves the continuous route and its semantic cell colors.
+test('the responsive route preserves the prototype proportions and colors', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const source = pathToFileURL(resolve('dist/fast-track-prototype/index.html')).href;
   const app = pathToFileURL(resolve(output, 'index.html')).href;
   const reference: Record<string, unknown> = {};
   for (const view of ['classic']) {
     await page.goto(source);
+    // The prototype imports the live stylesheet but stores pixel coordinates.
+    // Keep its canvas at the original size when reading the reference route.
+    await page.locator(`#${view}-board`).evaluate(el => { (el as HTMLElement).style.width = '1240px'; });
     reference[view] = await page.locator(`#${view}-board .board-cell`).evaluateAll(cells => cells.map(cell => {
       const s = getComputedStyle(cell);
-      return { x: (cell as HTMLElement).offsetLeft, y: (cell as HTMLElement).offsetTop, width: s.width, height: s.height, background: s.backgroundColor, radius: s.borderRadius };
+      const r = cell.getBoundingClientRect(), board = cell.parentElement!.getBoundingClientRect();
+      return { x: Math.round((r.left-board.left)*1240/board.width), y: Math.round((r.top-board.top)*714/board.height), width: Math.round(r.width*1240/board.width), height: Math.round(r.height*714/board.height), background: s.backgroundColor, radius: s.borderRadius };
     }));
     await page.screenshot({ path: join(output, `prototype-${view}-1440.png`), fullPage: true });
     await page.goto(app);
     expect(await page.locator('[data-fast-cell]').evaluateAll(cells => cells.map(cell => {
       const s = getComputedStyle(cell);
-      return { x: (cell as HTMLElement).offsetLeft, y: (cell as HTMLElement).offsetTop, width: s.width, height: s.height, background: s.backgroundColor, radius: s.borderRadius };
+      const r = cell.getBoundingClientRect(), board = cell.parentElement!.getBoundingClientRect();
+      return { x: Math.round((r.left-board.left)*1240/board.width), y: Math.round((r.top-board.top)*714/board.height), width: Math.round(r.width*1240/board.width), height: Math.round(r.height*714/board.height), background: s.backgroundColor, radius: s.borderRadius };
     }))).toEqual(reference[view]);
     await page.screenshot({ path: join(output, `approved-${view}-1440.png`), fullPage: true });
     const cell = page.locator('[data-fast-cell="23"]');
@@ -228,3 +233,99 @@ test('decisions stay disabled on pause and during another player’s turn', asyn
     await expect(page.getByRole('button',{name:'Ожидайте ход'})).toBeDisabled();
   }
 });
+
+for (const size of [{width:1366,height:768},{width:1920,height:1080},{width:2560,height:1440},{width:3440,height:1440},{width:3840,height:2160}]) {
+  for (const track of ['small','large']) {
+    test(`${track} board fills the desktop viewport at ${size.width}px`, async ({page}) => {
+      await page.setViewportSize(size);
+      const errors:string[]=[];
+      page.on('pageerror',error=>errors.push(error.message));
+      await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=desktop-${track}`);
+      const shell=page.locator(track==='large'?'.board-shell':'.desktop-game-board-shell');
+      const cells=page.locator(track==='large'?'[data-fast-cell]':'.desktop-game-board-grid > .relative');
+      await expect(cells).toHaveCount(track==='large'?48:24);
+      await expect(page.locator('.player-status')).toHaveCount(0);
+      const bounds=await shell.boundingBox();
+      expect(bounds!.x).toBeLessThanOrEqual(16);
+      expect(bounds!.width).toBeGreaterThanOrEqual(size.width-32);
+      expect(Math.abs(bounds!.y+bounds!.height-size.height)).toBeLessThanOrEqual(9);
+      const geometry=await cells.evaluateAll(items=>{
+        const rects=items.map(item=>item.getBoundingClientRect());
+        return {
+          widths:rects.map(r=>r.width),heights:rects.map(r=>r.height),
+          overlap:rects.some((a,i)=>rects.slice(i+1).some(b=>Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top)))
+        };
+      });
+      expect(Math.max(...geometry.widths)-Math.min(...geometry.widths)).toBeLessThan(.1);
+      expect(Math.max(...geometry.heights)-Math.min(...geometry.heights)).toBeLessThan(.1);
+      expect(geometry.overlap).toBe(false);
+      const turnHeader=page.locator('.dice-action');
+      expect(await turnHeader.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(255, 245, 237)');
+      expect(await turnHeader.evaluate(el=>getComputedStyle(el).borderRadius)).toBe('0px');
+      if(track==='large') {
+        const overflow=await cells.evaluateAll(items=>items.filter(cell=>[...cell.querySelectorAll('.cell-title,.cell-price,.cell-effect')].some(content=>{
+          const a=cell.getBoundingClientRect(),b=content.getBoundingClientRect();return b.top<a.top||b.bottom>a.bottom||b.right>a.right;
+        })).map(cell=>cell.getAttribute('aria-label')));
+        expect(overflow).toEqual([]);
+        expect(await page.locator('.player-metrics dt').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(12);
+        if(size.width>=1920) {
+          expect(await page.locator('.cell-title').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(12);
+          expect(await page.locator('.board-scroll').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
+        }
+      }
+      await page.screenshot({path:join(output,`desktop-${track}-${size.width}.png`),fullPage:true});
+      await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+      await page.getByRole('button',{name:'Показать ещё',exact:true}).click();
+      await expect(page.locator('.game-action-entry')).toHaveCount(25);
+      const after=await shell.boundingBox();
+      expect(after).toEqual(bounds);
+      expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight&&document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      await expect(page.getByRole('button',{name:'Пропустить ход',exact:true})).toBeVisible();
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+for(const count of [2,3]) {
+  test(`${count} dice replace the roll button and reset for a new turn`,async({page})=>{
+    await page.setViewportSize({width:1920,height:1080});
+    await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=desktop-large`);
+    await page.getByLabel('Количество кубиков').selectOption(String(count));
+    await expect(page.getByLabel('Результат броска')).toHaveCount(0);
+    await page.getByRole('button',{name:'Пропустить ход',exact:true}).click();
+    await expect(page.locator('output')).toHaveText('Ход пропущен');
+    await page.getByRole('button',{name:'Бросить кубики',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Бросить кубики',exact:true})).toHaveCount(0);
+    await expect(page.getByLabel('Результат броска').locator('[aria-label^="На кубике"]')).toHaveCount(count);
+    await expect(page.getByRole('heading',{name:'Ход выполнен',exact:true})).toBeVisible();
+    await page.evaluate(()=>window.dispatchEvent(new Event('fixture:next-turn')));
+    await expect(page.getByRole('button',{name:'Бросить кубики',exact:true})).toBeEnabled();
+    await expect(page.getByLabel('Результат броска')).toHaveCount(0);
+  });
+}
+
+test('a failed roll restores the button',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=roll-error`);
+  await page.getByRole('button',{name:'Бросить кубики',exact:true}).click();
+  await expect(page.locator('output')).toHaveText('Не удалось бросить кубик');
+  await expect(page.getByRole('button',{name:'Бросить кубики',exact:true})).toBeEnabled();
+  await expect(page.getByLabel('Результат броска')).toHaveCount(0);
+});
+
+for(const view of ['classic','journey']) {
+  test(`large board keeps its panels when resizing the ${view} room`,async({page})=>{
+    await page.setViewportSize({width:1920,height:1080});
+    await page.goto(`${pathToFileURL(resolve(output,'index.html')).href}?mode=desktop-large&view=${view}`);
+    await expect(page.locator('.central-panel')).toBeVisible();
+    await page.setViewportSize({width:1024,height:768});
+    await expect(page.locator('.mobile-controls')).toBeVisible();
+    expect(await page.locator('.fast-track').evaluate(el=>el.clientHeight)).toBeGreaterThan(300);
+    await page.locator('.board-scroll').scrollIntoViewIfNeeded();
+    await expect(page.locator('.board-scroll')).toBeInViewport();
+    await page.setViewportSize({width:1920,height:1080});
+    await expect(page.locator('.central-panel')).toBeVisible();
+    await expect(page.locator('.mobile-controls')).toHaveCount(0);
+    expect(await page.locator('.board-scroll').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
+  });
+}

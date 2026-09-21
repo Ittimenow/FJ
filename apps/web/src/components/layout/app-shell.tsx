@@ -32,7 +32,7 @@ export function AppShell({
       )}
     >
       <header className="app-shell-header sticky top-0 z-[100] sm:px-4">
-        <div className="mx-auto grid min-h-16 min-w-0 max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 rounded-2xl bg-card/95 px-2 py-2 shadow-panel backdrop-blur-md min-[420px]:gap-2 min-[420px]:px-3 sm:px-4">
+        <div className="app-shell-header-content mx-auto grid min-h-16 min-w-0 max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 rounded-2xl bg-card/95 px-2 py-2 shadow-panel backdrop-blur-md min-[420px]:gap-2 min-[420px]:px-3 sm:px-4">
           <Link
             href="/dashboard"
             aria-label="Финансовое путешествие — личный кабинет"
