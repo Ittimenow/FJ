@@ -44,19 +44,20 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     page.on('pageerror', (error) => errors.push(error.message));
     const url = fixtureUrl;
     await page.goto(url);
-    await expect(page.locator('[data-fast-cell]')).toHaveCount(48);
+    await expect(page.locator('[data-fast-cell]')).toHaveCount(size.width < 1024 ? 0 : 48);
     await expect(page.getByRole('button', { name: /Оплатить/ })).toBeVisible();
     await expect(page.getByRole('tab')).toHaveCount(size.width < 1024 ? 3 : 0);
     await expect(page.locator('.cell-number,.cell-letter,.mobile-detail,.is-selected')).toHaveCount(0);
     await expect(page.locator('[data-fast-cell] button,[data-fast-cell][aria-pressed]')).toHaveCount(0);
     await expect(page.locator('.player-identity img')).toHaveCount(1);
-    await expect(page.locator('.cell-tokens img')).toHaveCount(2);
+    const tokenContainer = size.width < 1024 ? '.fast-track-timeline-players' : '.cell-tokens';
+    await expect(page.locator(`${tokenContainer} img`)).toHaveCount(2);
     for (const [id, figurine] of [['anna', 'rubber-duck'], ['boris', 'cat-in-box']]) {
-      const image = page.locator(`.cell-tokens [data-player-id="${id}"] img`);
+      const image = page.locator(`${tokenContainer} [data-player-id="${id}"] img`);
       await expect(image).toHaveAttribute('src', `/figurines/${figurine}.png`);
       await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
     }
-    await expect(page.locator('[data-fast-cell="1"]').getByRole('img', { name: 'Владелец: Анна', exact: true })).toHaveCount(1);
+    if (size.width >= 1024) await expect(page.locator('[data-fast-cell="1"]').getByRole('img', { name: 'Владелец: Анна', exact: true })).toHaveCount(1);
     if (size.width < 1024) await page.getByRole('tab', { name: 'Игрок', exact: true }).click();
     expect(await page.locator('.player-metrics > div').evaluateAll(items => new Set(items.map(item => item.getBoundingClientRect().top)).size)).toBe(1);
     if (size.width < 1024) {
@@ -69,7 +70,8 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await expect(page.getByRole('article', {name:'Приобретено: Семейная сеть ресторанов'})).toHaveCount(1);
     if (size.width < 1024) await page.getByRole('tab', { name: /^Ход/ }).click();
     await expect(page.getByText('До победы по доходу', {exact:true})).toHaveCount(0);
-    await expect(page.getByRole('button', {name:'Выберите действие',exact:true})).toBeDisabled();
+    if (size.width >= 1024) await expect(page.getByRole('button', {name:'Выберите действие',exact:true})).toBeDisabled();
+    else await expect(page.locator('.dice-action')).toHaveCount(0);
     await expect(page.locator('.game-action-entry')).toHaveCount(10);
     await expect(page.locator('.game-action-entry').first()).toContainText('Анна');
     await expect(page.locator('.game-action-entry').nth(1)).toContainText('Борис');
@@ -95,9 +97,10 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.goto(`${url}?mode=occupied`);
     await page.screenshot({ path: join(output, `classic-occupied-${size.width}.png`), fullPage: true });
     await page.goto(`${url}?mode=lobby`);
-    await page.getByLabel('Мечта большого круга').selectOption('0');
+    await page.getByRole('button', { name: /Купите лес/ }).click();
     await expect(page.locator('p').filter({ hasText: /^Купите лес ·/ })).toBeVisible();
-    await page.getByText('Посмотреть все мечты', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Мечта большого круга', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: 'Мечта большого круга', exact: true }).click();
     await expect(page.getByRole('button', { name: /Купите лес/ })).toHaveAttribute('aria-pressed', 'true');
     await page.screenshot({ path: join(output, `dreams-${size.width}.png`), fullPage: true });
     await page.goto(`${url}?mode=admin`);
@@ -366,6 +369,13 @@ for(const view of ['classic','journey']) {
     expect(await page.locator('.fast-track').evaluate(el=>el.clientHeight)).toBeGreaterThan(300);
     await page.locator('.board-scroll').scrollIntoViewIfNeeded();
     await expect(page.locator('.board-scroll')).toBeInViewport();
+    await page.setViewportSize({width:390,height:844});
+    await expect(page.locator('.board-shell')).toHaveCount(0);
+    await expect(page.locator('.dice-action')).toHaveCount(0);
+    await expect(page.locator('[data-fast-timeline-cell]')).toHaveCount(49);
+    await page.setViewportSize({width:1024,height:768});
+    await expect(page.locator('.board-shell')).toBeVisible();
+    await expect(page.locator('[data-fast-cell="23"]')).toBeInViewport();
     await page.setViewportSize({width:1920,height:1080});
     await expect(page.locator('.central-panel')).toBeVisible();
     await expect(page.locator('.mobile-controls')).toHaveCount(0);
@@ -382,25 +392,30 @@ for (const width of [320, 390, 430]) {
     await expect(page.getByRole('link', { name: 'Правила игры' })).toBeInViewport();
     await page.getByRole('tab', { name: 'Игрок', exact: true }).click();
     await expect(page.locator('.player-identity [data-figurine="rubber-duck"] img')).toBeVisible();
+    const others = page.getByRole('region', { name: 'Остальные игроки', exact: true });
+    await expect(others.locator('[data-other-player]')).toHaveCount(2);
+    await expect(others.locator('[data-other-player="boris"]').getByRole('img', { name: 'Большой круг', exact: true })).toBeVisible();
+    await expect(others.locator('[data-other-player="vera"]').getByRole('img', { name: 'Большой круг', exact: true })).toHaveCount(0);
     await page.getByRole('tab', { name: /^Ход/ }).click();
-    await expect(page.locator('.cell-owner [data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
+    await expect(page.locator('.dice-action')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Ваш ход', exact: true })).toHaveCount(0);
     await expect(page.locator('.game-action-entry [data-player-id="boris"]').first()).toHaveAttribute('data-figurine', 'cat-in-box');
     await page.getByLabel('Количество кубиков').selectOption('3');
     const bounds = await bar.boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(0);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(await bar.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    expect(await page.locator('.board-shell').evaluate(el => { const r=el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })).toBe(true);
+    await expect(page.locator('.board-shell')).toHaveCount(0);
+    await expect(page.locator('[data-fast-cell]')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.mouse.move(width / 2, 350);
     await page.mouse.wheel(0, 600);
     await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
     await expect(bar).toBeInViewport();
-    await page.locator('.board-scroll').scrollIntoViewIfNeeded();
-    expect(await page.locator('.board-scroll').evaluate(el => {
-      el.scrollTop = 100;
+    await page.locator('.fast-track-timeline').scrollIntoViewIfNeeded();
+    expect(await page.locator('.fast-track-timeline').evaluate(el => {
       el.scrollLeft = 200;
-      return el.scrollTop > 0 && el.scrollLeft > 0;
+      return el.scrollLeft > 0;
     })).toBe(true);
     await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: join(output, `mobile-room-${width}.png`) });
@@ -417,14 +432,16 @@ test(`large track animates humans and queued bot moves through each route cell a
   await page.setViewportSize({ width, height: 900 });
   await page.goto(`${fixtureUrl}?mode=movement`);
   await expect(page.locator('html')).toHaveAttribute('data-fixture-ready', 'true');
+  if (width < 1024) await expect(page.locator('[data-fast-timeline-cell]')).toHaveCount(49);
   await expect(page.locator('[data-moving-player]')).toHaveCount(0);
   await page.evaluate(() => {
     const visited: Record<string, number[]> = { anna: [], boris: [] };
     (window as any).visited = visited;
     new MutationObserver(() => {
       for (const id of Object.keys(visited)) {
-        const token = document.querySelector(`.cell-tokens [data-player-id="${id}"]`);
-        const position = Number(token?.closest('[data-fast-cell]')?.getAttribute('data-fast-cell'));
+        const token = document.querySelector(`.cell-tokens [data-player-id="${id}"],.fast-track-timeline-players [data-player-id="${id}"]`);
+        const cell = token?.closest('[data-fast-cell],[data-fast-timeline-cell]');
+        const position = Number(cell?.getAttribute('data-fast-cell') ?? cell?.getAttribute('data-fast-timeline-cell'));
         if (token && visited[id]!.at(-1) !== position) visited[id]!.push(position);
       }
     }).observe(document.querySelector('.fast-track')!, { childList: true, subtree: true });
@@ -432,8 +449,10 @@ test(`large track animates humans and queued bot moves through each route cell a
     window.dispatchEvent(new CustomEvent('fixture:moves', { detail: [move('anna', 101, 23, [24,25,26]), move('boris', 102, 46, [47,0,1])] }));
   });
   await expect(page.locator('.fast-track')).toHaveAttribute('data-moving-player', 'anna');
-  await expect(page.locator('[data-fast-cell="26"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
-  await expect(page.locator('[data-fast-cell="1"] .cell-tokens [data-player-id="boris"]')).toHaveCount(1);
+  if (width >= 1024) {
+    await expect(page.locator('[data-fast-cell="26"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
+    await expect(page.locator('[data-fast-cell="1"] .cell-tokens [data-player-id="boris"]')).toHaveCount(1);
+  }
   if (width < 1024) {
     await expect(page.locator('[data-fast-timeline-cell="26"] [data-player-id="anna"]')).toHaveCount(1);
     await expect(page.locator('[data-fast-timeline-cell="1"] [data-player-id="boris"]')).toHaveCount(1);
@@ -508,7 +527,7 @@ for (const width of [320, 390, 430]) {
     await expect(page.locator('.player-identity [data-figurine="rubber-duck"] img')).toBeVisible();
     await expect(page.getByRole('region', { name: 'История большого круга' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Активы большого круга', exact: true })).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath('player.png') });
+    await page.screenshot({ path: testInfo.outputPath('player.png'), fullPage: true });
 
     await assets.click();
     await expect(page.getByRole('article', { name: /^Приобретено:/ })).toHaveCount(3);
@@ -547,4 +566,95 @@ test('mobile large track shows empty tabs, start tokens and every player sharing
   for (const id of ['boris', 'vera']) await expect(sharedCell.locator(`[data-player-id="${id}"]`)).toBeInViewport();
   const tokens = await sharedCell.locator('[data-player-id]').evaluateAll(elements => elements.map(element => { const rect = element.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom }; }));
   expect(tokens[0]!.bottom).toBeLessThanOrEqual(tokens[1]!.top);
+});
+
+for (const scenario of [{ width: 390, mode: 'mixed-history' }, { width: 1440, mode: 'desktop-large' }, { width: 1440, mode: 'desktop-small' }]) {
+  test(`other players show results from both tracks in ${scenario.mode} at ${scenario.width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: scenario.width, height: 900 });
+    await page.goto(`${fixtureUrl}?mode=${scenario.mode}`);
+    if (scenario.width < 1024) await page.getByRole('tab', { name: 'Игрок', exact: true }).click();
+    const others = page.getByRole('region', { name: 'Остальные игроки', exact: true });
+    await expect(others.locator('[data-other-player]')).toHaveCount(2);
+    await expect(others.locator('[data-other-player="anna"]')).toHaveCount(0);
+    const boris = others.locator('[data-other-player="boris"]');
+    const vera = others.locator('[data-other-player="vera"]');
+    await expect(boris).toContainText('Борис');
+    await expect(boris.getByRole('img', { name: 'Большой круг', exact: true })).toBeVisible();
+    await expect(boris.locator('[data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
+    await expect(boris).toContainText(/CASHFLOW 139\s000/);
+    await expect(boris.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '39000');
+    await expect(boris.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '50000');
+    await expect(vera).toContainText('Вера');
+    await expect(vera).toContainText(/Поток 1\s120/);
+    await expect(vera.getByRole('img', { name: 'Большой круг', exact: true })).toHaveCount(0);
+    await expect(vera.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+    await expect(vera).toContainText('Финансовая свобода');
+    await vera.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('other-players.png') });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+for (const width of [320, 390, 1024, 1440]) {
+  test(`dream cards scroll and collapse after selection at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`${fixtureUrl}?mode=lobby`);
+    const toggle = page.getByRole('button', { name: 'Мечта большого круга', exact: true });
+    const cards = page.getByRole('group', { name: 'Карточки мечт', exact: true });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    await expect(page.getByText('Для начала партии мечту должен выбрать каждый игрок.', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Выберите вашу мечту. Покупка этой мечты принесёт победу в этой игре. После старта изменить выбор нельзя.', { exact: true })).toBeVisible();
+    await expect(cards).toBeVisible();
+    expect(await cards.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+    if (width >= 1024) {
+      const frame = await cards.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        const children = [...el.querySelectorAll('button')].map(card => card.getBoundingClientRect());
+        return { height: rect.height, cardHeight: children[0]!.height, gap: parseFloat(getComputedStyle(el).rowGap), fullyVisible: children.filter(card => card.top >= rect.top && card.bottom <= rect.bottom + 1).length };
+      });
+      expect(frame.height).toBeCloseTo(frame.cardHeight * 3 + frame.gap * 2);
+      expect(frame.fullyVisible).toBe(9);
+      const overflowingCards = await cards.getByRole('button').evaluateAll(buttons => buttons.filter(button => button.scrollHeight > button.clientHeight + 1).length);
+      expect(overflowingCards).toBe(0);
+    }
+    await page.screenshot({ path: testInfo.outputPath('dreams-expanded.png'), fullPage: true });
+    const last = cards.getByRole('button').last();
+    const name = (await last.locator('span').first().innerText()).trim();
+    await last.scrollIntoViewIfNeeded();
+    await last.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toBeFocused();
+    await expect(cards).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('dreams-collapsed.png'), fullPage: true });
+    await toggle.click();
+    await expect(cards.getByRole('button', { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: /Купите лес/ }).click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('p').filter({ hasText: /^Купите лес ·/ })).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event('fixture:remount')));
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+test('dream selection stays open during saving and failure, then collapses after confirmation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=lobby-delayed`);
+  const toggle = page.getByRole('button', { name: 'Мечта большого круга', exact: true });
+  const dream = page.getByRole('button', { name: /Купите лес/ });
+  await dream.click();
+  await expect(dream).toBeDisabled();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: false })));
+  await expect(dream).toBeEnabled();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await dream.click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: true })));
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await dream.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: true })));
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 });

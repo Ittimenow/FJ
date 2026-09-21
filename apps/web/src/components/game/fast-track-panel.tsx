@@ -1,8 +1,8 @@
 "use client";
 
 import { fastTrackCells, fastTrackDreams } from "@cashflow/shared";
-import { Check, Heart, Target } from "lucide-react";
-import { type ReactNode } from "react";
+import { Check, ChevronDown, Heart, Target } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { FastTrackBoard } from "./fast-track-board";
 import { DiceAction } from "./dice-action";
 export { FastTrackBoard } from "./fast-track-board";
@@ -12,28 +12,35 @@ import type { GamePlayer, GameSnapshot } from "@/lib/types";
 
 export function DreamPicker({ player, saving, onChoose }: { player: GamePlayer; saving: boolean; onChoose: (index: number) => void }) {
   const selected = fastTrackDreams.find((cell) => cell.index === player.dreamCellIndex);
+  const [expanded, setExpanded] = useState(!selected);
+  const [requested, setRequested] = useState<number | null>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const cardsId = useId();
+  useEffect(() => {
+    if (requested === null || saving || selected?.index !== requested) return;
+    setExpanded(false);
+    setRequested(null);
+    toggle.current?.focus();
+  }, [requested, saving, selected?.index]);
   return <section className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="dream-picker-title">
     <h2 id="dream-picker-title" className="flex items-center gap-2 text-xl font-extrabold"><Target size={22} aria-hidden="true" /> Ваша мечта</h2>
-    <p className="mt-2 text-sm leading-6">Выберите цель из клеток большого круга. Покупка этой мечты принесёт победу. После старта изменить выбор нельзя.</p>
-    <label htmlFor="dream-choice" className="mt-4 block text-sm font-bold">Мечта большого круга</label>
-    <select id="dream-choice" value={player.dreamCellIndex ?? ""} disabled={saving} onChange={(event) => onChoose(Number(event.target.value))}
-      className="mt-2 min-h-12 w-full min-w-0 rounded-xl border border-line bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/30">
-      <option value="" disabled>Выберите мечту…</option>
-      {fastTrackDreams.map((cell) => <option key={cell.index} value={cell.index}>{cell.code} · {cell.label} · {money(cell.cost)}</option>)}
-    </select>
-    <div className="mt-4 min-h-20" aria-live="polite">
-      {selected ? <><p className="font-extrabold text-[#57378f]">{selected.label} · {money(selected.cost)}</p><p className="mt-1 max-w-3xl text-sm leading-6">{selected.description}</p></> : <p className="text-sm">Для начала партии мечту должен выбрать каждый игрок.</p>}
+    <p className="mt-2 text-sm leading-6">Выберите вашу мечту. Покупка этой мечты принесёт победу в этой игре. После старта изменить выбор нельзя.</p>
+    <div className={selected || saving ? "mt-4" : ""} aria-live="polite">
+      {selected ? <><p className="font-extrabold text-[#57378f]">{selected.label} · {money(selected.cost)}</p><p className="mt-1 max-w-3xl text-sm leading-6">{selected.description}</p></> : null}
       {saving ? <p className="mt-1 text-sm">Сохраняем выбор…</p> : null}
     </div>
-    <details className="mt-2"><summary className="cursor-pointer py-2 text-sm font-bold text-journey focus-visible:outline-journey">Посмотреть все мечты</summary>
-      <div className="mt-2 grid max-h-96 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
-        {fastTrackDreams.map((cell) => <button type="button" disabled={saving} key={cell.index} aria-pressed={selected?.index === cell.index} onClick={() => onChoose(cell.index)}
-          className={`rounded-xl p-3 text-left text-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/30 ${selected?.index === cell.index ? "bg-[#eee8ff] text-[#57378f]" : "bg-card hover:bg-surface"}`}>
+    <button ref={toggle} type="button" aria-expanded={expanded} aria-controls={cardsId} onClick={() => setExpanded((value) => !value)} className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-md py-2 text-sm font-bold text-journey underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey">
+      Мечта большого круга<ChevronDown size={16} className={expanded ? "rotate-180" : ""} aria-hidden="true" />
+    </button>
+    <div id={cardsId} hidden={!expanded}>
+      <div className="dream-picker-cards mt-2 grid max-h-96 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label="Карточки мечт" aria-busy={saving}>
+        {fastTrackDreams.map((cell) => <button type="button" disabled={saving} key={cell.index} aria-pressed={selected?.index === cell.index} onClick={() => { setRequested(cell.index); onChoose(cell.index); }}
+          className={`flex min-w-0 flex-col items-stretch rounded-xl p-3 text-left text-sm leading-5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-journey/30 ${selected?.index === cell.index ? "bg-[#eee8ff] text-[#57378f]" : "bg-card hover:bg-surface"}`}>
           <span className="flex items-start justify-between gap-2 font-bold">{cell.code} · {cell.label}{selected?.index === cell.index ? <Check size={18} className="shrink-0" /> : null}</span>
           <span className="mt-1 block font-bold">{money(cell.cost)}</span><span className="mt-1 block leading-5">{cell.description}</span>
         </button>)}
       </div>
-    </details>
+    </div>
   </section>;
 }
 
@@ -67,11 +74,10 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   const isTurn = snapshot.game.status === "IN_PROGRESS" && snapshot.game.currentPlayerId === player?.id && player?.track === "FAST_TRACK";
   const choiceCell = mine ? fastTrackCells[mine.cellIndex]! : null;
   const statusLabel = snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : isTurn ? "Ваш ход" : `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}`;
-  const actions = <>
-    <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
+  const diceAction = <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
       statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
-      diceValues={diceValues} diceCount={diceCount} onRoll={onRoll} onSkip={onSkip} pinnedToPanel replaceButtonWithDice />
-    <div className="fast-track-turn-options" aria-label="Действия большого круга">
+      diceValues={diceValues} diceCount={diceCount} onRoll={onRoll} onSkip={onSkip} pinnedToPanel replaceButtonWithDice />;
+  const actions = <div className="fast-track-turn-options" aria-label="Действия большого круга">
     {isTurn && !pending && player?.financialState?.fastTrackCharity ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
     {mine ? <div className="turn-decision">
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
@@ -79,7 +85,6 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
       <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
     </div> : null}
-    </div>
-  </>;
-  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} phase={phase} turnTabRequest={turnTabRequest} />;
+    </div>;
+  return <FastTrackBoard snapshot={snapshot} player={player} diceAction={diceAction} actions={actions} history={children} phase={phase} turnTabRequest={turnTabRequest} />;
 }

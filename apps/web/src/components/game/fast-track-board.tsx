@@ -9,6 +9,7 @@ import type { GamePlayer, GameSnapshot } from "@/lib/types";
 import { GameActionHistory } from "./game-action-history";
 import { GamePlayerMark } from "./game-player-mark";
 import { PlayerAvatar } from "./player-avatar";
+import { OtherPlayersList } from "./other-players-list";
 import { fastTrackCellEffect, purchasedFastTrackCells } from "./fast-track-presentation";
 import { useFastTrackMovement } from "./use-fast-track-movement";
 import "./fast-track.css";
@@ -31,9 +32,10 @@ function cellPosition(index: number): CSSProperties {
   return at(columns[52 - index]!, rows[1]!);
 }
 
-export function FastTrackBoard({ snapshot, player, actions, history, phase, turnTabRequest = 0 }: {
+export function FastTrackBoard({ snapshot, player, diceAction, actions, history, phase, turnTabRequest = 0 }: {
   snapshot: GameSnapshot;
   player?: GamePlayer | undefined;
+  diceAction?: ReactNode;
   actions?: ReactNode;
   history?: ReactNode;
   phase?: "ready" | "rolling" | "moving" | "landed";
@@ -74,11 +76,12 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase, turn
       top: cell.offsetTop - container.clientHeight / 2 + cell.clientHeight / 2,
       behavior: "instant"
     });
-  }, [position, followedPlayer?.id, externalPanels]);
+  }, [position, followedPlayer?.id, externalPanels, mobile]);
   const world = readFastTrackWorld(snapshot.game.fastTrackWorld);
   const players = snapshot.players.filter((item) => item.role === "PLAYER" && item.status === "JOINED");
   const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} mobile={mobile} /> : <p className="turn-waiting">На большом круге пока нет игроков.</p>;
   const turn = <section className="turn-activity" aria-label="Ход и история игроков">
+    {!mobile ? diceAction : null}
     {actions ?? <p className="turn-waiting">{snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : `Ходит: ${gamePlayerName(active)}`}</p>}
     {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly />}
   </section>;
@@ -115,7 +118,7 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase, turn
         </div>
       </section>
     </div> : externalPanels ? <div className="mobile-controls">{overview}{turn}</div> : null}
-    <div className="board-shell"><div className="board-scroll" ref={viewport} tabIndex={0} aria-label="Маршрут большого круга, прокручиваемая область">
+    {!mobile ? <div className="board-shell"><div className="board-scroll" ref={viewport} tabIndex={0} aria-label="Маршрут большого круга, прокручиваемая область">
       <div className="board board-classic">
         <svg className="classic-route" viewBox="0 0 1240 714" preserveAspectRatio="none" aria-hidden="true"><path className="classic-route-line" vectorEffect="non-scaling-stroke" d="M 620 147 H 200 V 567 H 440 V 671 H 92 Q 60 671 60 639 V 75 Q 60 43 92 43 H 1148 Q 1180 43 1180 75 V 639 Q 1180 671 1148 671 H 800 V 567 H 1040 V 147 H 620" /></svg>
         <span className="classic-start-label">СТАРТ</span>
@@ -136,7 +139,7 @@ export function FastTrackBoard({ snapshot, player, actions, history, phase, turn
         })}
         {!externalPanels && !mobile ? <div className="central-panel">{overview}{turn}</div> : null}
       </div>
-    </div></div>
+    </div></div> : null}
   </section>;
 }
 
@@ -197,6 +200,7 @@ function PlayerOverview({ snapshot, player, mobile }: { snapshot: GameSnapshot; 
       <div className="player-goal-row"><span>Позиция</span><strong>{(player.fastTrackPosition ?? -1) < 0 ? "Старт" : `Клетка ${player.fastTrackPosition! + 1} · ${fastTrackCells[player.fastTrackPosition!]?.label}`}</strong></div>
       <div className="player-goal-row"><span>Благотворительность</span><strong>{state?.fastTrackCharity ? "Активна · 1–3 кубика" : "Не оплачена · 2 кубика"}</strong></div>
     </div> : <PlayerAssets snapshot={snapshot} player={player} />}
+    <OtherPlayersList className="mt-4 border-t border-line/70 pt-4" players={snapshot.players.filter((other) => other.role === "PLAYER" && other.id !== player.id)} currentPlayerId={snapshot.game.currentPlayerId} />
   </section>;
 }
 

@@ -176,6 +176,8 @@
 :where(.fast-track) .fast-track-tab-panel > .empty-assets { margin: 0; padding: 12px; }
 :where(.fast-track) .fast-track-tab-panel .player-overview,
 :where(.fast-track) .fast-track-tab-panel .turn-activity { overflow: visible; border-radius: 0; box-shadow: none; }
+:where(.fast-track) .fast-track-tab-panel .turn-activity { padding-top: 12px; }
+:where(.fast-track) .fast-track-tab-panel .fast-track-turn-options { padding-top: 0; }
 :where(.fast-track) .fast-track-tab-panel .player-goal { margin-top: 20px; }
 :where(.fast-track) .fast-track-tab-panel .player-goal .player-section-heading { margin: 0; }
 :where(.fast-track) .player-goal-summary { margin: 0; color: #405372; font-size: 14px; line-height: 1.5; }
@@ -201,9 +203,14 @@
 }
 
 @media (max-width: 1023px) {
+  :where(.fast-track) .board-shell { display: none; }
   .fast-track.scroll-board { overflow: visible; overscroll-behavior: auto; }
   :where(.fast-track) .mobile-controls { min-width: 0; }
   :where(.fast-track) .mobile-controls .player-overview,
   :where(.fast-track) .mobile-controls .turn-activity { overflow: visible; max-height: none; overscroll-behavior: auto; }
   :where(.fast-track) .board-scroll { overscroll-behavior-y: auto; touch-action: pan-x pan-y; }
+}
+
+@media (min-width: 1024px) {
+  .dream-picker-cards { grid-auto-rows: 12rem; height: calc(36rem + 16px); max-height: none; }
 }

@@ -18,7 +18,11 @@ const archiveWindow=Array.from({length:80},(_,i)=>event(i+21,i<75?'state:update'
 const archived=Array.from({length:20},(_,i)=>event(i+1));
 function App(){
  const mode=new URLSearchParams(location.search).get('mode');
- const [player,setPlayer]=useState(user);const [count,setCount]=useState(2);const [decision,setDecision]=useState(!['ready','roll-error','desktop-small','desktop-large','mobile-room','movement'].includes(mode ?? ''));const [notice,setNotice]=useState('');
+ const lobby=mode?.startsWith('lobby');
+ const [player,setPlayer]=useState(()=>lobby?{...user,dreamCellIndex:null}:user);const [count,setCount]=useState(2);const [decision,setDecision]=useState(!['ready','roll-error','desktop-small','desktop-large','mobile-room','movement'].includes(mode ?? ''));const [notice,setNotice]=useState('');
+ const [dreamSaving,setDreamSaving]=useState(false);
+ const pendingDream=useRef<number|null>(null);
+ useEffect(()=>{const save=(event:Event)=>{if((event as CustomEvent).detail&&pendingDream.current!==null)setPlayer((current:any)=>({...current,dreamCellIndex:pendingDream.current}));else setNotice('Не удалось сохранить мечту');setDreamSaving(false);};window.addEventListener('fixture:save-dream',save);return()=>window.removeEventListener('fixture:save-dream',save);},[]);
  const [rolling,setRolling]=useState(false);
  const [phase,setPhase]=useState<'ready'|'rolling'|'moving'|'landed'>('ready');
  const [moves,setMoves]=useState<any[]>([]);
@@ -37,19 +41,21 @@ function App(){
  if(mode==='mixed-history') snapshot.events.push({...event(26,'player:move'),payload:{track:'RAT_RACE',from:0,to:1,steps:1,cell:{label:'Ячейка малого круга'}}});
  const feed=<GameActionHistory gameId="synthetic" players={snapshot.players} events={mode==='archive'?archiveWindow:snapshot.events} fastTrackOnly={mode!=='small'&&mode!=='desktop-small'} loadEarlier={async()=>{if(++attempts.current===1)throw new Error('Не удалось загрузить историю партии');return [...archived,...archiveWindow];}}/>;
  const fast=<FastTrackPanel key={boardVersion} snapshot={snapshot} player={snapshot.players[0]} rolling={rolling} phase={phase} diceValues={Array.from({length:count},(_,i)=>i+4)} diceCount={count} onDiceCount={setCount} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} busy={false} onDecision={(buy)=>{setDecision(false);setPhase('ready');setNotice(buy?'Покупка принята':'Отказ принят')}}>{feed}</FastTrackPanel>;
+ const floating=<MobileTurnDialog open={!decision&&snapshot.game.status==='IN_PROGRESS'&&snapshot.game.currentPlayerId==='anna'} rolling={rolling} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1023} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} />;
  if(mode==='mobile-room') return <GameMenuFixture>{fast}<MobileTurnDialog open={!decision} rolling={rolling} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1279} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} /><output>{notice}</output></GameMenuFixture>;
  if(mode==='desktop-small'||mode==='desktop-large') {
    const small=mode==='desktop-small';
    const view=new URLSearchParams(location.search).get('view')==='journey'?'journey':'classic';
    const smallPlayer={...player,track:'RAT_RACE'};
+   const smallPlayers=[smallPlayer,...snapshot.players.slice(1)];
    return <GameRoomHeaderProvider><AppShell userName="Анна" gameViewportMode={view}>
      <div className={`game-room game-room--${view}-active ${small?'':'game-room--fast-track-active'}`}>
-       {small?<div className="desktop-game-board-viewport"><DesktopGameBoard snapshot={{...snapshot,players:[smallPlayer]}} selectedPlayer={smallPlayer} players={[smallPlayer]} outsidePlayers={[]} canManageLiabilities={false} onCloseLiability={()=>{}} canOpenBank={false} onOpenBank={()=>{}}>
+       {small?<div className="desktop-game-board-viewport"><DesktopGameBoard snapshot={{...snapshot,players:smallPlayers}} selectedPlayer={smallPlayer} players={smallPlayers} outsidePlayers={[]} canManageLiabilities={false} onCloseLiability={()=>{}} canOpenBank={false} onOpenBank={()=>{}}>
          <DiceAction canRoll rolling={false} diceValues={[4]} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} pinnedToPanel/>{feed}
        </DesktopGameBoard></div>:fast}
      </div><output className="sr-only">{notice}</output>
    </AppShell></GameRoomHeaderProvider>;
  }
- return <main style={{maxWidth:1440,margin:'0 auto',padding:16}}><header style={{marginBottom:16}}><strong>Финансовое путешествие · демонстрационные данные</strong></header>{mode==='lobby'?<DreamPicker player={player} saving={false} onChoose={index=>setPlayer({...player,dreamCellIndex:index})}/>:mode==='admin'?<form><TestGameOptions/></form>:mode==='small'?<section style={{maxWidth:420}} aria-label="Ход и история игроков"><DiceAction canRoll rolling={false} diceValues={[4]} onRoll={()=>setNotice('Бросок принят')} onSkip={()=>setNotice('Ход пропущен')}/>{feed}</section>:fast}<output>{notice}</output></main>
+ return <main style={{maxWidth:1440,margin:'0 auto',padding:16}}><header style={{marginBottom:16}}><strong>Финансовое путешествие · демонстрационные данные</strong></header>{lobby?<DreamPicker key={boardVersion} player={player} saving={dreamSaving} onChoose={index=>{if(mode==='lobby-delayed'){pendingDream.current=index;setDreamSaving(true);}else setPlayer({...player,dreamCellIndex:index});}}/>:mode==='admin'?<form><TestGameOptions/></form>:mode==='small'?<section style={{maxWidth:420}} aria-label="Ход и история игроков"><DiceAction canRoll rolling={false} diceValues={[4]} onRoll={()=>setNotice('Бросок принят')} onSkip={()=>setNotice('Ход пропущен')}/>{feed}</section>:<>{fast}{floating}</>}<output>{notice}</output></main>
 }
 createRoot(document.getElementById('root')!).render(<App/>);

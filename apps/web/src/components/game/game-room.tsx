@@ -6,6 +6,7 @@ import { MobileTurnDialog } from "./mobile-turn-dialog";
 import { boardStepDuration } from "./board-movement";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
+import { OtherPlayersList } from "./other-players-list";
 
 import {
   availableBankLoanCents,
@@ -3401,66 +3402,6 @@ function ringCellStyle(index: number): CSSProperties {
   return {};
 }
 
-function OtherPlayersList({
-  players,
-  currentPlayerId,
-  className = ""
-}: {
-  players: GamePlayer[];
-  currentPlayerId: string | null;
-  className?: string;
-}) {
-  return (
-    <section className={className} aria-label="Остальные игроки">
-      <h3 className="text-sm font-semibold">Остальные игроки</h3>
-      {players.length === 0 ? (
-        <p className="mt-2 text-sm text-neutral-500">Других игроков пока нет.</p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {players.map((otherPlayer) => {
-            const state = otherPlayer.financialState;
-            const trackLabel =
-              otherPlayer.track === "FAST_TRACK" ? "Быстрый круг" : "Крысиные бега";
-
-            return (
-              <li key={otherPlayer.id} className="rounded-md bg-surface p-3">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5">
-                  <PlayerIdentityMark player={otherPlayer} size="sm" />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">
-                      {gamePlayerName(otherPlayer)}
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-neutral-500">
-                      {otherPlayer.profession?.name ?? "Профессия не выдана"}
-                    </div>
-                  </div>
-                  {currentPlayerId === otherPlayer.id ? (
-                    <Badge className="bg-green-100 text-success">ходит</Badge>
-                  ) : null}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-neutral-500">
-                  {otherPlayer.seat ? <span>Место {otherPlayer.seat}</span> : null}
-                  <span>{trackLabel}</span>
-                  {state ? <span>Поток {money(state.monthlyCashflowCents)}/мес</span> : null}
-                </div>
-                {state ? (
-                  <PlayerFreedomMini
-                    passiveIncomeCents={state.passiveIncomeCents}
-                    totalExpensesCents={state.totalExpensesCents}
-                    bankLoanBalanceCents={outstandingBankLoanBalanceCents(
-                      otherPlayer.liabilities
-                    )}
-                  />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 function PlayerStatusBadges({ state }: { state: FinancialState }) {
   const statuses = compactDetails([
     state.wonAt ? "🏆 Победитель" : null,
@@ -6472,59 +6413,6 @@ function FinancialFreedomProgress({
           </span>
         </li>
       </ul>
-    </div>
-  );
-}
-
-function PlayerFreedomMini({
-  passiveIncomeCents,
-  totalExpensesCents,
-  bankLoanBalanceCents
-}: {
-  passiveIncomeCents: number;
-  totalExpensesCents: number;
-  bankLoanBalanceCents: number;
-}) {
-  const target = Math.max(1, totalExpensesCents + 1);
-  const incomeReached = passiveIncomeCents > totalExpensesCents;
-  const reached = canEscapeRatRace(
-    passiveIncomeCents,
-    totalExpensesCents,
-    bankLoanBalanceCents > 0
-  );
-  const percentage = incomeReached
-    ? 100
-    : Math.round(Math.min(100, Math.max(0, (passiveIncomeCents / target) * 100)));
-  const label = reached
-    ? "Условия выхода с малого круга выполнены"
-    : bankLoanBalanceCents > 0 && incomeReached
-      ? `Пассивный доход выше расходов, осталось погасить банковские кредиты на ${money(bankLoanBalanceCents)}`
-      : `Прогресс игрока к выходу с малого круга ${percentage}%`;
-
-  return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
-        <span>Финансовая свобода</span>
-        <strong className={reached ? "text-success" : "text-neutral-700"}>
-          {reached
-            ? "Готово"
-            : incomeReached && bankLoanBalanceCents > 0
-              ? "Остался кредит"
-              : `${percentage}%`}
-        </strong>
-      </div>
-      <ProgressBar
-        className="mt-1.5"
-        value={incomeReached ? target : passiveIncomeCents}
-        max={target}
-        label={label}
-        tone={reached ? "success" : "neutral"}
-      />
-      {bankLoanBalanceCents > 0 ? (
-        <div className="mt-1.5 text-xs text-neutral-600">
-          Кредиты к погашению: <strong>{money(bankLoanBalanceCents)}</strong>
-        </div>
-      ) : null}
     </div>
   );
 }
