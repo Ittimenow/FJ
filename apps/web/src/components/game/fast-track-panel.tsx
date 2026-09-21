@@ -80,5 +80,5 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
     </div> : null}
     </div>
   </>;
-  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} />;
+  return <FastTrackBoard snapshot={snapshot} player={player} actions={actions} history={children} phase={phase} />;
 }

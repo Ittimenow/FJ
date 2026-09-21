@@ -6,7 +6,7 @@ import { gameChatNotices } from "../../apps/api/src/games/game-chat-notices";
 import type { ChatMessage } from "../../apps/web/src/lib/types";
 import logoUrl from "../../apps/web/public/logo.svg";
 
-function MenuContent() {
+function MenuContent({ children }: { children?: React.ReactNode }) {
   const setHeader = useSetGameRoomHeader();
   const role = new URLSearchParams(location.search).get("role") ?? "host";
   const [status, setStatus] = useState("IN_PROGRESS");
@@ -41,13 +41,14 @@ function MenuContent() {
       onCheckConnection: () => {}
     });
   }, [setHeader, messages, status, role, track]);
-  return <AppShell userName="Макс" userInitials="М">
+  return <AppShell userName="Макс" userInitials="М" gameViewportMode={children ? "classic" : null}>
+    {children ? <div className="game-room game-room--classic-active game-room--fast-track-active">{children}</div> : null}
     <p>Демонстрационная партия</p>
     <output aria-label="Открытый круг">{track}</output>
     <button type="button" onClick={() => setSync((value) => value + 1)}>Синхронизировать</button>
   </AppShell>;
 }
 
-export function GameMenuFixture() {
-  return <GameRoomHeaderProvider><MenuContent /></GameRoomHeaderProvider>;
+export function GameMenuFixture({ children }: { children?: React.ReactNode }) {
+  return <GameRoomHeaderProvider><MenuContent>{children}</MenuContent></GameRoomHeaderProvider>;
 }

@@ -2,6 +2,8 @@
 
 import { fastTrackCells, isDreamCell } from "@cashflow/shared";
 import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
+import { MobileTurnDialog } from "./mobile-turn-dialog";
+import { boardStepDuration } from "./board-movement";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
 
@@ -583,6 +585,7 @@ export function GameRoom({
     setGameRoomHeader({
       gameId: snapshot.game.id,
       currentUserId,
+      player: me,
       title: snapshot.game.title,
       status: snapshot.game.status,
       connected,
@@ -610,6 +613,7 @@ export function GameRoom({
     connected,
     connection,
     currentPlayer,
+    me,
     currentUserId,
     isSolo,
     setGameRoomHeader,
@@ -925,7 +929,7 @@ export function GameRoom({
       if (move) {
         setTurnAnimationPhase("moving");
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!reduceMotion) await wait(turnMoveDuration(move.steps));
+        if (!reduceMotion) await wait(me?.track === "FAST_TRACK" ? move.steps * boardStepDuration : turnMoveDuration(move.steps));
       }
 
       setTurnAnimationPhase("landed");
@@ -1270,11 +1274,12 @@ export function GameRoom({
       )}
     >
       <MobileTurnDialog
-        open={canRoll && !pendingAction && !showFastTrack}
+        open={canRoll && !pendingAction}
+        disabled={fastBusy}
         rolling={rollingDice}
         diceValues={diceFaces}
         diceCount={activeDiceCount}
-        maxCompactViewportWidth={gameRoomView === "classic" ? 1023 : 1279}
+        maxCompactViewportWidth={showFastTrack ? 1279 : gameRoomView === "classic" ? 1023 : 1279}
         onSkip={skipTurn}
         onRoll={() => {
           void rollDice();
@@ -1692,73 +1697,6 @@ function BankruptcyPanel({
   );
 }
 
-function MobileTurnDialog({
-  open,
-  rolling,
-  diceValues,
-  diceCount,
-  maxCompactViewportWidth,
-  onRoll,
-  onSkip
-}: {
-  open: boolean;
-  rolling: boolean;
-  diceValues: number[];
-  diceCount: number;
-  maxCompactViewportWidth: number;
-  onRoll: () => void;
-  onSkip: () => void;
-}) {
-  const [mobileViewport, setMobileViewport] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia(`(max-width: ${maxCompactViewportWidth}px)`);
-    const updateViewport = () => setMobileViewport(media.matches);
-    updateViewport();
-    media.addEventListener("change", updateViewport);
-    return () => media.removeEventListener("change", updateViewport);
-  }, [maxCompactViewportWidth]);
-
-  if (!open || !mobileViewport) return null;
-
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] pb-[max(.75rem,env(safe-area-inset-bottom))] pl-[max(.75rem,env(safe-area-inset-left))] pr-[max(.75rem,env(safe-area-inset-right))] xl:hidden">
-      <div
-        role="region"
-        aria-label="Действия текущего хода"
-        className="pointer-events-auto mx-auto flex w-full max-w-sm items-center gap-2 rounded-2xl bg-[#fff5ed] p-2 shadow-[0_18px_48px_rgba(5,18,45,.28)]"
-      >
-        <button
-          type="button"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#7b3f17] shadow-[0_6px_16px_rgba(123,63,23,.12)] transition hover:bg-[#fffaf6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c0560c] disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onSkip}
-          disabled={rolling}
-          aria-label="Пропустить ход"
-          title="Пропустить ход"
-        >
-          <X size={18} strokeWidth={2.5} aria-hidden="true" />
-        </button>
-        <Button
-          type="button"
-          variant="action"
-          className="h-12 min-w-0 flex-1 whitespace-nowrap px-1.5 text-xs text-white min-[360px]:px-3 min-[360px]:text-sm"
-          onClick={onRoll}
-          disabled={rolling}
-          aria-busy={rolling}
-        >
-          {rolling ? "Бросаем…" : diceCount > 1 ? "Бросить кубики" : "Бросить кубик"}
-        </Button>
-        <div className="flex shrink-0 gap-1" aria-live="polite">
-          {diceValues.map((diceValue, index) => (
-            <div key={index} className="-m-5 scale-50">
-              <DiceFace value={diceValue} rolling={rolling} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function GameEndPopup({
   open,

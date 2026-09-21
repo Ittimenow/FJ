@@ -43,14 +43,11 @@ export function AppShell({
               textClassName="!hidden text-[13px] lg:!flex"
             />
           </Link>
-          <GameRoomHeaderSlot />
-          {userName ? (
-            <div className="col-start-3 row-start-1 flex items-center justify-self-end gap-0 min-[420px]:gap-2">
-              <GuideLink />
+          <GameRoomHeaderSlot profile={userName ? (
               <Link
                 href="/profile"
                 aria-label={`Открыть профиль: ${userName}`}
-                className="flex h-11 w-11 items-center justify-center gap-2 rounded-xl p-0 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 lg:w-auto lg:px-2"
+                className="game-profile-link flex h-11 w-11 items-center justify-center gap-2 rounded-xl p-0 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 lg:w-auto lg:px-2"
               >
                 <UserAvatar
                   url={userAvatarUrl}
@@ -58,10 +55,10 @@ export function AppShell({
                   initials={userInitials}
                   figurine={userFigurine}
                 />
-                <span className="hidden text-sm lg:inline">{userName}</span>
+                <span className="game-profile-name hidden text-sm lg:inline">{userName}</span>
               </Link>
-            </div>
-          ) : null}
+          ) : null} />
+          <div className="col-start-3 row-start-1 justify-self-end"><GuideLink /></div>
         </div>
       </header>
       <main className="app-shell-main mx-auto min-w-0 max-w-[1480px] px-3 py-6 sm:px-4 sm:py-8">{children}</main>

@@ -130,17 +130,32 @@ for (const width of [1440, 768, 390, 320]) {
     await expect(page.getByLabel('Открытый круг')).toHaveText('RAT_RACE');
     await header.getByRole('button', {name:'Большой круг',exact:true}).click();
     await expect(page.getByLabel('Открытый круг')).toHaveText('FAST_TRACK');
-    await expect(header.getByRole('link', { name: 'Пульт ведущего', exact: true })).toHaveAttribute('href', '/games/synthetic/host');
-    await expect(header.getByRole('link', { name: 'Открыть поле', exact: true })).toHaveAttribute('href', '/games/synthetic/display?view=classic');
+    await expect(header.getByRole('link', { name: 'Правила игры' })).toBeVisible();
+    if (width < 1280) await header.getByRole('button', { name: 'Меню игры', exact: true }).click();
+    const hostLink = header.getByRole('link', { name: 'Пульт ведущего', exact: true });
+    await expect(hostLink).toBeVisible();
+    await expect(hostLink).toHaveAttribute('href', '/games/synthetic/host');
     await expect(header.getByRole('link', { name: 'Открыть поле', exact: true })).toHaveAttribute('target', '_blank');
+    if (width < 1280) {
+      await expect(header.getByRole('link', { name: /Открыть профиль/ })).toBeVisible();
+      await expect(header.getByRole('button', { name: /Открыть диагностику/ })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(header.getByRole('button', { name: 'Меню игры', exact: true })).toBeFocused();
+    }
     await expect(header.getByText(/Вечерняя партия|5C8G8M|Раунд|Ход:/)).toHaveCount(0);
     await expect(header.getByRole('button', { name: 'Удалить игру' })).toHaveCount(0);
     await expect(page.getByText(/^Тестовая партия ·/)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Открыть чат, непрочитанных сообщений: 2' })).toBeVisible();
     const brand = await header.getByRole('link', { name: 'Финансовое путешествие — личный кабинет' }).boundingBox();
-    const shortcuts = await header.getByRole('navigation', { name: 'Экраны ведущего' }).boundingBox();
-    if (width >= 1280) expect(brand!.x + brand!.width).toBeLessThanOrEqual(shortcuts!.x);
-    else expect(brand!.y + brand!.height).toBeLessThanOrEqual(shortcuts!.y);
+    const rules = await header.getByRole('link', { name: 'Правила игры' }).boundingBox();
+    const tracks = await header.getByRole('group', { name: 'Показать круг' }).boundingBox();
+    if (width < 1280) {
+      expect(Math.abs(brand!.y - rules!.y)).toBeLessThanOrEqual(4);
+      expect(Math.abs(tracks!.y - rules!.y)).toBeLessThanOrEqual(4);
+      expect(brand!.x + brand!.width).toBeLessThanOrEqual(tracks!.x);
+      const chatBox = await header.getByRole('button', { name: /Открыть чат/ }).boundingBox();
+      expect(Math.abs(chatBox!.y - rules!.y)).toBeLessThanOrEqual(4);
+    }
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: join(output, `menu-${width}.png`), fullPage: true });
 
@@ -160,8 +175,8 @@ for (const width of [1440, 768, 390, 320]) {
     await page.getByRole('button', { name: 'Синхронизировать' }).click();
     await expect(page.getByRole('button', { name: 'Открыть чат', exact: true })).toBeVisible();
 
-    if (width < 768) {
-      await page.getByRole('button', { name: 'Управление игрой', exact: true }).click();
+    if (width < 1280) {
+      await page.getByRole('button', { name: 'Меню игры', exact: true }).click();
       await page.getByRole('button', { name: 'Поставить на паузу', exact: true }).click();
     } else {
       await page.getByRole('button', { name: 'Поставить игру на паузу' }).click();
@@ -169,8 +184,8 @@ for (const width of [1440, 768, 390, 320]) {
     await page.getByRole('button', { name: 'Открыть чат, непрочитанных сообщений: 1' }).click();
     await expect(chat.getByText('Игра поставлена на паузу. Весь прогресс сохранён.', { exact: true })).toHaveCount(1);
     await page.keyboard.press('Escape');
-    if (width < 768) {
-      await page.getByRole('button', { name: 'Игра на паузе', exact: true }).click();
+    if (width < 1280) {
+      await page.getByRole('button', { name: 'Меню игры', exact: true }).click();
       await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
     } else {
       await page.getByRole('button', { name: 'Продолжить игру' }).click();
@@ -329,3 +344,97 @@ for(const view of ['classic','journey']) {
     expect(await page.locator('.board-scroll').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
   });
 }
+
+for (const width of [320, 390, 430]) {
+  test(`mobile room keeps one header row, scroll and floating dice at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${pathToFileURL(resolve(output, 'index.html')).href}?mode=mobile-room`);
+    const bar = page.getByRole('region', { name: 'Действия текущего хода' });
+    await expect(bar).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Правила игры' })).toBeInViewport();
+    await expect(page.locator('.player-identity [data-figurine="rubber-duck"] img')).toBeVisible();
+    await expect(page.locator('.cell-owner [data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
+    await expect(page.locator('.game-action-entry [data-player-id="boris"]').first()).toHaveAttribute('data-figurine', 'cat-in-box');
+    await page.getByLabel('Количество кубиков').selectOption('3');
+    const bounds = await bar.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(await bar.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    expect(await page.locator('.board-shell').evaluate(el => { const r=el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.mouse.move(width / 2, 350);
+    await page.mouse.wheel(0, 600);
+    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+    await expect(bar).toBeInViewport();
+    await page.locator('.board-scroll').scrollIntoViewIfNeeded();
+    expect(await page.locator('.board-scroll').evaluate(el => {
+      el.scrollTop = 100;
+      el.scrollLeft = 200;
+      return el.scrollTop > 0 && el.scrollLeft > 0;
+    })).toBe(true);
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    await page.screenshot({ path: join(output, `mobile-room-${width}.png`) });
+    await bar.getByRole('button', { name: 'Бросить кубики', exact: true }).click();
+    await expect(page.getByText('Бросок принят', { exact: true })).toBeVisible();
+    await expect(bar).toHaveCount(0);
+  });
+}
+
+test('large track animates humans and queued bot moves through each route cell', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${pathToFileURL(resolve(output, 'index.html')).href}?mode=movement`);
+  await expect(page.locator('html')).toHaveAttribute('data-fixture-ready', 'true');
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+  await page.evaluate(() => {
+    const visited: Record<string, number[]> = { anna: [], boris: [] };
+    (window as any).visited = visited;
+    new MutationObserver(() => {
+      for (const id of Object.keys(visited)) {
+        const token = document.querySelector(`.cell-tokens [data-player-id="${id}"]`);
+        const position = Number(token?.closest('[data-fast-cell]')?.getAttribute('data-fast-cell'));
+        if (token && visited[id]!.at(-1) !== position) visited[id]!.push(position);
+      }
+    }).observe(document.querySelector('.fast-track')!, { childList: true, subtree: true });
+    const move = (id: string, sequence: number, from: number, route: number[]) => ({ id: `move-${sequence}`, sequence, type: 'player:move', createdAt: new Date().toISOString(), gamePlayer: { id, seat: 1, role: 'PLAYER' }, payload: { track: 'FAST_TRACK', from, to: route.at(-1), steps: route.length, route } });
+    window.dispatchEvent(new CustomEvent('fixture:moves', { detail: [move('anna', 101, 23, [24,25,26]), move('boris', 102, 46, [47,0,1])] }));
+  });
+  await expect(page.locator('.fast-track')).toHaveAttribute('data-moving-player', 'anna');
+  await expect(page.locator('[data-fast-cell="26"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
+  await expect(page.locator('[data-fast-cell="1"] .cell-tokens [data-player-id="boris"]')).toHaveCount(1);
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+  const visited = await page.evaluate(() => (window as any).visited);
+  expect(visited.anna).toEqual(expect.arrayContaining([24,25,26]));
+  expect(visited.boris).toEqual(expect.arrayContaining([47,0,1]));
+});
+
+test('reduced motion immediately shows the final large-track position', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${pathToFileURL(resolve(output, 'index.html')).href}?mode=movement`);
+  await expect(page.locator('html')).toHaveAttribute('data-fixture-ready', 'true');
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:moves', { detail: [{ id: 'move-101', sequence: 101, type: 'player:move', createdAt: '', gamePlayer: { id: 'boris', seat: 2, role: 'PLAYER' }, payload: { track: 'FAST_TRACK', from: 12, to: 15, steps: 3, route: [13,14,15] } }] })));
+  await expect(page.locator('[data-fast-cell="15"] .cell-tokens [data-player-id="boris"]')).toHaveCount(1);
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+});
+
+
+test('movement waits for the local dice and never replays duplicate or restored events', async ({ page }) => {
+  await page.goto(`${pathToFileURL(resolve(output, 'index.html')).href}?mode=movement`);
+  await expect(page.locator('html')).toHaveAttribute('data-fixture-ready', 'true');
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('fixture:phase', { detail: 'rolling' }));
+    const moves = [{ id: 'move-101', sequence: 101, type: 'player:move', createdAt: '', gamePlayer: { id: 'anna', seat: 1, role: 'PLAYER' }, payload: { track: 'FAST_TRACK', from: 23, to: 25, steps: 2, route: [24,25] } }];
+    (window as any).moves = moves;
+    window.dispatchEvent(new CustomEvent('fixture:moves', { detail: moves }));
+  });
+  await expect(page.locator('.fast-track')).toHaveAttribute('data-moving-player', 'anna');
+  await page.waitForTimeout(300);
+  await expect(page.locator('[data-fast-cell="23"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:phase', { detail: 'moving' })));
+  await expect(page.locator('[data-fast-cell="25"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:moves', { detail: (window as any).moves })));
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new Event('fixture:remount')));
+  await expect(page.locator('[data-moving-player]')).toHaveCount(0);
+  await expect(page.locator('[data-fast-cell="25"] .cell-tokens [data-player-id="anna"]')).toHaveCount(1);
+});

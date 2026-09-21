@@ -7,6 +7,7 @@ import { DesktopGameBoard } from '../../apps/web/src/components/game/game-room';
 import { AppShell } from '../../apps/web/src/components/layout/app-shell';
 import { GameRoomHeaderProvider } from '../../apps/web/src/components/layout/game-room-header-context';
 import logo from '../../apps/web/public/logo.svg';
+import { MobileTurnDialog } from '../../apps/web/src/components/game/mobile-turn-dialog';
 import { DiceAction } from '../../apps/web/src/components/game/dice-action';
 import { TestGameOptions } from '../../apps/web/src/components/game/test-game-options';
 import { GameMenuFixture } from './game-menu-ui';
@@ -21,9 +22,13 @@ const archiveWindow=Array.from({length:80},(_,i)=>event(i+21,i<75?'state:update'
 const archived=Array.from({length:20},(_,i)=>event(i+1));
 function App(){
  const mode=new URLSearchParams(location.search).get('mode');
- const [player,setPlayer]=useState(user);const [count,setCount]=useState(2);const [decision,setDecision]=useState(!['ready','roll-error','desktop-small','desktop-large'].includes(mode ?? ''));const [notice,setNotice]=useState('');
+ const [player,setPlayer]=useState(user);const [count,setCount]=useState(2);const [decision,setDecision]=useState(!['ready','roll-error','desktop-small','desktop-large','mobile-room','movement'].includes(mode ?? ''));const [notice,setNotice]=useState('');
  const [rolling,setRolling]=useState(false);
- const [phase,setPhase]=useState<'ready'|'rolling'|'landed'>('ready');
+ const [phase,setPhase]=useState<'ready'|'rolling'|'moving'|'landed'>('ready');
+ const [moves,setMoves]=useState<any[]>([]);
+ const [boardVersion,setBoardVersion]=useState(0);
+ useEffect(()=>{const remount=()=>setBoardVersion(value=>value+1);const changePhase=(event:Event)=>setPhase((event as CustomEvent).detail);window.addEventListener('fixture:remount',remount);window.addEventListener('fixture:phase',changePhase);return()=>{window.removeEventListener('fixture:remount',remount);window.removeEventListener('fixture:phase',changePhase);};},[]);
+ useEffect(()=>{const move=(event:Event)=>setMoves(current=>[...current,...(event as CustomEvent).detail]);window.addEventListener('fixture:moves',move);document.documentElement.dataset.fixtureReady='true';return()=>{window.removeEventListener('fixture:moves',move);delete document.documentElement.dataset.fixtureReady;};},[]);
  useEffect(()=>{const reset=()=>{setDecision(false);setPhase('ready');};window.addEventListener('fixture:next-turn',reset);return()=>window.removeEventListener('fixture:next-turn',reset);},[]);
  const roll=()=>{setRolling(true);setPhase('rolling');setNotice('Бросок принят');setTimeout(()=>{setRolling(false);if(mode==='roll-error'){setPhase('ready');setNotice('Не удалось бросить кубик');}else{setPhase('landed');setDecision(true);}},200);};
  const attempts=useRef(0);
@@ -33,10 +38,12 @@ function App(){
    const observer=new MutationObserver(update);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});update();return ()=>observer.disconnect();
  },[]);
  if(mode==='menu') return <GameMenuFixture />;
- const snapshot:any={game:{id:'synthetic',status:mode==='paused'?'PAUSED':'IN_PROGRESS',currentPlayerId:mode==='waiting'?'boris':'anna',currentRound:3,currentTurnIndex:0,rulesVersion:2,isTest:true,fastTrackWorld:{owners:{1:'anna',3:'boris'},influence:{4:['boris','vera']},dreamPurchases:{0:['anna']}},pendingAction:decision?{type:'fast_track_choice',cellIndex:23,gamePlayerId:'anna',decisionId:'demo',priceCents:300000}:null},players:[player,{...user,id:'boris',userId:null,user:null,figurine:'cat-in-box',controller:'BOT',guestName:'Борис',fastTrackPosition:12,dreamCellIndex:12,financialState:{...user.financialState,fastTrackCharity:false}},{...user,id:'vera',userId:null,user:null,figurine:'robot',guestName:'Вера',track:'RAT_RACE',dreamCellIndex:16}],events:history,board:ratRaceBoard};
+ const snapshot:any={game:{id:'synthetic',status:mode==='paused'?'PAUSED':'IN_PROGRESS',currentPlayerId:mode==='waiting'?'boris':'anna',currentRound:3,currentTurnIndex:0,rulesVersion:2,isTest:true,fastTrackWorld:{owners:{1:'anna',3:'boris'},influence:{4:['boris','vera']},dreamPurchases:{0:['anna']}},pendingAction:decision?{type:'fast_track_choice',cellIndex:23,gamePlayerId:'anna',decisionId:'demo',priceCents:300000}:null},players:[player,{...user,id:'boris',userId:null,user:null,figurine:'cat-in-box',controller:'BOT',guestName:'Борис',fastTrackPosition:12,dreamCellIndex:12,financialState:{...user.financialState,fastTrackCharity:false}},{...user,id:'vera',userId:null,user:null,figurine:'robot',guestName:'Вера',track:'RAT_RACE',dreamCellIndex:16}],events:[...history,...moves],board:ratRaceBoard};
+ snapshot.players=snapshot.players.map((p:any)=>({...p,fastTrackPosition:[...moves].reverse().find(e=>e.gamePlayer.id===p.id)?.payload.to ?? p.fastTrackPosition}));
  if(mode==='occupied') snapshot.players=snapshot.players.map((p:any,i:number)=>({...p,track:'FAST_TRACK',fastTrackPosition:i===0?36:12}));
  const feed=<GameActionHistory gameId="synthetic" players={snapshot.players} events={mode==='archive'?archiveWindow:history} loadEarlier={async()=>{if(++attempts.current===1)throw new Error('Не удалось загрузить историю партии');return [...archived,...archiveWindow];}}/>;
- const fast=<FastTrackPanel snapshot={snapshot} player={player} rolling={rolling} phase={phase} diceValues={Array.from({length:count},(_,i)=>i+4)} diceCount={count} onDiceCount={setCount} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} busy={false} onDecision={(buy)=>{setDecision(false);setPhase('ready');setNotice(buy?'Покупка принята':'Отказ принят')}}>{feed}</FastTrackPanel>;
+ const fast=<FastTrackPanel key={boardVersion} snapshot={snapshot} player={snapshot.players[0]} rolling={rolling} phase={phase} diceValues={Array.from({length:count},(_,i)=>i+4)} diceCount={count} onDiceCount={setCount} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} busy={false} onDecision={(buy)=>{setDecision(false);setPhase('ready');setNotice(buy?'Покупка принята':'Отказ принят')}}>{feed}</FastTrackPanel>;
+ if(mode==='mobile-room') return <GameMenuFixture>{fast}<MobileTurnDialog open={!decision} rolling={rolling} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1279} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} /><output>{notice}</output></GameMenuFixture>;
  if(mode==='desktop-small'||mode==='desktop-large') {
    const small=mode==='desktop-small';
    const view=new URLSearchParams(location.search).get('view')==='journey'?'journey':'classic';

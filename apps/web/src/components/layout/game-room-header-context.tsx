@@ -3,6 +3,9 @@
 import {
   Bot,
   CircleDot,
+  Circle,
+  Orbit,
+  Menu,
   Clock3,
   MessageCircle,
   Pause,
@@ -29,7 +32,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { shortDate } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
-import type { ChatMessage } from "@/lib/types";
+import { GamePlayerMark } from "@/components/game/game-player-mark";
+import { gamePlayerName } from "@/lib/game-player";
+import type { ChatMessage, GamePlayer } from "@/lib/types";
 import {
   connectionPresentation,
   type ConnectionDiagnostics
@@ -38,6 +43,7 @@ import {
 export interface GameRoomHeaderState {
   gameId: string;
   currentUserId: string;
+  player?: GamePlayer | undefined;
   title: string;
   status: string;
   connected: boolean;
@@ -81,12 +87,14 @@ export function useSetGameRoomHeader() {
   return context.setState;
 }
 
-export function GameRoomHeaderSlot() {
+export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {
   const context = useContext(GameRoomHeaderContext);
   const state = context?.state ?? null;
   const rootRef = useRef<HTMLDivElement>(null);
-  const hasHostLinks = Boolean(state?.hostDisplayView);
-  const hasExtraControls = hasHostLinks || Boolean(state?.trackView);
+  const profileLink = state?.player ? <a href="/profile" aria-label={`Открыть профиль: ${gamePlayerName(state.player)}`}
+    className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-bold text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+    <GamePlayerMark player={state.player} size="sm" /><span>{gamePlayerName(state.player)}</span>
+  </a> : profile;
 
   useEffect(() => {
     const header = rootRef.current?.closest("header");
@@ -102,38 +110,23 @@ export function GameRoomHeaderSlot() {
       if (previous) style.setProperty("--app-shell-header-bottom", previous);
       else style.removeProperty("--app-shell-header-bottom");
     };
-  }, [hasExtraControls]);
+  }, [Boolean(state)]);
 
   return (
-    <div ref={rootRef} className={`flex min-w-0 justify-center${hasExtraControls ? " col-span-3 row-start-2 xl:col-span-1 xl:col-start-2 xl:row-start-1" : ""}`}>
+    <div ref={rootRef} className={`col-start-2 row-start-1 flex min-w-0 justify-end${state ? " xl:justify-center" : ""}`}>
       {state ? (
-        <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 text-xs text-muted sm:gap-2">
-          {state.trackView ? <div className="flex w-full justify-center sm:w-auto" role="group" aria-label="Показать круг">
-            <div className="flex rounded-xl bg-card p-1">
+        <div className="game-header-controls flex min-w-0 max-w-full items-center justify-center text-xs text-muted xl:flex-wrap xl:gap-2">
+          {state.trackView ? <div className="flex shrink-0 justify-center" role="group" aria-label="Показать круг">
+            <div className="flex rounded-xl bg-card xl:p-1">
               {([['RAT_RACE', 'Малый круг'], ['FAST_TRACK', 'Большой круг']] as const).map(([track, label]) => <button
-                key={track} type="button" aria-pressed={state.trackView === track} onClick={() => state.onTrackChange(track)}
-                className={`min-h-11 rounded-lg px-3 font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${state.trackView === track ? "bg-white text-journey shadow-sm" : "text-muted hover:text-ink"}`}>{label}</button>)}
+                key={track} type="button" aria-label={label} title={label} aria-pressed={state.trackView === track} onClick={() => state.onTrackChange(track)}
+                className={`inline-flex h-11 w-11 items-center justify-center rounded-lg font-bold transition xl:w-auto xl:px-3 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${state.trackView === track ? "bg-white text-journey shadow-sm" : "text-muted hover:text-ink"}`}><span className="xl:hidden">{track === "RAT_RACE" ? <Circle size={18} aria-hidden="true" /> : <Orbit size={22} aria-hidden="true" />}</span><span className="hidden xl:inline">{label}</span></button>)}
             </div>
           </div> : null}
-          {state.hostDisplayView ? (
-            <nav className="flex shrink-0 items-center" aria-label="Экраны ведущего">
-              <a href={`/games/${state.gameId}/host`} aria-label="Пульт ведущего" title="Пульт ведущего"
-                className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
-                <LayoutDashboard size={19} aria-hidden="true" />
-                <span className="hidden xl:inline">Пульт ведущего</span>
-              </a>
-              <a href={`/games/${state.gameId}/display?view=${state.hostDisplayView}`} target="_blank" rel="noreferrer"
-                aria-label="Открыть поле" title="Открыть поле в новом окне"
-                className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 text-muted transition hover:bg-white hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
-                <MonitorUp size={19} aria-hidden="true" />
-                <span className="hidden xl:inline">Открыть поле</span>
-              </a>
-            </nav>
-          ) : null}
-          <MobileTimelineControl state={state} />
+          <div className="hidden xl:block"><HostShortcuts state={state} /></div>
           {!state.isSolo && state.remainingSeconds !== null ? (
             <span
-              className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 font-extrabold tabular-nums text-ink md:inline-flex"
+              className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 font-extrabold tabular-nums text-ink xl:inline-flex"
               aria-label={timelineAriaLabel(state)}
             >
               <Clock3 size={14} aria-hidden="true" />
@@ -147,7 +140,7 @@ export function GameRoomHeaderSlot() {
             onSend={state.onSendChat}
           />
           {!state.isSolo && state.status !== "WAITING" && state.status !== "ENDED" ? (
-            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink md:inline">
+            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink xl:inline">
               Период {state.currentPeriod}/{state.periodCount}
             </span>
           ) : null}
@@ -156,7 +149,7 @@ export function GameRoomHeaderSlot() {
               type="button"
               onClick={state.onPause}
               disabled={state.timelineLoading}
-              className="hidden h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-card px-2.5 font-extrabold text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 disabled:cursor-wait disabled:opacity-60 md:inline-flex"
+              className="hidden h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-card px-2.5 font-extrabold text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 disabled:cursor-wait disabled:opacity-60 xl:inline-flex"
               aria-label="Поставить игру на паузу"
             >
               <Pause size={14} aria-hidden="true" />
@@ -168,7 +161,7 @@ export function GameRoomHeaderSlot() {
               type="button"
               onClick={state.onResume}
               disabled={state.timelineLoading}
-              className="hidden h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-action px-2.5 font-extrabold text-ink shadow-[0_8px_20px_rgba(249,143,47,.22)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/25 disabled:cursor-wait disabled:opacity-60 disabled:shadow-none md:inline-flex"
+              className="hidden h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-action px-2.5 font-extrabold text-ink shadow-[0_8px_20px_rgba(249,143,47,.22)] transition hover:-translate-y-0.5 hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-journey/25 disabled:cursor-wait disabled:opacity-60 disabled:shadow-none xl:inline-flex"
               aria-label={state.startsNextPeriod ? "Начать следующий период" : "Продолжить игру"}
             >
               <Play size={14} aria-hidden="true" />
@@ -177,9 +170,11 @@ export function GameRoomHeaderSlot() {
               </span>
             </button>
           ) : null}
-          <ConnectionStatusControl state={state} />
+          <div className="hidden xl:block"><ConnectionStatusControl state={state} /></div>
+          <div className="hidden xl:flex">{profileLink}</div>
+          <MobileGameMenu state={state} profile={profileLink} />
           {state.status === "WAITING" ? (
-            <div className="hidden items-center gap-2 md:flex">
+            <div className="hidden items-center gap-2 xl:flex">
               <span className="hidden max-w-44 truncate font-bold text-ink xl:inline">{state.title}</span>
               {state.isSolo ? (
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#eee8ff] px-2.5 py-2 font-extrabold text-[#6443b4]">
@@ -188,17 +183,17 @@ export function GameRoomHeaderSlot() {
               ) : <RoomInviteActions code={state.code} />}
             </div>
           ) : state.status === "PAUSED" || state.status === "ENDED" ? (
-            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink md:inline">
+            <span className="hidden shrink-0 rounded-lg bg-card px-2.5 py-2 font-bold text-ink xl:inline">
               {gameStatusLabel(state.status)}
             </span>
           ) : null}
         </div>
-      ) : null}
+      ) : profileLink}
     </div>
   );
 }
 
-function ConnectionStatusControl({ state }: { state: GameRoomHeaderState }) {
+function ConnectionStatusControl({ state, showLabel = false }: { state: GameRoomHeaderState; showLabel?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const presentation = connectionPresentation(state.connection.phase);
@@ -236,7 +231,7 @@ function ConnectionStatusControl({ state }: { state: GameRoomHeaderState }) {
         aria-label={`${presentation.label}. Открыть диагностику соединения`}
       >
         <CircleDot size={12} aria-hidden="true" />
-        <span className="hidden lg:inline">{presentation.label}</span>
+        <span className={showLabel ? "" : "hidden xl:inline"}>{presentation.label}</span>
       </button>
       {open ? (
         <section
@@ -306,121 +301,67 @@ function checkedAtText(value: string | null) {
   }).format(new Date(value));
 }
 
-function MobileTimelineControl({ state }: { state: GameRoomHeaderState }) {
+function HostShortcuts({ state, expanded = false }: { state: GameRoomHeaderState; expanded?: boolean }) {
+  if (!state.hostDisplayView) return null;
+  return <nav className={expanded ? "grid" : "flex shrink-0 items-center"} aria-label="Экраны ведущего">
+    <a href={`/games/${state.gameId}/host`} aria-label="Пульт ведущего" title="Пульт ведущего"
+      className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-xl px-2 font-bold hover:bg-card focus-visible:ring-4 focus-visible:ring-action/25">
+      <LayoutDashboard size={19} aria-hidden="true" /><span className={expanded ? "" : "hidden 2xl:inline"}>Пульт ведущего</span>
+    </a>
+    <a href={`/games/${state.gameId}/display?view=${state.hostDisplayView}`} target="_blank" rel="noreferrer" aria-label="Открыть поле" title="Открыть поле в новом окне"
+      className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-xl px-2 font-bold hover:bg-card focus-visible:ring-4 focus-visible:ring-action/25">
+      <MonitorUp size={19} aria-hidden="true" /><span className={expanded ? "" : "hidden 2xl:inline"}>Открыть поле</span>
+    </a>
+  </nav>;
+}
+
+function MobileGameMenu({ state, profile }: { state: GameRoomHeaderState; profile: ReactNode }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const canControl = Boolean(state.onPause || state.onResume);
-  const hasTimer = !state.isSolo && state.remainingSeconds !== null;
-
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
+    panelRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+    const closeOutside = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") { setOpen(false); buttonRef.current?.focus(); }
     };
-    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("pointerdown", closeOutside);
     document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeOnEscape); };
   }, [open]);
-
-  if (!hasTimer && !canControl) return null;
-
-  const controlLabel = !hasTimer
-    ? state.onResume
-      ? "Игра на паузе"
-      : "Управление игрой"
-    : timelineAriaLabel(state);
-
-  return (
-    <div ref={rootRef} className="relative md:hidden">
-      {canControl ? (
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-card px-1.5 font-extrabold tabular-nums text-ink transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 min-[360px]:px-2"
-          aria-label={controlLabel}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-        >
-          {!hasTimer ? (
-            <Pause size={14} aria-hidden="true" />
-          ) : (
-            <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
-          )}
-          <span>
-            {!hasTimer
-              ? state.onResume ? "Пауза" : "Игра"
-              : formatRemainingTime(state.remainingSeconds ?? 0)}
-          </span>
-        </button>
-      ) : (
-        <span
-          className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-card px-1.5 font-extrabold tabular-nums text-ink min-[360px]:px-2"
-          aria-label={controlLabel}
-        >
-          <Clock3 className="hidden min-[360px]:block" size={14} aria-hidden="true" />
-          <span>{formatRemainingTime(state.remainingSeconds ?? 0)}</span>
-        </span>
-      )}
-      {open && canControl ? (
-        <div
-          role="dialog"
-          aria-label={!hasTimer ? "Управление игрой" : "Управление временем партии"}
-          className="absolute left-0 top-[calc(100%+.5rem)] z-[70] w-56 rounded-xl bg-white p-3 text-left shadow-[0_18px_48px_rgba(5,18,45,.2)]"
-        >
-          {!hasTimer ? (
-            <div className="text-sm font-bold leading-5 text-ink">
-              Без ограничения времени
-            </div>
-          ) : (
-            <>
-              <div className="text-xs font-bold text-muted">
-                Период {state.currentPeriod}/{state.periodCount}
-              </div>
-              <div className="mt-1 text-sm font-extrabold tabular-nums text-ink">
-                {formatRemainingTime(state.remainingSeconds ?? 0)}
-              </div>
-            </>
-          )}
-          {state.onPause ? (
-            <Button
-              type="button"
-              variant="secondary"
-              className="mt-3 w-full gap-2"
-              onClick={() => {
-                setOpen(false);
-                state.onPause?.();
-              }}
-              disabled={state.timelineLoading}
-            >
-              <Pause size={16} aria-hidden="true" />
-              Поставить на паузу
-            </Button>
-          ) : null}
-          {state.onResume ? (
-            <Button
-              type="button"
-              variant="action"
-              className="mt-3 w-full gap-2"
-              onClick={() => {
-                setOpen(false);
-                state.onResume?.();
-              }}
-              disabled={state.timelineLoading}
-            >
-              <Play size={16} aria-hidden="true" />
-              {state.startsNextPeriod ? "Следующий период" : "Продолжить"}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
+  return <div ref={rootRef} className="relative shrink-0 xl:hidden" onBlur={(event) => {
+    // Safari does not focus buttons on pointer clicks; a null target must not
+    // remove the action before its click event. Outside clicks close above.
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
+  }}>
+    <button ref={buttonRef} type="button" aria-label="Меню игры" title="Меню игры" aria-expanded={open} aria-haspopup="dialog"
+      onClick={() => setOpen((value) => !value)}
+      className="grid h-11 w-11 place-items-center rounded-xl text-ink hover:bg-white focus-visible:ring-4 focus-visible:ring-action/25">
+      <Menu size={21} aria-hidden="true" />
+      {state.status === "PAUSED" ? <span className="sr-only">Игра на паузе</span> : null}
+    </button>
+    {open ? <div ref={panelRef} role="dialog" aria-label="Меню игры" className="game-mobile-menu rounded-2xl bg-white p-3 text-sm text-ink shadow-[0_18px_48px_rgba(5,18,45,.2)]">
+      <div className="grid gap-1">
+        {profile}
+        <HostShortcuts state={state} expanded />
+        <ConnectionStatusControl state={state} showLabel />
+      </div>
+      <div className="mt-3 rounded-xl bg-card p-3 text-sm">
+        <p className="font-bold">{gameStatusLabel(state.status)}</p>
+        {!state.isSolo ? <p className="mt-1">Период {state.currentPeriod}/{state.periodCount}</p> : null}
+        <p className="mt-1 tabular-nums">{state.remainingSeconds === null ? "Без ограничения времени" : formatRemainingTime(state.remainingSeconds)}</p>
+        {state.status === "WAITING" && !state.isSolo ? <RoomInviteActions code={state.code} /> : null}
+        {state.onPause ? <Button type="button" variant="secondary" className="mt-3 w-full gap-2" disabled={state.timelineLoading}
+          onClick={() => { setOpen(false); buttonRef.current?.focus(); state.onPause?.(); }}><Pause size={16} aria-hidden="true" />Поставить на паузу</Button> : null}
+        {state.onResume ? <Button type="button" variant="action" className="mt-3 w-full gap-2" disabled={state.timelineLoading}
+          onClick={() => { setOpen(false); buttonRef.current?.focus(); state.onResume?.(); }}><Play size={16} aria-hidden="true" />{state.startsNextPeriod ? "Следующий период" : "Продолжить"}</Button> : null}
+      </div>
+    </div> : null}
+  </div>;
 }
 
 function GameChatControl({

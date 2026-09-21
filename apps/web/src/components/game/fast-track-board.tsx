@@ -9,6 +9,7 @@ import { GameActionHistory } from "./game-action-history";
 import { GamePlayerMark } from "./game-player-mark";
 import { PlayerAvatar } from "./player-avatar";
 import { fastTrackCellEffect, purchasedFastTrackCells } from "./fast-track-presentation";
+import { useFastTrackMovement } from "./use-fast-track-movement";
 import "./fast-track.css";
 
 // The prototype's route is one continuous track with two lower transitions.
@@ -29,15 +30,18 @@ function cellPosition(index: number): CSSProperties {
   return at(columns[52 - index]!, rows[1]!);
 }
 
-export function FastTrackBoard({ snapshot, player, actions, history }: {
+export function FastTrackBoard({ snapshot, player, actions, history, phase }: {
   snapshot: GameSnapshot;
   player?: GamePlayer | undefined;
   actions?: ReactNode;
   history?: ReactNode;
+  phase?: "ready" | "rolling" | "moving" | "landed";
 }) {
   const active = snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId);
   const focusPlayer = player?.track === "FAST_TRACK" ? player : active?.track === "FAST_TRACK" ? active : snapshot.players.find((item) => item.track === "FAST_TRACK");
-  const position = focusPlayer?.fastTrackPosition ?? -1;
+  const movement = useFastTrackMovement(snapshot, player?.id, phase);
+  const followedPlayer = snapshot.players.find((item) => item.id === movement.movingPlayerId) ?? focusPlayer;
+  const position = followedPlayer ? movement.positions.get(followedPlayer.id) ?? followedPlayer.fastTrackPosition ?? -1 : -1;
   const root = useRef<HTMLElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [externalPanels, setExternalPanels] = useState(false);
@@ -57,7 +61,7 @@ export function FastTrackBoard({ snapshot, player, actions, history }: {
       top: cell.offsetTop - container.clientHeight / 2 + cell.clientHeight / 2,
       behavior: "instant"
     });
-  }, [position, focusPlayer?.id, externalPanels]);
+  }, [position, followedPlayer?.id, externalPanels]);
   const world = readFastTrackWorld(snapshot.game.fastTrackWorld);
   const players = snapshot.players.filter((item) => item.role === "PLAYER" && item.status === "JOINED");
   const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} /> : null;
@@ -66,14 +70,15 @@ export function FastTrackBoard({ snapshot, player, actions, history }: {
     {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} />}
   </section>;
 
-  return <section ref={root} className={`fast-track${externalPanels ? " scroll-board" : ""}`} aria-label="Поле большого круга">
+  return <section ref={root} className={`fast-track${externalPanels ? " scroll-board" : ""}`} aria-label="Поле большого круга" data-moving-player={movement.movingPlayerId ?? undefined}>
     {externalPanels ? <div className="mobile-controls">{overview}{turn}</div> : null}
     <div className="board-shell"><div className="board-scroll" ref={viewport} tabIndex={0} aria-label="Маршрут большого круга, прокручиваемая область">
       <div className="board board-classic">
         <svg className="classic-route" viewBox="0 0 1240 714" preserveAspectRatio="none" aria-hidden="true"><path className="classic-route-line" vectorEffect="non-scaling-stroke" d="M 620 147 H 200 V 567 H 440 V 671 H 92 Q 60 671 60 639 V 75 Q 60 43 92 43 H 1148 Q 1180 43 1180 75 V 639 Q 1180 671 1148 671 H 800 V 567 H 1040 V 147 H 620" /></svg>
         <span className="classic-start-label">СТАРТ</span>
+        <span className="fast-track-start-tokens">{players.filter((item) => item.track === "FAST_TRACK" && (movement.positions.get(item.id) ?? item.fastTrackPosition ?? -1) < 0).map((item) => <GamePlayerMark key={item.id} player={item} size="sm" />)}</span>
         {fastTrackCells.map((cell) => {
-          const onCell = players.filter((item) => item.track === "FAST_TRACK" && item.fastTrackPosition === cell.index);
+          const onCell = players.filter((item) => item.track === "FAST_TRACK" && (movement.positions.get(item.id) ?? item.fastTrackPosition) === cell.index);
           const owners = snapshot.players.filter((item) => world.owners[cell.index] === item.id || world.dreamPurchases[cell.index]?.includes(item.id)
             || (cell.rule.kind === "charity" && item.financialState?.fastTrackCharity));
           const price = focusPlayer ? fastTrackPrice(cell, focusPlayer.id, focusPlayer.dreamCellIndex ?? null, world) : cell.cost;
@@ -83,7 +88,7 @@ export function FastTrackBoard({ snapshot, player, actions, history }: {
             {cell.cost > 0 ? <span className="cell-price">{money(price)}</span> : null}
             {effect ? <span className="cell-effect">{effect}</span> : null}
             {owners.length ? <span className="cell-owner">{owners.map((owner) => <span key={owner.id} role="img" aria-label={`${cell.rule.kind === "ipo" ? "Закрыто" : "Владелец"}: ${gamePlayerName(owner)}`}><PlayerAvatar player={owner} /></span>)}</span> : null}
-            {onCell.length ? <span className="cell-tokens">{onCell.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" />)}</span> : null}
+            {onCell.length ? <span className="cell-tokens">{onCell.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" className={movement.movingPlayerId === item.id ? "timeline-moving-token" : ""} />)}</span> : null}
           </article>;
         })}
         {!externalPanels ? <div className="central-panel">{overview}{turn}</div> : null}

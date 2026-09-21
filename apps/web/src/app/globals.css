@@ -156,6 +156,34 @@ body.game-room-viewport-locked {
   width: min(21.25rem, calc(100vw - 1.5rem));
 }
 
+.game-mobile-menu {
+  position: fixed;
+  top: calc(var(--app-shell-header-bottom) + 0.5rem);
+  right: max(0.75rem, env(safe-area-inset-right));
+  width: min(20rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - var(--app-shell-header-bottom) - 1.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.game-mobile-menu .game-profile-link { width: auto; justify-content: flex-start; padding-inline: 0.5rem; }
+.game-mobile-menu .game-profile-name { display: inline; }
+
+.game-mobile-menu .connection-diagnostics-dialog {
+  position: static;
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 1279px) {
+  .app-shell-header-content:has(.game-header-controls) .brand-logo-text { display: none !important; }
+  .app-shell-main:has(.mobile-turn-bar) { padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom))); }
+}
+
+@media (max-width: 359px) {
+  .mobile-turn-bar .mobile-turn-dice { grid-column: 1 / -1; justify-content: center; }
+}
+
 .desktop-game-board-grid {
   width: 100%;
   grid-template-columns: repeat(8, minmax(0, 1fr));
