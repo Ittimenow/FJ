@@ -60,6 +60,7 @@ export interface GameRoomHeaderState {
   onPause: (() => void) | null;
   onResume: (() => void) | null;
   hostDisplayView: "classic" | "journey" | null;
+  viewportMode?: "classic" | "journey" | null;
   trackView: "RAT_RACE" | "FAST_TRACK" | null;
   onTrackChange: (track: "RAT_RACE" | "FAST_TRACK") => void;
   onCheckConnection: () => void;
@@ -85,6 +86,15 @@ export function useSetGameRoomHeader() {
   const context = useContext(GameRoomHeaderContext);
   if (!context) throw new Error("useSetGameRoomHeader must be used inside GameRoomHeaderProvider");
   return context.setState;
+}
+
+export function GameRoomViewport({ initialMode, children }: {
+  initialMode: "classic" | "journey" | null;
+  children: ReactNode;
+}) {
+  const context = useContext(GameRoomHeaderContext);
+  const mode = context?.state?.viewportMode === undefined ? initialMode : context.state.viewportMode;
+  return <div className={`min-h-screen min-w-0 bg-surface text-ink${mode ? ` app-shell--game-${mode}-active` : ""}`}>{children}</div>;
 }
 
 export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {

@@ -119,6 +119,7 @@
   scrollbar-color: #c5b5a3 transparent;
 }
 :where(.fast-track) .turn-activity { padding-top: 0; }
+:where(.fast-track) .turn-activity > .dice-action { margin-bottom: 12px; }
 :where(.fast-track) .turn-waiting { padding-top: 12px; }
 :where(.fast-track) .fast-track-turn-options { padding-top: 12px; }
 :where(.fast-track) .fast-track-turn-options:empty { display: none; }

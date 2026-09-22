@@ -11,7 +11,7 @@ const fixtureUrl = `${fixtureOrigin}/index.html`;
 let output: string;
 test.beforeAll(() => {
   output = mkdtempSync(join(tmpdir(), 'fj-game-ui-'));
-  buildSync({ entryPoints: ['tests/fixtures/fast-track-ui.tsx'], outfile: join(output, 'app.js'), bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', tsconfig: 'apps/web/tsconfig.json', loader: { '.svg': 'dataurl', '.png': 'dataurl' }, alias: { 'next/navigation': resolve('tests/fixtures/navigation.ts'), 'next/link': resolve('tests/fixtures/link.tsx'), '@sentry/nextjs': '@sentry/browser' } });
+  buildSync({ entryPoints: ['tests/fixtures/fast-track-ui.tsx'], outfile: join(output, 'app.js'), bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', define: { 'process.env': JSON.stringify({ NODE_ENV: 'development' }) }, tsconfig: 'apps/web/tsconfig.json', loader: { '.svg': 'dataurl', '.png': 'dataurl' }, alias: { 'next/navigation': resolve('tests/fixtures/navigation.ts'), 'next/link': resolve('tests/fixtures/link.tsx'), 'socket.io-client': resolve('tests/fixtures/socket.ts'), '@sentry/nextjs': '@sentry/browser' } });
   execFileSync(process.execPath, ['node_modules/tailwindcss/lib/cli.js', '-c', 'apps/web/tailwind.config.ts', '-i', 'apps/web/src/app/globals.css', '-o', join(output, 'style.css'), '--content', 'apps/web/src/**/*.{ts,tsx}', '--minify']);
   let fonts = '';
   try {
@@ -24,6 +24,7 @@ test.beforeAll(() => {
 });
 
 test.beforeEach(async ({ page }) => {
+  page.on('pageerror', error => console.error(error.stack));
   // Serve real assets before navigation so root-relative image URLs work in every browser.
   await page.route(`${fixtureOrigin}/**`, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -657,4 +658,127 @@ test('dream selection stays open during saving and failure, then collapses after
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: true })));
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+});
+
+for (const width of [1440, 390]) {
+  test(`room starts, switches tracks and enters the large track without reloading at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(`${fixtureUrl}?mode=room&status=WAITING`);
+    await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+    await expect(page.getByRole('group', { name: 'Показать круг' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Начать партию', exact: true }).click();
+    await expect(page.locator('.app-shell--game-classic-active')).toHaveCount(1);
+    await expect(page.getByRole('group', { name: 'Показать круг' })).toHaveCount(0);
+    if (width >= 1024) {
+      await expect.poll(() => page.locator('.desktop-game-board-shell').evaluate(el => el.clientHeight)).toBeGreaterThan(650);
+      await expect(page.locator('.desktop-game-board-shell [data-board-cell="19"]')).toBeInViewport();
+      await expect(page.getByRole('heading', { name: 'Действия', exact: true })).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Банк', exact: true }).filter({ visible: true })).toHaveCount(1);
+    } else {
+      await page.getByRole('tab', { name: 'Ход', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Действия', exact: true }).filter({ visible: true })).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Банк', exact: true }).filter({ visible: true })).toHaveCount(1);
+    }
+    await page.evaluate(() => {
+      const snapshot = structuredClone((window as any).roomSnapshot);
+      snapshot.players[1].track = 'FAST_TRACK';
+      // Dispatch a fresh server snapshot, as the real socket does.
+      window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: structuredClone(snapshot) }));
+    });
+    await page.getByRole('button', { name: 'Большой круг', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Поле большого круга', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Малый круг', exact: true }).click();
+    if (width >= 1024) {
+      await expect.poll(() => page.locator('.desktop-game-board-shell').evaluate(el => el.clientHeight)).toBeGreaterThan(650);
+      await expect(page.locator('.desktop-game-board-shell [data-board-cell="19"]')).toBeInViewport();
+    } else await page.getByRole('tab', { name: 'Ход', exact: true }).click();
+    await page.evaluate(() => {
+      const snapshot = structuredClone((window as any).roomSnapshot);
+      snapshot.players[0].financialState.passiveIncomeCents = 10000;
+      window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+    });
+    const history = page.getByRole('region', { name: 'История действий игроков', exact: true }).filter({ visible: true });
+    const entry = history.getByRole('button', { name: 'Перейти на большой круг', exact: true });
+    await expect(entry).toBeVisible();
+    await page.screenshot({ path: join(output, `room-small-${width}.png`), fullPage: true });
+    await page.route('**/api/games/synthetic/fast-track/enter', async route => {
+      const snapshot = await page.evaluate(() => {
+        const next = structuredClone((window as any).roomSnapshot);
+        next.players[0].track = 'FAST_TRACK';
+        next.players[0].fastTrackPosition = -1;
+        return next;
+      });
+      await route.fulfill({ json: { snapshot } });
+    });
+    await entry.click();
+    await expect(page.getByRole('region', { name: 'Поле большого круга', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Большой круг', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    if (width >= 1024) {
+      const gap = await page.locator('.turn-activity').evaluate(el => {
+        const dice = el.querySelector('.dice-action')!.getBoundingClientRect();
+        const history = el.querySelector('.game-action-history')!.getBoundingClientRect();
+        return history.top - dice.bottom;
+      });
+      expect(gap).toBeGreaterThanOrEqual(12);
+    }
+    await page.screenshot({ path: join(output, `room-large-${width}.png`), fullPage: true });
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const view of ['classic', 'journey']) {
+  for (const width of [1440, 390]) {
+    test(`small-track ${view} room animates every human and queued bot cell at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${fixtureUrl}?mode=room&view=${view}`);
+      await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+      if (view === 'journey' && width < 1280) await page.getByRole('tab', { name: 'Поле', exact: true }).click();
+      const board = view === 'journey' ? '.journey-board-canvas' : width >= 1024 ? '.desktop-game-board-shell' : '[aria-label="Малый круг"]';
+      await page.evaluate(({ board }) => {
+        const visited: Record<string, number[]> = { anna: [], boris: [] };
+        (window as any).visited = visited;
+        new MutationObserver(() => {
+          for (const id of Object.keys(visited)) {
+            const token = document.querySelector(`${board} [data-board-cell] [data-player-id="${id}"]`);
+            const cell = token?.closest('[data-board-cell]');
+            const position = Number(cell?.getAttribute('data-board-cell'));
+            if (token && visited[id]!.at(-1) !== position) visited[id]!.push(position);
+          }
+        }).observe(document.querySelector(board)!, { childList: true, subtree: true });
+        const move = (id: string, sequence: number, from: number, to: number) => ({ id: `small-${sequence}`, sequence, type: 'player:move', createdAt: new Date().toISOString(), gamePlayer: { id, seat: 1, role: 'PLAYER' }, payload: { from, to, steps: 3 } });
+        const moves = [move('anna', 101, 0, 3), move('boris', 102, 22, 1)];
+        (window as any).smallMoves = moves;
+        window.dispatchEvent(new CustomEvent('fixture:room-moves', { detail: moves }));
+      }, { board });
+      await expect(page.locator(`${board} [data-board-cell="3"] [data-player-id="anna"]`)).toHaveCount(1);
+      await expect(page.locator(`${board} [data-board-cell="1"] [data-player-id="boris"]`)).toHaveCount(1);
+      await expect(page.locator('.timeline-moving-token')).toHaveCount(0);
+      const visited = await page.evaluate(() => (window as any).visited);
+      expect(visited.anna).toEqual(expect.arrayContaining([1, 2, 3]));
+      expect(visited.boris).toEqual(expect.arrayContaining([23, 0, 1]));
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:room-moves', { detail: (window as any).smallMoves })));
+      await expect(page.locator('.timeline-moving-token')).toHaveCount(0);
+      await page.evaluate(() => window.dispatchEvent(new Event('fixture:room-remount')));
+      await expect(page.locator('.timeline-moving-token')).toHaveCount(0);
+    });
+  }
+}
+
+test('small-track movement waits for dice, uses no white frame, and respects reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${fixtureUrl}?mode=room`);
+  await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+  await page.getByRole('button', { name: 'Бросить кубик', exact: true }).filter({ visible: true }).click();
+  await expect(page.locator('.desktop-game-board-shell [data-board-cell="0"] [data-player-id="anna"]')).toHaveCount(1);
+  await expect(page.locator('.desktop-game-board-shell')).toHaveAttribute('data-moving-player', 'anna');
+  const shadow = await page.locator('.desktop-game-board-shell .timeline-moving-token').evaluate(el => getComputedStyle(el).boxShadow);
+  expect(shadow).toBe('none');
+  await expect(page.locator('.desktop-game-board-shell [data-board-cell="3"] [data-player-id="anna"]')).toHaveCount(1);
+  await expect(page.locator('.timeline-moving-token')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:room-moves', { detail: [{ id: 'reduced', sequence: 102, type: 'player:move', createdAt: '', gamePlayer: { id: 'boris', seat: 2, role: 'PLAYER' }, payload: { from: 22, to: 1, steps: 3 } }] })));
+  await expect(page.locator('.desktop-game-board-shell [data-board-cell="1"] [data-player-id="boris"]')).toHaveCount(1);
+  await expect(page.locator('.timeline-moving-token')).toHaveCount(0);
 });

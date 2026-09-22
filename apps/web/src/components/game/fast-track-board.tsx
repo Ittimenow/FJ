@@ -11,7 +11,7 @@ import { GamePlayerMark } from "./game-player-mark";
 import { PlayerAvatar } from "./player-avatar";
 import { OtherPlayersList } from "./other-players-list";
 import { fastTrackCellEffect, purchasedFastTrackCells } from "./fast-track-presentation";
-import { useFastTrackMovement } from "./use-fast-track-movement";
+import { useBoardMovement } from "./use-board-movement";
 import "./fast-track.css";
 
 // The prototype's route is one continuous track with two lower transitions.
@@ -43,7 +43,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
 }) {
   const active = snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId);
   const focusPlayer = player?.track === "FAST_TRACK" ? player : active?.track === "FAST_TRACK" ? active : snapshot.players.find((item) => item.track === "FAST_TRACK");
-  const movement = useFastTrackMovement(snapshot, player?.id, phase);
+  const movement = useBoardMovement(snapshot, "FAST_TRACK", player?.id, phase);
   const followedPlayer = snapshot.players.find((item) => item.id === movement.movingPlayerId) ?? focusPlayer;
   const position = followedPlayer ? movement.positions.get(followedPlayer.id) ?? followedPlayer.fastTrackPosition ?? -1 : -1;
   const root = useRef<HTMLElement>(null);

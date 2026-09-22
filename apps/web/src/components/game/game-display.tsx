@@ -1,6 +1,7 @@
 "use client";
 
 import { FastTrackBoard } from "./fast-track-panel";
+import { useBoardMovement } from "./use-board-movement";
 
 import { CircleDot, Clock3, Expand, MonitorUp } from "lucide-react";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +24,7 @@ export function GameDisplay({
   initialView: DisplayFieldView;
 }) {
   const { snapshot, connection, error } = useLiveGame(initialSnapshot, token);
+  const movement = useBoardMovement(snapshot, "RAT_RACE");
   const connectionStatus = connectionPresentation(connection.phase);
   const remaining = useRemainingSeconds(snapshot);
   const showFastTrack = snapshot.players.find((player) => player.id === snapshot.game.currentPlayerId)?.track === "FAST_TRACK";
@@ -97,13 +99,13 @@ export function GameDisplay({
 
       {error ? <p className="mx-auto mt-2 max-w-[1800px] rounded-xl bg-red-950 px-4 py-2 text-sm text-red-100">{error}</p> : null}
       <main className="mx-auto mt-3 flex h-[calc(100vh-5.75rem)] max-w-[1800px] items-center justify-center overflow-auto">
-        {showFastTrack ? <div className="w-full min-w-0"><FastTrackBoard snapshot={snapshot} /></div> : view === "classic" ? <ClassicBroadcastBoard snapshot={snapshot} /> : <JourneyBroadcastBoard snapshot={snapshot} />}
+        {showFastTrack ? <div className="w-full min-w-0"><FastTrackBoard snapshot={snapshot} /></div> : view === "classic" ? <ClassicBroadcastBoard snapshot={movement.snapshot} movingPlayerId={movement.movingPlayerId} /> : <JourneyBroadcastBoard snapshot={movement.snapshot} movingPlayerId={movement.movingPlayerId} />}
       </main>
     </div>
   );
 }
 
-function ClassicBroadcastBoard({ snapshot }: { snapshot: GameSnapshot }) {
+function ClassicBroadcastBoard({ snapshot, movingPlayerId }: { snapshot: GameSnapshot; movingPlayerId: string | null }) {
   return (
     <section className="grid aspect-[16/9] h-auto max-h-full w-full min-w-[720px] grid-cols-8 grid-rows-6 gap-1.5 rounded-2xl bg-[#fff9f1] p-2 shadow-[0_24px_60px_rgba(3,13,32,.38)]">
       {snapshot.board.map((cell) => (
@@ -111,6 +113,7 @@ function ClassicBroadcastBoard({ snapshot }: { snapshot: GameSnapshot }) {
           key={cell.index}
           snapshot={snapshot}
           cell={cell}
+          movingPlayerId={movingPlayerId}
           style={classicCellPosition(cell.index)}
         />
       ))}
@@ -126,7 +129,7 @@ const journeyPositions = Array.from({ length: 24 }, (_, index) => {
   return [50 - Math.cos(angle) * 43, 50 + Math.sin(angle) * 42] as const;
 });
 
-function JourneyBroadcastBoard({ snapshot }: { snapshot: GameSnapshot }) {
+function JourneyBroadcastBoard({ snapshot, movingPlayerId }: { snapshot: GameSnapshot; movingPlayerId: string | null }) {
   return (
     <section className="relative aspect-[16/9] h-auto max-h-full w-full min-w-[720px] overflow-hidden rounded-2xl bg-[#e9ddc7] shadow-[0_24px_60px_rgba(3,13,32,.38)]">
       <img src="/financial-journey-board.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-[0.12] mix-blend-multiply" />
@@ -142,6 +145,7 @@ function JourneyBroadcastBoard({ snapshot }: { snapshot: GameSnapshot }) {
             key={cell.index}
             snapshot={snapshot}
             cell={cell}
+            movingPlayerId={movingPlayerId}
             journey
             style={{ left: `${x}%`, top: `${y}%` }}
           />
@@ -158,12 +162,14 @@ function BroadcastCell({
   snapshot,
   cell,
   style,
-  journey = false
+  journey = false,
+  movingPlayerId
 }: {
   snapshot: GameSnapshot;
   cell: GameSnapshot["board"][number];
   style: CSSProperties;
   journey?: boolean;
+  movingPlayerId: string | null;
 }) {
   const players = snapshot.players.filter(
     (player) => player.role === "PLAYER" && player.track === "RAT_RACE" && player.position === cell.index
@@ -186,7 +192,7 @@ function BroadcastCell({
       {players.length > 0 ? (
         <div className={journey ? "absolute -bottom-4 left-1/2 flex -translate-x-1/2 -space-x-2" : "absolute bottom-1 right-1 flex -space-x-2"}>
           {players.map((player: GamePlayer) => (
-            <GamePlayerMark key={player.id} player={player} size="sm" active={player.id === snapshot.game.currentPlayerId} />
+            <GamePlayerMark key={player.id} player={player} size="sm" active={player.id === snapshot.game.currentPlayerId} className={player.id === movingPlayerId ? "timeline-moving-token" : ""} />
           ))}
         </div>
       ) : null}

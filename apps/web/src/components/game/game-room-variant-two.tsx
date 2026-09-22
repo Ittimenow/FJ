@@ -51,6 +51,7 @@ type VariantTwoProps = {
   canRoll: boolean;
   turnTabRequest: number;
   actions: ReactNode;
+  movingPlayerId?: string | null;
 };
 
 type CompactSection = "board" | "finance" | "actions";
@@ -60,6 +61,7 @@ export function GameRoomVariantTwo({
   currentUserId,
   canRoll,
   turnTabRequest,
+  movingPlayerId = null,
   actions
 }: VariantTwoProps) {
   const players = snapshot.players.filter(
@@ -185,7 +187,7 @@ export function GameRoomVariantTwo({
             compactSection === "board" ? "block" : "hidden"
           ].join(" ")}
         >
-          <JourneyBoard snapshot={snapshot} />
+          <JourneyBoard snapshot={snapshot} movingPlayerId={movingPlayerId} />
         </div>
 
         <aside
@@ -524,7 +526,7 @@ const ratRacePositions = [
 
 const boardPath = ratRacePositions.map(([x, y]) => `${x},${y}`).join(" ");
 
-function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
+function JourneyBoard({ snapshot, movingPlayerId }: { snapshot: GameSnapshot; movingPlayerId: string | null }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
@@ -551,7 +553,7 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
   }
 
   return (
-    <section className="h-full min-h-0 overflow-hidden rounded-2xl bg-[#e9ddc7] shadow-panel">
+    <section className="h-full min-h-0 overflow-hidden rounded-2xl bg-[#e9ddc7] shadow-panel" data-moving-player={movingPlayerId ?? undefined}>
       <div
         ref={boardRef}
         className="journey-board-stage relative h-full min-h-0 overflow-auto bg-[#e9ddc7] p-2 sm:p-3 xl:grid xl:place-items-center"
@@ -598,6 +600,7 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
             return (
               <div
                 key={cell.index}
+                data-board-cell={cell.index}
                 className={[
                   "absolute grid h-11 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg border text-center shadow-[0_5px_12px_rgba(57,45,30,.16)] sm:h-12 sm:w-16",
                   boardCellTones[cell.type] ?? boardCellTones.deal
@@ -616,7 +619,7 @@ function JourneyBoard({ snapshot }: { snapshot: GameSnapshot }) {
                 {cellPlayers.length > 0 ? (
                   <span className="absolute -bottom-4 left-1/2 flex -translate-x-1/2 -space-x-2">
                     {cellPlayers.map((player) => (
-                      <PlayerMark key={player.id} player={player} size="sm" current={player.id === snapshot.game.currentPlayerId} />
+                      <PlayerMark key={player.id} player={player} size="sm" current={player.id === snapshot.game.currentPlayerId} moving={player.id === movingPlayerId} />
                     ))}
                   </span>
                 ) : null}
@@ -757,11 +760,13 @@ function ProfileMark({ player }: { player: GamePlayer }) {
 function PlayerMark({
   player,
   size,
-  current = false
+  current = false,
+  moving = false
 }: {
   player: GamePlayer;
   size: "xs" | "sm" | "md";
   current?: boolean;
+  moving?: boolean;
 }) {
   const figurine = player.figurine ?? player.user?.figurine;
   const sizeClass = figurine
@@ -791,9 +796,11 @@ function PlayerMark({
           ? ""
           : "rounded-full bg-journey font-black text-white shadow-[0_4px_10px_rgba(23,36,63,.22)]",
         sizeClass,
+        moving ? "timeline-moving-token" : "",
         current ? (figurine ? "relative z-10 scale-110" : "ring-2 ring-action ring-offset-2") : ""
       ].join(" ")}
       title={name}
+      data-player-id={player.id}
     >
       {figurine ? (
         <img src={figurineImagePath(figurine)} alt="" className="h-full w-full object-contain" />

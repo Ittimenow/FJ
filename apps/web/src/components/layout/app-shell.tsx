@@ -1,9 +1,8 @@
 import { figurineImagePath } from "@cashflow/shared";
 import Link from "next/link";
-import { GameRoomHeaderSlot } from "@/components/layout/game-room-header-context";
+import { GameRoomHeaderSlot, GameRoomViewport } from "@/components/layout/game-room-header-context";
 import { GuideLink } from "@/components/layout/guide-link";
 import { BrandLogo } from "@/components/layout/brand-logo";
-import { cn } from "@/lib/utils";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -25,12 +24,7 @@ export function AppShell({
   gameViewportMode = null
 }: AppShellProps) {
   return (
-    <div
-      className={cn(
-        "min-h-screen min-w-0 bg-surface text-ink",
-        gameViewportMode ? `app-shell--game-${gameViewportMode}-active` : null
-      )}
-    >
+    <GameRoomViewport initialMode={gameViewportMode}>
       <header className="app-shell-header sticky top-0 z-[100] sm:px-4">
         <div className="app-shell-header-content mx-auto grid min-h-16 min-w-0 max-w-[1480px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 rounded-2xl bg-card/95 px-2 py-2 shadow-panel backdrop-blur-md min-[420px]:gap-2 min-[420px]:px-3 sm:px-4">
           <Link
@@ -62,7 +56,7 @@ export function AppShell({
         </div>
       </header>
       <main className="app-shell-main mx-auto min-w-0 max-w-[1480px] px-3 py-6 sm:px-4 sm:py-8">{children}</main>
-    </div>
+    </GameRoomViewport>
   );
 }
 

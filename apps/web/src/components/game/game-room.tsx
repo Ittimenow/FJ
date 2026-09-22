@@ -4,6 +4,7 @@ import { fastTrackCells, isDreamCell } from "@cashflow/shared";
 import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
 import { MobileTurnDialog } from "./mobile-turn-dialog";
 import { boardStepDuration } from "./board-movement";
+import { useBoardMovement } from "./use-board-movement";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
 import { OtherPlayersList } from "./other-players-list";
@@ -233,34 +234,6 @@ export function GameRoom({
   const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const decisionSubmissionRef = useRef(false);
 
-  useEffect(() => {
-    const desktopViewport = window.matchMedia(
-      gameRoomView === "classic" ? "(min-width: 1024px)" : "(min-width: 1280px)"
-    );
-    const documentElement = document.documentElement;
-    const { body } = document;
-
-    const syncViewportLock = () => {
-      const shouldLock = snapshot.game.status !== "WAITING" && desktopViewport.matches;
-
-      documentElement.classList.toggle("game-room-viewport-locked", shouldLock);
-      body.classList.toggle("game-room-viewport-locked", shouldLock);
-
-      if (shouldLock) {
-        documentElement.scrollTop = 0;
-        body.scrollTop = 0;
-      }
-    };
-
-    syncViewportLock();
-    desktopViewport.addEventListener("change", syncViewportLock);
-
-    return () => {
-      desktopViewport.removeEventListener("change", syncViewportLock);
-      documentElement.classList.remove("game-room-viewport-locked");
-      body.classList.remove("game-room-viewport-locked");
-    };
-  }, [gameRoomView, snapshot.game.status]);
   const setGameRoomHeader = useSetGameRoomHeader();
 
   useEffect(() => {
@@ -421,6 +394,39 @@ export function GameRoom({
   const me = gamePlayers.find((player) => player.userId === currentUserId);
   const showFastTrack = snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && (trackView ?? me?.track ?? currentPlayer?.track) === "FAST_TRACK";
   useEffect(() => { setTrackView(null); }, [me?.track, currentPlayer?.track]);
+  const hasFastTrackPlayers = gamePlayers.some((player) => player.track === "FAST_TRACK");
+  const viewportMode = snapshot.game.status === "WAITING" ? null : showFastTrack ? "classic" : gameRoomView;
+  const movement = useBoardMovement(snapshot, "RAT_RACE", me?.id, turnAnimationPhase);
+  const boardSnapshot = movement.snapshot;
+  useEffect(() => {
+    const desktopViewport = window.matchMedia(
+      viewportMode === "classic" ? "(min-width: 1024px)" : "(min-width: 1280px)"
+    );
+    const documentElement = document.documentElement;
+    const { body } = document;
+
+    const syncViewportLock = () => {
+      const shouldLock = snapshot.game.status !== "WAITING" && desktopViewport.matches;
+
+      documentElement.classList.toggle("game-room-viewport-locked", shouldLock);
+      body.classList.toggle("game-room-viewport-locked", shouldLock);
+
+      if (shouldLock) {
+        documentElement.scrollTop = 0;
+        body.scrollTop = 0;
+      }
+    };
+
+    syncViewportLock();
+    desktopViewport.addEventListener("change", syncViewportLock);
+
+    return () => {
+      desktopViewport.removeEventListener("change", syncViewportLock);
+      documentElement.classList.remove("game-room-viewport-locked");
+      body.classList.remove("game-room-viewport-locked");
+    };
+  }, [viewportMode, snapshot.game.status]);
+
   const takenFigurines = gamePlayers
     .filter((player) => player.id !== me?.id)
     .map((player) => player.figurine)
@@ -603,7 +609,8 @@ export function GameRoom({
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
       hostDisplayView: canManage && !isSolo ? gameRoomView : null,
-      trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
+      viewportMode,
+      trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && hasFastTrackPlayers ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
       onTrackChange: setTrackView,
       onCheckConnection: () => void refreshConnection()
     });
@@ -627,6 +634,8 @@ export function GameRoom({
     snapshot.game.title,
     gameRoomView,
     showFastTrack,
+    hasFastTrackPlayers,
+    viewportMode,
     snapshot.game.rulesVersion,
     snapshot.chatMessages,
     remainingSeconds,
@@ -900,6 +909,7 @@ export function GameRoom({
       const result = await response.json();
       if (!response.ok) throw new Error(Array.isArray(result.message) ? result.message.join(". ") : result.message ?? "Не удалось выполнить действие");
       applyActionResult(result as GameActionResult);
+      if (path === "fast-track/enter") setTrackView("FAST_TRACK");
     } catch (caught) { setError(gameErrorMessage(caught, "Не удалось выполнить действие")); }
     finally { setFastBusy(false); }
   }
@@ -930,7 +940,7 @@ export function GameRoom({
       if (move) {
         setTurnAnimationPhase("moving");
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (!reduceMotion) await wait(me?.track === "FAST_TRACK" ? move.steps * boardStepDuration : turnMoveDuration(move.steps));
+        if (!reduceMotion) await wait(move.steps * boardStepDuration);
       }
 
       setTurnAnimationPhase("landed");
@@ -1247,6 +1257,12 @@ export function GameRoom({
     diceIntervalRef.current = null;
   }
 
+  const enterFastTrackAction = !showFastTrack && snapshot.game.rulesVersion === 2 && canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? (
+    <Button variant="action" className="w-full" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>
+      Перейти на большой круг
+    </Button>
+  ) : null;
+
   const renderTurnFeed = (showHeader = true) => (
     <GameTurnFeed
       gameId={snapshot.game.id}
@@ -1258,6 +1274,7 @@ export function GameRoom({
       onSendBabyGift={sendBabyGift}
       showHeader={showHeader}
       fastTrackOnly={showFastTrack}
+      leadingAction={enterFastTrackAction}
     />
   );
 
@@ -1354,7 +1371,6 @@ export function GameRoom({
         </div>
       ) : null}
       {snapshot.game.rulesVersion === 2 && snapshot.game.status === "WAITING" && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => void fastAction("dream", { cellIndex })} /> : null}
-      {snapshot.game.rulesVersion === 2 && canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>Перейти на большой круг</Button> : null}
 
       {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
@@ -1378,7 +1394,8 @@ export function GameRoom({
 
       {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy} turnTabRequest={turnTabRequest}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
-          snapshot={snapshot}
+          snapshot={boardSnapshot}
+          movingPlayerId={movement.movingPlayerId}
           currentUserId={currentUserId}
           canRoll={canRoll && !pendingAction}
           turnTabRequest={turnTabRequest}
@@ -1430,6 +1447,7 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
+              hideHeaderAt="xl"
               activityFeed={renderTurnFeed()}
                 embedded
               />
@@ -1441,14 +1459,15 @@ export function GameRoom({
           {snapshot.game.status !== "WAITING" ? (
           <div className="desktop-game-board-viewport hidden lg:block">
         <DesktopGameBoard
-          snapshot={snapshot}
+          snapshot={boardSnapshot}
+          movingPlayerId={movement.movingPlayerId}
           selectedPlayer={selectedPlayer}
           players={gamePlayers}
           canManageLiabilities={selectedPlayer?.id === me?.id && canTakeLoan}
           onCloseLiability={closeLiability}
           canOpenBank={selectedPlayer?.id === me?.id && canTakeLoan}
           onOpenBank={() => setBankDialogOpen(true)}
-          outsidePlayers={snapshot.players.filter(
+          outsidePlayers={boardSnapshot.players.filter(
             (player) =>
               player.role === "PLAYER" &&
               player.track === "RAT_RACE" &&
@@ -1501,7 +1520,7 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              pinnedHeader
+              hideHeaderAt="lg"
               activityFeed={renderTurnFeed(false)}
               embedded
             />
@@ -1514,8 +1533,9 @@ export function GameRoom({
         {snapshot.game.status !== "WAITING" ? (
           <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-2">
             <MobileBoard
-              snapshot={snapshot}
-              selectedPlayer={selectedPlayer}
+              snapshot={boardSnapshot}
+              movingPlayerId={movement.movingPlayerId}
+              selectedPlayer={boardSnapshot.players.find((player) => player.id === selectedPlayer?.id)}
               containerRef={mobileBoardRef}
             />
             <MobileGameTabs
@@ -2128,15 +2148,6 @@ function moveFromActionResult(result: GameActionResult) {
   return { from, to, steps };
 }
 
-function normalizeBoardPosition(position: number, boardSize: number) {
-  if (boardSize <= 0) return 0;
-  return ((position % boardSize) + boardSize) % boardSize;
-}
-
-function turnMoveDuration(steps: number) {
-  return Math.min(1100, Math.max(420, 300 + steps * 110));
-}
-
 function randomDiceValues(diceCount: number) {
   return Array.from({ length: Math.max(1, diceCount) }, () => Math.floor(Math.random() * 6) + 1);
 }
@@ -2558,6 +2569,7 @@ export function DesktopGameBoard({
   canOpenBank,
   onOpenBank,
   outsidePlayers,
+  movingPlayerId = null,
   children
 }: {
   snapshot: GameSnapshot;
@@ -2568,10 +2580,11 @@ export function DesktopGameBoard({
   canOpenBank: boolean;
   onOpenBank: () => void;
   outsidePlayers: GamePlayer[];
+  movingPlayerId?: string | null;
   children: ReactNode;
 }) {
   return (
-    <section className="desktop-game-board-shell w-full rounded-2xl bg-card p-3 shadow-panel">
+    <section className="desktop-game-board-shell w-full rounded-2xl bg-card p-3 shadow-panel" aria-label="Поле малого круга" data-moving-player={movingPlayerId ?? undefined}>
       <div className="desktop-game-board-grid grid justify-center gap-2 overflow-x-auto">
         {snapshot.board.map((cell) => {
           const players = cellPlayers(snapshot, cell.index);
@@ -2580,6 +2593,7 @@ export function DesktopGameBoard({
               key={cell.index}
               cell={cell}
               players={players}
+              movingPlayerId={movingPlayerId}
               style={ringCellStyle(cell.index)}
               compact
             />
@@ -2931,24 +2945,17 @@ function assetPortfolioCategory(asset: GamePlayer["assets"][number]) {
 function MobileBoard({
   snapshot,
   selectedPlayer,
+  movingPlayerId,
   containerRef
 }: {
   snapshot: GameSnapshot;
   selectedPlayer: GamePlayer | undefined;
   containerRef: RefObject<HTMLDivElement | null>;
+  movingPlayerId: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const latestOtherMove = latestPlayerMoveEvent(snapshot.events, selectedPlayer?.id);
-  const lastAnimatedMoveSequenceRef = useRef(latestOtherMove?.sequence ?? 0);
-  const moveAnimationRunRef = useRef(0);
-  const [animatedOtherPlayer, setAnimatedOtherPlayer] = useState<{
-    playerId: string;
-    position: number;
-  } | null>(null);
-  const targetCellIndex =
-    selectedPlayer?.track === "RAT_RACE" && selectedPlayer.position >= 0
-      ? selectedPlayer.position
-      : 0;
+  const followedPlayer = snapshot.players.find((player) => player.id === movingPlayerId) ?? selectedPlayer;
+  const targetCellIndex = followedPlayer?.track === "RAT_RACE" && followedPlayer.position >= 0 ? followedPlayer.position : 0;
   useEffect(() => {
     const target = scrollRef.current?.querySelector<HTMLElement>(
       `[data-board-cell="${targetCellIndex}"]`
@@ -2956,62 +2963,12 @@ function MobileBoard({
     target?.scrollIntoView({
       block: "nearest",
       inline: "center",
-      behavior: "smooth"
+      behavior: "instant"
     });
   }, [snapshot.game.id, targetCellIndex]);
 
-  useEffect(() => {
-    if (!latestOtherMove || latestOtherMove.sequence <= lastAnimatedMoveSequenceRef.current) {
-      return;
-    }
-
-    lastAnimatedMoveSequenceRef.current = latestOtherMove.sequence;
-    const animationRun = moveAnimationRunRef.current + 1;
-    moveAnimationRunRef.current = animationRun;
-    const playerId = latestOtherMove.gamePlayer?.id;
-    const from = Number(latestOtherMove.payload.from);
-    const to = Number(latestOtherMove.payload.to);
-    const steps = Number(latestOtherMove.payload.steps);
-    if (
-      !playerId ||
-      ![from, to, steps].every(Number.isFinite) ||
-      steps < 0 ||
-      snapshot.board.length === 0
-    ) {
-      return;
-    }
-
-    const animateMove = async () => {
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduceMotion) {
-        setAnimatedOtherPlayer({ playerId, position: to });
-        await wait(120);
-      } else {
-        for (let step = 1; step <= steps; step += 1) {
-          if (moveAnimationRunRef.current !== animationRun) return;
-          setAnimatedOtherPlayer({
-            playerId,
-            position: normalizeBoardPosition(from + step, snapshot.board.length)
-          });
-          await wait(180);
-        }
-      }
-
-      if (moveAnimationRunRef.current === animationRun) {
-        setAnimatedOtherPlayer(null);
-      }
-    };
-
-    void animateMove();
-    return () => {
-      if (moveAnimationRunRef.current === animationRun) {
-        moveAnimationRunRef.current += 1;
-      }
-    };
-  }, [latestOtherMove?.sequence, snapshot.board.length]);
-
   return (
-    <div ref={containerRef} className="w-full min-w-0 max-w-full">
+    <div ref={containerRef} className="w-full min-w-0 max-w-full" data-moving-player={movingPlayerId ?? undefined}>
       <div className="min-w-0 max-w-full overflow-hidden rounded-xl bg-card/60">
         <div
           ref={scrollRef}
@@ -3019,7 +2976,7 @@ function MobileBoard({
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
-            const players = timelineCellPlayers(snapshot, cell.index, animatedOtherPlayer);
+            const players = cellPlayers(snapshot, cell.index);
             const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
             return (
               <div
@@ -3053,7 +3010,7 @@ function MobileBoard({
                     players={players}
                     small
                     mobileBoard
-                    movingPlayerId={animatedOtherPlayer?.playerId ?? null}
+                    movingPlayerId={movingPlayerId}
                   />
                 </div>
               </div>
@@ -3071,7 +3028,8 @@ function BoardCellTile({
   style,
   compact = false,
   mobile = false,
-  active = false
+  active = false,
+  movingPlayerId = null
 }: {
   cell: GameSnapshot["board"][number];
   players: GamePlayer[];
@@ -3079,6 +3037,7 @@ function BoardCellTile({
   compact?: boolean;
   mobile?: boolean;
   active?: boolean;
+  movingPlayerId?: string | null;
 }) {
   const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
 
@@ -3095,6 +3054,7 @@ function BoardCellTile({
         active ? "ring-2 ring-success ring-offset-2 ring-offset-white" : ""
       ].join(" ")}
       style={style}
+      data-board-cell={cell.index}
     >
       <span
         aria-hidden="true"
@@ -3137,7 +3097,7 @@ function BoardCellTile({
         </Badge>
       </div>
       <div className="absolute bottom-2 left-2 right-2 h-12">
-        <PlayerTokenStack players={players} desktopBoard={compact} />
+        <PlayerTokenStack players={players} desktopBoard={compact} movingPlayerId={movingPlayerId} />
       </div>
     </div>
   );
@@ -3213,6 +3173,7 @@ function PlayerToken({
           moving ? "timeline-moving-token" : ""
         ].join(" ")}
         title={title}
+        data-player-id={player.id}
       >
         <img
           src={figurineImagePath(player.figurine)}
@@ -3356,32 +3317,6 @@ function FigurineDialog({
       </div>
     </div>
   );
-}
-
-function timelineCellPlayers(
-  snapshot: GameSnapshot,
-  cellIndex: number,
-  animatedPlayer: { playerId: string; position: number } | null
-) {
-  if (!animatedPlayer) return cellPlayers(snapshot, cellIndex);
-
-  const players = cellPlayers(snapshot, cellIndex).filter(
-    (player) => player.id !== animatedPlayer.playerId
-  );
-  const movingPlayer = snapshot.players.find((player) => player.id === animatedPlayer.playerId);
-  if (movingPlayer && cellIndex === animatedPlayer.position) players.push(movingPlayer);
-  return players;
-}
-
-function latestPlayerMoveEvent(events: GameEvent[], excludedPlayerId: string | undefined) {
-  return [...events]
-    .reverse()
-    .find(
-      (event) =>
-        event.type === realtimeEvents.playerMove &&
-        Boolean(event.gamePlayer?.id) &&
-        event.gamePlayer?.id !== excludedPlayerId
-    );
 }
 
 function cellPlayers(snapshot: GameSnapshot, cellIndex: number) {
@@ -4250,7 +4185,7 @@ function ActionsPanel({
   canTakeLoan,
   onOpenBank,
   headerControl,
-  pinnedHeader = false,
+  hideHeaderAt,
   activityFeed,
   embedded = false
 }: {
@@ -4288,7 +4223,7 @@ function ActionsPanel({
   canTakeLoan: boolean;
   onOpenBank: () => void;
   headerControl?: ReactNode;
-  pinnedHeader?: boolean;
+  hideHeaderAt?: "lg" | "xl";
   activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
@@ -4817,8 +4752,7 @@ function ActionsPanel({
     <div
       className={cn(
         "flex items-center justify-between gap-3",
-        pinnedHeader &&
-          "sticky top-[var(--dice-action-height,4.5rem)] z-[9] -mx-3 h-12 bg-white px-3"
+        hideHeaderAt === "lg" ? "lg:hidden" : hideHeaderAt === "xl" ? "xl:hidden" : null
       )}
     >
       <h2 className="text-lg font-semibold">Действия</h2>
@@ -4861,7 +4795,7 @@ function ActionsPanel({
 
 function GameTurnFeed({
   gameId, token, events, players, currentGamePlayerId, gameStatus,
-  onSendBabyGift, showHeader, fastTrackOnly
+  onSendBabyGift, showHeader, fastTrackOnly, leadingAction
 }: {
   gameId: string;
   token: string;
@@ -4872,6 +4806,7 @@ function GameTurnFeed({
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
   showHeader: boolean;
   fastTrackOnly: boolean;
+  leadingAction?: ReactNode;
 }) {
   const viewingPlayer = players.find((player) => player.id === currentGamePlayerId);
   return <GameActionHistory
@@ -4886,7 +4821,7 @@ function GameTurnFeed({
       const data = await response.json() as { events: GameEvent[] };
       return data.events;
     }}
-    header={showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}
+    header={<>{showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}{leadingAction ? <div className="mb-3">{leadingAction}</div> : null}</>}
     renderAction={(event, allEvents) => event.type === realtimeEvents.cardDraw ? <JournalCardDraw event={event} /> : event.type === "player:baby" ? <BabyJournalEvent
       event={event} allEvents={allEvents} players={players}
       recipient={gamePlayerForEvent(event, players) ?? undefined}

@@ -7,7 +7,8 @@ import { boardMove, boardStepDuration } from "./board-movement";
 
 type Move = NonNullable<ReturnType<typeof boardMove>>;
 
-export function useFastTrackMovement(snapshot: GameSnapshot, rollingPlayerId?: string, phase?: string) {
+export function useBoardMovement(snapshot: GameSnapshot, track: "RAT_RACE" | "FAST_TRACK", rollingPlayerId?: string, phase?: string) {
+  const size = track === "FAST_TRACK" ? fastTrackCells.length : snapshot.board.length;
   const cursor = useRef({ gameId: snapshot.game.id, sequence: Math.max(0, ...snapshot.events.map((event) => event.sequence)) });
   const [moves, setMoves] = useState<Move[]>([]);
   const [step, setStep] = useState(0);
@@ -30,13 +31,13 @@ export function useFastTrackMovement(snapshot: GameSnapshot, rollingPlayerId?: s
       return;
     }
     const added = snapshot.events
-      .filter((event) => event.sequence > cursor.current.sequence && event.payload.track === "FAST_TRACK")
+      .filter((event) => event.sequence > cursor.current.sequence && (event.payload.track ?? "RAT_RACE") === track)
       .sort((a, b) => a.sequence - b.sequence)
-      .map((event) => boardMove(event, fastTrackCells.length))
+      .map((event) => boardMove(event, size))
       .filter((move): move is Move => Boolean(move));
     cursor.current.sequence = Math.max(cursor.current.sequence, sequence);
     if (added.length) setMoves((current) => [...current, ...added]);
-  }, [snapshot.game.id, snapshot.events]);
+  }, [snapshot.game.id, snapshot.events, track, size]);
 
   const move = moves[0];
   const holdForDice = move?.playerId === rollingPlayerId && phase === "rolling";
@@ -55,5 +56,11 @@ export function useFastTrackMovement(snapshot: GameSnapshot, rollingPlayerId?: s
     if (!positions.has(pending.playerId)) positions.set(pending.playerId, pending.from);
   }
   if (move) positions.set(move.playerId, move.positions[step - 1] ?? move.from);
-  return { positions, movingPlayerId: move?.playerId ?? null };
+  const displayedSnapshot: GameSnapshot = {
+    ...snapshot,
+    players: snapshot.players.map((player) => player.track === track && positions.has(player.id)
+      ? { ...player, [track === "FAST_TRACK" ? "fastTrackPosition" : "position"]: positions.get(player.id)! }
+      : player)
+  };
+  return { positions, movingPlayerId: move?.playerId ?? null, snapshot: displayedSnapshot };
 }

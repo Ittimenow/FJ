@@ -10,6 +10,7 @@ import { MobileTurnDialog } from '../../apps/web/src/components/game/mobile-turn
 import { DiceAction } from '../../apps/web/src/components/game/dice-action';
 import { TestGameOptions } from '../../apps/web/src/components/game/test-game-options';
 import { GameMenuFixture } from './game-menu-ui';
+import { GameRoomFixture } from './game-room-ui';
 const avatar = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#bbccf3"/><circle cx="32" cy="24" r="12" fill="#946746"/><ellipse cx="32" cy="65" rx="26" ry="28" fill="#2967df"/></svg>');
 const user:any={id:'anna',userId:'admin',guestName:'Анна',user:{id:'admin',displayName:'Анна',avatarUrl:avatar},figurine:'rubber-duck',controller:'HUMAN',role:'PLAYER',status:'JOINED',seat:1,color:'#2967df',track:'FAST_TRACK',position:0,assets:[],liabilities:[],profession:{name:'Медсестра'},fastTrackPosition:23,dreamCellIndex:4,financialState:{cashCents:450000,salaryCents:3100,passiveIncomeCents:0,totalIncomeCents:3100,totalExpensesCents:1980,monthlyCashflowCents:1120,childrenCount:0,fastTrackStartIncomeCents:100000,fastTrackIncomeCents:139000,fastTrackCharity:true}};
 const event = (sequence:number,type='player:roll_dice') => ({id:`event-${sequence}`,sequence,type,payload:{dice:[sequence%6+1],total:sequence%6+1,track:'FAST_TRACK'},createdAt:'2026-09-20T10:00:00Z',gamePlayer:{id:sequence%2?'anna':'boris',seat:1,role:'PLAYER'}});
@@ -35,6 +36,7 @@ function App(){
  if(mode==='menu') return <GameMenuFixture />;
  const snapshot:any={game:{id:'synthetic',status:mode==='paused'?'PAUSED':'IN_PROGRESS',currentPlayerId:mode==='waiting'?'boris':'anna',currentRound:3,currentTurnIndex:0,rulesVersion:2,isTest:true,fastTrackWorld:{owners:{1:'anna',3:'boris'},influence:{4:['boris','vera']},dreamPurchases:{0:['anna']}},pendingAction:decision?{type:'fast_track_choice',cellIndex:23,gamePlayerId:'anna',decisionId:'demo',priceCents:300000}:null},players:[player,{...user,id:'boris',userId:null,user:null,figurine:'cat-in-box',controller:'BOT',guestName:'Борис',fastTrackPosition:12,dreamCellIndex:12,financialState:{...user.financialState,fastTrackCharity:false}},{...user,id:'vera',userId:null,user:null,figurine:'robot',guestName:'Вера',track:'RAT_RACE',dreamCellIndex:16}],events:[...history,...moves],board:ratRaceBoard};
  snapshot.players=snapshot.players.map((p:any)=>({...p,fastTrackPosition:[...moves].reverse().find(e=>e.gamePlayer.id===p.id)?.payload.to ?? p.fastTrackPosition}));
+ if(mode==='room') return <GameRoomFixture snapshot={snapshot}/>;
  if(mode==='occupied') snapshot.players=snapshot.players.map((p:any,i:number)=>({...p,track:'FAST_TRACK',fastTrackPosition:i===0?36:12}));
  if(mode==='start') snapshot.players=snapshot.players.map((p:any)=>({...p,fastTrackPosition:-1}));
  if(mode==='empty') { snapshot.game.fastTrackWorld={owners:{},dreamPurchases:{},influence:{}}; snapshot.players[0]={...snapshot.players[0],financialState:{...player.financialState,fastTrackCharity:false}}; snapshot.events=[]; }
