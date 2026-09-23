@@ -180,10 +180,6 @@ body.game-room-viewport-locked {
   .app-shell-main:has(.mobile-turn-bar) { padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom))); }
 }
 
-@media (max-width: 359px) {
-  .mobile-turn-bar .mobile-turn-dice { grid-column: 1 / -1; justify-content: center; }
-}
-
 .desktop-game-board-grid {
   width: 100%;
   grid-template-columns: repeat(8, minmax(0, 1fr));

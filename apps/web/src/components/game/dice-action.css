@@ -2,6 +2,9 @@
 .dice-action-row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding-block: 6px; }
 .dice-action-row > button { min-width: 96px; font-size: 14px; }
 .dice-action-row--replace .dice-action-values { flex: 1 1 0; min-width: 0; justify-content: center; }
+.dice-face--rolling { animation: dice-tumble 180ms ease-in-out infinite alternate; }
+@keyframes dice-tumble { from { transform: translateY(-4px) rotate(-12deg); } to { transform: translateY(3px) rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .dice-face--rolling { animation: none; } }
 @container (max-width: 360px) {
   .dice-action-row.has-many-dice:not(.dice-action-row--replace) { flex-wrap: wrap; }
   .has-many-dice:not(.dice-action-row--replace) .dice-action-values { width: 100%; justify-content: center; padding-block: 4px; }

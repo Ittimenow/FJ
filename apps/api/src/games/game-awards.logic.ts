@@ -89,7 +89,7 @@ export function selectGameAwards(
     title: "Архитектор денежного потока",
     metricUnit: "money_monthly",
     result: (candidate) => `${money(candidate.metricValue)} в месяц за ${candidate.actionCount} ${plural(candidate.actionCount, "действие", "действия", "действий")}`
-  }, sumEvents(events, positiveCashflowDelta));
+  }, sumEvents(withFastTrackIncomeChanges(events), positiveCashflowDelta));
   add(105, countDefinition("deal_hunter", "Охотник за сделками", "покупка", "покупки", "покупок"),
     countEvents(events, "deal:buy", "deal:auction_select"));
   add(130, {
@@ -197,6 +197,7 @@ function awardPlayerId(event: GameAwardEvent) {
 function positiveCashflowDelta(event: GameAwardEvent) {
   const payload = record(event.payload);
   if (!payload) return 0;
+  if (event.type === "fast_track:purchased") return positiveNumber(payload.incomeChangeCents);
   if (event.type === "deal:buy" || event.type === "deal:auction_select") {
     return positiveNumber(payload.cashflowCents);
   }
@@ -210,6 +211,27 @@ function positiveCashflowDelta(event: GameAwardEvent) {
     return Math.max(0, number(payload.cashflowCents) - number(payload.previousCashflowCents));
   }
   return 0;
+}
+
+function withFastTrackIncomeChanges(events: GameAwardEvent[]) {
+  const incomes = new Map<string, number>();
+  return [...events].sort((a, b) => a.sequence - b.sequence).map((event) => {
+    const payload = record(event.payload);
+    const playerId = event.gamePlayerId;
+    if (!playerId || !payload) return event;
+    if (event.type === "player:escaped_rat_race") {
+      incomes.set(playerId, number(payload.incomeCents));
+    }
+    if (event.type !== "fast_track:purchased") return event;
+    const previous = payload.previousIncomeCents !== undefined ? number(payload.previousIncomeCents) : incomes.get(playerId);
+    const income = number(payload.incomeCents);
+    incomes.set(playerId, income);
+    // Old parties have cumulative income; compare it with the preceding state.
+    const change = payload.incomeChangeCents !== undefined
+      ? number(payload.incomeChangeCents)
+      : previous === undefined ? 0 : income - previous;
+    return { ...event, payload: { ...payload, incomeChangeCents: change } };
+  });
 }
 
 function doodadCost(event: GameAwardEvent) {
@@ -291,7 +313,7 @@ function money(valueCents: number) {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0
-  }).format(valueCents / 100);
+  }).format(valueCents);
 }
 
 function plural(value: number, one: string, few: string, many: string) {

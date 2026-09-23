@@ -17,7 +17,8 @@ export function DiceAction({
   idleLabel = "Ожидайте ход",
   disabled = false,
   pinnedToPanel = false,
-  replaceButtonWithDice = false
+  replaceButtonWithDice = true,
+  className
 }: {
   canRoll: boolean;
   rolling: boolean;
@@ -31,6 +32,7 @@ export function DiceAction({
   disabled?: boolean;
   pinnedToPanel?: boolean;
   replaceButtonWithDice?: boolean;
+  className?: string;
 }) {
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -43,7 +45,7 @@ export function DiceAction({
     observer.observe(element);
     return () => { observer.disconnect(); parent.style.removeProperty("--dice-action-height"); };
   }, [pinnedToPanel]);
-  const status = rolling
+  const status = phase === "rolling"
     ? "Бросаем кубик…"
     : phase === "moving"
       ? "Фишка движется по полю…"
@@ -60,7 +62,8 @@ export function DiceAction({
       className={cn(
         "dice-action mb-3 rounded-xl bg-[#fff5ed] px-2",
         pinnedToPanel &&
-          "sticky top-0 z-10 -mx-3 mb-0 rounded-none px-3"
+          "sticky top-0 z-10 -mx-3 mb-0 rounded-none px-3",
+        className
       )}
       aria-label="Бросок кубика"
     >
@@ -101,7 +104,7 @@ export function DiceAction({
         {showDice ? <div className="dice-action-values flex shrink-0 gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="scale-[.58] -m-4">
-              <DiceFace value={diceValue} rolling={rolling} />
+              <DiceFace value={diceValue} rolling={phase === "rolling"} />
             </div>
           ))}
         </div> : null}
@@ -117,7 +120,7 @@ export function DiceFace({ value, rolling }: { value: number; rolling: boolean }
     <div
       className={[
         "relative h-20 w-20 rounded-xl border-2 border-ink bg-white shadow-panel transition-transform",
-        rolling ? "rotate-6 scale-105" : ""
+        rolling ? "dice-face--rolling" : ""
       ].join(" ")}
       aria-label={`На кубике ${value}`}
     >

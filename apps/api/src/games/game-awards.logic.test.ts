@@ -85,6 +85,30 @@ test("cashflow architect sums only positive cashflow actions", () => {
   assert.equal(award?.metricValue, 65_000);
 });
 
+test("money awards use the same whole dollars as the game", () => {
+  const award = selectGameAwards(events("deal:buy", "anna", 4, { cashflowCents: 650 }), players)
+    .find((item) => item.kind === "cashflow_architect")!;
+  assert.equal(award.metricValue, 2600);
+  assert.equal(award.result.replace(/\s/g, " "), "2 600 $ в месяц за 4 действия");
+  const debt = selectGameAwards(events("loan:repay", "anna", 3, { amountCents: 1000 }), players)
+    .find((item) => item.kind === "debt_master")!;
+  assert.equal(debt.result.replace(/\s/g, " "), "3 000 $ погашено за 3 операции");
+});
+
+test("cashflow award counts actual increases on both tracks, including archived parties", () => {
+  const actions: GameAwardEvent[] = [
+    { sequence: 1, type: "deal:buy", gamePlayerId: "anna", payload: { cashflowCents: 650 } },
+    { sequence: 2, type: "player:escaped_rat_race", gamePlayerId: "anna", payload: { incomeCents: 100_000 } },
+    { sequence: 3, type: "fast_track:purchased", gamePlayerId: "anna", payload: { incomeCents: 106_000 } },
+    { sequence: 4, type: "fast_track:purchased", gamePlayerId: "anna", payload: { incomeCents: 106_000, success: false } },
+    { sequence: 5, type: "fast_track:cashflow", gamePlayerId: "anna", payload: { amountCents: 106_000 } },
+    { sequence: 6, type: "fast_track:purchased", gamePlayerId: "anna", payload: { incomeCents: 114_000, incomeChangeCents: 8_000 } }
+  ];
+  const award = selectGameAwards(actions.reverse(), players).find((item) => item.kind === "cashflow_architect")!;
+  assert.equal(award.actionCount, 3);
+  assert.equal(award.metricValue, 14_650);
+});
+
 test("every first-release nomination uses its declared qualifying events", () => {
   const scenarios = [
     { kind: "career_swings", type: "player:downsized", payload: {} },

@@ -36,8 +36,17 @@ export class Socket {
     if (event === realtimeEvents.playerRollDice) {
       const player = snapshot.players.find(player => player.id === snapshot.game.currentPlayerId)!;
       const sequence = Math.max(0, ...snapshot.events.map(event => event.sequence)) + 1;
-      const route = [1, 2, 3].map(step => (player.position + step) % snapshot.board.length);
-      events = [{ id: `move-${sequence}`, sequence, type: 'player:move', createdAt: new Date().toISOString(), gamePlayer: { id: player.id, seat: player.seat, role: player.role }, payload: { from: player.position, to: route.at(-1), steps: route.length } }];
+      const fast = player.track === 'FAST_TRACK';
+      const from = fast ? player.fastTrackPosition : player.position;
+      const route = [1, 2, 3].map(step => (from + step) % (fast ? 48 : snapshot.board.length));
+      const identity = { id: player.id, seat: player.seat, role: player.role };
+      events = [
+        { id: `roll-${sequence}`, sequence, type: 'player:roll_dice', createdAt: new Date().toISOString(), gamePlayer: identity, payload: { diceValues: fast ? [1, 2] : [3], dice: 3, track: player.track } },
+        { id: `move-${sequence}`, sequence: sequence + 1, type: 'player:move', createdAt: new Date().toISOString(), gamePlayer: identity, payload: { from, to: route.at(-1), steps: route.length, track: player.track } }
+      ];
+      snapshot = { ...snapshot, game: { ...snapshot.game, pendingAction: fast
+        ? { type: 'fast_track_choice', gamePlayerId: player.id, cellIndex: 23, decisionId: 'fixture', priceCents: 300000 }
+        : { type: 'choose_deal', gamePlayerId: player.id } } };
       addRoomMoves(events);
     }
     callback?.(null, { snapshot, events });

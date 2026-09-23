@@ -4,15 +4,17 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GameEvent, GamePlayer } from "@/lib/types";
-import { eventHeadline, gamePlayerForEvent } from "./game-journal";
-import { mergeActionEvents, playerActionEvents } from "./game-action-history.logic";
+import { eventHeadline } from "./game-journal";
+import { mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
 import { PlayerAvatar } from "./player-avatar";
+import "./game-action-history.css";
 
-export function GameActionHistory({ gameId, events, players, onlyPlayerId, fastTrackOnly = false, loadEarlier, renderAction, header }: {
+export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, fastTrackOnly = false, loadEarlier, renderAction, header }: {
   gameId: string;
   events: GameEvent[];
   players: GamePlayer[];
   onlyPlayerId?: string | null;
+  viewerPlayerId?: string | null;
   fastTrackOnly?: boolean;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
   renderAction?: (event: GameEvent, allEvents: GameEvent[]) => ReactNode;
@@ -23,6 +25,7 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, fastT
   const [archiveLoaded, setArchiveLoaded] = useState(events.length < 80);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onlyMine, setOnlyMine] = useState(false);
   useEffect(() => {
     setHistory(events);
     setVisibleCount(10);
@@ -30,8 +33,8 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, fastT
     setError(null);
   }, [gameId]);
   useEffect(() => { setHistory((current) => mergeActionEvents(current, events)); }, [events]);
-  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId, fastTrackOnly]);
-  const actions = playerActionEvents(history, players, onlyPlayerId, fastTrackOnly);
+  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId, onlyMine, fastTrackOnly]);
+  const actions = playerActionTurns(history, players, onlyPlayerId ?? (onlyMine ? viewerPlayerId : null), fastTrackOnly);
   const canLoadArchive = !archiveLoaded && Boolean(loadEarlier);
 
   async function showMore() {
@@ -55,15 +58,22 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, fastT
 
   return <section className="game-action-history min-w-0" aria-label={fastTrackOnly ? "История большого круга" : "История действий игроков"}>
     {header}
-    <ol className="m-0 list-none space-y-3 p-0" aria-live="polite" aria-busy={loading}>
-      {actions.slice(0, visibleCount).map((event) => {
-        const player = gamePlayerForEvent(event, players)!;
-        return <li key={event.id} className="game-action-entry min-w-0 rounded-xl bg-surface p-3 [overflow-wrap:anywhere]">
+    {viewerPlayerId ? <div className="mb-3 flex flex-wrap justify-end gap-1" role="group" aria-label="Фильтр истории действий">
+      {[{ mine: true, label: "Только свои" }, { mine: false, label: "Все игроки" }].map(({ mine, label }) => <button key={label} type="button" aria-pressed={onlyMine === mine} onClick={() => setOnlyMine(mine)} className={`min-h-9 rounded-lg px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey ${onlyMine === mine ? "bg-journey text-white" : "bg-surface text-ink hover:bg-line/50"}`}>{label}</button>)}
+    </div> : null}
+    <ol className="game-action-timeline m-0 list-none p-0" aria-live="polite" aria-busy={loading}>
+      {actions.slice(0, visibleCount).map((turn) => {
+        const player = turn.player;
+        return <li key={turn.id} className="game-action-entry min-w-0 rounded-xl bg-surface p-3 [overflow-wrap:anywhere]">
           <div className="mb-2 flex items-center gap-2">
             <PlayerAvatar player={player} className="h-7 w-7" />
             <span className="min-w-0 break-words text-xs font-extrabold text-ink">{gamePlayerName(player)}</span>
           </div>
-          {renderAction ? renderAction(event, history) : <p className="m-0 text-sm leading-5 text-ink">{eventHeadline(event)}</p>}
+          <ol className="m-0 list-none space-y-3 p-0">
+            {turn.events.map((event) => <li key={event.id} data-action-id={event.id}>
+              {renderAction ? renderAction(event, history) : <p className="m-0 text-sm leading-5 text-ink">{eventHeadline(event)}</p>}
+            </li>)}
+          </ol>
         </li>;
       })}
     </ol>

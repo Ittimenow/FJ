@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { mergeActionEvents, playerActionEvents } from './game-action-history.logic';
+import { mergeActionEvents, playerActionEvents, playerActionTurns } from './game-action-history.logic';
 import type { GameEvent, GamePlayer } from '../../lib/types';
 // Shared is a CommonJS workspace; load its runtime exports through the same boundary.
 const require = createRequire(import.meta.url);
@@ -9,6 +9,20 @@ const { purchasedFastTrackCells, fastTrackCellEffect } = require('./fast-track-p
 const { fastTrackCells } = require('@cashflow/shared') as typeof import('@cashflow/shared');
 const players=[{id:'anna',userId:'u1'},{id:'boris',userId:'u2'}] as GamePlayer[];
 const event=(sequence:number,type:string,id='anna',payload={}):GameEvent=>({id:`e${sequence}`,sequence,type,payload,createdAt:'2026-09-20T10:00:00Z',gamePlayer:{id,seat:1,role:'PLAYER'}});
+test('an unfinished turn updates in place with newest actions first for every viewer',()=>{
+  const start=[event(1,'loan:take'),event(2,'player:roll_dice'),event(3,'player:move')];
+  const before=playerActionTurns(start,players);
+  const after=playerActionTurns(mergeActionEvents(start,[event(4,'card:draw'),event(5,'deal:buy')]),players);
+  assert.equal(before.length,1);assert.equal(after.length,1);
+  assert.equal(before[0]?.id,after[0]?.id);
+  assert.deepEqual(after[0]?.events.map(e=>e.sequence),[5,4,3,2,1]);
+});
+test('own-action filtering preserves turn boundaries and groups other players market decisions',()=>{
+  const events=[event(1,'player:roll_dice'),event(2,'market:sale_offer','boris'),event(3,'market:sale_declined','boris'),event(4,'state:update','anna',{reason:'market_sale_declined_turn_ended'}),event(5,'player:roll_dice','boris'),event(6,'loan:repay'),event(7,'state:update','anna',{reason:'roll_resolved'}),event(8,'player:roll_dice'),event(9,'deal:buy')];
+  const all=playerActionTurns(events,players);
+  assert.deepEqual(all.map(t=>t.events.map(e=>e.sequence)),[[9,8],[6],[5],[3,2],[1]]);
+  assert.deepEqual(playerActionTurns(events,players,'anna').map(t=>t.events.map(e=>e.sequence)),[[9,8],[6],[1]]);
+});
 test('history selects actions of all players, ordered newest first, without administrative or preparation messages',()=>{
   const events=[event(1,'player:joined'),event(2,'player:roll_dice'),event(3,'state:update'),event(4,'fast_track:purchased','boris'),event(5,'game:paused'),event(6,'player:dream_chosen')];
   assert.deepEqual(playerActionEvents(events,players).map(e=>e.sequence),[4,2]);

@@ -42,6 +42,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { selectGameAwards } from "./game-awards.logic";
+import { assetRealEstate, cardRealEstate, realEstateAssetName } from "./real-estate";
 import { gameChatNotices, gameChatNoticeTypes } from "./game-chat-notices";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
@@ -596,7 +597,7 @@ export class GamesService {
         await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(result.cash), fastTrackIncomeCents: BigInt(result.income), fastTrackCharity: result.charity } });
         await tx.game.update({ where: { id: gameId }, data: { fastTrackWorld: result.world as unknown as Prisma.InputJsonValue } });
         if (die) events.push({ type: "fast_track:investment_roll", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, die, success: result.success } });
-        events.push({ type: "fast_track:purchased", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, costCents: result.cost, success: result.success, incomeCents: result.income, beforeCashCents: Number(state.cashCents), afterCashCents: result.cash, kind: cell.rule.kind } });
+        events.push({ type: "fast_track:purchased", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, costCents: result.cost, success: result.success, incomeCents: result.income, previousIncomeCents: Number(state.fastTrackIncomeCents), incomeChangeCents: result.income - Number(state.fastTrackIncomeCents), beforeCashCents: Number(state.cashCents), afterCashCents: result.cash, kind: cell.rule.kind } });
         won = result.won;
       } else events.push({ type: "fast_track:declined", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label } });
       await tx.game.update({ where: { id: gameId }, data: { settings: this.settingsWithPending(game.settings, null), ...(won ? { status: GameStatus.ENDED, endedAt: new Date() } : {}) } });
@@ -1893,7 +1894,7 @@ export class GamesService {
           gamePlayerId: player.id,
           sourceCardId: card.id,
           type: card.category ?? card.cardType.toLowerCase(),
-          name: card.title,
+          name: realEstateAssetName({ name: card.title, sourceCard: card }),
           symbol: assetSymbol ?? null,
           quantity,
           units: quantity,
@@ -2281,7 +2282,7 @@ export class GamesService {
           gamePlayerId: buyer.id,
           sourceCardId: card.id,
           type: card.category ?? card.cardType.toLowerCase(),
-          name: card.title,
+          name: realEstateAssetName({ name: card.title, sourceCard: card }),
           symbol: meta.symbol ?? null,
           quantity: 1,
           units: 1,
@@ -2650,7 +2651,7 @@ export class GamesService {
           cardId: pending.cardId,
           title: pending.title,
           assetId: asset.id,
-          assetName: asset.name,
+          assetName: realEstateAssetName(asset),
           salePriceCents: pending.salePriceCents,
           mortgageCents: pending.mortgageCents,
           proceedsCents: pending.proceedsCents,
@@ -3357,7 +3358,7 @@ export class GamesService {
         gamePlayerId: player.id,
         payload: {
           assetId: asset.id,
-          assetName: asset.name,
+          assetName: realEstateAssetName(asset),
           quantity: dto.quantity,
           proceedsCents: cents(proceeds),
           removedCashflowCents: cents(removedCashflow)
@@ -3851,7 +3852,7 @@ export class GamesService {
     if (stableRule) return stableRule;
 
     const marketText = this.normalizedSearchText(card.title, card.bodyText);
-    const target = this.marketTargetKeys(marketText)[0];
+    const target = cardRealEstate(card)?.target ?? this.marketTargetKeys(marketText)[0];
     if (!target) return null;
     const scope = marketText.includes("но не другие игроки") ? "current" : "all";
     if (marketText.includes("втрое")) {
@@ -3889,8 +3890,9 @@ export class GamesService {
       action: "sale",
       target,
       scope,
+      ...(target === "plex" ? { allowedUnits: this.marketPlexUnits(marketText) } : {}),
       pricing:
-        marketText.includes("каждый блок") || marketText.includes("каждый номер")
+        /кажд(?:ый блок|ый номер|ую квартиру)|за квартир/.test(marketText)
           ? { type: "per_unit", priceCents }
           : { type: "fixed", priceCents }
     };
@@ -3932,10 +3934,11 @@ export class GamesService {
           sourceCard?.category,
           sourceCard?.subcategory
         );
-        if (!marketAssetMatchesTarget(rule.target, assetText)) return [];
+        const property = assetRealEstate(asset);
+        if (!marketAssetMatchesTarget(rule.target, assetText, property)) return [];
 
         const noteSale = rule.pricing.type === "no_cash_note";
-        const salePrice = marketRuleSalePriceCents(rule, asset, assetText);
+        const salePrice = marketRuleSalePriceCents(rule, asset, assetText, property);
         if (!noteSale && salePrice <= 0n) return [];
         const sourceMeta = sourceCard ? this.metaMap(sourceCard.meta) : {};
         const mortgage = noteSale
@@ -3954,7 +3957,7 @@ export class GamesService {
         return [{
           gamePlayerId: asset.gamePlayerId,
           assetId: asset.id,
-          assetName: asset.name,
+          assetName: realEstateAssetName(asset),
           salePriceCents: Number(salePrice),
           mortgageCents: Number(mortgage),
           proceedsCents: Number(proceeds),
@@ -4036,7 +4039,8 @@ export class GamesService {
           asset.sourceCard?.bodyText,
           asset.sourceCard?.category,
           asset.sourceCard?.subcategory
-        )
+        ),
+        assetRealEstate(asset)
       )
     );
     if (matching.length === 0) {
@@ -4112,12 +4116,18 @@ export class GamesService {
     });
   }
 
+  private marketPlexUnits(text: string) {
+    const units = [...text.matchAll(/(?:^|[^\d])(2|4|8)\s*[-х]?\s*(?:plex|плекс|квартир)/g)].map((match) => Number(match[1]));
+    if (/duplex|дуплекс/.test(text)) units.push(2);
+    return units.length ? [...new Set(units)] : [2, 4, 8];
+  }
+
   private marketTargetKeys(marketText: string) {
     const keys: MarketAssetTarget[] = [];
     if (/(?:^|\s)10\s*(?:га|гектар)/.test(marketText)) keys.push("land10");
     if (/(?:^|\s)20\s*(?:га|гектар)/.test(marketText)) keys.push("land20");
     if (marketText.includes("золот") && marketText.includes("монет")) keys.push("gold_coin");
-    if (marketText.includes("2у")) keys.push("house2u");
+    if (/2у|2\s*\/\s*1/.test(marketText)) keys.push("house2u");
     if (/\b3m\b|\b3м\b|3br|3\/2/.test(marketText)) keys.push("house3m");
     if (marketText.includes("plex") || marketText.includes("квартирн")) keys.push("plex");
     if (marketText.includes("апартамент")) keys.push("apartment");
@@ -6300,7 +6310,10 @@ export class GamesService {
       },
       board: ratRaceBoard,
       fastTrackBoard: fastTrackCells,
-      players: game.players,
+      players: game.players.map((player) => ({
+        ...player,
+        assets: player.assets.map((asset) => ({ ...asset, name: realEstateAssetName(asset) }))
+      })),
       events: [...game.events].reverse(),
       chatMessages: [
         ...game.chatMessages,

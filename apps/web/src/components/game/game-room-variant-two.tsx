@@ -199,7 +199,7 @@ export function GameRoomVariantTwo({
             compactSection === "actions" ? "block" : "hidden"
           ].join(" ")}
         >
-          <div className="min-w-0 overflow-hidden rounded-2xl bg-white p-3 shadow-panel">
+          <div className="min-w-0 rounded-2xl bg-white px-3 pb-3 pt-0 shadow-panel">
             {actions}
           </div>
           <JourneyHint

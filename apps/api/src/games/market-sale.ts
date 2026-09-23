@@ -1,4 +1,8 @@
+import { realEstateFromText, type RealEstate } from "./real-estate";
+
 export function marketAssetUnits(assetText: string) {
+  const property = realEstateFromText(assetText);
+  if (property) return property.units;
   if (/60[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 60;
   if (/24[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 24;
   if (/12[\s-]*(кв|квартир|апартамент)/.test(assetText)) return 12;
@@ -35,6 +39,7 @@ export type MarketRule =
       action: "sale";
       target: MarketAssetTarget;
       scope: "all" | "current";
+      allowedUnits?: number[];
       pricing:
         | { type: "fixed"; priceCents: number }
         | { type: "per_unit"; priceCents: number; minimumUnits?: number }
@@ -229,15 +234,14 @@ export function originalMarketRule(slug: string) {
   return source ? recognizedOriginalMarketRules[source] ?? null : null;
 }
 
-export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: string) {
+export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: string, property = realEstateFromText(assetText)) {
   const normalized = assetText.toLowerCase().replace(/ё/g, "е");
+  if (["house2u", "house3m", "plex", "apartment"].includes(target)) {
+    return property ? property.target === target : target === "apartment" && normalized.includes("апартамент");
+  }
   if (target === "land10") return /(?:^|\s)10\s*(?:га|гектар)/.test(normalized);
   if (target === "land20") return /(?:^|\s)20\s*(?:га|гектар)/.test(normalized);
   if (target === "gold_coin") return normalized.includes("золот") && normalized.includes("монет");
-  if (target === "house2u") return /\b2у\b|2\/1|2\s*спальн/.test(normalized);
-  if (target === "house3m") return /\b3m\b|\b3м\b|3\/2|3br/.test(normalized);
-  if (target === "plex") return /duplex|дуплекс|plex|плекс|[248][\s-]*(кв|квартир)/.test(normalized);
-  if (target === "apartment") return normalized.includes("апартамент");
   if (target === "carwash") return normalized.includes("автомой");
   if (target === "kebab") return normalized.includes("шашлык");
   if (target === "zirconium") return normalized.includes("циркони");
@@ -254,11 +258,13 @@ export function marketAssetMatchesTarget(target: MarketAssetTarget, assetText: s
 export function marketRuleSalePriceCents(
   rule: Extract<MarketRule, { action: "sale" }>,
   asset: { downPaymentCents: bigint; costBasisCents: bigint },
-  assetText: string
+  assetText: string,
+  property?: RealEstate | null
 ) {
+  const units = property?.units ?? marketAssetUnits(assetText);
+  if (rule.allowedUnits && !rule.allowedUnits.includes(units)) return 0n;
   if (rule.pricing.type === "fixed") return BigInt(rule.pricing.priceCents);
   if (rule.pricing.type === "per_unit") {
-    const units = marketAssetUnits(assetText);
     if (rule.pricing.minimumUnits && units < rule.pricing.minimumUnits) return 0n;
     return BigInt(rule.pricing.priceCents) * BigInt(units);
   }

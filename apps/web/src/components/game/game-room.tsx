@@ -935,6 +935,7 @@ export function GameRoom({
       await wait(remaining);
       stopDiceAnimation();
       setDiceFaces(dice);
+      setTurnAnimationPhase(move ? "moving" : "landed");
       await wait(450);
 
       if (move) {
@@ -1293,12 +1294,13 @@ export function GameRoom({
       )}
     >
       <MobileTurnDialog
-        open={canRoll && !pendingAction}
+        open={Boolean(me) && snapshot.game.status === "IN_PROGRESS" && ((canRoll && !pendingAction) || rollingDice || turnAnimationPhase !== "ready")}
+        phase={turnAnimationPhase}
         disabled={fastBusy}
         rolling={rollingDice}
         diceValues={diceFaces}
         diceCount={activeDiceCount}
-        maxCompactViewportWidth={showFastTrack ? 1279 : gameRoomView === "classic" ? 1023 : 1279}
+        maxCompactViewportWidth={showFastTrack || gameRoomView === "classic" ? 1023 : 1279}
         onSkip={skipTurn}
         onRoll={() => {
           void rollDice();
@@ -1401,8 +1403,9 @@ export function GameRoom({
           turnTabRequest={turnTabRequest}
           actions={
             <>
-              <div>
                 <DiceAction
+                  className="hidden xl:block"
+                  pinnedToPanel
                   canRoll={canRoll && !pendingAction}
                   rolling={rollingDice}
                   phase={turnAnimationPhase}
@@ -1412,7 +1415,6 @@ export function GameRoom({
                   onRoll={rollDice}
                   onSkip={skipTurn}
                 />
-              </div>
               <ActionsPanel
               canChooseDeal={canChooseDeal}
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
@@ -1447,7 +1449,6 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              hideHeaderAt="xl"
               activityFeed={renderTurnFeed()}
                 embedded
               />
@@ -1520,7 +1521,6 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              hideHeaderAt="lg"
               activityFeed={renderTurnFeed(false)}
               embedded
             />
@@ -1552,9 +1552,6 @@ export function GameRoom({
               turnTabRequest={turnTabRequest}
               actions={
                 <>
-                  <DiceAction canRoll={canRoll && !pendingAction} rolling={rollingDice} phase={turnAnimationPhase}
-                    statusLabel={canRoll ? "Ваш ход" : undefined} idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
-                    diceValues={diceFaces} onRoll={rollDice} onSkip={skipTurn} />
                   <ActionsPanel
                   canChooseDeal={canChooseDeal}
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
@@ -4184,8 +4181,6 @@ function ActionsPanel({
   onDeclineStockSale,
   canTakeLoan,
   onOpenBank,
-  headerControl,
-  hideHeaderAt,
   activityFeed,
   embedded = false
 }: {
@@ -4222,8 +4217,6 @@ function ActionsPanel({
   onDeclineStockSale: () => void;
   canTakeLoan: boolean;
   onOpenBank: () => void;
-  headerControl?: ReactNode;
-  hideHeaderAt?: "lg" | "xl";
   activityFeed?: ReactNode;
   embedded?: boolean;
 }) {
@@ -4748,32 +4741,10 @@ function ActionsPanel({
     </>
   );
 
-  const header = (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-3",
-        hideHeaderAt === "lg" ? "lg:hidden" : hideHeaderAt === "xl" ? "xl:hidden" : null
-      )}
-    >
-      <h2 className="text-lg font-semibold">Действия</h2>
-      {headerControl ?? (
-        <Button
-          variant="primary"
-          className="h-9 gap-2 px-3 text-xs"
-          onClick={onOpenBank}
-          disabled={!canTakeLoan}
-        >
-          <Landmark size={15} aria-hidden="true" />
-          Банк
-        </Button>
-      )}
-    </div>
-  );
 
   if (embedded) {
     return (
       <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
-        {header}
         {content}
         {activityFeed ? <div className="mt-1">{activityFeed}</div> : null}
       </section>
@@ -4782,9 +4753,6 @@ function ActionsPanel({
 
   return (
     <Card>
-      <CardHeader className="p-4">
-        {header}
-      </CardHeader>
       <CardContent className="space-y-4">
         {content}
         {activityFeed ? <div>{activityFeed}</div> : null}
@@ -4815,6 +4783,7 @@ function GameTurnFeed({
     events={events}
     players={players}
     fastTrackOnly={fastTrackOnly}
+    viewerPlayerId={currentGamePlayerId}
     loadEarlier={async () => {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Не удалось загрузить историю партии");
