@@ -1264,7 +1264,7 @@ export function GameRoom({
     </Button>
   ) : null;
 
-  const renderTurnFeed = (showHeader = true) => (
+  const renderTurnFeed = (showHeader = true, action?: ReactNode) => (
     <GameTurnFeed
       gameId={snapshot.game.id}
       token={token}
@@ -1275,7 +1275,9 @@ export function GameRoom({
       onSendBabyGift={sendBabyGift}
       showHeader={showHeader}
       fastTrackOnly={showFastTrack}
-      leadingAction={enterFastTrackAction}
+      turnPlayerId={snapshot.game.status === "IN_PROGRESS" || snapshot.game.status === "PAUSED" ? snapshot.game.currentPlayerId : null}
+      turnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`}
+      currentAction={enterFastTrackAction || (showFastTrack ? action : pendingAction || stockSaleOffer ? action : null)}
     />
   );
 
@@ -1394,7 +1396,7 @@ export function GameRoom({
         />
       ) : null}
 
-      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy} turnTabRequest={turnTabRequest}>{renderTurnFeed(false)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
+      {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy} turnTabRequest={turnTabRequest}>{(action) => renderTurnFeed(false, action)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
           snapshot={boardSnapshot}
           movingPlayerId={movement.movingPlayerId}
@@ -1449,7 +1451,7 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              activityFeed={renderTurnFeed()}
+              renderHistory={(action) => renderTurnFeed(true, action)}
                 embedded
               />
             </>
@@ -1521,7 +1523,7 @@ export function GameRoom({
               onDeclineStockSale={declineStockSale}
               canTakeLoan={canTakeLoan}
               onOpenBank={() => setBankDialogOpen(true)}
-              activityFeed={renderTurnFeed(false)}
+              renderHistory={(action) => renderTurnFeed(false, action)}
               embedded
             />
           </>
@@ -1586,7 +1588,7 @@ export function GameRoom({
                   onDeclineStockSale={declineStockSale}
                   canTakeLoan={canTakeLoan}
                   onOpenBank={() => setBankDialogOpen(true)}
-                  activityFeed={renderTurnFeed(false)}
+                  renderHistory={(action) => renderTurnFeed(false, action)}
                     embedded
                   />
                 </>
@@ -2969,7 +2971,7 @@ function MobileBoard({
       <div className="min-w-0 max-w-full overflow-hidden rounded-xl bg-card/60">
         <div
           ref={scrollRef}
-          className="grid w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-[46px] overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid h-[88px] w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-auto overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
@@ -2979,6 +2981,7 @@ function MobileBoard({
               <div
                 key={cell.index}
                 data-board-cell={cell.index}
+                style={{ width: Math.max(46, players.length * 40 + 8) }}
                 className="relative min-w-0 snap-center text-center"
                 aria-label={`Клетка ${cell.index + 1}: ${localizeGameText(cell.label)}`}
               >
@@ -3113,7 +3116,7 @@ function PlayerTokenStack({
   mobileBoard?: boolean;
   movingPlayerId?: string | null;
 }) {
-  const overlapClass = desktopBoard ? "-ml-7" : mobileBoard ? "-ml-5" : "-ml-3";
+  const overlapClass = desktopBoard ? "-ml-7" : mobileBoard ? "ml-1" : "-ml-3";
 
   return (
     <div
@@ -4181,7 +4184,7 @@ function ActionsPanel({
   onDeclineStockSale,
   canTakeLoan,
   onOpenBank,
-  activityFeed,
+  renderHistory,
   embedded = false
 }: {
   canChooseDeal: boolean;
@@ -4217,7 +4220,7 @@ function ActionsPanel({
   onDeclineStockSale: () => void;
   canTakeLoan: boolean;
   onOpenBank: () => void;
-  activityFeed?: ReactNode;
+  renderHistory: (action: ReactNode) => ReactNode;
   embedded?: boolean;
 }) {
   const [stockCostDraft, setStockCostDraft] = useState("");
@@ -4745,8 +4748,7 @@ function ActionsPanel({
   if (embedded) {
     return (
       <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
-        {content}
-        {activityFeed ? <div className="mt-1">{activityFeed}</div> : null}
+        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard ? content : null)}
       </section>
     );
   }
@@ -4754,8 +4756,7 @@ function ActionsPanel({
   return (
     <Card>
       <CardContent className="space-y-4">
-        {content}
-        {activityFeed ? <div>{activityFeed}</div> : null}
+        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard ? content : null)}
       </CardContent>
     </Card>
   );
@@ -4763,7 +4764,7 @@ function ActionsPanel({
 
 function GameTurnFeed({
   gameId, token, events, players, currentGamePlayerId, gameStatus,
-  onSendBabyGift, showHeader, fastTrackOnly, leadingAction
+  onSendBabyGift, showHeader, fastTrackOnly, currentAction, turnPlayerId, turnKey
 }: {
   gameId: string;
   token: string;
@@ -4774,7 +4775,9 @@ function GameTurnFeed({
   onSendBabyGift: (birthEventId: string, amountCents: number) => Promise<void>;
   showHeader: boolean;
   fastTrackOnly: boolean;
-  leadingAction?: ReactNode;
+  currentAction?: ReactNode;
+  turnPlayerId: string | null;
+  turnKey: string;
 }) {
   const viewingPlayer = players.find((player) => player.id === currentGamePlayerId);
   return <GameActionHistory
@@ -4784,13 +4787,16 @@ function GameTurnFeed({
     players={players}
     fastTrackOnly={fastTrackOnly}
     viewerPlayerId={currentGamePlayerId}
+    currentTurnPlayerId={turnPlayerId}
+    currentTurnKey={turnKey}
+    currentAction={currentAction}
     loadEarlier={async () => {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Не удалось загрузить историю партии");
       const data = await response.json() as { events: GameEvent[] };
       return data.events;
     }}
-    header={<>{showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}{leadingAction ? <div className="mb-3">{leadingAction}</div> : null}</>}
+    header={showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}
     renderAction={(event, allEvents) => event.type === realtimeEvents.cardDraw ? <JournalCardDraw event={event} /> : event.type === "player:baby" ? <BabyJournalEvent
       event={event} allEvents={allEvents} players={players}
       recipient={gamePlayerForEvent(event, players) ?? undefined}

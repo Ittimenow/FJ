@@ -51,9 +51,8 @@ export function gameTurns(events: GameEvent[]): PlayerTurn[] {
 
   for (const event of [...events].sort((left, right) => left.sequence - right.sequence)) {
     if (turnStartEventTypes.has(event.type)) {
-      const activePlayerId = activeTurn?.find((item) => item.gamePlayer?.id)?.gamePlayer?.id;
       const activeHasStart = activeTurn?.some((item) => turnStartEventTypes.has(item.type));
-      if (activeTurn && !activeHasStart && activePlayerId === event.gamePlayer?.id) {
+      if (activeTurn && !activeHasStart) {
         activeTurn.push(event);
         continue;
       }
@@ -71,18 +70,6 @@ export function gameTurns(events: GameEvent[]): PlayerTurn[] {
     }
 
     if (activeTurn) {
-      const activeHasStart = activeTurn.some((item) => turnStartEventTypes.has(item.type));
-      const activePlayerId = activeTurn.find((item) => item.gamePlayer?.id)?.gamePlayer?.id;
-      if (
-        !activeHasStart &&
-        isPlayerGameplayEvent(event) &&
-        activePlayerId &&
-        activePlayerId !== event.gamePlayer?.id
-      ) {
-        finish(true);
-        activeTurn = [event];
-        continue;
-      }
       activeTurn.push(event);
       if (event.type === "game:ended") finish(true);
       continue;

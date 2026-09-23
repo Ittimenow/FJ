@@ -1,5 +1,6 @@
-.game-action-timeline { position: relative; padding-left: 18px; }
-.game-action-timeline::before { content: ""; position: absolute; top: 24px; bottom: 24px; left: 4px; width: 1px; background: #dfcebb; }
-.game-action-entry { position: relative; }
-.game-action-entry + .game-action-entry { margin-top: 12px; }
-.game-action-entry::before { content: ""; position: absolute; left: -18px; top: 22px; width: 9px; height: 9px; border-radius: 50%; background: #7b3f17; }
+.game-turn-timeline { padding-left: 16px; }
+.game-turn-event { position: relative; }
+.game-turn-event + .game-turn-event { margin-top: 12px; }
+.game-turn-event::before { content: ""; position: absolute; left: -16px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: #7b3f17; }
+.game-turn-event:not(:last-child)::after { content: ""; position: absolute; left: -13px; top: 13px; bottom: -18px; width: 1px; background: #dfcebb; }
+.game-turn-decision > :empty { display: none; }

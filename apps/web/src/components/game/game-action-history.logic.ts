@@ -1,5 +1,5 @@
 import type { GameEvent, GamePlayer } from "../../lib/types";
-import { gamePlayerForEvent, gameTurns, groupTurnEventsByPlayer } from "./game-journal";
+import { gamePlayerForEvent, gameTurns, playerIdForTurn } from "./game-journal";
 
 const preparationEvents = new Set([
   "player:joined", "player:added", "player:removed", "player:role_changed",
@@ -12,20 +12,41 @@ export function mergeActionEvents(current: GameEvent[], incoming: GameEvent[]) {
   return [...events.values()].sort((a, b) => b.sequence - a.sequence);
 }
 
-/** Group before filtering so another player's turn still separates my actions. */
-export function playerActionTurns(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false) {
-  const visibleIds = new Set(playerActionEvents(events, players, onlyPlayerId, fastTrackOnly).map((event) => event.id));
+/** One card belongs to the turn owner; other participants stay inside that turn. */
+export function playerActionTurns(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false, currentPlayerId?: string | null) {
+  const visibleIds = new Set(playerActionEvents(events, players, onlyPlayerId).map((event) => event.id));
+  const fastTrackIds = new Set(fastTrackOnly ? playerActionEvents(events, players, null, true).map((event) => event.id) : []);
   const resolved = events.map((event) => {
     const player = gamePlayerForEvent(event, players);
     return player && !event.gamePlayer
       ? { ...event, gamePlayer: { id: player.id, seat: player.seat, role: player.role } }
       : event;
   });
-  return gameTurns(resolved).flatMap((turn) =>
-    groupTurnEventsByPlayer(turn.events.filter((event) => visibleIds.has(event.id)).reverse(), players)
-      .filter((group) => group.player)
-      .map((group) => ({ id: `${turn.id}-${group.key}`, player: group.player!, events: group.events }))
-  ).sort((a, b) => b.events[0]!.sequence - a.events[0]!.sequence);
+  return gameTurns(resolved).flatMap((turn) => {
+    const started = turn.events.some((event) => ["player:roll_dice", "turn:skipped", "bankruptcy:turn_skipped"].includes(event.type));
+    const ownerId = !started && !turn.complete && currentPlayerId ? currentPlayerId : playerIdForTurn(turn);
+    const player = players.find((item) => item.id === ownerId);
+    if (!player) return [];
+    const currentFastTrackPreparation = !started && !turn.complete && player.id === currentPlayerId && player.track === "FAST_TRACK";
+    if (fastTrackOnly && !currentFastTrackPreparation && !turn.events.some((event) => fastTrackIds.has(event.id))) return [];
+    const visible = turn.events.filter((event) => visibleIds.has(event.id) && (!fastTrackOnly || fastTrackIds.has(event.id) || !["player:roll_dice", "player:move"].includes(event.type)));
+    const otherActions: Array<{ player: GamePlayer; events: GameEvent[] }> = [];
+    for (const event of visible) {
+      const author = gamePlayerForEvent(event, players);
+      if (!author || author.id === ownerId) continue;
+      const previous = otherActions[otherActions.length - 1];
+      if (previous?.player.id === author.id) previous.events.push(event);
+      else otherActions.push({ player: author, events: [event] });
+    }
+    return [{
+      id: turn.id,
+      player,
+      complete: turn.complete,
+      sequence: turn.events[0]?.sequence ?? 0,
+      events: visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId).reverse(),
+      otherActions
+    }];
+  }).sort((a, b) => b.sequence - a.sequence);
 }
 
 export function playerActionEvents(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false) {

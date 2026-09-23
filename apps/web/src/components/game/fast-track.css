@@ -182,7 +182,7 @@
 :where(.fast-track) .fast-track-tab-panel .player-goal { margin-top: 20px; }
 :where(.fast-track) .fast-track-tab-panel .player-goal .player-section-heading { margin: 0; }
 :where(.fast-track) .player-goal-summary { margin: 0; color: #405372; font-size: 14px; line-height: 1.5; }
-:where(.fast-track) .fast-track-timeline { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 46px; width: 100%; min-width: 0; margin: 0; padding: 8px calc(50% - 23px) 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: #fff9f199; list-style: none; }
+:where(.fast-track) .fast-track-timeline { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: auto; height: 88px; box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 8px calc(50% - 23px) 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: #fff9f199; list-style: none; }
 :where(.fast-track) .fast-track-timeline::-webkit-scrollbar { display: none; }
 :where(.fast-track) .fast-track-timeline-cell { --timeline-color: #657597; min-width: 0; scroll-snap-align: center; text-align: center; }
 :where(.fast-track) .timeline-business { --timeline-color: #587424; }
@@ -195,7 +195,7 @@
 :where(.fast-track) .fast-track-timeline-line::before { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: var(--board-route); }
 :where(.fast-track) .fast-track-timeline-line > span { position: absolute; left: calc(50% - 6px); width: 12px; height: 12px; border: 2px solid #fff; border-radius: 50%; background: var(--timeline-color); }
 :where(.fast-track) [aria-current="location"] .fast-track-timeline-line > span { outline: 2px solid #718866; outline-offset: 1px; }
-:where(.fast-track) .fast-track-timeline-players { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 36px; margin-top: 4px; }
+:where(.fast-track) .fast-track-timeline-players { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 4px; height: 36px; margin-top: 4px; }
 :where(.fast-track) .fast-track-tablist button:focus-visible,
 :where(.fast-track) .fast-track-tab-panel:focus-visible,
 :where(.fast-track) .fast-track-timeline:focus-visible { outline: 2px solid #718866; outline-offset: -2px; }

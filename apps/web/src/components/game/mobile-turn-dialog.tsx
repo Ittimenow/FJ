@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DiceFace } from "./dice-action";
 
@@ -46,16 +45,19 @@ export function MobileTurnDialog({
         aria-label="Действия текущего хода"
         className="pointer-events-auto mx-auto grid w-full max-w-sm grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-2xl bg-[#fff5ed] p-2 shadow-[0_18px_48px_rgba(5,18,45,.28)]"
       >
-        <button
-          type="button"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-[#7b3f17] shadow-[0_6px_16px_rgba(123,63,23,.12)] transition hover:bg-[#fffaf6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c0560c] disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onSkip}
-          disabled={showDice || disabled}
-          aria-label="Пропустить ход"
-          title="Пропустить ход"
-        >
-          <X size={18} strokeWidth={2.5} aria-hidden="true" />
-        </button>
+        <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0 text-[#7b3f17]">
+          <h3 className="text-sm font-semibold">Ваш ход</h3>
+          <button
+            type="button"
+            className="mt-0.5 rounded-md text-xs font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onSkip}
+            disabled={showDice || disabled}
+            aria-label="Пропустить ход"
+            title="Пропустить ход"
+          >
+            Пропустить ход
+          </button>
+        </div>
         {!showDice ? <Button
           type="button"
           variant="action"

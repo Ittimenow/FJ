@@ -66,7 +66,7 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   snapshot: GameSnapshot; player?: GamePlayer | undefined;
   onRoll: () => void; rolling: boolean; diceValues: number[]; diceCount: number; onDiceCount: (count: number) => void;
   onSkip: () => void; phase?: "ready" | "rolling" | "moving" | "landed";
-  onDecision: (buy: boolean, decisionId: string) => void; busy: boolean; children?: ReactNode;
+  onDecision: (buy: boolean, decisionId: string) => void; busy: boolean; children?: (actions: ReactNode) => ReactNode;
   turnTabRequest?: number;
 }) {
   const pending = snapshot.game.pendingAction;
@@ -77,14 +77,15 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   const diceAction = <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
       statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
       diceValues={diceValues} diceCount={diceCount} onRoll={onRoll} onSkip={onSkip} pinnedToPanel replaceButtonWithDice />;
-  const actions = <div className="fast-track-turn-options" aria-label="Действия большого круга">
-    {isTurn && !pending && player?.financialState?.fastTrackCharity ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
+  const canChooseDice = isTurn && !pending && player?.financialState?.fastTrackCharity;
+  const actions = mine || canChooseDice ? <div className="fast-track-turn-options" aria-label="Действия большого круга">
+    {canChooseDice ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
     {mine ? <div className="turn-decision">
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
       {choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo" ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}
       <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
     </div> : null}
-    </div>;
-  return <FastTrackBoard snapshot={snapshot} player={player} diceAction={diceAction} actions={actions} history={children} phase={phase} turnTabRequest={turnTabRequest} />;
+    </div> : null;
+  return <FastTrackBoard snapshot={snapshot} player={player} diceAction={diceAction} actions={actions} history={children?.(actions)} phase={phase} turnTabRequest={turnTabRequest} />;
 }

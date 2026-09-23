@@ -400,7 +400,8 @@ for (const width of [320, 390, 430]) {
     await expect(others.locator('[data-other-player="vera"]').getByRole('img', { name: 'Большой круг', exact: true })).toHaveCount(0);
     await page.getByRole('tab', { name: /^Ход/ }).click();
     await expect(page.locator('.dice-action')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Ваш ход', exact: true })).toHaveCount(0);
+    await expect(bar.getByRole('heading', { name: 'Ваш ход', exact: true })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Пропустить ход', exact: true })).toBeVisible();
     await expect(page.locator('.game-action-entry [data-player-id="boris"]').first()).toHaveAttribute('data-figurine', 'cat-in-box');
     await page.getByLabel('Количество кубиков').selectOption('3');
     const bounds = await bar.boundingBox();
@@ -567,8 +568,9 @@ test('mobile large track shows empty tabs, start tokens and every player sharing
   await expect(sharedCell.locator('[data-player-id]')).toHaveCount(2);
   await sharedCell.scrollIntoViewIfNeeded();
   for (const id of ['boris', 'vera']) await expect(sharedCell.locator(`[data-player-id="${id}"]`)).toBeInViewport();
-  const tokens = await sharedCell.locator('[data-player-id]').evaluateAll(elements => elements.map(element => { const rect = element.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom }; }));
-  expect(tokens[0]!.bottom).toBeLessThanOrEqual(tokens[1]!.top);
+  const tokens = await sharedCell.locator('[data-player-id]').evaluateAll(elements => elements.map(element => { const rect = element.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right }; }));
+  expect(tokens[0]!.top).toBe(tokens[1]!.top);
+  expect(tokens[0]!.right).toBeLessThanOrEqual(tokens[1]!.left);
 });
 
 for (const scenario of [{ width: 390, mode: 'mixed-history' }, { width: 1440, mode: 'desktop-large' }, { width: 1440, mode: 'desktop-small' }]) {
@@ -858,21 +860,108 @@ test('live turn groups and history filters update for both players before the tu
   await update(3, 'market:sale_declined', 'boris');
   await update(4, 'loan:repay', 'boris');
   for (const view of [page, other]) {
-    await expect(history(view).locator('.game-action-entry')).toHaveCount(2);
+    await expect(history(view).locator('.game-action-entry')).toHaveCount(1);
     await expect(history(view).locator('.game-action-entry').first()).toContainText('Борис');
-    await expect(history(view).locator('.game-action-entry').first().locator('[data-action-id]')).toHaveCount(2);
+    await expect(history(view).locator('.game-turn-other-action')).toHaveCount(2);
+    await expect(history(view).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
+    await expect(history(view).locator('.game-turn-other-action [data-turn-identity="boris"]')).toBeVisible();
     await history(view).getByRole('button', { name: 'Только свои', exact: true }).click();
     await expect(history(view).locator('.game-action-entry')).toHaveCount(1);
   }
   await expect(history(page).locator('.game-action-entry')).toContainText('Анна');
   await expect(history(other).locator('.game-action-entry')).toContainText('Борис');
+  await expect(history(other).locator('.game-action-entry')).toHaveAttribute('data-turn-player-id', 'anna');
   await update(5, 'loan:repay');
   await expect(history(page).locator('[data-action-id]')).toHaveCount(3);
   await expect(history(other).locator('[data-action-id]')).toHaveCount(2);
   await history(other).getByRole('button', { name: 'Все игроки', exact: true }).click();
   await expect(history(other).locator('.game-action-entry').first()).toContainText('Анна');
   await expect(history(other).locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'live-5');
+  await expect(history(other).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
   await page.screenshot({ path: join(output, 'restored-history-desktop.png'), fullPage: true });
   await other.screenshot({ path: join(output, 'restored-history-mobile.png'), fullPage: true });
   await other.close();
 });
+
+for (const track of ['small', 'large']) {
+  for (const width of [320, 390]) {
+    test(`mobile ${track} route keeps its height with three neighbours at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${fixtureUrl}?mode=room${track === 'large' ? '&allFast=1' : ''}`);
+      await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+      const route = track === 'large' ? page.locator('.fast-track-timeline') : page.getByLabel('Малый круг', { exact: true });
+      const before = await route.boundingBox();
+      await page.evaluate((track) => {
+        const snapshot = structuredClone((window as any).roomSnapshot);
+        for (const player of snapshot.players) {
+          player.position = 0;
+          player.fastTrackPosition = 0;
+        }
+        window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+      }, track);
+      const cell = route.locator(track === 'large' ? '[data-fast-timeline-cell="0"]' : '[data-board-cell="0"]');
+      await expect(cell.locator('[data-player-id]')).toHaveCount(3);
+      await cell.scrollIntoViewIfNeeded();
+      const after = await route.boundingBox();
+      expect(after!.height).toBe(before!.height);
+      const tokens = await cell.locator('[data-player-id]').evaluateAll(elements => elements.map(element => {
+        const box = element.getBoundingClientRect();
+        return { top: box.top, right: box.right, left: box.left, bottom: box.bottom };
+      }));
+      expect(new Set(tokens.map(box => box.top)).size).toBe(1);
+      for (let i = 1; i < tokens.length; i++) expect(tokens[i - 1]!.right).toBeLessThanOrEqual(tokens[i]!.left);
+      expect(Math.max(...tokens.map(box => box.bottom))).toBeLessThanOrEqual(after!.y + after!.height);
+      if (track === 'large') await expect(route.locator('.bg-action')).toHaveCount(0);
+      const bar = page.locator('.mobile-turn-bar');
+      await expect(bar.getByRole('heading', { name: 'Ваш ход', exact: true })).toBeVisible();
+      await expect(bar.getByRole('button', { name: 'Пропустить ход', exact: true })).toBeVisible();
+      await expect(bar.locator('svg')).toHaveCount(0);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: join(output, `turn-layout-${track}-${width}-tokens.png`), fullPage: true });
+    });
+  }
+  for (const width of [1440, 390]) {
+    test(`${track} decisions and timeline stay inside one turn card at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${fixtureUrl}?mode=room&multiplayer=1${track === 'large' ? '&allFast=1' : ''}`);
+      await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+      if (width < 1024) await page.getByRole('tab', { name: 'Ход', exact: true }).click();
+      await page.evaluate((track) => {
+        const snapshot = structuredClone((window as any).roomSnapshot);
+        const event = (sequence: number, type: string, playerId: string, payload: object) => ({ id: `turn-layout-${sequence}`, sequence, type, createdAt: new Date().toISOString(), gamePlayer: { id: playerId, seat: 1, role: 'PLAYER' }, payload });
+        snapshot.events = [
+          event(1, 'player:roll_dice', 'anna', { diceValues: [3], track: track === 'large' ? 'FAST_TRACK' : 'RAT_RACE' }),
+          event(2, 'player:move', 'anna', { from: 0, to: 3, steps: 3, track: track === 'large' ? 'FAST_TRACK' : 'RAT_RACE' }),
+          event(3, 'loan:repay', 'boris', { amountCents: 1000, beforeCashCents: 10000, afterCashCents: 9000 }),
+          event(4, 'deal:sell', 'boris', { assetName: 'Квартира 2/1', proceedsCents: 5000, beforeCashCents: 9000, afterCashCents: 14000 })
+        ];
+        snapshot.game.pendingAction = track === 'large'
+          ? { type: 'fast_track_choice', gamePlayerId: 'anna', cellIndex: 23, priceCents: 300000, decisionId: 'turn-layout' }
+          : { type: 'choose_deal', gamePlayerId: 'anna' };
+        window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+      }, track);
+      const history = page.locator('.game-action-history:visible');
+      const card = history.locator('.game-action-entry');
+      await expect(card).toHaveCount(1);
+      const decision = card.getByLabel('Текущее решение', { exact: true });
+      await expect(decision).toBeVisible();
+      await expect(decision.getByRole('button', { name: track === 'large' ? /Оплатить/ : 'Мелкая сделка', exact: track !== 'large' })).toBeVisible();
+      expect((await history.getByRole('group', { name: 'Фильтр истории действий' }).boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y);
+      await expect(card.locator('.game-turn-timeline')).toHaveCount(1);
+      await expect(card.locator('[data-action-id]')).toHaveCount(4);
+      await expect(card.locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'turn-layout-2');
+      await expect(card.locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'turn-layout-4');
+      await expect(card.locator('.game-turn-other-action [data-turn-identity="boris"]')).toContainText('Борис');
+      await expect(card.locator('.game-turn-other-action [data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
+      await expect(card.locator('.game-turn-other-action').first()).toContainText('1 000');
+      await expect(card.locator('.game-turn-other-action').last()).toContainText('Квартира 2/1');
+      const dots = await card.locator('.game-turn-event').evaluateAll(elements => elements.map(element => ({ content: getComputedStyle(element, '::before').content, left: element.getBoundingClientRect().left + parseFloat(getComputedStyle(element, '::before').left) })));
+      expect(dots.every(dot => dot.content === '""' && dot.left > (0))).toBe(true);
+      expect(new Set(dots.map(dot => dot.left)).size).toBe(1);
+      expect(dots[0]!.left).toBeGreaterThan((await card.boundingBox())!.x);
+      expect(await card.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+      await page.screenshot({ path: join(output, `turn-layout-${track}-${width}-decision.png`), fullPage: true });
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+  }
+}

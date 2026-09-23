@@ -20,8 +20,40 @@ test('an unfinished turn updates in place with newest actions first for every vi
 test('own-action filtering preserves turn boundaries and groups other players market decisions',()=>{
   const events=[event(1,'player:roll_dice'),event(2,'market:sale_offer','boris'),event(3,'market:sale_declined','boris'),event(4,'state:update','anna',{reason:'market_sale_declined_turn_ended'}),event(5,'player:roll_dice','boris'),event(6,'loan:repay'),event(7,'state:update','anna',{reason:'roll_resolved'}),event(8,'player:roll_dice'),event(9,'deal:buy')];
   const all=playerActionTurns(events,players);
-  assert.deepEqual(all.map(t=>t.events.map(e=>e.sequence)),[[9,8],[6],[5],[3,2],[1]]);
-  assert.deepEqual(playerActionTurns(events,players,'anna').map(t=>t.events.map(e=>e.sequence)),[[9,8],[6],[1]]);
+  assert.deepEqual(all.map(t=>t.events.map(e=>e.sequence)),[[9,8],[5],[1]]);
+  assert.deepEqual(all.map(t=>t.otherActions.flatMap(g=>g.events.map(e=>e.sequence))),[[],[6],[2,3]]);
+  assert.deepEqual(all.map(t=>t.player.id),['anna','boris','anna']);
+  const mine=playerActionTurns(events,players,'anna');
+  assert.deepEqual(mine.map(t=>t.events.map(e=>e.sequence)),[[9,8],[],[1]]);
+  assert.deepEqual(mine[1]?.otherActions[0]?.events.map(e=>e.sequence),[6]);
+});
+test('actions before the roll belong to the upcoming turn and retain their authors',()=>{
+  const before = [event(1,'loan:repay','boris'),event(2,'loan:take')];
+  const pending = playerActionTurns(before,players,null,false,'anna');
+  const rolled = playerActionTurns([...before,event(3,'player:roll_dice')],players,null,false,'anna');
+  assert.equal(pending.length,1); assert.equal(rolled.length,1);
+  assert.equal(pending[0]?.id,rolled[0]?.id);
+  assert.equal(rolled[0]?.player.id,'anna');
+  assert.deepEqual(rolled[0]?.events.map(e=>e.sequence),[3,2]);
+  assert.deepEqual(rolled[0]?.otherActions[0]?.events.map(e=>e.sequence),[1]);
+});
+test('a large-track turn includes a small-track players loan and property sale at the bottom',()=>{
+  const events=[event(1,'player:roll_dice','anna',{track:'FAST_TRACK'}),event(2,'player:move','anna',{track:'FAST_TRACK'}),event(3,'loan:repay','boris'),event(4,'deal:sell','boris')];
+  const turns=playerActionTurns(events,players,null,true,'anna');
+  assert.equal(turns.length,1);
+  assert.deepEqual(turns[0]?.events.map(e=>e.sequence),[2,1]);
+  assert.equal(turns[0]?.otherActions[0]?.player?.id,'boris');
+  assert.deepEqual(turns[0]?.otherActions[0]?.events.map(e=>e.sequence),[3,4]);
+});
+test('a small-track player action appears before the active large-track player rolls',()=>{
+  const currentPlayers=players.map(player=>({...player,track:player.id==='anna'?'FAST_TRACK':'RAT_RACE'})) as GamePlayer[];
+  const before=[event(1,'loan:repay','boris')];
+  const pending=playerActionTurns(before,currentPlayers,null,true,'anna');
+  const rolled=playerActionTurns([...before,event(2,'player:roll_dice','anna',{track:'FAST_TRACK'})],currentPlayers,null,true,'anna');
+  assert.equal(pending.length,1);
+  assert.equal(pending[0]?.player.id,'anna');
+  assert.deepEqual(pending[0]?.otherActions[0]?.events.map(e=>e.sequence),[1]);
+  assert.equal(pending[0]?.id,rolled[0]?.id);
 });
 test('history selects actions of all players, ordered newest first, without administrative or preparation messages',()=>{
   const events=[event(1,'player:joined'),event(2,'player:roll_dice'),event(3,'state:update'),event(4,'fast_track:purchased','boris'),event(5,'game:paused'),event(6,'player:dream_chosen')];

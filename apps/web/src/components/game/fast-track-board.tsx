@@ -82,8 +82,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
   const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} mobile={mobile} /> : <p className="turn-waiting">На большом круге пока нет игроков.</p>;
   const turn = <section className="turn-activity" aria-label="Ход и история игроков">
     {!mobile ? diceAction : null}
-    {actions ?? <p className="turn-waiting">{snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : `Ходит: ${gamePlayerName(active)}`}</p>}
-    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly />}
+    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly viewerPlayerId={player?.id ?? null} currentTurnPlayerId={snapshot.game.currentPlayerId} currentTurnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`} currentAction={actions} />}
   </section>;
   const tabs = [
     { id: "turn", label: "Ход", icon: Dices },
@@ -94,7 +93,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
 
   return <section ref={root} className={`fast-track${externalPanels ? " scroll-board" : ""}`} aria-label="Поле большого круга" data-moving-player={movement.movingPlayerId ?? undefined}>
     {mobile ? <div className="fast-track-mobile">
-      <FastTrackTimeline players={players} positions={movement.positions} position={position} followedPlayerId={followedPlayer?.id} movingPlayerId={movement.movingPlayerId} currentPlayerId={snapshot.game.currentPlayerId} />
+      <FastTrackTimeline players={players} positions={movement.positions} position={position} followedPlayerId={followedPlayer?.id} movingPlayerId={movement.movingPlayerId} />
       <section className="fast-track-tabs" aria-label="Большой круг: ход, игрок и активы">
         <div className="fast-track-tablist" role="tablist" aria-label="Информация об игроке">
           {tabs.map((tab, index) => <button key={tab.id} type="button" id={`${tabId}-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`${tabId}-${tab.id}-panel`} tabIndex={activeTab === tab.id ? 0 : -1}
@@ -143,13 +142,12 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
   </section>;
 }
 
-function FastTrackTimeline({ players, positions, position, followedPlayerId, movingPlayerId, currentPlayerId }: {
+function FastTrackTimeline({ players, positions, position, followedPlayerId, movingPlayerId }: {
   players: GamePlayer[];
   positions: Map<string, number>;
   position: number;
   followedPlayerId: string | undefined;
   movingPlayerId: string | null;
-  currentPlayerId: string | null;
 }) {
   const viewport = useRef<HTMLOListElement>(null);
   useEffect(() => {
@@ -163,10 +161,10 @@ function FastTrackTimeline({ players, positions, position, followedPlayerId, mov
     {cells.map((cell) => {
       const occupants = players.filter((item) => item.track === "FAST_TRACK" && (positions.get(item.id) ?? item.fastTrackPosition ?? -1) === cell.index);
       const label = cell.index < 0 ? "Старт" : `Клетка ${cell.index + 1}: ${cell.label}`;
-      return <li key={cell.index} className={`fast-track-timeline-cell timeline-${cell.type}`} data-fast-timeline-cell={cell.index} aria-current={position === cell.index ? "location" : undefined} aria-label={`${label}${occupants.length ? ` — ${occupants.map(gamePlayerName).join(", ")}` : ""}`} title={label}>
+      return <li key={cell.index} className={`fast-track-timeline-cell timeline-${cell.type}`} style={{ width: Math.max(46, occupants.length * 36 + 8) }} data-fast-timeline-cell={cell.index} aria-current={position === cell.index ? "location" : undefined} aria-label={`${label}${occupants.length ? ` — ${occupants.map(gamePlayerName).join(", ")}` : ""}`} title={label}>
         <span className="fast-track-timeline-number">{cell.index < 0 ? "Старт" : cell.index + 1}</span>
         <span className="fast-track-timeline-line" aria-hidden="true"><span /></span>
-        <span className="fast-track-timeline-players">{occupants.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" active={item.id === currentPlayerId} className={item.id === movingPlayerId ? "timeline-moving-token" : ""} />)}</span>
+        <span className="fast-track-timeline-players">{occupants.map((item) => <GamePlayerMark key={item.id} player={item} size="sm" className={item.id === movingPlayerId ? "timeline-moving-token" : ""} />)}</span>
       </li>;
     })}
   </ol>;
