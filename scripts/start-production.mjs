@@ -3,6 +3,7 @@ import net from "node:net";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import { proxyUpgrade as forwardUpgrade } from "./production-proxy.mjs";
 
 const children = new Set();
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -276,6 +277,16 @@ function selectTarget(url) {
 }
 
 function proxyHttp(req, res) {
+  let proxyReq;
+  req.on("error", () => {
+    res.destroy();
+    proxyReq?.destroy();
+  });
+  res.on("error", () => {
+    res.destroy();
+    proxyReq?.destroy();
+  });
+
   if (req.url === "/healthz") {
     respondHealth(res);
     return;
@@ -300,7 +311,7 @@ function proxyHttp(req, res) {
     "x-forwarded-proto": req.headers["x-forwarded-proto"] ?? "https"
   };
 
-  const proxyReq = http.request(
+  proxyReq = http.request(
     {
       hostname: target.host,
       port: target.port,
@@ -309,17 +320,34 @@ function proxyHttp(req, res) {
       headers
     },
     (proxyRes) => {
+      proxyRes.on("error", () => res.destroy());
+      proxyRes.on("aborted", () => res.destroy());
+      if (res.destroyed) {
+        proxyRes.destroy();
+        return;
+      }
       res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
       proxyRes.pipe(res);
     }
   );
 
   proxyReq.on("error", (error) => {
+    if (res.destroyed) return;
     console.error(`[cashflow-prod] proxy error: ${error.message}`);
-    if (!res.headersSent) {
-      res.writeHead(502, { "content-type": "application/json" });
+    if (res.headersSent) {
+      res.destroy();
+      return;
     }
+    res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ statusCode: 502, message: "Upstream unavailable" }));
+  });
+
+  req.on("aborted", () => {
+    res.destroy();
+    proxyReq.destroy();
+  });
+  res.on("close", () => {
+    if (!res.writableEnded) proxyReq.destroy();
   });
 
   req.pipe(proxyReq);
@@ -334,6 +362,21 @@ function respondHealth(res) {
   }
 
   const startedAt = Date.now();
+  const fail = (error) => {
+    if (res.destroyed || res.writableEnded) return;
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+    res.writeHead(503, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "error",
+        error: error.message,
+        latencyMs: Date.now() - startedAt
+      })
+    );
+  };
   const request = http.get(
     {
       hostname: apiHost,
@@ -345,6 +388,7 @@ function respondHealth(res) {
       const chunks = [];
       apiResponse.on("data", (chunk) => chunks.push(chunk));
       apiResponse.on("end", () => {
+        if (res.destroyed || res.writableEnded) return;
         const ready = apiResponse.statusCode === 200;
         res.writeHead(ready ? 200 : 503, { "content-type": "application/json" });
         res.end(
@@ -356,19 +400,14 @@ function respondHealth(res) {
           })
         );
       });
+      apiResponse.on("error", fail);
+      apiResponse.on("aborted", () => fail(new Error("API readiness response aborted")));
     }
   );
   request.on("timeout", () => request.destroy(new Error("API readiness timeout")));
-  request.on("error", (error) => {
-    if (res.headersSent) return;
-    res.writeHead(503, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "error",
-        error: error.message,
-        latencyMs: Date.now() - startedAt
-      })
-    );
+  request.on("error", fail);
+  res.on("close", () => {
+    if (!res.writableEnded) request.destroy();
   });
 }
 
@@ -381,32 +420,10 @@ function safeJson(value) {
 }
 
 function proxyUpgrade(req, socket, head) {
-  if (!appReady) {
-    socket.destroy();
-    return;
-  }
-
-  const target = selectTarget(req.url);
-  const upstream = net.connect(target.port, target.host, () => {
-    const headers = {
-      ...req.headers,
-      host: `${target.host}:${target.port}`,
-      "x-forwarded-host": req.headers.host ?? "",
-      "x-forwarded-proto": req.headers["x-forwarded-proto"] ?? "https"
-    };
-    const headerLines = Object.entries(headers)
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
-      .join("\r\n");
-
-    upstream.write(`${req.method} ${target.path} HTTP/${req.httpVersion}\r\n`);
-    upstream.write(`${headerLines}\r\n\r\n`);
-    if (head.length > 0) upstream.write(head);
-    socket.pipe(upstream);
-    upstream.pipe(socket);
+  forwardUpgrade(req, socket, head, {
+    isReady: () => appReady,
+    selectTarget
   });
-
-  upstream.on("error", () => socket.destroy());
 }
 
 let shuttingDown = false;

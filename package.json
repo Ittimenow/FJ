@@ -18,7 +18,7 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "node --test scripts/production-proxy.test.mjs && npm run test --workspaces --if-present",
     "db:generate": "npm run prisma:generate --workspace=@cashflow/database",
     "db:migrate": "npm run prisma:migrate --workspace=@cashflow/database",
     "db:push": "npm run prisma:push --workspace=@cashflow/database",
