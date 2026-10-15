@@ -562,6 +562,29 @@ export function GameRoom({
   useEffect(() => {
     setDealAuctionBid("");
   }, [dealAuction?.cardId]);
+  useEffect(() => {
+    if (isDealAuctionBidder && !dealAuctionResponse) {
+      setTurnTabRequest((current) => current + 1);
+    }
+  }, [dealAuction?.cardId, isDealAuctionBidder]);
+  const auctionPanel = dealAuction && dealAuctionCard && (isDealAuctionSeller || isDealAuctionBidder) ? (
+    <DealAuctionDialog
+      open
+      role={isDealAuctionSeller ? "seller" : "bidder"}
+      card={dealAuctionCard}
+      rows={dealAuctionRows}
+      resolved={dealAuctionResolved}
+      hasResponded={Boolean(dealAuctionResponse)}
+      bidDraft={dealAuctionBid}
+      currentCashCents={me?.financialState?.cashCents ?? 0}
+      submitting={Boolean(decisionSubmission?.startsWith("deal_auction_"))}
+      onBidDraftChange={setDealAuctionBid}
+      onBid={bidOnLatestDealAuction}
+      onDecline={declineLatestDealAuction}
+      onSelect={selectLatestDealAuctionOffer}
+      onCancel={cancelLatestDealAuction}
+    />
+  ) : null;
   const waitingStockSellerNames =
     ownPendingAction?.type === "stock_sale_window"
       ? unresolvedStockSellerNames(
@@ -1343,24 +1366,6 @@ export function GameRoom({
         loanSubmitting={loanSubmitting}
         onClose={() => setBankDialogOpen(false)}
       />
-      <DealAuctionDialog
-        open={Boolean(
-          dealAuction && dealAuctionCard && (isDealAuctionSeller || isDealAuctionBidder)
-        )}
-        role={isDealAuctionSeller ? "seller" : "bidder"}
-        card={dealAuctionCard}
-        rows={dealAuctionRows}
-        resolved={dealAuctionResolved}
-        hasResponded={Boolean(dealAuctionResponse)}
-        bidDraft={dealAuctionBid}
-        currentCashCents={me?.financialState?.cashCents ?? 0}
-        submitting={Boolean(decisionSubmission?.startsWith("deal_auction_"))}
-        onBidDraftChange={setDealAuctionBid}
-        onBid={bidOnLatestDealAuction}
-        onDecline={declineLatestDealAuction}
-        onSelect={selectLatestDealAuctionOffer}
-        onCancel={cancelLatestDealAuction}
-      />
       {snapshot.game.status === "IN_PROGRESS" &&
       me?.financialState?.bankruptcyStatus === "LIQUIDATING" ? (
         <BankruptcyPanel
@@ -1422,6 +1427,7 @@ export function GameRoom({
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
               onDrawBigDeal={() => draw("BIG_DEAL")}
               latestCard={latestDealDecisionCard}
+              auctionPanel={auctionPanel}
               charityChoice={charityChoice}
               canAnswerCharity={canAnswerCharity}
               doodadPaymentChoice={doodadPaymentChoice}
@@ -1494,6 +1500,7 @@ export function GameRoom({
               onDrawSmallDeal={() => draw("SMALL_DEAL")}
               onDrawBigDeal={() => draw("BIG_DEAL")}
               latestCard={latestDealDecisionCard}
+              auctionPanel={auctionPanel}
               charityChoice={charityChoice}
               canAnswerCharity={canAnswerCharity}
               doodadPaymentChoice={doodadPaymentChoice}
@@ -1559,6 +1566,7 @@ export function GameRoom({
                   onDrawSmallDeal={() => draw("SMALL_DEAL")}
                   onDrawBigDeal={() => draw("BIG_DEAL")}
                   latestCard={latestDealDecisionCard}
+                  auctionPanel={auctionPanel}
                   charityChoice={charityChoice}
                   canAnswerCharity={canAnswerCharity}
                   doodadPaymentChoice={doodadPaymentChoice}
@@ -4155,6 +4163,7 @@ function ActionsPanel({
   onDrawSmallDeal,
   onDrawBigDeal,
   latestCard,
+  auctionPanel,
   charityChoice,
   canAnswerCharity,
   doodadPaymentChoice,
@@ -4191,6 +4200,7 @@ function ActionsPanel({
   onDrawSmallDeal: () => void;
   onDrawBigDeal: () => void;
   latestCard: ReturnType<typeof latestDealCard>;
+  auctionPanel: ReactNode;
   charityChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "charity_choice" }> | null;
   canAnswerCharity: boolean;
   doodadPaymentChoice: Extract<GameSnapshot["game"]["pendingAction"], { type: "doodad_payment_choice" }> | null;
@@ -4268,6 +4278,7 @@ function ActionsPanel({
 
   const content = (
     <>
+      {auctionPanel}
       {canChooseDeal ? (
         <div className="rounded-md bg-[#f5faf2] p-3">
           <div className="text-sm font-medium">Возможность</div>
@@ -4748,7 +4759,7 @@ function ActionsPanel({
   if (embedded) {
     return (
       <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
-        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard ? content : null)}
+        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard || auctionPanel ? content : null)}
       </section>
     );
   }
@@ -4756,7 +4767,7 @@ function ActionsPanel({
   return (
     <Card>
       <CardContent className="space-y-4">
-        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard ? content : null)}
+        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard || auctionPanel ? content : null)}
       </CardContent>
     </Card>
   );
@@ -5708,7 +5719,9 @@ function eventDetails(event: GameEvent) {
     case "deal:auction_bid":
       return ["Игрок отправил закрытое предложение."];
     case "deal:auction_decline":
-      return ["Игрок отказался от покупки возможности."];
+      return [payload.reason === "insufficient_cash"
+        ? "Игрок не участвует в аукционе: не хватает наличных на первоначальный взнос и $1."
+        : "Игрок отказался от покупки возможности."];
     case "deal:auction_select":
       return compactDetails([
         textDetail("Возможность", payload.title),
@@ -6722,7 +6735,7 @@ function latestDealCard(
     isStock,
     isAuctionEligible:
       !isStock &&
-      isRentalRealEstateText(`${category} ${subcategory} ${title} ${bodyText}`)
+      (category === "business" || isRentalRealEstateText(`${category} ${subcategory} ${title} ${bodyText}`))
   };
 }
 

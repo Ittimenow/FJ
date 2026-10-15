@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Gavel, Hourglass, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import React, { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { money } from "@/lib/format";
@@ -65,24 +65,8 @@ export function DealAuctionDialog({
   onSelect: (buyerGamePlayerId: string) => void;
   onCancel: () => void;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.requestAnimationFrame(() => {
-      panelRef.current?.focus();
-    });
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, [open, role, resolved, hasResponded]);
-
+  const titleId = useId();
+  const bidId = useId();
   if (!open || !card) return null;
 
   const maxBidCents = dealAuctionMaxBidCents(currentCashCents, card.downPaymentCents);
@@ -90,46 +74,16 @@ export function DealAuctionDialog({
   const offeredRows = rows.filter((row) => row.status === "offered");
 
   return (
-    <div className="deal-auction-overlay fixed inset-0 z-[85] bg-[#07152d]/65 backdrop-blur-[2px]">
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="deal-auction-title"
-        aria-describedby="deal-auction-description"
-        tabIndex={-1}
-        className="deal-auction-panel flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-card shadow-[0_34px_90px_rgba(5,18,45,.35)] focus:outline-none"
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const focusable = Array.from(
-            panelRef.current?.querySelectorAll<HTMLElement>(
-              'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-            ) ?? []
-          );
-          if (focusable.length === 0) {
-            event.preventDefault();
-            return;
-          }
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
-          }
-        }}
-      >
-        <div className="flex shrink-0 items-start gap-3 bg-[#e8effe] px-4 py-4 sm:px-5">
+    <section aria-labelledby={titleId} className="min-w-0 rounded-xl bg-card p-4 sm:p-5">
+        <div className="flex shrink-0 items-start gap-3 rounded-xl bg-[#e8effe] p-4">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-journey text-white shadow-[0_9px_24px_rgba(41,103,223,.24)]">
             <Gavel size={21} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h2 id="deal-auction-title" className="text-xl font-extrabold tracking-[-0.025em] text-ink">
+            <h2 id={titleId} className="text-xl font-extrabold tracking-[-0.025em] text-ink">
               {role === "seller" ? "Аукцион возможности" : "Вам предлагают возможность"}
             </h2>
-            <p id="deal-auction-description" className="mt-1 text-sm leading-5 text-[#536789]">
+            <p className="mt-1 text-sm leading-5 text-[#536789]">
               {role === "seller"
                 ? "Дождитесь решений игроков, затем выберите подходящее предложение."
                 : "Назовите цену за право купить актив или откажитесь. Ответ изменить нельзя."}
@@ -137,8 +91,8 @@ export function DealAuctionDialog({
           </div>
         </div>
 
-        <div className="deal-auction-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5">
-          <section className="rounded-2xl bg-white p-4 shadow-[0_14px_34px_rgba(27,57,118,.09)]">
+        <div className="mt-4 space-y-4">
+          <section className="border-t border-line pt-4">
             <h3 className="break-words text-base font-extrabold text-ink">{card.title}</h3>
             {card.bodyText ? (
               <p className="mt-2 break-words text-sm leading-6 text-muted">{card.bodyText}</p>
@@ -160,22 +114,24 @@ export function DealAuctionDialog({
               <div className="mt-4 flex items-start gap-3 rounded-2xl bg-[#fff5e8] p-4 text-sm text-ink" role="status">
                 <Hourglass className="mt-0.5 shrink-0 text-[#c56b1a]" size={19} aria-hidden="true" />
                 <div>
-                  <div className="font-extrabold">Ответ принят</div>
-                  <p className="mt-1 leading-5 text-[#76532e]">Ожидаем решения остальных игроков и выбор владельца хода.</p>
+                  <div className="font-extrabold">{maxBidCents < 1 ? "Ставка недоступна" : "Ответ принят"}</div>
+                  <p className="mt-1 leading-5 text-[#76532e]">{maxBidCents < 1
+                    ? "Для участия нужны наличные на первоначальный взнос и ставку от $1. Ваш отказ учтён автоматически."
+                    : "Ожидаем решения остальных игроков и выбор владельца хода."}</p>
                 </div>
               </div>
             ) : (
               <div className="mt-4">
-                <label htmlFor="deal-auction-bid" className="text-sm font-extrabold text-ink">
+                <label htmlFor={bidId} className="text-sm font-extrabold text-ink">
                   Ваша цена за возможность
                 </label>
                 <div className="mt-2 flex gap-2">
                   <Input
-                    id="deal-auction-bid"
+                    id={bidId}
                     type="number"
                     min={1}
                     max={maxBidCents}
-                    step={100}
+                    step={1}
                     inputMode="decimal"
                     value={bidDraft}
                     placeholder="Введите сумму"
@@ -268,7 +224,6 @@ export function DealAuctionDialog({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </section>
   );
 }

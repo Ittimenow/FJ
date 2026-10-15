@@ -27,7 +27,7 @@ const seller = {
   role: GameRole.PLAYER,
   status: "JOINED",
   seat: 0,
-  financialState: { bankruptcyStatus: BankruptcyStatus.NONE }
+  financialState: { bankruptcyStatus: BankruptcyStatus.NONE, cashCents: 0n }
 };
 const buyer = {
   id: "buyer",
@@ -35,7 +35,7 @@ const buyer = {
   role: GameRole.PLAYER,
   status: "JOINED",
   seat: 1,
-  financialState: { bankruptcyStatus: BankruptcyStatus.NONE }
+  financialState: { bankruptcyStatus: BankruptcyStatus.NONE, cashCents: 10_000n }
 };
 const secondBuyer = {
   id: "second-buyer",
@@ -43,10 +43,10 @@ const secondBuyer = {
   role: GameRole.PLAYER,
   status: "JOINED",
   seat: 2,
-  financialState: { bankruptcyStatus: BankruptcyStatus.NONE }
+  financialState: { bankruptcyStatus: BankruptcyStatus.NONE, cashCents: 20_000n }
 };
 
-function fixture(pendingAction: Record<string, unknown>) {
+function fixture(pendingAction: Record<string, unknown>, auctionCard = card) {
   const game = {
     id: "game-1",
     status: GameStatus.IN_PROGRESS,
@@ -88,7 +88,7 @@ function fixture(pendingAction: Record<string, unknown>) {
       }
     },
     card: {
-      findUnique: async () => structuredClone(card)
+      findUnique: async () => structuredClone(auctionCard)
     },
     playerFinancialState: {
       findUniqueOrThrow: async ({ where }: { where: { gamePlayerId: string } }) => {
@@ -165,6 +165,72 @@ test("начинает аукцион недвижимости для остал
     bidderGamePlayerIds: [buyer.id, secondBuyer.id],
     responses: []
   });
+});
+
+test("разрешает аукцион карточки бизнеса и записывает бизнес покупателю", async () => {
+  const business = {
+    ...card,
+    id: 43,
+    category: "business",
+    title: "Создайте компанию без отрыва от работы: $5,000",
+    bodyText: "Первый взнос: $5,000"
+  };
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: business.id,
+    cardType: CardType.SMALL_DEAL
+  }, business);
+  await setup.service.startDealAuction("game-1", seller.userId, { cardId: business.id });
+  assert.equal(setup.game.settings.pendingAction.type, "deal_auction");
+  await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1 });
+  await setup.service.declineDealAuction("game-1", secondBuyer.userId);
+  await setup.service.selectDealAuctionOffer("game-1", seller.userId, {
+    buyerGamePlayerId: buyer.id
+  });
+  assert.equal(setup.assets[0]?.name, business.title);
+  assert.equal(setup.assets[0]?.type, "business");
+  assert.equal(setup.states.get(buyer.id)?.cashCents, 4_999n);
+});
+
+test("автоматически отказывает игрокам без взноса и одного доллара", async () => {
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL
+  });
+  secondBuyer.financialState.cashCents = 5_000n;
+  buyer.financialState.cashCents = 5_001n;
+  try {
+    await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
+    assert.deepEqual(setup.game.settings.pendingAction.responses, [
+      { gamePlayerId: secondBuyer.id, amountCents: null }
+    ]);
+    await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1 });
+    assert.equal(setup.game.settings.pendingAction.responses.length, 2);
+  } finally {
+    secondBuyer.financialState.cashCents = 20_000n;
+    buyer.financialState.cashCents = 10_000n;
+  }
+});
+
+test("когда ни у кого нет денег, аукцион сразу возвращает карточку владельцу", async () => {
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL
+  });
+  buyer.financialState.cashCents = 5_000n;
+  secondBuyer.financialState.cashCents = 4_999n;
+  try {
+    await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
+    assert.equal(setup.game.settings.pendingAction.type, "deal_card_drawn");
+  } finally {
+    buyer.financialState.cashCents = 10_000n;
+    secondBuyer.financialState.cashCents = 20_000n;
+  }
 });
 
 test("если все отказались, возвращает продавцу обычное решение по карточке", async () => {

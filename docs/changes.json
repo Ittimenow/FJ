@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "auction-business-and-automatic-insufficient-cash-declines",
+          "category": "improvement",
+          "summary": "На аукцион можно предложить бизнес и недвижимость, игроки без денег на взнос и ставку от $1 пропускаются автоматически, а предложение показывается в карточке хода."
+        },
+        {
           "id": "show-icon-when-adding-game-to-home-screen",
           "category": "fix",
           "summary": "При добавлении игры на главный экран телефон получает фирменную иконку вместо значка с первой буквой названия."

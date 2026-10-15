@@ -1894,7 +1894,9 @@ export class GamesService {
           gamePlayerId: player.id,
           sourceCardId: card.id,
           type: card.category ?? card.cardType.toLowerCase(),
-          name: realEstateAssetName({ name: card.title, sourceCard: card }),
+          name: card.category?.toLowerCase() === "business"
+            ? card.title
+            : realEstateAssetName({ name: card.title, sourceCard: card }),
           symbol: assetSymbol ?? null,
           quantity,
           units: quantity,
@@ -2033,29 +2035,42 @@ export class GamesService {
       });
       if (!card) throw new NotFoundException("Карточка не найдена");
       if (!this.isDealAuctionEligible(card)) {
-        throw new BadRequestException("На аукцион можно выставить только возможность с недвижимостью");
+        throw new BadRequestException("На аукцион можно выставить возможность с недвижимостью или бизнесом");
       }
 
-      const bidderGamePlayerIds = game.players
-        .filter(
-          (candidate) =>
-            candidate.track !== BoardTrack.FAST_TRACK &&
-            candidate.id !== seller.id &&
-            candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
-        )
-        .map((candidate) => candidate.id);
+      const candidates = game.players.filter(
+        (candidate) =>
+          candidate.track !== BoardTrack.FAST_TRACK &&
+          candidate.id !== seller.id &&
+          candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
+      );
+      const bidderGamePlayerIds = candidates.map((candidate) => candidate.id);
       if (bidderGamePlayerIds.length === 0) {
         throw new BadRequestException("В игре нет участников, которым можно предложить возможность");
       }
 
-      const nextPending: GamePendingAction = {
-        type: "deal_auction",
-        gamePlayerId: seller.id,
-        cardId: card.id,
-        cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
-        bidderGamePlayerIds,
-        responses: []
-      };
+      const downPaymentCents = this.dealDownPaymentCents(card);
+      const responses = candidates
+        .filter((candidate) =>
+          (candidate.financialState?.cashCents ?? 0n) < downPaymentCents + 1n
+        )
+        .map((candidate) => ({ gamePlayerId: candidate.id, amountCents: null }));
+      const noOffersPossible = responses.length === bidderGamePlayerIds.length;
+      const nextPending: GamePendingAction = noOffersPossible
+        ? {
+            type: "deal_card_drawn",
+            gamePlayerId: seller.id,
+            cardId: card.id,
+            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL"
+          }
+        : {
+            type: "deal_auction",
+            gamePlayerId: seller.id,
+            cardId: card.id,
+            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
+            bidderGamePlayerIds,
+            responses
+          };
       const started = await tx.game.updateMany({
         where: {
           id: gameId,
@@ -2075,9 +2090,23 @@ export class GamesService {
           bidderGamePlayerIds
         }
       });
+      for (const response of responses) {
+        emittedEvents.push({
+          type: realtimeEvents.dealAuctionDecline,
+          gamePlayerId: response.gamePlayerId,
+          payload: { cardId: card.id, reason: "insufficient_cash" }
+        });
+      }
+      if (noOffersPossible) {
+        emittedEvents.push({
+          type: realtimeEvents.dealAuctionCancel,
+          gamePlayerId: seller.id,
+          payload: { cardId: card.id, reason: "no_offers" }
+        });
+      }
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
-        payload: { reason: "deal_auction_started" }
+        payload: { reason: noOffersPossible ? "deal_auction_no_offers" : "deal_auction_started" }
       });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });
@@ -2282,7 +2311,9 @@ export class GamesService {
           gamePlayerId: buyer.id,
           sourceCardId: card.id,
           type: card.category ?? card.cardType.toLowerCase(),
-          name: realEstateAssetName({ name: card.title, sourceCard: card }),
+          name: card.category?.toLowerCase() === "business"
+            ? card.title
+            : realEstateAssetName({ name: card.title, sourceCard: card }),
           symbol: meta.symbol ?? null,
           quantity: 1,
           units: 1,
@@ -5561,6 +5592,7 @@ export class GamesService {
     ) {
       return false;
     }
+    if (card.category?.toLowerCase() === "business") return true;
     return isRentalRealEstateAsset(
       `${card.category ?? ""} ${card.subcategory ?? ""} ${card.title} ${card.bodyText}`
     );
