@@ -3,11 +3,13 @@
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   Layers3,
   Pencil,
   Plus,
   Save,
   Star,
+  Upload,
   Trash2
 } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
@@ -63,6 +65,50 @@ interface ApiCardSet {
   counts: Partial<Record<AdminCardType, number>>;
 }
 
+interface ImportCardData {
+  id: number | null;
+  cardSetId: string;
+  cardType: AdminCardType;
+  slug: string;
+  title: string;
+  bodyText: string;
+  category: string | null;
+  subcategory: string | null;
+  isActive: boolean;
+  meta: Array<{ metaKey: string; metaValue: string }>;
+  effects: Array<{ effectType: string; amountCents: number | null; payload: Record<string, unknown> }>;
+  conditions: Array<{ condType: string; payload: Record<string, unknown> }>;
+}
+
+interface ImportChange {
+  action: "create" | "update" | "delete";
+  cardId: number | null;
+  before: ImportCardData | null;
+  after: ImportCardData | null;
+  fields: string[];
+  expectedSnapshot: string | null;
+  state?: "applied" | "skipped";
+  error?: string | undefined;
+}
+
+interface ImportPreview {
+  totalInFile: number;
+  unchanged: number;
+  changes: ImportChange[];
+}
+
+const importFieldLabels: Record<string, string> = {
+  cardSetId: "Набор", cardType: "Тип", slug: "Slug", title: "Название",
+  bodyText: "Текст", category: "Категория", subcategory: "Подкатегория",
+  isActive: "Активность", meta: "Метаданные", effects: "Эффекты", conditions: "Условия"
+};
+
+function importValue(value: unknown) {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
 const cardTypes: Array<{ value: AdminCardType; label: string }> = [
   { value: "SMALL_DEAL", label: "Сделка мелкая" },
   { value: "BIG_DEAL", label: "Сделка крупная" },
@@ -98,6 +144,84 @@ export function AdminCardsPanel({ token }: { token: string }) {
   const [setsError, setSetsError] = useState<string | null>(null);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [defaultError, setDefaultError] = useState<string | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importApplying, setImportApplying] = useState<number | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  async function exportCards() {
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/admin/cards/export`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response));
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "game-cards.xls";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (failure) {
+      setImportError(failure instanceof Error ? failure.message : "Не удалось выгрузить карточки");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function previewImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!importFile) return;
+    setImportBusy(true);
+    setImportError(null);
+    setImportPreview(null);
+    try {
+      const form = new FormData();
+      form.append("file", importFile);
+      const response = await fetch(`${publicApiBaseUrl()}/api/admin/cards/import/preview`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response));
+      setImportPreview((await response.json()) as ImportPreview);
+    } catch (failure) {
+      setImportError(failure instanceof Error ? failure.message : "Не удалось сравнить карточки");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function applyImportChange(index: number) {
+    const change = importPreview?.changes[index];
+    if (!change || change.state) return;
+    if (change.action === "delete" && !window.confirm(`Удалить карточку #${change.cardId} «${change.before?.title}»?`)) return;
+    setImportApplying(index);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/admin/cards/import/apply`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: change.action, cardId: change.cardId, expectedSnapshot: change.expectedSnapshot, after: change.after })
+      });
+      if (!response.ok) throw new Error(await apiErrorMessage(response));
+      setImportPreview((current) => current && ({
+        ...current,
+        changes: current.changes.map((item, itemIndex) => itemIndex === index ? { ...item, state: "applied", error: undefined } : item)
+      }));
+      await Promise.all([loadCardSets(), selectedCardSetId ? loadCards() : Promise.resolve()]);
+    } catch (failure) {
+      setImportPreview((current) => current && ({
+        ...current,
+        changes: current.changes.map((item, itemIndex) => itemIndex === index ? {
+          ...item, error: failure instanceof Error ? failure.message : "Не удалось применить изменение"
+        } : item)
+      }));
+    } finally {
+      setImportApplying(null);
+    }
+  }
 
   async function loadCardSets(preferredId?: string) {
     setSetsLoading(true);
@@ -457,6 +581,73 @@ export function AdminCardsPanel({ token }: { token: string }) {
           <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-800" role="alert">
             {setsError}
           </p>
+        ) : null}
+      </section>
+
+      <section className="rounded-2xl bg-card p-4 sm:p-5" aria-labelledby="card-import-heading">
+        <h3 id="card-import-heading" className="text-lg font-extrabold">Выгрузка и импорт Excel</h3>
+        <p className="mt-1 text-sm leading-6 text-muted">
+          Файл содержит все наборы и карточки. Лист «Наборы» служит для сопоставления; изменяйте строки на листе «Карточки», затем загрузите файл для сравнения.
+        </p>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <Button variant="secondary" disabled={importBusy} onClick={() => void exportCards()}>
+            <Download className="mr-2" size={16} aria-hidden="true" />Выгрузить все карточки .xls
+          </Button>
+          <form className="flex flex-wrap items-end gap-3" onSubmit={previewImport}>
+            <label className="grid gap-1 text-sm font-bold text-ink">
+              Файл для импорта
+              <input type="file" accept=".xls,.xlsx" className="max-w-full text-sm" onChange={(event) => {
+                setImportFile(event.target.files?.[0] ?? null);
+                setImportPreview(null);
+              }} />
+            </label>
+            <Button type="submit" variant="action" disabled={!importFile || importBusy}>
+              <Upload className="mr-2" size={16} aria-hidden="true" />{importBusy ? "Сравниваем…" : "Сравнить изменения"}
+            </Button>
+          </form>
+        </div>
+        {importError ? <p className="mt-3 text-sm text-red-700" role="alert">{importError}</p> : null}
+        {importPreview ? (
+          <div className="mt-5 border-t border-line/70 pt-4">
+            <p className="text-sm font-bold text-ink">
+              В файле: {importPreview.totalInFile}; без изменений: {importPreview.unchanged}; требуют решения: {importPreview.changes.length}.
+            </p>
+            {importPreview.changes.length === 0 ? <p className="mt-3 text-sm text-muted">Изменений нет.</p> : null}
+            <div className="mt-3 grid gap-3">
+              {importPreview.changes.map((change, index) => (
+                <article key={`${change.action}:${change.cardId ?? change.after?.slug}:${index}`} className="rounded-xl border border-line bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold text-ink">
+                        {change.action === "create" ? "Новая" : change.action === "delete" ? "Отсутствует в файле" : "Изменена"}: {change.after?.title ?? change.before?.title}
+                      </p>
+                      <p className="text-xs text-muted">{change.after?.slug ?? change.before?.slug} · {cardSets.find((set) => set.id === (change.after?.cardSetId ?? change.before?.cardSetId))?.name ?? "Набор"}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {change.state ? <span className="text-sm font-bold text-success">{change.state === "applied" ? "Применено" : "Пропущено"}</span> : (
+                        <>
+                          <Button variant="action" className="h-9" disabled={importApplying !== null} onClick={() => void applyImportChange(index)}>
+                            {importApplying === index ? "Сохраняем…" : change.action === "delete" ? "Подтвердить удаление" : "Подтвердить"}
+                          </Button>
+                          <Button variant="secondary" className="h-9" disabled={importApplying !== null} onClick={() => setImportPreview((current) => current && ({ ...current, changes: current.changes.map((item, itemIndex) => itemIndex === index ? { ...item, state: "skipped" } : item) }))}>Пропустить</Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {change.fields.filter((field) => field !== "new" && field !== "missing").map((field) => (
+                      <div key={field} className="grid gap-2 rounded-lg bg-card p-3 text-xs sm:grid-cols-2">
+                        <div><b>{importFieldLabels[field] ?? field} · было</b><pre className="mt-1 whitespace-pre-wrap break-words font-sans">{importValue(change.before?.[field as keyof ImportCardData])}</pre></div>
+                        <div><b>{importFieldLabels[field] ?? field} · станет</b><pre className="mt-1 whitespace-pre-wrap break-words font-sans">{importValue(change.after?.[field as keyof ImportCardData])}</pre></div>
+                      </div>
+                    ))}
+                    {change.action !== "update" ? <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-card p-3 text-xs">{importValue(change.after ?? change.before)}</pre> : null}
+                  </div>
+                  {change.error ? <p className="mt-2 text-sm text-red-700" role="alert">{change.error}</p> : null}
+                </article>
+              ))}
+            </div>
+          </div>
         ) : null}
       </section>
 

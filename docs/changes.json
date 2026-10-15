@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "export-and-review-card-workbooks",
+          "category": "feature",
+          "summary": "Все игровые карточки можно выгрузить в Excel, загрузить обратно, увидеть отличия и отдельно подтвердить изменение каждой карточки."
+        },
+        {
           "id": "auction-business-and-automatic-insufficient-cash-declines",
           "category": "improvement",
           "summary": "На аукцион можно предложить бизнес и недвижимость, игроки без денег на взнос и ставку от $1 пропускаются автоматически, а предложение показывается в карточке хода."

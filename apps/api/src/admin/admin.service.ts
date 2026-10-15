@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { AccountStatus, CardType, Prisma, SystemRole } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { missingCardTypes } from "../games/card-set";
@@ -14,6 +16,7 @@ import { AdminCardDto } from "./dto/card.dto";
 import { CreateCardSetDto, UpdateCardSetDto } from "./dto/card-set.dto";
 import { AdminCreateUserDto } from "./dto/create-user.dto";
 import { AdminUpdateUserRoleDto } from "./dto/update-user-role.dto";
+import { cardDifferences, cardSnapshot, readCardWorkbook, writeCardWorkbook, type WorkbookCard } from "./card-workbook";
 
 const requiredCardTypeLabels: Partial<Record<CardType, string>> = {
   SMALL_DEAL: "мелкая сделка",
@@ -177,6 +180,154 @@ export class AdminService {
     });
 
     return toSerializable(cards);
+  }
+
+  private workbookCard(row: any): WorkbookCard {
+    return {
+      id: row.id,
+      cardSetId: row.cardSetId,
+      cardType: row.cardType,
+      slug: row.slug,
+      title: row.title,
+      bodyText: row.bodyText,
+      category: row.category,
+      subcategory: row.subcategory,
+      isActive: row.isActive,
+      meta: row.meta.map((item: any) => ({ metaKey: item.metaKey, metaValue: item.metaValue })),
+      effects: row.effects.map((item: any) => ({
+        effectType: item.effectType,
+        amountCents: item.amountCents === null ? null : Number(item.amountCents),
+        payload: item.payload as Record<string, unknown>
+      })),
+      conditions: row.conditions.map((item: any) => ({
+        condType: item.condType,
+        payload: item.payload as Record<string, unknown>
+      }))
+    };
+  }
+
+  private cardInclude = {
+    meta: { orderBy: { id: "asc" as const } },
+    effects: { orderBy: { id: "asc" as const } },
+    conditions: { orderBy: { id: "asc" as const } }
+  };
+
+  async exportCardWorkbook() {
+    const [sets, cards] = await Promise.all([
+      this.prisma.cardSet.findMany({ orderBy: { name: "asc" } }),
+      this.prisma.card.findMany({ include: this.cardInclude, orderBy: [{ cardSetId: "asc" }, { cardType: "asc" }, { id: "asc" }] })
+    ]);
+    return writeCardWorkbook(sets, cards.map((card) => this.workbookCard(card)));
+  }
+
+  private async validateWorkbookCard(card: WorkbookCard) {
+    const { id: _id, ...fields } = card;
+    const dto = plainToInstance(AdminCardDto, fields);
+    const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+    if (errors.length) throw new BadRequestException(`Карточка «${card.title}»: неверные поля или значения`);
+    this.validateCardRelations(dto);
+    return dto;
+  }
+
+  async previewCardWorkbook(buffer: Buffer) {
+    const workbook = readCardWorkbook(buffer);
+    const [sets, existing] = await Promise.all([
+      this.prisma.cardSet.findMany({ select: { id: true, name: true } }),
+      this.prisma.card.findMany({
+        where: { cardSetId: { in: workbook.sets.map((set) => set.id) } },
+        include: this.cardInclude
+      })
+    ]);
+    const setIds = new Set(sets.map((set) => set.id));
+    for (const set of workbook.sets) {
+      if (!setIds.has(set.id)) throw new BadRequestException(`Набор «${set.name}» не найден в базе`);
+    }
+    const currentCards = existing.map((card) => this.workbookCard(card));
+    const byId = new Map(currentCards.map((card) => [card.id, card]));
+    const bySlug = new Map(currentCards.map((card) => [`${card.cardSetId}:${card.slug}`, card]));
+    const seen = new Set<number>();
+    const changes: Array<{
+      action: "create" | "update" | "delete";
+      cardId: number | null;
+      before: WorkbookCard | null;
+      after: WorkbookCard | null;
+      fields: string[];
+      expectedSnapshot: string | null;
+    }> = [];
+    for (const incoming of workbook.cards) {
+      await this.validateWorkbookCard(incoming);
+      const byIdentity = incoming.id === null ? undefined : byId.get(incoming.id);
+      if (incoming.id !== null && !byIdentity) {
+        throw new BadRequestException(`Карточка #${incoming.id} не найдена в указанном наборе`);
+      }
+      const current = byIdentity ?? bySlug.get(`${incoming.cardSetId}:${incoming.slug}`);
+      if (current && current.cardSetId !== incoming.cardSetId) {
+        throw new BadRequestException(`Карточку #${current.id} нельзя перенести в другой набор через импорт`);
+      }
+      if (current && seen.has(current.id!)) throw new BadRequestException(`Карточка #${current.id} повторяется в файле`);
+      if (current) seen.add(current.id!);
+      const collision = bySlug.get(`${incoming.cardSetId}:${incoming.slug}`);
+      if (collision && collision.id !== current?.id) {
+        throw new BadRequestException(`Slug ${incoming.slug} уже занят в наборе`);
+      }
+      if (!current) {
+        changes.push({ action: "create", cardId: null, before: null, after: incoming, fields: ["new"], expectedSnapshot: null });
+      } else {
+        const matched = { ...incoming, id: current.id };
+        const fields = cardDifferences(current, matched);
+        if (fields.length) changes.push({ action: "update", cardId: current.id, before: current, after: matched, fields, expectedSnapshot: cardSnapshot(current) });
+      }
+    }
+    for (const current of currentCards) {
+      if (!seen.has(current.id!)) {
+        changes.push({ action: "delete", cardId: current.id, before: current, after: null, fields: ["missing"], expectedSnapshot: cardSnapshot(current) });
+      }
+    }
+    return { totalInFile: workbook.cards.length, unchanged: workbook.cards.length - changes.filter((change) => change.action !== "delete").length, changes };
+  }
+
+  async applyWorkbookCard(input: { action: "create" | "update" | "delete"; cardId: number | null; expectedSnapshot: string | null; after: WorkbookCard | null }) {
+    if (!["create", "update", "delete"].includes(input.action)) throw new BadRequestException("Неизвестное действие");
+    if (input.action !== "delete" && !input.after) throw new BadRequestException("Данные карточки отсутствуют");
+    if (input.action !== "create" && (!Number.isSafeInteger(input.cardId) || !input.expectedSnapshot)) {
+      throw new BadRequestException("Идентификатор или исходная версия карточки отсутствуют");
+    }
+    const dto = input.after ? await this.validateWorkbookCard(input.after) : null;
+    if (dto) await this.requireCardSet(dto.cardSetId);
+    try {
+      return toSerializable(await this.prisma.$transaction(async (tx) => {
+        const currentRow = input.cardId === null ? null : await tx.card.findUnique({ where: { id: input.cardId }, include: this.cardInclude });
+        const current = currentRow ? this.workbookCard(currentRow) : null;
+        if (input.action === "create") {
+          if (input.cardId !== null || input.expectedSnapshot !== null || !dto || input.after?.id !== null) throw new BadRequestException("Неверное создание карточки");
+          return tx.card.create({
+            data: { ...this.cardData(dto), meta: { create: this.metaData(dto) }, effects: { create: this.effectData(dto) }, conditions: { create: this.conditionData(dto) } },
+            include: this.cardInclude
+          });
+        }
+        if (!current || cardSnapshot(current) !== input.expectedSnapshot) {
+          throw new ConflictException("Карточка изменилась после предварительного просмотра. Загрузите файл повторно");
+        }
+        if (input.action === "delete") return tx.card.delete({ where: { id: current.id! }, include: this.cardInclude });
+        if (!dto || dto.cardSetId !== current.cardSetId || input.after?.id !== current.id) {
+          throw new BadRequestException("Неверное соответствие карточки и набора");
+        }
+        await tx.cardMeta.deleteMany({ where: { cardId: current.id! } });
+        await tx.cardEffect.deleteMany({ where: { cardId: current.id! } });
+        await tx.cardCondition.deleteMany({ where: { cardId: current.id! } });
+        return tx.card.update({
+          where: { id: current.id! },
+          data: { ...this.cardData(dto), meta: { create: this.metaData(dto) }, effects: { create: this.effectData(dto) }, conditions: { create: this.conditionData(dto) } },
+          include: this.cardInclude
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof ConflictException) throw error;
+      if (input.action === "delete" && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new ConflictException("Карточку нельзя удалить: она уже используется в партии");
+      }
+      this.handleCardWriteError(error);
+    }
   }
 
   async createCard(dto: AdminCardDto) {

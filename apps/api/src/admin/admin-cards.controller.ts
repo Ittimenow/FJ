@@ -1,15 +1,20 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
-  UseGuards
+  UploadedFile,
+  UseGuards,
+  UseInterceptors
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { CardType, SystemRole } from "@prisma/client";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -17,6 +22,7 @@ import { RolesGuard } from "../common/roles.guard";
 import { AdminService } from "./admin.service";
 import { CreateCardSetDto, UpdateCardSetDto } from "./dto/card-set.dto";
 import { AdminCardDto } from "./dto/card.dto";
+import type { WorkbookCard } from "./card-workbook";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(SystemRole.ADMIN)
@@ -45,6 +51,25 @@ export class AdminCardsController {
   @Patch("sets/:id/default")
   setDefaultCardSet(@Param("id", new ParseUUIDPipe()) id: string) {
     return this.admin.setDefaultCardSet(id);
+  }
+
+  @Get("export")
+  @Header("Content-Type", "application/vnd.ms-excel")
+  @Header("Content-Disposition", "attachment; filename=game-cards.xls")
+  exportCards() {
+    return this.admin.exportCardWorkbook();
+  }
+
+  @Post("import/preview")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }))
+  previewImport(@UploadedFile() file?: { buffer: Buffer }) {
+    if (!file?.buffer) throw new BadRequestException("Выберите Excel-файл");
+    return this.admin.previewCardWorkbook(file.buffer);
+  }
+
+  @Post("import/apply")
+  applyImport(@Body() input: { action: "create" | "update" | "delete"; cardId: number | null; expectedSnapshot: string | null; after: WorkbookCard | null }) {
+    return this.admin.applyWorkbookCard(input);
   }
 
   @Get()
