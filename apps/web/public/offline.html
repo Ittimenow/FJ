@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#112a4e" />
+    <title>Нет соединения — Финансовое путешествие</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #112a4e; background: #f6f9ff; }
+      body { min-height: 100dvh; margin: 0; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+      main { max-width: 420px; text-align: center; }
+      img { width: 80px; height: 80px; }
+      h1 { margin: 24px 0 12px; font-size: 28px; line-height: 1.2; }
+      p { color: #435775; line-height: 1.5; }
+      button { margin-top: 16px; padding: 12px 20px; border: 0; border-radius: 12px; background: #1177d1; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/logo.svg" alt="" />
+      <h1>Нет соединения</h1>
+      <p>Для игры нужен интернет. Проверьте подключение и попробуйте снова — ваша партия хранится на сервере.</p>
+      <button type="button" onclick="location.reload()">Повторить попытку</button>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope } from "next/font/google";
 import { Providers } from "@/components/layout/providers";
+import { ServiceWorkerRegistration } from "@/components/layout/service-worker-registration";
 import { YandexMetrikaConsent } from "@/components/analytics/yandex-metrika-consent";
 import { publicSiteMetadataBase } from "@/lib/site";
 import "./globals.css";
@@ -51,14 +52,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
-    apple: "/logo.svg"
+    apple: "/pwa/apple-touch-icon.png"
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Финпутешествие",
+    statusBarStyle: "default"
   }
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover"
+  viewportFit: "cover",
+  themeColor: "#112a4e"
 };
 
 export default function RootLayout({
@@ -68,6 +75,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className={manrope.variable} suppressHydrationWarning>
         <YandexMetrikaConsent />
+        <ServiceWorkerRegistration />
         <Providers>{children}</Providers>
       </body>
     </html>

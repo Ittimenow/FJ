@@ -10,6 +10,13 @@ export default function nextConfig(phase) {
     async headers() {
       return [
         {
+          source: "/sw.js",
+          headers: [
+            { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+            { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }
+          ]
+        },
+        {
           source: "/:path(login|register|forgot-password|reset-password|dashboard|profile|design-preview)",
           headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
         },
