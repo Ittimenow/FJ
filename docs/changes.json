@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "show-icon-when-adding-game-to-home-screen",
+          "category": "fix",
+          "summary": "При добавлении игры на главный экран телефон получает фирменную иконку вместо значка с первой буквой названия."
+        },
+        {
           "id": "install-mobile-game-as-pwa",
           "category": "feature",
           "summary": "Игру можно добавить на главный экран телефона и открывать как приложение, а при потере соединения появляется понятное сообщение."
