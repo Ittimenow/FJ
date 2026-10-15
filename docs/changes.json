@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "download-card-workbook-as-binary-file",
+          "category": "fix",
+          "summary": "Выгрузка игровых карточек скачивается как открываемый Excel-файл вместо текста со списком байтов."
+        },
+        {
           "id": "export-and-review-card-workbooks",
           "category": "feature",
           "summary": "Все игровые карточки можно выгрузить в Excel, загрузить обратно, увидеть отличия и отдельно подтвердить изменение каждой карточки."

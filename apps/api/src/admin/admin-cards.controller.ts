@@ -4,12 +4,12 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors
@@ -54,10 +54,12 @@ export class AdminCardsController {
   }
 
   @Get("export")
-  @Header("Content-Type", "application/vnd.ms-excel")
-  @Header("Content-Disposition", "attachment; filename=game-cards.xls")
-  exportCards() {
-    return this.admin.exportCardWorkbook();
+  async exportCards() {
+    const workbook = await this.admin.exportCardWorkbook();
+    return new StreamableFile(workbook, {
+      type: "application/vnd.ms-excel",
+      disposition: 'attachment; filename="game-cards.xls"'
+    });
   }
 
   @Post("import/preview")
