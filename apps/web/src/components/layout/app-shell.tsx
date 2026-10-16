@@ -55,7 +55,7 @@ export function AppShell({
               </Link>
           ) : null} />
           <div className="col-start-3 row-start-1 flex items-center gap-1 justify-self-end">
-            {userName ? <Link href={"/notifications" as Route} aria-label="Оповещения" title="Оповещения" className="grid h-11 w-11 place-items-center rounded-xl text-muted transition hover:bg-white hover:text-journey focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"><Bell size={20} aria-hidden="true" /></Link> : null}
+            {userName ? <Link href={"/notifications" as Route} aria-label="Оповещения" title="Оповещения" className="app-shell-notifications-link grid h-11 w-11 place-items-center rounded-xl text-muted transition hover:bg-white hover:text-journey focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"><Bell size={20} aria-hidden="true" /></Link> : null}
             <GuideLink />
           </div>
         </div>

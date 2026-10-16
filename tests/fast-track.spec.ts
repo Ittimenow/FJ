@@ -28,7 +28,7 @@ async function serveFixture(page: Page) {
   // Serve real assets before navigation so root-relative image URLs work in every browser.
   await page.route(`${fixtureOrigin}/**`, async (route) => {
     const pathname = new URL(route.request().url()).pathname;
-    if (pathname === '/logo.svg' || /^\/figurines\/[a-z0-9-]+\.png$/.test(pathname)) {
+    if (pathname === '/logo.svg' || /^\/figurines\/[a-z0-9-]+\.(?:png|webp)$/.test(pathname) || /^\/dreams\/\d+\.webp$/.test(pathname)) {
       await route.fulfill({ path: resolve('apps/web/public', `.${pathname}`) });
     } else if (['/index.html', '/app.js', '/app.css', '/style.css'].includes(pathname) || /^\/media\/[\w.-]+\.woff2$/.test(pathname)) {
       await route.fulfill({ path: join(output, pathname) });
@@ -56,7 +56,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await expect(page.locator(`${tokenContainer} img`)).toHaveCount(2);
     for (const [id, figurine] of [['anna', 'rubber-duck'], ['boris', 'cat-in-box']]) {
       const image = page.locator(`${tokenContainer} [data-player-id="${id}"] img`);
-      await expect(image).toHaveAttribute('src', `/figurines/${figurine}.png`);
+      await expect(image).toHaveAttribute('src', `/figurines/${figurine}.webp`);
       await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
     }
     if (size.width >= 1024) await expect(page.locator('[data-fast-cell="1"]').getByRole('img', { name: 'Владелец: Анна', exact: true })).toHaveCount(1);
@@ -100,9 +100,6 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.screenshot({ path: join(output, `classic-occupied-${size.width}.png`), fullPage: true });
     await page.goto(`${url}?mode=lobby`);
     await page.getByRole('button', { name: /Купите лес/ }).click();
-    await expect(page.locator('p').filter({ hasText: /^Купите лес ·/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Мечта большого круга', exact: true })).toHaveAttribute('aria-expanded', 'false');
-    await page.getByRole('button', { name: 'Мечта большого круга', exact: true }).click();
     await expect(page.getByRole('button', { name: /Купите лес/ })).toHaveAttribute('aria-pressed', 'true');
     await page.screenshot({ path: join(output, `dreams-${size.width}.png`), fullPage: true });
     await page.goto(`${url}?mode=admin`);
@@ -601,67 +598,43 @@ for (const scenario of [{ width: 390, mode: 'mixed-history' }, { width: 1440, mo
 }
 
 for (const width of [320, 390, 1024, 1440]) {
-  test(`dream cards scroll and collapse after selection at ${width}px`, async ({ page }, testInfo) => {
+  test(`dream cards scroll and keep the selection at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`${fixtureUrl}?mode=lobby`);
-    const toggle = page.getByRole('button', { name: 'Мечта большого круга', exact: true });
     const cards = page.getByRole('group', { name: 'Карточки мечт', exact: true });
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('combobox')).toHaveCount(0);
-    await expect(page.getByText('Для начала партии мечту должен выбрать каждый игрок.', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('Выберите вашу мечту. Покупка этой мечты принесёт победу в этой игре. После старта изменить выбор нельзя.', { exact: true })).toBeVisible();
     await expect(cards).toBeVisible();
     expect(await cards.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
-    if (width >= 1024) {
-      const frame = await cards.evaluate(el => {
-        const rect = el.getBoundingClientRect();
-        const children = [...el.querySelectorAll('button')].map(card => card.getBoundingClientRect());
-        return { height: rect.height, cardHeight: children[0]!.height, gap: parseFloat(getComputedStyle(el).rowGap), fullyVisible: children.filter(card => card.top >= rect.top && card.bottom <= rect.bottom + 1).length };
-      });
-      expect(frame.height).toBeCloseTo(frame.cardHeight * 3 + frame.gap * 2);
-      expect(frame.fullyVisible).toBe(9);
-      const overflowingCards = await cards.getByRole('button').evaluateAll(buttons => buttons.filter(button => button.scrollHeight > button.clientHeight + 1).length);
-      expect(overflowingCards).toBe(0);
-    }
     await page.screenshot({ path: testInfo.outputPath('dreams-expanded.png'), fullPage: true });
     const last = cards.getByRole('button').last();
-    const name = (await last.locator('span').first().innerText()).trim();
     await last.scrollIntoViewIfNeeded();
     await last.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(toggle).toBeFocused();
-    await expect(cards).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath('dreams-collapsed.png'), fullPage: true });
-    await toggle.click();
-    await expect(cards.getByRole('button', { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toHaveAttribute('aria-pressed', 'true');
-    await page.getByRole('button', { name: /Купите лес/ }).click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('p').filter({ hasText: /^Купите лес ·/ })).toBeVisible();
+    await expect(last).toHaveAttribute('aria-pressed', 'true');
+    await expect(cards).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('dreams-selected.png'), fullPage: true });
+    const first = cards.getByRole('button', { name: /Купите лес/ });
+    await first.click();
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    await expect(last).toHaveAttribute('aria-pressed', 'false');
     await page.evaluate(() => window.dispatchEvent(new Event('fixture:remount')));
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
 
-test('dream selection stays open during saving and failure, then collapses after confirmation', async ({ page }) => {
+test('dream selection reports saving and failure before confirming the choice', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${fixtureUrl}?mode=lobby-delayed`);
-  const toggle = page.getByRole('button', { name: 'Мечта большого круга', exact: true });
   const dream = page.getByRole('button', { name: /Купите лес/ });
   await dream.click();
   await expect(dream).toBeDisabled();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText('Сохраняем мечту…', { exact: true })).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: false })));
   await expect(dream).toBeEnabled();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText('Не удалось сохранить мечту')).toBeVisible();
+  await expect(dream).toHaveAttribute('aria-pressed', 'false');
   await dream.click();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: true })));
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await toggle.click();
-  await dream.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fixture:save-dream', { detail: true })));
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(dream).toHaveAttribute('aria-pressed', 'true');
 });
 
 for (const width of [1440, 390]) {

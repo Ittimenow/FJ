@@ -169,6 +169,10 @@ body.game-room-viewport-locked {
 .game-mobile-menu .game-profile-link { width: auto; justify-content: flex-start; padding-inline: 0.5rem; }
 .game-mobile-menu .game-profile-name { display: inline; }
 
+@media (max-width: 359px) {
+  .app-shell-header-content:has(.game-header-controls) .app-shell-notifications-link { display: none; }
+}
+
 .game-mobile-menu .connection-diagnostics-dialog {
   position: static;
   width: 100%;

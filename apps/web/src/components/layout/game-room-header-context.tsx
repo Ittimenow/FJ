@@ -357,6 +357,7 @@ function MobileGameMenu({ state, profile }: { state: GameRoomHeaderState; profil
     {open ? <div ref={panelRef} role="dialog" aria-label="Меню игры" className="game-mobile-menu rounded-2xl bg-white p-3 text-sm text-ink shadow-[0_18px_48px_rgba(5,18,45,.2)]">
       <div className="grid gap-1">
         {profile}
+        <a href="/notifications" className="rounded-xl px-2 py-3 font-bold text-ink hover:bg-card">Оповещения</a>
         <HostShortcuts state={state} expanded />
         <ConnectionStatusControl state={state} showLabel />
       </div>

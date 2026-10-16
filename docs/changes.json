@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "keep-game-header-controls-clear-on-narrow-phones",
+          "category": "fix",
+          "summary": "На узких телефонах кнопки в заголовке игры не перекрываются, а оповещения доступны через меню игры."
+        },
+        {
           "id": "scheduled-open-games-and-notifications",
           "category": "feature",
           "summary": "Ведущие могут назначать открытые игры, а игроки получают сообщения о них и видят время в своём часовом поясе с возможностью отключить объявления."
