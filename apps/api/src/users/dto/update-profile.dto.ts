@@ -1,6 +1,6 @@
 import { normalizeTelegramChannel, TELEGRAM_CHANNEL_PATTERN } from "@cashflow/shared";
 import { Transform, Type } from "class-transformer";
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, MinLength } from "class-validator";
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -43,6 +43,15 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean()
   telegramMentionConsent?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  timeZone?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  openGameNotifications?: boolean;
 
   @IsOptional()
   @IsUUID(undefined, { message: "Выберите город из списка." })

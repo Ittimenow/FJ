@@ -55,6 +55,7 @@ import {
 } from "./dto/deal-auction.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
+import { scheduledInstant } from "./scheduled-game";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { missingCardTypes } from "./card-set";
@@ -280,6 +281,10 @@ export class GamesService {
 
   async createGame(userId: string, dto: CreateGameDto) {
     const creator = await this.ensureHostOrAdmin(userId);
+    if (dto.isPublic && dto.testing) throw new BadRequestException("Тестовую партию нельзя открыть для всех.");
+    const scheduledAt = dto.isPublic
+      ? scheduledInstant(dto.scheduledLocal ?? "", creator.timeZone ?? "")
+      : null;
     const testSettings = this.testGameSettings(creator.role, dto);
     if (dto.cardSetId && creator.role !== SystemRole.ADMIN) {
       throw new ForbiddenException("Выбирать набор карточек может только администратор");
@@ -292,13 +297,17 @@ export class GamesService {
     const botPlayers = createBotPlayers(botCount);
 
     const code = await this.generateGameCode();
-    const game = await this.prisma.game.create({
+    const game = await this.prisma.$transaction(async (tx) => {
+      const game = await tx.game.create({
       data: {
         code,
         title: dto.title?.trim() || "Новая партия",
         mode: GameMode.MULTIPLAYER,
         rulesVersion: 2,
         isTest: Boolean(dto.testing),
+        isPublic: Boolean(dto.isPublic),
+        scheduledAt,
+        scheduleTimeZone: dto.isPublic ? creator.timeZone : null,
         maxPlayers: null,
         cardSetId: cardSet.id,
         settings: {
@@ -322,9 +331,9 @@ export class GamesService {
           ]
         }
       }
-    });
+      });
 
-    await this.prisma.gameEvent.create({
+      await tx.gameEvent.create({
       data: {
         gameId: game.id,
         actorUserId: userId,
@@ -338,7 +347,23 @@ export class GamesService {
           botCount
         })
       }
-    });
+      });
+
+      if (dto.isPublic) {
+        const recipients = await tx.user.findMany({
+          where: { status: AccountStatus.ACTIVE, openGameNotifications: true, id: { not: userId } },
+          select: { id: true }
+        });
+        await tx.userNotification.createMany({
+          data: recipients.map((user) => ({
+            userId: user.id, gameId: game.id, kind: "OPEN_GAME_PUBLISHED",
+            dedupeKey: `published:${game.id}`
+          })),
+          skipDuplicates: true
+        });
+      }
+      return game;
+    }, { timeout: 20_000 });
 
     return this.getGame(game.id, userId);
   }
@@ -654,6 +679,7 @@ export class GamesService {
       this.prisma.game.findMany({
         where: mineWhere,
         include: {
+          createdBy: { select: { id: true, displayName: true } },
           cardSet: { select: { id: true, name: true } },
           players: {
             include: {
@@ -669,6 +695,8 @@ export class GamesService {
         where: {
           status: GameStatus.WAITING,
           mode: GameMode.MULTIPLAYER,
+          isPublic: true,
+          isTest: false,
           ...(canSeeAll
             ? {}
             : {
@@ -678,6 +706,7 @@ export class GamesService {
               })
         },
         include: {
+          createdBy: { select: { id: true, displayName: true } },
           cardSet: { select: { id: true, name: true } },
           players: {
             include: {
@@ -886,6 +915,7 @@ export class GamesService {
     await this.ensureCanManageGame(gameId, actorUserId);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
       if (game.status === GameStatus.CANCELLED) return;
 
@@ -896,6 +926,18 @@ export class GamesService {
           endedAt: new Date()
         }
       });
+
+      if (game.isPublic) {
+        const participants = await tx.gamePlayer.findMany({
+          where: { gameId, userId: { not: null } }, select: { userId: true }
+        });
+        await tx.userNotification.createMany({
+          data: participants.filter((player) => player.userId && player.userId !== actorUserId).map((player) => ({
+            userId: player.userId!, gameId, kind: "OPEN_GAME_CANCELLED", dedupeKey: `cancelled:${gameId}`
+          })),
+          skipDuplicates: true
+        });
+      }
 
       await this.appendEvents(tx, gameId, actorUserId, [
         {
@@ -913,6 +955,38 @@ export class GamesService {
       { type: "game:deleted", payload: {} },
       { type: realtimeEvents.stateUpdate, payload: {} }
     ]);
+  }
+
+  async updateGameSchedule(gameId: string, actorUserId: string, scheduledLocal: string) {
+    await this.ensureCanManageGame(gameId, actorUserId);
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actorUserId }, select: { timeZone: true }
+    });
+    const scheduledAt = scheduledInstant(scheduledLocal, user.timeZone ?? "");
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      if (!game.isPublic || game.status !== GameStatus.WAITING) {
+        throw new BadRequestException("Перенести можно только ожидающую открытую игру.");
+      }
+      if (game.scheduledAt?.getTime() === scheduledAt.getTime()) return;
+      const revision = game.scheduleRevision + 1;
+      await tx.game.update({
+        where: { id: gameId },
+        data: { scheduledAt, scheduleTimeZone: user.timeZone, scheduleRevision: revision }
+      });
+      const participants = await tx.gamePlayer.findMany({
+        where: { gameId, userId: { not: null } }, select: { userId: true }
+      });
+      await tx.userNotification.createMany({
+        data: participants.filter((player) => player.userId && player.userId !== actorUserId).map((player) => ({
+          userId: player.userId!, gameId, kind: "OPEN_GAME_RESCHEDULED",
+          dedupeKey: `rescheduled:${gameId}:${revision}`
+        })),
+        skipDuplicates: true
+      });
+    });
+    return this.getGame(gameId, actorUserId);
   }
 
   async startGame(gameId: string, userId: string) {
@@ -944,6 +1018,9 @@ export class GamesService {
 
       if (game.status !== GameStatus.WAITING) {
         throw new BadRequestException("Игра уже началась");
+      }
+      if (game.isPublic && game.scheduledAt && game.scheduledAt > new Date()) {
+        throw new BadRequestException("Открытую игру можно начать после назначенного времени.");
       }
       if (game.players.length < 2) {
         throw new BadRequestException("Для начала игры нужно не менее двух игроков");
@@ -6079,7 +6156,7 @@ export class GamesService {
   private async ensureHostOrAdmin(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { role: true, status: true }
+      select: { role: true, status: true, timeZone: true }
     });
     if (
       user.status !== AccountStatus.ACTIVE ||

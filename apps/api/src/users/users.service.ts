@@ -8,6 +8,7 @@ import { AccountStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { MailService } from "../mail/mail.service";
+import { validTimeZone } from "../games/scheduled-game";
 import { PrismaService } from "../prisma/prisma.service";
 import { cents, toSerializable } from "../common/json";
 import { ChangePasswordDto } from "./dto/change-password.dto";
@@ -36,6 +37,8 @@ export class UsersService {
         gameRoomView: true,
         telegramChannel: true,
         telegramMentionConsent: true,
+        timeZone: true,
+        openGameNotifications: true,
         city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true,
@@ -128,6 +131,9 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
+    if (dto.timeZone !== undefined && !validTimeZone(dto.timeZone)) {
+      throw new BadRequestException("Выберите корректный часовой пояс.");
+    }
     if (dto.figurine != null && !isFigurineId(dto.figurine)) {
       throw new BadRequestException("Unknown figurine");
     }
@@ -156,6 +162,8 @@ export class UsersService {
         ...(dto.telegramMentionConsent !== undefined && {
           telegramMentionConsent: dto.telegramMentionConsent
         }),
+        ...(dto.timeZone !== undefined && { timeZone: dto.timeZone }),
+        ...(dto.openGameNotifications !== undefined && { openGameNotifications: dto.openGameNotifications }),
         ...(dto.cityId !== undefined && { cityId: dto.cityId })
       },
       select: {
@@ -171,12 +179,37 @@ export class UsersService {
         gameRoomView: true,
         telegramChannel: true,
         telegramMentionConsent: true,
+        timeZone: true,
+        openGameNotifications: true,
         city: { select: { id: true, name: true, region: true } },
         role: true,
         status: true
       }
     });
     return user;
+  }
+
+  async notifications(userId: string) {
+    const [items, unreadCount] = await Promise.all([
+      this.prisma.userNotification.findMany({
+        where: { userId },
+        include: { game: { select: {
+          id: true, code: true, title: true, status: true, scheduledAt: true,
+          createdBy: { select: { displayName: true } }
+        } } },
+        orderBy: { createdAt: "desc" }
+      }),
+      this.prisma.userNotification.count({ where: { userId, readAt: null } })
+    ]);
+    return { items, unreadCount };
+  }
+
+  async readNotification(userId: string, notificationId: string) {
+    await this.prisma.userNotification.updateMany({
+      where: { id: notificationId, userId, readAt: null },
+      data: { readAt: new Date() }
+    });
+    return { ok: true };
   }
 
   async updateAvatar(userId: string, avatarDataUrl: string) {

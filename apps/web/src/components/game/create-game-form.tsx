@@ -23,16 +23,19 @@ const requiredCardTypes = [
 
 export function CreateGameForm({
   token,
-  allowCardSetSelection = false
+  allowCardSetSelection = false,
+  timeZone = null
 }: {
   token: string;
   allowCardSetSelection?: boolean;
+  timeZone?: string | null;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(90);
   const [periodCount, setPeriodCount] = useState(3);
+  const [isPublic, setIsPublic] = useState(false);
   const [cardSets, setCardSets] = useState<GameCardSet[]>([]);
   const [cardSetId, setCardSetId] = useState("");
   const [cardSetsLoading, setCardSetsLoading] = useState(allowCardSetSelection);
@@ -69,6 +72,11 @@ export function CreateGameForm({
     setLoading(true);
     setError(null);
     const form = new FormData(event.currentTarget);
+    if (isPublic && !timeZone) {
+      setError("Сначала выберите часовой пояс в профиле.");
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(`${publicApiBaseUrl()}/api/games`, {
         method: "POST",
@@ -81,7 +89,9 @@ export function CreateGameForm({
           ...(allowCardSetSelection && cardSetId ? { cardSetId } : {}),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
           periodCount: Number(form.get("periodCount") ?? 3),
-          botCount: Number(form.get("botCount") ?? 0)
+          botCount: Number(form.get("botCount") ?? 0),
+          isPublic,
+          ...(isPublic ? { scheduledLocal: String(form.get("scheduledLocal") ?? "") } : {})
         })
       });
 
@@ -115,6 +125,19 @@ export function CreateGameForm({
           maxLength={80}
           required
         />
+      </div>
+      <div className="rounded-xl bg-card p-4">
+        <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-ink">
+          <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="mt-1 h-4 w-4 accent-journey" />
+          <span><strong className="block">Открытая игра</strong><span className="block text-xs text-muted">Появится в списке доступных игр, а игроки получат оповещение.</span></span>
+        </label>
+        {isPublic ? (
+          <div className="mt-4 space-y-2">
+            <label htmlFor="game-scheduled-local" className="text-sm font-extrabold text-ink">Дата и время начала</label>
+            <Input id="game-scheduled-local" name="scheduledLocal" type="datetime-local" required className="h-12" />
+            <p className="text-xs text-muted">Время в часовом поясе {timeZone ?? "не указан — выберите его в профиле"}.</p>
+          </div>
+        ) : null}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -225,7 +248,7 @@ export function CreateGameForm({
         disabled={loading || cardSetsLoading || (allowCardSetSelection && cardSets.length > 0 && !cardSetId)}
         aria-busy={loading}
       >
-        {loading ? "Создаём комнату..." : "Создать комнату"}
+        {loading ? "Создаём комнату..." : isPublic ? "Опубликовать открытую игру" : "Создать комнату по приглашению"}
       </Button>
     </form>
   );

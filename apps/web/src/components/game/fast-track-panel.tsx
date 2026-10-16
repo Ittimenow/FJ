@@ -14,12 +14,12 @@ export function DreamPicker({ player, saving, onChoose }: { player: GamePlayer; 
   return <section className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="dream-picker-title">
     <h2 id="dream-picker-title" className="flex items-center gap-2 text-xl font-extrabold"><Target size={22} aria-hidden="true" /> Выберите мечту</h2>
     <p className="mt-2 text-sm leading-6">Покупка выбранной мечты принесёт победу. До начала партии выбор можно изменить.</p>
-    <div className="dream-picker-cards mt-4 grid max-h-[min(70vh,760px)] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3" role="group" aria-label="Карточки мечт" aria-busy={saving}>
+    <div className="dream-picker-cards mt-4 grid auto-rows-max max-h-[min(70vh,760px)] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3" role="group" aria-label="Карточки мечт" aria-busy={saving}>
       {fastTrackDreams.map((cell) => {
         const selected = player.dreamCellIndex === cell.index;
         return <button type="button" disabled={saving} key={cell.index} aria-pressed={selected} onClick={() => onChoose(cell.index)}
           className={`flex min-w-0 flex-col overflow-hidden rounded-xl text-left text-sm leading-5 outline-none transition focus-visible:ring-4 focus-visible:ring-journey/30 ${selected ? "bg-[#eee8ff] text-[#57378f] ring-2 ring-[#7655c7]" : "bg-card hover:bg-surface"}`}>
-          <img src={`/dreams/${cell.index}.webp`} alt="" width={640} height={427} loading="lazy" decoding="async" className="aspect-[3/2] w-full object-cover" />
+          <img src={`/dreams/${cell.index}.webp`} alt="" width={640} height={427} loading="lazy" decoding="async" className="block h-auto w-full shrink-0" />
           <span className="flex items-start justify-between gap-2 px-3 pt-3 font-extrabold">{cell.label}{selected ? <Check size={18} className="shrink-0" aria-hidden="true" /> : null}</span>
           <span className="px-3 pt-1 font-bold">{money(cell.cost)}</span>
           <span className="px-3 pb-3 pt-1 leading-5">{cell.description}</span>

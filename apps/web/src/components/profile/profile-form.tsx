@@ -9,6 +9,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { CityCombobox, type CityOption } from "@/components/auth/city-combobox";
 import { normalizeTelegramChannel, validateTelegramChannel } from "@/components/auth/auth-validation";
 import { AvatarPicker } from "@/components/profile/avatar-picker";
+import { TimeZoneSelect } from "@/components/profile/time-zone-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publicApiBaseUrl } from "@/lib/api";
@@ -54,6 +55,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     gameRoomView: profile.user.gameRoomView,
     telegramChannel: profile.user.telegramChannel ?? "",
     telegramMentionConsent: profile.user.telegramMentionConsent,
+    timeZone: profile.user.timeZone ?? "",
+    openGameNotifications: profile.user.openGameNotifications,
     city: profile.user.city
   }));
   const [displayName, setDisplayName] = useState(profile.user.displayName);
@@ -71,6 +74,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   const [telegramMentionConsent, setTelegramMentionConsent] = useState(
     profile.user.telegramMentionConsent
   );
+  const [timeZone, setTimeZone] = useState(profile.user.timeZone ?? "");
+  const [openGameNotifications, setOpenGameNotifications] = useState(profile.user.openGameNotifications);
   const [city, setCity] = useState<CityOption | null>(profile.user.city);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -106,7 +111,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       normalizedGameExperience >= 0 &&
       normalizedGameExperience <= 100);
   const profileFormValid =
-    displayNameValid && gameExperienceValid && telegramError === null && cityValid;
+    displayNameValid && gameExperienceValid && telegramError === null && cityValid && Boolean(timeZone);
   const hasAvatarChanges =
     avatarPending !== undefined && avatarPending !== savedProfile.avatarUrl;
   const hasProfileChanges =
@@ -119,6 +124,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     gameRoomView !== savedProfile.gameRoomView ||
     normalizedTelegramChannel !== savedProfile.telegramChannel ||
     telegramMentionConsent !== savedProfile.telegramMentionConsent ||
+    timeZone !== savedProfile.timeZone ||
+    openGameNotifications !== savedProfile.openGameNotifications ||
     city?.id !== savedProfile.city?.id;
   const visibleProfileMsg = profileMsg?.ok && hasProfileChanges ? null : profileMsg;
   const passwordsMatch = newPassword === confirmPassword;
@@ -161,6 +168,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       gameRoomView,
       telegramChannel: normalizedTelegramChannel,
       telegramMentionConsent,
+      timeZone,
+      openGameNotifications,
       city
     };
     const savedBefore = savedProfile;
@@ -216,6 +225,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       if (snapshot.telegramMentionConsent !== savedBefore.telegramMentionConsent) {
         body.telegramMentionConsent = snapshot.telegramMentionConsent;
       }
+      if (snapshot.timeZone !== savedBefore.timeZone) body.timeZone = snapshot.timeZone;
+      if (snapshot.openGameNotifications !== savedBefore.openGameNotifications) body.openGameNotifications = snapshot.openGameNotifications;
       if (snapshot.city?.id !== savedBefore.city?.id && snapshot.city) {
         body.cityId = snapshot.city.id;
       }
@@ -247,6 +258,8 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         gameRoomView: snapshot.gameRoomView,
         telegramChannel: snapshot.telegramChannel,
         telegramMentionConsent: snapshot.telegramMentionConsent,
+        timeZone: snapshot.timeZone,
+        openGameNotifications: snapshot.openGameNotifications,
         city: snapshot.city
       });
       setDisplayName((current) =>
@@ -465,6 +478,14 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               </div>
 
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <TimeZoneSelect id="profile-time-zone" value={timeZone} onChange={(value) => { setTimeZone(value); markProfileChanged(true); }} required />
+                <div className="space-y-2">
+                  <span className="block text-sm font-extrabold text-ink">Оповещения</span>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card p-3 text-sm leading-5 text-ink">
+                    <input type="checkbox" checked={openGameNotifications} onChange={(event) => { setOpenGameNotifications(event.target.checked); markProfileChanged(true); }} className="mt-0.5 h-4 w-4 accent-journey" />
+                    <span><strong className="block">Новые открытые игры</strong><span className="mt-1 block text-xs text-muted">Сообщать о новых партиях. Изменения игр, к которым вы присоединились, приходят отдельно.</span></span>
+                  </label>
+                </div>
                 <div className="space-y-2">
                   <label htmlFor="profile-name" className="text-sm font-extrabold text-ink">
                     Имя в игре

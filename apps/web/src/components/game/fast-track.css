@@ -211,7 +211,3 @@
   :where(.fast-track) .mobile-controls .turn-activity { overflow: visible; max-height: none; overscroll-behavior: auto; }
   :where(.fast-track) .board-scroll { overscroll-behavior-y: auto; touch-action: pan-x pan-y; }
 }
-
-@media (min-width: 1024px) {
-  .dream-picker-cards { grid-auto-rows: 12rem; height: calc(36rem + 16px); max-height: none; }
-}

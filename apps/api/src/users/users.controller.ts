@@ -7,6 +7,8 @@ import {
   HttpStatus,
   Patch,
   Put,
+  Param,
+  ParseUUIDPipe,
   UseGuards
 } from "@nestjs/common";
 import {
@@ -28,6 +30,16 @@ export class UsersController {
   @Get("me")
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.users.profile(user.userId);
+  }
+
+  @Get("me/notifications")
+  notifications(@CurrentUser() user: AuthenticatedUser) {
+    return this.users.notifications(user.userId);
+  }
+
+  @Patch("me/notifications/:id/read")
+  readNotification(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
+    return this.users.readNotification(user.userId, id);
   }
 
   @Patch("me")

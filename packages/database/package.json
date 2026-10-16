@@ -26,7 +26,8 @@
     "prisma:import-cards": "tsx prisma/import-cards.ts",
     "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "prisma:prepare-full-game": "prisma db execute --file prisma/deploy/20260919_add_full_game.sql --schema prisma/schema.prisma"
+    "prisma:prepare-full-game": "prisma db execute --file prisma/deploy/20260919_add_full_game.sql --schema prisma/schema.prisma",
+    "prisma:prepare-open-game-notifications": "prisma db execute --file prisma/deploy/20261016_add_open_game_notifications.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

@@ -1,5 +1,5 @@
 import { ChooseDreamDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CardType } from "@prisma/client";
 import {
   AuthenticatedUser,
@@ -19,6 +19,7 @@ import { ChatDto } from "./dto/chat.dto";
 import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
+import { UpdateGameScheduleDto } from "./dto/update-game-schedule.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
@@ -82,6 +83,13 @@ export class GamesController {
   @Get(":id")
   get(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.games.getGame(id, user.userId);
+  }
+
+  @Patch(":id/schedule")
+  async updateSchedule(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: UpdateGameScheduleDto) {
+    const snapshot = await this.games.updateGameSchedule(id, user.userId, dto.scheduledLocal);
+    this.realtime.broadcastSnapshot(id, snapshot);
+    return snapshot;
   }
 
   @Post(":id/start")

@@ -126,6 +126,8 @@ model User {
   gameRoomView    String    @default("classic") @map("game_room_view")
   telegramChannel String?   @map("telegram_channel")
   telegramMentionConsent Boolean @default(false) @map("telegram_mention_consent")
+  timeZone        String?   @map("time_zone")
+  openGameNotifications Boolean @default(true) @map("open_game_notifications")
   cityId          String?   @map("city_id") @db.Uuid
   role         SystemRole    @default(USER)
   status       AccountStatus @default(ACTIVE)
@@ -138,6 +140,7 @@ model User {
   gamePlayers       GamePlayer[]        @relation("UserGamePlayers")
   events            GameEvent[]         @relation("UserEvents")
   chatMessages      GameChatMessage[]   @relation("UserChatMessages")
+  notifications     UserNotification[]
   feedbackMessages  FeedbackMessage[]   @relation("UserFeedback")
   passwordResetTokens PasswordResetToken[]
   personalDataConsents PersonalDataConsent[]
@@ -193,6 +196,10 @@ model PasswordResetToken {
 model Game {
   rulesVersion     Int        @default(1) @map("rules_version")
   isTest           Boolean    @default(false) @map("is_test")
+  isPublic         Boolean    @default(false) @map("is_public")
+  scheduledAt       DateTime?  @map("scheduled_at")
+  scheduleTimeZone  String?    @map("schedule_time_zone")
+  scheduleRevision  Int        @default(0) @map("schedule_revision")
   fastTrackWorld   Json       @default("{}") @map("fast_track_world")
   id               String     @id @default(uuid()) @db.Uuid
   code             String     @unique
@@ -217,14 +224,32 @@ model Game {
   players      GamePlayer[]
   events       GameEvent[]
   chatMessages GameChatMessage[]
+  notifications UserNotification[]
   babyGifts    BabyGift[]
   summary      GameSummary?
 
   @@index([status])
   @@index([mode, status])
+  @@index([isPublic, status, scheduledAt])
   @@index([createdById])
   @@index([cardSetId])
   @@map("games")
+}
+
+model UserNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  gameId    String    @map("game_id") @db.Uuid
+  kind      String
+  dedupeKey String    @map("dedupe_key")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game      Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@map("user_notifications")
 }
 
 model TelegramAnnouncement {

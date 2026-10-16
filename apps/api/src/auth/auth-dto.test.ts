@@ -17,6 +17,7 @@ test("DTO регистрации нормализует данные", async () 
     displayName: "  Анна   Смирнова  ",
     telegramChannel: "  Example_Channel ",
     cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
+    timeZone: "Europe/Moscow",
     accountType: "PLAYER",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -55,6 +56,7 @@ test("DTO регистрации принимает аккаунт ведуще�
     displayName: "Анна",
     telegramChannel: "@host_channel",
     cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
+    timeZone: "Europe/Moscow",
     accountType: "HOST",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION

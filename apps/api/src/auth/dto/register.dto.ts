@@ -35,6 +35,10 @@ export class RegisterDto {
   @IsUUID(undefined, { message: "Выберите город из списка." })
   cityId!: string;
 
+  @IsString({ message: "Выберите часовой пояс." })
+  @MaxLength(100)
+  timeZone!: string;
+
   @IsBoolean({ message: "Подтвердите согласие на обработку персональных данных." })
   @Equals(true, { message: "Подтвердите согласие на обработку персональных данных." })
   personalDataConsent!: boolean;

@@ -13,6 +13,8 @@ export interface ProfileResponse {
     gameRoomView: "classic" | "journey";
     telegramChannel: string | null;
     telegramMentionConsent: boolean;
+    timeZone: string | null;
+    openGameNotifications: boolean;
     city: {
       id: string;
       name: string;
@@ -108,6 +110,24 @@ export interface GamesListResponse {
   open: GameListItem[];
 }
 
+export interface NotificationsResponse {
+  unreadCount: number;
+  items: Array<{
+    id: string;
+    kind: "OPEN_GAME_PUBLISHED" | "OPEN_GAME_RESCHEDULED" | "OPEN_GAME_CANCELLED";
+    readAt: string | null;
+    createdAt: string;
+    game: {
+      id: string;
+      code: string;
+      title: string;
+      status: string;
+      scheduledAt: string | null;
+      createdBy: { displayName: string } | null;
+    };
+  }>;
+}
+
 export interface AdminGameSummary {
   id: string;
   code: string;
@@ -163,6 +183,11 @@ export interface GameListItem {
   mode: "MULTIPLAYER" | "SOLO";
   maxPlayers: number | null;
   createdAt: string;
+  isPublic: boolean;
+  scheduledAt: string | null;
+  scheduleTimeZone: string | null;
+  createdBy: { id: string; displayName: string } | null;
+  settings: { timeLimitMinutes?: number | null };
   cardSet: {
     id: string;
     name: string;

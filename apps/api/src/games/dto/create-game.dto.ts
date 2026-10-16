@@ -1,8 +1,16 @@
 import { TestGameOptionsDto } from "./fast-track.dto";
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from "class-validator";
 
 export class CreateGameDto extends TestGameOptionsDto {
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+  scheduledLocal?: string;
   @IsOptional()
   @IsString()
   @MaxLength(80)

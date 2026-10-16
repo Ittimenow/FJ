@@ -4,6 +4,21 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "scheduled-open-games-and-notifications",
+          "category": "feature",
+          "summary": "Ведущие могут назначать открытые игры, а игроки получают сообщения о них и видят время в своём часовом поясе с возможностью отключить объявления."
+        },
+        {
+          "id": "simplify-player-dashboard-on-mobile",
+          "category": "improvement",
+          "summary": "На мобильном экране личного кабинета создание игры, вход по приглашению и статистика доступны без длинного вступления."
+        },
+        {
+          "id": "show-complete-dream-images-and-descriptions",
+          "category": "fix",
+          "summary": "Карточки мечт показывают изображения целиком и не скрывают текстовые описания на широком экране."
+        },
+        {
           "id": "guide-dream-and-figurine-before-board",
           "category": "improvement",
           "summary": "Перед началом партии игрок последовательно выбирает мечту с иллюстрацией и фишку, а затем переходит на игровое поле."

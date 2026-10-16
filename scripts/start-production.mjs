@@ -210,6 +210,7 @@ async function setupDatabaseIfNeeded() {
   ]);
 
   await run(npmCommand, ["run", "prisma:prepare-full-game", "--workspace=@cashflow/database"]);
+  await run(npmCommand, ["run", "prisma:prepare-open-game-notifications", "--workspace=@cashflow/database"]);
 
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);

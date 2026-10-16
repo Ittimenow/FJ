@@ -1,5 +1,7 @@
 import { figurineImagePath } from "@cashflow/shared";
 import Link from "next/link";
+import { Bell } from "lucide-react";
+import type { Route } from "next";
 import { GameRoomHeaderSlot, GameRoomViewport } from "@/components/layout/game-room-header-context";
 import { GuideLink } from "@/components/layout/guide-link";
 import { BrandLogo } from "@/components/layout/brand-logo";
@@ -52,7 +54,10 @@ export function AppShell({
                 <span className="game-profile-name hidden text-sm lg:inline">{userName}</span>
               </Link>
           ) : null} />
-          <div className="col-start-3 row-start-1 justify-self-end"><GuideLink /></div>
+          <div className="col-start-3 row-start-1 flex items-center gap-1 justify-self-end">
+            {userName ? <Link href={"/notifications" as Route} aria-label="Оповещения" title="Оповещения" className="grid h-11 w-11 place-items-center rounded-xl text-muted transition hover:bg-white hover:text-journey focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"><Bell size={20} aria-hidden="true" /></Link> : null}
+            <GuideLink />
+          </div>
         </div>
       </header>
       <main className="app-shell-main mx-auto min-w-0 max-w-[1480px] px-3 py-6 sm:px-4 sm:py-8">{children}</main>
