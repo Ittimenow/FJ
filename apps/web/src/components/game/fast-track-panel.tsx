@@ -1,6 +1,6 @@
 "use client";
 
-import { fastTrackCells, fastTrackDreams } from "@cashflow/shared";
+import { fastTrackCells, fastTrackDreams, fastTrackOwner, readFastTrackWorld } from "@cashflow/shared";
 import { Check, Heart, Target } from "lucide-react";
 import type { ReactNode } from "react";
 import { FastTrackBoard } from "./fast-track-board";
@@ -59,6 +59,9 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   const mine = pending?.type === "fast_track_choice" && pending.gamePlayerId === player?.id ? pending : null;
   const isTurn = snapshot.game.status === "IN_PROGRESS" && snapshot.game.currentPlayerId === player?.id && player?.track === "FAST_TRACK";
   const choiceCell = mine ? fastTrackCells[mine.cellIndex]! : null;
+  const ownerId = choiceCell ? fastTrackOwner(choiceCell, readFastTrackWorld(snapshot.game.fastTrackWorld)) : null;
+  const owner = snapshot.players.find((item) => item.id === ownerId);
+  const resale = Boolean(ownerId && choiceCell?.rule.kind !== "ipo");
   const statusLabel = snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : isTurn ? "Ваш ход" : `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}`;
   const diceAction = <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
       statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
@@ -68,8 +71,9 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
     {canChooseDice ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
     {mine ? <div className="turn-decision">
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
-      {choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo" ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}
-      <div className="turn-actions"><button type="button" className="turn-action" aria-label={`Оплатить ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>Купить</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
+      {resale ? <p className="turn-decision-note">Выкуп у игрока {gamePlayerName(owner)}. Деньги получит прежний владелец{choiceCell?.income ? ", доход CASHFLOW перейдёт вам" : ""}. При следующем выкупе цена снова удвоится.</p> : null}
+      {!resale && (choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo") ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}
+      <div className="turn-actions"><button type="button" className="turn-action" aria-label={`${resale ? "Выкупить" : "Оплатить"} ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>{resale ? "Выкупить" : "Купить"}</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
     </div> : null}
     </div> : null;

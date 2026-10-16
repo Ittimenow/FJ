@@ -116,6 +116,23 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
       const state = await db.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: bot.id } });
       assert.equal(state.fastTrackIncomeCents, 109_500n);
     });
+    await t.test("buyout transfers cash and business income to the new owner", async () => {
+      const seller = snapshot.players[0];
+      const buyer = snapshot.players[1];
+      await db.playerFinancialState.update({ where: { gamePlayerId: buyer.id }, data: { cashCents: 1_000_000n } });
+      const decisionId = await setDecision(snapshot.game.id, buyer.id, 1);
+      await db.game.update({ where: { id: snapshot.game.id }, data: { currentTurnIndex: 1 } });
+      snapshot = (await service.decideFastTrack(snapshot.game.id, service.botActorId(buyer.id), { buy: true, decisionId }) as any).snapshot;
+      const sellerState = await db.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: seller.id } });
+      const buyerState = await db.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: buyer.id } });
+      assert.equal(sellerState.cashCents, 900_000n);
+      assert.equal(sellerState.fastTrackIncomeCents, 100_000n);
+      assert.equal(buyerState.cashCents, 400_000n);
+      assert.equal(buyerState.fastTrackIncomeCents, 123_500n);
+      assert.equal(snapshot.game.fastTrackWorld.owners[1], buyer.id);
+      assert.equal(snapshot.game.fastTrackWorld.purchaseCounts[1], 2);
+      assert.ok(snapshot.events.some((event: any) => event.type === "fast_track:sold" && event.gamePlayerId === seller.id));
+    });
     await t.test("buying target ends test game without statistics or publication", async () => {
       const player = snapshot.players[0];
       await db.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: 1_000_000 } });
@@ -143,6 +160,7 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
       const loan = await db.playerLiability.create({ data: { gamePlayerId: player.id, type: "bank_loan", name: "Кредит", balanceCents: 1000, paymentCents: 100 } });
       await assert.rejects(service.enterFastTrack(snapshot.game.id, admin!.id), /погашенные/);
       await db.playerLiability.delete({ where: { id: loan.id } });
+      await assert.rejects(service.rollDice(snapshot.game.id, admin!.id, { expectedTurn: `${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}` }), /Перейдите на большой круг/);
       snapshot = (await service.enterFastTrack(snapshot.game.id, admin!.id) as any).snapshot;
       assert.equal(snapshot.game.status, "IN_PROGRESS");
       assert.equal(snapshot.players[0].financialState.fastTrackStartIncomeCents, 200_100);

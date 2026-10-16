@@ -4,6 +4,8 @@ import {
   canEscapeRatRace,
   outstandingBankLoanBalanceCents
 } from "@cashflow/shared";
+import { BankruptcyStatus, BoardTrack, GameStatus, PlayerController } from "@prisma/client";
+import { GamesService } from "./games.service";
 
 test("player escapes the rat race with excess passive income and no bank loan", () => {
   assert.equal(canEscapeRatRace(1_001, 1_000, false), true);
@@ -53,5 +55,42 @@ test("full bank loan repayment unlocks escape without requiring profession debts
       outstandingBankLoanBalanceCents(professionDebts) > 0
     ),
     true
+  );
+});
+
+test("ready player must enter the large track before another roll", async () => {
+  const game = {
+    id: "game",
+    status: GameStatus.IN_PROGRESS,
+    rulesVersion: 2,
+    currentRound: 1,
+    currentTurnIndex: 0,
+    settings: {},
+    players: [{
+      id: "player",
+      userId: "user",
+      controller: PlayerController.HUMAN,
+      track: BoardTrack.RAT_RACE,
+      dreamCellIndex: 0,
+      liabilities: [],
+      financialState: {
+        bankruptcyStatus: BankruptcyStatus.NONE,
+        passiveIncomeCents: 2_001n,
+        totalExpensesCents: 2_000n
+      }
+    }]
+  };
+  const service = Object.create(GamesService.prototype) as GamesService;
+  (service as any).prisma = {
+    $transaction: async (action: (tx: unknown) => Promise<unknown>) => action({
+      game: { findUniqueOrThrow: async () => game }
+    })
+  };
+  (service as any).expireGameIfNeeded = async () => null;
+  (service as any).lockGame = async () => undefined;
+
+  await assert.rejects(
+    service.rollDice(game.id, "user", { expectedTurn: "1:0" }),
+    /Перейдите на большой круг/
   );
 });

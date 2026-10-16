@@ -73,6 +73,8 @@ test('purchased cards reflect owned businesses, purchased dreams and paid charit
   const player={...players[0],financialState:{fastTrackCharity:true}} as GamePlayer;
   const cells=purchasedFastTrackCells(player,{owners:{1:'anna',3:'boris'},dreamPurchases:{0:['anna'],4:['boris']},influence:{}});
   assert.deepEqual(cells.map(c=>c.index),[0,1,7]);
+  const afterResale=purchasedFastTrackCells(player,{owners:{1:'boris'},dreamPurchases:{0:['anna','boris']},influence:{}});
+  assert.deepEqual(afterResale.map(c=>c.index),[7]);
   assert.equal(purchasedFastTrackCells({...player,financialState:null},{owners:{},dreamPurchases:{},influence:{}}).length,0);
 });
 test('cell effects expose payout thresholds and losses without a separate detail panel',()=>{

@@ -112,6 +112,13 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
   });
 }
 
+test('mobile buyout shows the previous owner and doubled price', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=buyout`);
+  await expect(page.getByText('Выкуп у игрока Борис', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Выкупить 240 000 $' })).toBeVisible();
+});
+
 // Resizing preserves the continuous route and its semantic cell colors.
 test('the responsive route preserves the prototype proportions and colors', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -680,6 +687,27 @@ for (const width of [1440, 390]) {
     });
     const history = page.getByRole('region', { name: 'История действий игроков', exact: true }).filter({ visible: true });
     const entry = history.getByRole('button', { name: 'Перейти на большой круг', exact: true });
+    const primaryEntry = width >= 1024
+      ? page.getByRole('region', { name: 'Бросок кубика' }).filter({ visible: true }).getByRole('button', { name: 'Перейти на большой круг' })
+      : page.getByRole('region', { name: 'Действия текущего хода' }).getByRole('button', { name: 'Перейти на большой круг' });
+    await expect(entry).toBeVisible();
+    await expect(primaryEntry).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Бросить кубик', exact: true }).filter({ visible: true })).toHaveCount(0);
+    await page.evaluate(() => {
+      const snapshot = structuredClone((window as any).roomSnapshot);
+      snapshot.game.currentPlayerId = snapshot.players[1].id;
+      snapshot.game.currentTurnIndex = 1;
+      window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+    });
+    await expect(entry).toHaveCount(0);
+    await expect(page.getByText('Условия выхода выполнены. Перейти на большой круг можно в начале вашего следующего хода после завершения обязательных действий.')).toBeVisible();
+    await page.evaluate(() => {
+      const snapshot = structuredClone((window as any).roomSnapshot);
+      snapshot.game.currentPlayerId = snapshot.players[0].id;
+      snapshot.game.currentTurnIndex = 0;
+      snapshot.game.currentRound += 1;
+      window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+    });
     await expect(entry).toBeVisible();
     await page.screenshot({ path: join(output, `room-small-${width}.png`), fullPage: true });
     await page.route('**/api/games/synthetic/fast-track/enter', async route => {
@@ -691,7 +719,7 @@ for (const width of [1440, 390]) {
       });
       await route.fulfill({ json: { snapshot } });
     });
-    await entry.click();
+    await primaryEntry.click();
     await expect(page.getByRole('region', { name: 'Поле большого круга', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Большой круг', exact: true })).toHaveAttribute('aria-pressed', 'true');
     if (width >= 1024) {

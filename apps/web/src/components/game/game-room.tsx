@@ -474,6 +474,18 @@ export function GameRoom({
     snapshot.game.createdById === currentUserId &&
     (currentUserRole === "HOST" || currentUserRole === "ADMIN");
   const pendingAction = snapshot.game.pendingAction;
+  const fastTrackReady =
+    snapshot.game.rulesVersion === 2 &&
+    me?.track === "RAT_RACE" &&
+    isDreamCell(me.dreamCellIndex) &&
+    me.financialState != null &&
+    me.financialState.bankruptcyStatus !== "LIQUIDATING" &&
+    canEscapeRatRace(
+      me.financialState.passiveIncomeCents,
+      me.financialState.totalExpensesCents,
+      outstandingBankLoanBalanceCents(me.liabilities) > 0
+    );
+  const canEnterFastTrack = fastTrackReady && canRoll && !pendingAction;
   const ownPendingAction = pendingAction?.gamePlayerId === me?.id ? pendingAction : null;
   const charityChoice =
     ownPendingAction?.type === "charity_choice" ? ownPendingAction : null;
@@ -1283,7 +1295,7 @@ export function GameRoom({
     diceIntervalRef.current = null;
   }
 
-  const enterFastTrackAction = !showFastTrack && snapshot.game.rulesVersion === 2 && canRoll && !pendingAction && me?.track === "RAT_RACE" && me.financialState && canEscapeRatRace(me.financialState.passiveIncomeCents, me.financialState.totalExpensesCents, outstandingBankLoanBalanceCents(me.liabilities) > 0) ? (
+  const enterFastTrackAction = canEnterFastTrack ? (
     <Button variant="action" className="w-full" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>
       Перейти на большой круг
     </Button>
@@ -1328,10 +1340,9 @@ export function GameRoom({
         diceValues={diceFaces}
         diceCount={activeDiceCount}
         maxCompactViewportWidth={showFastTrack || gameRoomView === "classic" ? 1023 : 1279}
-        onSkip={skipTurn}
-        onRoll={() => {
-          void rollDice();
-        }}
+        onSkip={canEnterFastTrack ? undefined : skipTurn}
+        rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
+        onRoll={() => { void (canEnterFastTrack ? fastAction("fast-track/enter") : rollDice()); }}
       />
       <GameEndPopup
         open={gameEndOpen && snapshot.game.status === "ENDED"}
@@ -1380,6 +1391,16 @@ export function GameRoom({
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </div>
+      ) : null}
+      {fastTrackReady && snapshot.game.status === "IN_PROGRESS" && !canEnterFastTrack ? (
+        <p role="status" className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">
+          Условия выхода выполнены. Перейти на большой круг можно в начале вашего следующего хода после завершения обязательных действий.
+        </p>
+      ) : null}
+      {canEnterFastTrack && showFastTrack ? (
+        <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>
+          Перейти на большой круг
+        </Button>
       ) : null}
       {snapshot.game.status === "WAITING" && me ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-ink shadow-panel" aria-label="Этапы подготовки партии">
@@ -1436,7 +1457,7 @@ export function GameRoom({
           snapshot={boardSnapshot}
           movingPlayerId={movement.movingPlayerId}
           currentUserId={currentUserId}
-          canRoll={canRoll && !pendingAction}
+          canRoll={canRoll && !pendingAction && !fastTrackReady}
           turnTabRequest={turnTabRequest}
           actions={
             <>
@@ -1449,8 +1470,10 @@ export function GameRoom({
                   statusLabel={canRoll ? "Ваш ход" : undefined}
                   idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
                   diceValues={diceFaces}
-                  onRoll={rollDice}
-                  onSkip={skipTurn}
+                  rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
+                  onRoll={canEnterFastTrack ? () => void fastAction("fast-track/enter") : rollDice}
+                  onSkip={canEnterFastTrack ? undefined : skipTurn}
+                  disabled={canEnterFastTrack && fastBusy}
                 />
               <ActionsPanel
               canChooseDeal={canChooseDeal}
@@ -1521,8 +1544,10 @@ export function GameRoom({
               statusLabel={canRoll ? "Ваш ход" : undefined}
               idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
               diceValues={diceFaces}
-              onRoll={rollDice}
-              onSkip={skipTurn}
+              rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
+              onRoll={canEnterFastTrack ? () => void fastAction("fast-track/enter") : rollDice}
+              onSkip={canEnterFastTrack ? undefined : skipTurn}
+              disabled={canEnterFastTrack && fastBusy}
               pinnedToPanel
             />
             <ActionsPanel
@@ -5147,6 +5172,9 @@ function GameEventPresentation({
 }
 
 function GameEventHeadline({ event }: { event: GameEvent }) {
+  if (event.type === "fast_track:purchased" && event.payload.previousOwnerId) {
+    return <span>Выкуплено: {String(event.payload.title ?? "возможность большого круга")}</span>;
+  }
   if (event.type === realtimeEvents.playerRollDice) {
     const diceValues = Array.isArray(event.payload.diceValues)
       ? event.payload.diceValues
@@ -5240,21 +5268,10 @@ function CashChangeVisualization({ change }: { change: CashChange }) {
       <Banknote size={16} className="shrink-0 text-success" aria-hidden="true" />
       {expression.kind === "equation" ? (
         <>
-          <strong>{expression.result}</strong>
+          <strong>{expression.before}</strong>
           <span className="text-neutral-400" aria-hidden="true">→</span>
-          <strong
-            className={expression.changedOperand === "first" ? "text-success" : undefined}
-          >
-            {expression.firstOperand}
-          </strong>
-          <strong className={positive ? "text-success" : "text-red-700"}>
-            {expression.operator}
-          </strong>
-          <strong
-            className={expression.changedOperand === "second" ? "text-red-700" : undefined}
-          >
-            {expression.secondOperand}
-          </strong>
+          <strong className={positive ? "text-success" : "text-red-700"}>{expression.after}</strong>
+          <strong className={positive ? "text-success" : "text-red-700"}>({expression.delta})</strong>
         </>
       ) : (
         <strong className={positive ? "text-success" : "text-red-700"}>
@@ -5412,6 +5429,7 @@ const eventTitles: Record<string, string> = {
   "fast_track:cashflow": "Доход большого круга",
   "fast_track:expense": "Расход большого круга",
   "fast_track:purchased": "Инвестиция большого круга",
+  "fast_track:sold": "Продажа на большом круге",
   "fast_track:investment_roll": "Бросок инвестиции",
   "fast_track:declined": "Отказ от покупки",
   "fast_track:dream_influence": "Цена мечты увеличена",
@@ -5913,6 +5931,8 @@ function eventDetails(event: GameEvent) {
         : compactDetails([moneyDetail("Пассивный доход", payload.passiveIncomeCents, "/мес"), moneyDetail("Расходы", payload.totalExpensesCents, "/мес")]);
     case "fast_track:purchased":
       return compactDetails([textDetail("Возможность", payload.title), moneyDetail("Вложено", payload.costCents), moneyDetail("Доход", payload.incomeCents), textDetail("Результат", payload.success ? "Успех" : "Инвестиция не принесла дохода")]);
+    case "fast_track:sold":
+      return compactDetails([textDetail("Возможность", payload.title), toNumber(payload.incomeChangeCents) ? moneyDetail("Изменение дохода CASHFLOW", payload.incomeChangeCents) : null]);
     case "fast_track:cashflow":
     case "fast_track:expense":
       return compactDetails([textDetail("Клетка", payload.title), moneyDetail("Сумма", payload.amountCents)]);

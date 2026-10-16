@@ -10,11 +10,9 @@ export type CashChange = {
 export type CashChangeExpression =
   | {
       kind: "equation";
-      result: string;
-      firstOperand: string;
-      operator: "+" | "−";
-      secondOperand: string;
-      changedOperand: "first" | "second";
+      before: string;
+      after: string;
+      delta: string;
     }
   | {
       kind: "delta";
@@ -107,23 +105,12 @@ export function cashChangeExpression(change: CashChange): CashChangeExpression {
     };
   }
 
-  return positive
-    ? {
-        kind: "equation",
-        result: money(change.afterCents),
-        firstOperand: money(change.deltaCents),
-        operator: "+",
-        secondOperand: money(change.beforeCents),
-        changedOperand: "first"
-      }
-    : {
-        kind: "equation",
-        result: money(change.afterCents),
-        firstOperand: money(change.beforeCents),
-        operator: "−",
-        secondOperand: money(Math.abs(change.deltaCents)),
-        changedOperand: "second"
-      };
+  return {
+    kind: "equation",
+    before: money(change.beforeCents),
+    after: money(change.afterCents),
+    delta: `${positive ? "+" : "−"}${money(Math.abs(change.deltaCents))}`
+  };
 }
 
 export function compactPlayerActionDetails(event: GameEvent): string[] | null {

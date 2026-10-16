@@ -619,6 +619,7 @@ export interface FastTrackWorld {
   owners: Record<string, string>;
   influence: Record<string, string[]>;
   dreamPurchases: Record<string, string[]>;
+  purchaseCounts?: Record<string, number>;
 }
 
 export function readFastTrackWorld(value: unknown): FastTrackWorld {
@@ -627,8 +628,23 @@ export function readFastTrackWorld(value: unknown): FastTrackWorld {
   return {
     owners: { ...data.owners },
     influence: Object.fromEntries(Object.entries(data.influence ?? {}).map(([key, ids]) => [key, [...ids]])),
-    dreamPurchases: Object.fromEntries(Object.entries(data.dreamPurchases ?? {}).map(([key, ids]) => [key, [...ids]]))
+    dreamPurchases: Object.fromEntries(Object.entries(data.dreamPurchases ?? {}).map(([key, ids]) => [key, [...ids]])),
+    purchaseCounts: { ...data.purchaseCounts }
   };
+}
+
+export function fastTrackOwner(cell: FastTrackCell, world: FastTrackWorld) {
+  if (cell.rule.kind === "dream") return world.dreamPurchases[cell.index]?.at(-1) ?? null;
+  if (["business", "chance_business", "ipo"].includes(cell.rule.kind)) return world.owners[cell.index] ?? null;
+  return null;
+}
+
+function fastTrackPurchaseCount(cell: FastTrackCell, world: FastTrackWorld) {
+  if (cell.rule.kind === "dream") return world.dreamPurchases[cell.index]?.length ?? 0;
+  if (cell.rule.kind === "business" || cell.rule.kind === "chance_business") {
+    return world.purchaseCounts?.[cell.index] ?? (world.owners[cell.index] ? 1 : 0);
+  }
+  return 0;
 }
 
 export const fastTrackDreams = fastTrackCells.filter((cell) => cell.type === "dream");
@@ -637,9 +653,12 @@ export function isDreamCell(index: unknown): index is number {
   return typeof index === "number" && Number.isInteger(index) && fastTrackCells[index]?.type === "dream";
 }
 export function fastTrackPrice(cell: FastTrackCell, playerId: string, dreamCellIndex: number | null, world: FastTrackWorld) {
-  return cell.cost * (cell.index === dreamCellIndex
+  const influencedPrice = cell.cost * (cell.index === dreamCellIndex
     ? 1 + (world.influence[String(cell.index)] ?? []).filter((id) => id !== playerId).length
     : 1);
+  const price = influencedPrice * 2 ** fastTrackPurchaseCount(cell, world);
+  if (!Number.isSafeInteger(price)) throw new Error("Стоимость покупки слишком велика");
+  return price;
 }
 
 /** -1 is the entrance arrow, before cell 1. Every crossed payday appears once. */
@@ -670,26 +689,31 @@ export function settleFastTrackPurchase(input: FastTrackPurchaseInput) {
   const world = readFastTrackWorld(input.world);
   const kind = cell.rule.kind;
   if (["cashflow", "half_cash", "lose_cash"].includes(kind)) throw new Error("На этой клетке нет покупки");
-  if (world.owners[cell.index]) throw new Error("Эта возможность уже занята");
-  if (kind === "dream" && world.dreamPurchases[cell.index]?.includes(playerId)) throw new Error("Эта мечта уже куплена");
+  const previousOwnerId = fastTrackOwner(cell, world);
+  if (kind === "ipo" && previousOwnerId) throw new Error("Эта возможность уже занята");
+  if (previousOwnerId === playerId) throw new Error("Эта возможность уже принадлежит вам");
   if (kind === "charity" && input.charity) throw new Error("Благотворительность уже действует");
   const cost = fastTrackPrice(cell, playerId, input.dreamCellIndex, world);
   if (input.cash < cost) throw new Error("Недостаточно наличных для покупки");
   let cash = input.cash - cost;
   let income = input.income;
   let success = true;
-  if (cell.rule.kind === "chance_business" || cell.rule.kind === "ipo") {
+  if ((cell.rule.kind === "chance_business" && !previousOwnerId) || cell.rule.kind === "ipo") {
     if (!input.die || !Number.isInteger(input.die) || input.die < 1 || input.die > 6) throw new Error("Нужен результат броска одной кости");
     success = input.die >= cell.rule.minimum;
   }
   if (success && ["business", "chance_business", "ipo"].includes(kind)) {
     world.owners[cell.index] = playerId;
     if (cell.rule.kind === "ipo") cash += cell.rule.payout;
-    else income += cell.income;
+    else {
+      income += cell.income;
+      world.purchaseCounts ??= {};
+      world.purchaseCounts[cell.index] = fastTrackPurchaseCount(cell, input.world) + 1;
+    }
   }
   if (kind === "dream") world.dreamPurchases[cell.index] = [...(world.dreamPurchases[cell.index] ?? []), playerId];
   return {
-    cash, income, world, cost, success, charity: input.charity || kind === "charity",
+    cash, income, world, cost, success, previousOwnerId, charity: input.charity || kind === "charity",
     won: kind === "dream" && input.dreamCellIndex === cell.index ? "dream" as const
       : income - input.initialIncome >= fastTrackWinningIncrease ? "fast_track_income" as const : null
   };

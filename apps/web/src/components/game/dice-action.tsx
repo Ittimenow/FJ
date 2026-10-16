@@ -13,6 +13,7 @@ export function DiceAction({
   diceCount = diceValues.length,
   onRoll,
   onSkip,
+  rollLabel,
   statusLabel,
   idleLabel = "Ожидайте ход",
   disabled = false,
@@ -27,6 +28,7 @@ export function DiceAction({
   diceCount?: number;
   onRoll: () => void;
   onSkip?: (() => void) | undefined;
+  rollLabel?: string | undefined;
   statusLabel?: string | undefined;
   idleLabel?: string | undefined;
   disabled?: boolean;
@@ -98,7 +100,7 @@ export function DiceAction({
           {rolling
             ? "Бросаем…"
             : canRoll
-              ? diceCount > 1 ? "Бросить кубики" : "Бросить кубик"
+              ? rollLabel ?? (diceCount > 1 ? "Бросить кубики" : "Бросить кубик")
               : idleLabel}
         </Button> : null}
         {showDice ? <div className="dice-action-values flex shrink-0 gap-2" aria-live="polite" aria-label="Результат броска">

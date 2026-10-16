@@ -1,3 +1,5 @@
+import { availableBankLoanCents, bankLoanPaymentCents } from "@cashflow/shared";
+
 export const balancedBotStrategy = "balanced_v1";
 
 export interface BotFinancialSnapshot {
@@ -55,9 +57,17 @@ export function botCashReserve(state: BotFinancialSnapshot) {
   );
 }
 
+export function botDealReserve(state: BotFinancialSnapshot) {
+  return Math.max(
+    1_000,
+    Math.ceil(state.totalExpensesCents * 0.35),
+    Math.abs(Math.min(0, state.monthlyCashflowCents)) * 2
+  );
+}
+
 export function chooseBotDealType(state: BotFinancialSnapshot) {
-  const available = state.cashCents - botCashReserve(state);
-  return available >= Math.max(6_000, state.totalExpensesCents)
+  const available = state.cashCents - botDealReserve(state);
+  return available >= Math.max(8_000, state.totalExpensesCents * 1.5)
     ? "BIG_DEAL"
     : "SMALL_DEAL";
 }
@@ -66,11 +76,9 @@ export function decideBotDeal(
   state: BotFinancialSnapshot,
   offer: BotDealOffer
 ): BotDealDecision {
-  const reserve = botCashReserve(state);
-  const available = Math.max(0, state.cashCents - reserve);
-  const unitCost = Math.max(0, Math.round(offer.unitCostCents));
+  const unitCost = Math.round(offer.unitCostCents);
 
-  if (unitCost <= 0) {
+  if (!Number.isFinite(unitCost) || unitCost < 0 || (offer.isStock && unitCost === 0)) {
     return {
       buy: false,
       quantity: 1,
@@ -80,21 +88,21 @@ export function decideBotDeal(
   }
 
   if (offer.isStock) {
-    if (unitCost > available || unitCost > 40) {
+    const available = Math.max(0, state.cashCents - botCashReserve(state));
+    if (unitCost > 10 || unitCost > available * 0.15) {
       return {
         buy: false,
         quantity: 1,
         loanAmountCents: 0,
-        reason: "цена акций слишком высока для сохранения денежного резерва"
+        reason: "акции не дают пассивного дохода и займут слишком большую часть свободных денег"
       };
     }
-    const targetQuantity = unitCost <= 5 ? 50 : unitCost <= 10 ? 20 : 10;
-    const quantity = Math.max(1, Math.min(100, targetQuantity, Math.floor(available / unitCost)));
+    const quantity = Math.min(100, Math.floor((available * 0.15) / unitCost));
     return {
       buy: true,
       quantity,
       loanAmountCents: 0,
-      reason: `цена позволяет купить ${quantity} акций без использования резерва`
+      reason: `покупаю ${quantity} недорогих акций в пределах небольшой доли свободных денег`
     };
   }
 
@@ -107,15 +115,21 @@ export function decideBotDeal(
     };
   }
 
+  const reserve = botDealReserve(state);
+  const available = Math.max(0, state.cashCents - reserve);
   const paybackMonths = unitCost / offer.cashflowCents;
   const shortfall = Math.max(0, unitCost - available);
   const loanAmount = shortfall > 0
-    ? Math.ceil(shortfall / 0.8 / 1_000) * 1_000
+    ? Math.ceil(shortfall / 1_000) * 1_000
     : 0;
-  const loanPayment = loanAmount / 10;
+  const loanPayment = bankLoanPaymentCents(loanAmount);
   const netCashflow = offer.cashflowCents - loanPayment;
-  const affordableLoan = loanAmount <= Math.max(4_000, state.totalIncomeCents * 4);
-  const worthwhile = paybackMonths <= 48 && netCashflow > 0 && affordableLoan;
+  const affordableLoan = loanAmount === 0 || (
+    loanAmount <= availableBankLoanCents(state.monthlyCashflowCents) &&
+    loanPayment <= offer.cashflowCents * 0.5 &&
+    loanPayment <= state.monthlyCashflowCents - 100
+  );
+  const worthwhile = paybackMonths <= 72 && netCashflow > 0 && affordableLoan;
 
   return worthwhile
     ? {

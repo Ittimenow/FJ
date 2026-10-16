@@ -1,4 +1,4 @@
-import { fastTrackCells, fastTrackDreams, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
+import { fastTrackCells, fastTrackDreams, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackOwner, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
 import { TestGameOptionsDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import {
   BadRequestException,
@@ -577,8 +577,9 @@ export class GamesService {
     }
     await tx.gamePlayer.update({ where: { id: player.id }, data: { fastTrackPosition: cell.index, lastTurnAt: new Date() } });
     await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(cash) } });
+    const ownerId = fastTrackOwner(cell, world);
     const available = ["business", "chance_business", "ipo", "dream", "charity"].includes(cell.rule.kind)
-      && !world.owners[cell.index] && !world.dreamPurchases[cell.index]?.includes(player.id)
+      && ownerId !== player.id && !(cell.rule.kind === "ipo" && ownerId)
       && !(cell.rule.kind === "charity" && state.fastTrackCharity);
     const pending: GamePendingAction | null = available ? {
       type: "fast_track_choice", gamePlayerId: player.id, cellIndex: cell.index, decisionId: randomUUID(),
@@ -611,16 +612,30 @@ export class GamesService {
       const state = player.financialState;
       let won: "dream" | "fast_track_income" | null = null;
       if (dto.buy) {
-        const die = cell.rule.kind === "chance_business" || cell.rule.kind === "ipo" ? rollDie() : undefined;
+        const currentOwnerId = fastTrackOwner(cell, readFastTrackWorld(game.fastTrackWorld));
+        const die = (cell.rule.kind === "chance_business" && !currentOwnerId) || cell.rule.kind === "ipo" ? rollDie() : undefined;
         let result: ReturnType<typeof settleFastTrackPurchase>;
         try { result = settleFastTrackPurchase({ cell, playerId: player.id, dreamCellIndex: player.dreamCellIndex,
           cash: Number(state.cashCents), income: Number(state.fastTrackIncomeCents), initialIncome: Number(state.fastTrackStartIncomeCents),
           charity: state.fastTrackCharity, world: readFastTrackWorld(game.fastTrackWorld), die
         }); } catch (error) { throw new BadRequestException((error as Error).message); }
         await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(result.cash), fastTrackIncomeCents: BigInt(result.income), fastTrackCharity: result.charity } });
+        if (result.previousOwnerId) {
+          const sellerState = await tx.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: result.previousOwnerId } });
+          const sellerIncomeChange = cell.rule.kind === "business" || cell.rule.kind === "chance_business" ? cell.income : 0;
+          await tx.playerFinancialState.update({ where: { gamePlayerId: result.previousOwnerId }, data: {
+            cashCents: { increment: BigInt(result.cost) },
+            ...(sellerIncomeChange ? { fastTrackIncomeCents: { decrement: BigInt(sellerIncomeChange) } } : {})
+          } });
+          events.push({ type: "fast_track:sold", gamePlayerId: result.previousOwnerId, payload: {
+            cellIndex: cell.index, title: cell.label, buyerGamePlayerId: player.id, amountCents: result.cost,
+            beforeCashCents: Number(sellerState.cashCents), afterCashCents: Number(sellerState.cashCents) + result.cost,
+            incomeChangeCents: -sellerIncomeChange, kind: cell.rule.kind
+          } });
+        }
         await tx.game.update({ where: { id: gameId }, data: { fastTrackWorld: result.world as unknown as Prisma.InputJsonValue } });
         if (die) events.push({ type: "fast_track:investment_roll", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, die, success: result.success } });
-        events.push({ type: "fast_track:purchased", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, costCents: result.cost, success: result.success, incomeCents: result.income, previousIncomeCents: Number(state.fastTrackIncomeCents), incomeChangeCents: result.income - Number(state.fastTrackIncomeCents), beforeCashCents: Number(state.cashCents), afterCashCents: result.cash, kind: cell.rule.kind } });
+        events.push({ type: "fast_track:purchased", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label, costCents: result.cost, success: result.success, previousOwnerId: result.previousOwnerId, incomeCents: result.income, previousIncomeCents: Number(state.fastTrackIncomeCents), incomeChangeCents: result.income - Number(state.fastTrackIncomeCents), beforeCashCents: Number(state.cashCents), afterCashCents: result.cash, kind: cell.rule.kind } });
         won = result.won;
       } else events.push({ type: "fast_track:declined", gamePlayerId: player.id, payload: { cellIndex: cell.index, title: cell.label } });
       await tx.game.update({ where: { id: gameId }, data: { settings: this.settingsWithPending(game.settings, null), ...(won ? { status: GameStatus.ENDED, endedAt: new Date() } : {}) } });
@@ -1407,7 +1422,7 @@ export class GamesService {
         include: {
           players: {
             where: { role: GameRole.PLAYER, status: "JOINED" },
-            include: { financialState: true },
+            include: { financialState: true, liabilities: true },
             orderBy: { seat: "asc" }
           }
         }
@@ -1419,7 +1434,7 @@ export class GamesService {
           include: {
             players: {
               where: { role: GameRole.PLAYER, status: "JOINED" },
-              include: { financialState: true },
+              include: { financialState: true, liabilities: true },
               orderBy: { seat: "asc" }
             }
           }
@@ -1458,6 +1473,18 @@ export class GamesService {
         currentPlayer.financialState.bankruptcyStatus === BankruptcyStatus.LIQUIDATING
       ) {
         throw new BadRequestException("Завершите процедуру банкротства перед броском кубика");
+      }
+
+      if (
+        game.rulesVersion === 2 &&
+        isDreamCell(currentPlayer.dreamCellIndex) &&
+        canEscapeRatRace(
+          Number(currentPlayer.financialState.passiveIncomeCents),
+          Number(currentPlayer.financialState.totalExpensesCents),
+          currentPlayer.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n)
+        )
+      ) {
+        throw new BadRequestException("Условия выхода выполнены. Перейдите на большой круг перед броском кубика");
       }
 
       if (currentPlayer.financialState.bankruptcyTurns > 0) {

@@ -19,7 +19,7 @@ function gameEvent(type: string, payload: Record<string, unknown>): GameEvent {
   };
 }
 
-test("показывает полученный cashflow как результат, изменение и прежнюю сумму", () => {
+test("показывает полученный cashflow от прежней суммы к новой", () => {
   const change = eventCashChange(
     gameEvent("paycheck:receive", {
       beforeCashCents: 65_600,
@@ -31,11 +31,9 @@ test("показывает полученный cashflow как результа
   assert.ok(change);
   assert.deepEqual(cashChangeExpression(change), {
     kind: "equation",
-    result: money(69_450),
-    firstOperand: money(3_850),
-    operator: "+",
-    secondOperand: money(65_600),
-    changedOperand: "first"
+    before: money(65_600),
+    after: money(69_450),
+    delta: `+${money(3_850)}`
   });
   assert.deepEqual(
     compactPlayerActionDetails(
@@ -49,7 +47,7 @@ test("показывает полученный cashflow как результа
   );
 });
 
-test("показывает покупку как результат, прежнюю сумму и расход", () => {
+test("показывает покупку от прежней суммы к новой", () => {
   const change = eventCashChange(
     gameEvent("deal:buy", {
       beforeCashCents: 1_504,
@@ -61,11 +59,9 @@ test("показывает покупку как результат, прежн�
   assert.ok(change);
   assert.deepEqual(cashChangeExpression(change), {
     kind: "equation",
-    result: money(504),
-    firstOperand: money(1_504),
-    operator: "−",
-    secondOperand: money(1_000),
-    changedOperand: "second"
+    before: money(1_504),
+    after: money(504),
+    delta: `−${money(1_000)}`
   });
 });
 

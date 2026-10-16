@@ -1,4 +1,4 @@
-import { fastTrackCells, type FastTrackCell, type FastTrackWorld } from "@cashflow/shared";
+import { fastTrackCells, fastTrackOwner, type FastTrackCell, type FastTrackWorld } from "@cashflow/shared";
 import { money } from "../../lib/format";
 import type { GamePlayer } from "../../lib/types";
 
@@ -16,7 +16,6 @@ export function fastTrackCellEffect(cell: FastTrackCell) {
 }
 
 export function purchasedFastTrackCells(player: GamePlayer, world: FastTrackWorld) {
-  return fastTrackCells.filter((cell) => world.owners[cell.index] === player.id
-    || world.dreamPurchases[cell.index]?.includes(player.id)
+  return fastTrackCells.filter((cell) => fastTrackOwner(cell, world) === player.id
     || (cell.rule.kind === "charity" && player.financialState?.fastTrackCharity));
 }

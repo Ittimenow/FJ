@@ -13,7 +13,8 @@ export function MobileTurnDialog({
   diceCount,
   maxCompactViewportWidth,
   onRoll,
-  onSkip
+  onSkip,
+  rollLabel
 }: {
   open: boolean;
   rolling: boolean;
@@ -23,7 +24,8 @@ export function MobileTurnDialog({
   diceCount: number;
   maxCompactViewportWidth: number;
   onRoll: () => void;
-  onSkip: () => void;
+  onSkip?: (() => void) | undefined;
+  rollLabel?: string | undefined;
 }) {
   const [mobileViewport, setMobileViewport] = useState(false);
 
@@ -47,7 +49,7 @@ export function MobileTurnDialog({
       >
         <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0 text-[#7b3f17]">
           <h3 className="text-sm font-semibold">Ваш ход</h3>
-          <button
+          {onSkip ? <button
             type="button"
             className="mt-0.5 rounded-md text-xs font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onSkip}
@@ -56,7 +58,7 @@ export function MobileTurnDialog({
             title="Пропустить ход"
           >
             Пропустить ход
-          </button>
+          </button> : null}
         </div>
         {!showDice ? <Button
           type="button"
@@ -66,7 +68,7 @@ export function MobileTurnDialog({
           disabled={rolling || disabled}
           aria-busy={rolling}
         >
-          {rolling ? "Бросаем…" : diceCount > 1 ? "Бросить кубики" : "Бросить кубик"}
+          {rolling ? "Бросаем…" : rollLabel ?? (diceCount > 1 ? "Бросить кубики" : "Бросить кубик")}
         </Button> : <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">

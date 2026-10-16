@@ -1,6 +1,6 @@
 "use client";
 
-import { fastTrackCells, fastTrackPrice, readFastTrackWorld, type FastTrackCell } from "@cashflow/shared";
+import { fastTrackCells, fastTrackOwner, fastTrackPrice, readFastTrackWorld, type FastTrackCell } from "@cashflow/shared";
 import { BriefcaseBusiness, Dices, UserRound } from "lucide-react";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { money } from "@/lib/format";
@@ -124,7 +124,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
         <span className="fast-track-start-tokens">{players.filter((item) => item.track === "FAST_TRACK" && (movement.positions.get(item.id) ?? item.fastTrackPosition ?? -1) < 0).map((item) => <GamePlayerMark key={item.id} player={item} size="sm" />)}</span>
         {fastTrackCells.map((cell) => {
           const onCell = players.filter((item) => item.track === "FAST_TRACK" && (movement.positions.get(item.id) ?? item.fastTrackPosition) === cell.index);
-          const owners = snapshot.players.filter((item) => world.owners[cell.index] === item.id || world.dreamPurchases[cell.index]?.includes(item.id)
+          const owners = snapshot.players.filter((item) => fastTrackOwner(cell, world) === item.id
             || (cell.rule.kind === "charity" && item.financialState?.fastTrackCharity));
           const price = focusPlayer ? fastTrackPrice(cell, focusPlayer.id, focusPlayer.dreamCellIndex ?? null, world) : cell.cost;
           const effect = fastTrackCellEffect(cell);
@@ -214,6 +214,6 @@ function PurchasedCard({ cell }: { cell: FastTrackCell }) {
   const effect = fastTrackCellEffect(cell);
   return <article className={`purchased-card cell-${cell.type}`} aria-label={`Приобретено: ${cell.label}`}>
     <h5>{cell.label}</h5>
-    <dl><div><dt>{cell.rule.kind === "dream" ? "Базовая стоимость" : "Стоимость"}</dt><dd>{money(cell.cost)}</dd></div>{effect ? <div><dt>Эффект</dt><dd>{effect}</dd></div> : null}</dl>
+    <dl><div><dt>Первоначальная стоимость</dt><dd>{money(cell.cost)}</dd></div>{effect ? <div><dt>Эффект</dt><dd>{effect}</dd></div> : null}</dl>
   </article>;
 }

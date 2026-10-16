@@ -171,7 +171,8 @@ export function eventHeadline(event: GameEvent) {
     case "player:dream_chosen": return `Выбрана мечта «${payload.title ?? ""}»`;
     case "fast_track:cashflow": return `Доход CASHFLOW: +${formatWholeMoney(payload.amountCents)}`;
     case "fast_track:expense": return `${payload.title}: −${formatWholeMoney(payload.amountCents)}`;
-    case "fast_track:purchased": return payload.success === false ? `Инвестиция не принесла доход: ${payload.title}` : `Оплачено: ${payload.title}`;
+    case "fast_track:purchased": return payload.success === false ? `Инвестиция не принесла доход: ${payload.title}` : `${payload.previousOwnerId ? "Выкуплено" : "Оплачено"}: ${payload.title}`;
+    case "fast_track:sold": return `Продано: ${payload.title}`;
     case "fast_track:investment_roll": return `Бросок инвестиции: ${payload.die} · ${payload.success ? "успех" : "неудача"}`;
     case "fast_track:declined": return `Отказ: ${payload.title}`;
     case "fast_track:dream_influence": return `Цена чужой мечты увеличена: ${payload.title}`;
