@@ -214,9 +214,8 @@ export function GameRoom({
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [changingParticipation, setChangingParticipation] = useState(false);
-  const [figurinePickerOpen, setFigurinePickerOpen] = useState(
-    initialSnapshot.game.status === "WAITING" && Boolean(initialMe && !initialMe.figurine)
-  );
+  const [figurinePickerOpen, setFigurinePickerOpen] = useState(false);
+  const [dreamPickerOpen, setDreamPickerOpen] = useState(false);
   const [figurineChoice, setFigurineChoice] = useState<string | null>(
     initialMe?.figurine ??
       (initialPreferredFigurine && !initialTakenFigurines.has(initialPreferredFigurine)
@@ -392,6 +391,10 @@ export function GameRoom({
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
   const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
+  const ownFigurine = me?.figurine;
+  const hasPlayerMembership = Boolean(me);
+  const choosingDream = snapshot.game.status === "WAITING" && snapshot.game.rulesVersion === 2 && Boolean(me) && (!isDreamCell(me?.dreamCellIndex) || dreamPickerOpen);
+  const choosingFigurine = snapshot.game.status === "WAITING" && Boolean(me) && !choosingDream && !me?.figurine;
   const showFastTrack = snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && (trackView ?? me?.track ?? currentPlayer?.track) === "FAST_TRACK";
   useEffect(() => { setTrackView(null); }, [me?.track, currentPlayer?.track]);
   const hasFastTrackPlayers = gamePlayers.some((player) => player.track === "FAST_TRACK");
@@ -599,17 +602,14 @@ export function GameRoom({
   );
   const currentStockSaleResetKey = stockSaleResetKey(stockSaleOffer);
   useEffect(() => {
-    if (snapshot.game.status !== "WAITING" || !me) {
+    if (snapshot.game.status !== "WAITING" || !hasPlayerMembership) {
       setFigurinePickerOpen(false);
       return;
     }
-    if (me.figurine) {
-      setFigurineChoice(me.figurine);
-      setFigurinePickerOpen(false);
-    } else {
-      setFigurinePickerOpen(true);
+    if (ownFigurine) {
+      setFigurineChoice(ownFigurine);
     }
-  }, [me, snapshot.game.status]);
+  }, [hasPlayerMembership, ownFigurine, snapshot.game.status]);
 
   useEffect(() => {
     setGameRoomHeader({
@@ -787,6 +787,7 @@ export function GameRoom({
       }
       setSnapshot(result.snapshot ?? result);
       setFigurinePickerOpen(false);
+      if (snapshot.game.mode === "SOLO") await startGame();
     } catch (event) {
       setError(gameErrorMessage(event, "Не удалось выбрать фигурку"));
     } finally {
@@ -922,7 +923,7 @@ export function GameRoom({
   }
 
   async function fastAction(path: string, body: Record<string, unknown> = {}) {
-    if (fastBusy) return;
+    if (fastBusy) return false;
     setFastBusy(true);
     setError(null);
     try {
@@ -933,7 +934,8 @@ export function GameRoom({
       if (!response.ok) throw new Error(Array.isArray(result.message) ? result.message.join(". ") : result.message ?? "Не удалось выполнить действие");
       applyActionResult(result as GameActionResult);
       if (path === "fast-track/enter") setTrackView("FAST_TRACK");
-    } catch (caught) { setError(gameErrorMessage(caught, "Не удалось выполнить действие")); }
+      return true;
+    } catch (caught) { setError(gameErrorMessage(caught, "Не удалось выполнить действие")); return false; }
     finally { setFastBusy(false); }
   }
 
@@ -1379,9 +1381,36 @@ export function GameRoom({
           {error}
         </div>
       ) : null}
-      {snapshot.game.rulesVersion === 2 && snapshot.game.status === "WAITING" && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => void fastAction("dream", { cellIndex })} /> : null}
+      {snapshot.game.status === "WAITING" && me ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-ink shadow-panel" aria-label="Этапы подготовки партии">
+          <span className={choosingDream ? "text-journey" : "text-success"}>1. Мечта</span>
+          <span className="text-muted" aria-hidden="true">→</span>
+          <span className={choosingFigurine ? "text-journey" : me.figurine ? "text-success" : "text-muted"}>2. Фишка</span>
+          <span className="text-muted" aria-hidden="true">→</span>
+          <span className="text-muted">3. Игровое поле</span>
+        </div>
+      ) : null}
+      {choosingDream && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => { void fastAction("dream", { cellIndex }).then((saved) => { if (saved) setDreamPickerOpen(false); }); }} /> : null}
+      {choosingFigurine ? (
+        <section className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="choose-figurine-title">
+          <h2 id="choose-figurine-title" className="text-xl font-extrabold">Выберите фишку</h2>
+          <p className="mt-2 text-sm leading-6">Она будет представлять вас на обоих игровых кругах. У каждого игрока своя фишка.</p>
+          {me && isDreamCell(me.dreamCellIndex) ? (
+            <div className="mt-4 flex items-center gap-3 rounded-xl bg-card p-2 sm:p-3">
+              <img src={`/dreams/${me.dreamCellIndex}.webp`} alt="" width={96} height={64} className="aspect-[3/2] w-24 shrink-0 rounded-lg object-cover" />
+              <div className="min-w-0"><p className="text-xs text-muted">Ваша мечта</p><p className="font-extrabold">{fastTrackCells[me.dreamCellIndex]!.label}</p>
+                <button type="button" className="mt-1 min-h-9 text-sm font-bold text-journey underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey" onClick={() => setDreamPickerOpen(true)}>Изменить мечту</button>
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4 max-h-[min(65vh,600px)] overflow-y-auto pr-1"><FigurinePicker value={figurineChoice} taken={takenFigurines} onChange={setFigurineChoice} disabled={figurineSaving} /></div>
+          <Button type="button" variant="action" className="mt-4" onClick={chooseFigurine} disabled={!figurineChoice || figurineSaving || takenFigurines.includes(figurineChoice)}>
+            {figurineSaving ? "Сохраняем…" : "Выбрать фишку"}
+          </Button>
+        </section>
+      ) : null}
 
-      {snapshot.game.status === "WAITING" ? (
+      {snapshot.game.status === "WAITING" && !choosingDream && !choosingFigurine ? (
         <WaitingRoomOverview
           snapshot={snapshot}
           isSolo={isSolo}
@@ -1397,6 +1426,7 @@ export function GameRoom({
           changingParticipation={changingParticipation}
           onChangeParticipation={changeHostParticipation}
           currentPlayer={me}
+          onChooseDream={() => setDreamPickerOpen(true)}
           onChooseFigurine={() => setFigurinePickerOpen(true)}
         />
       ) : null}
@@ -2382,6 +2412,7 @@ function WaitingRoomOverview({
   changingParticipation,
   onChangeParticipation,
   currentPlayer,
+  onChooseDream,
   onChooseFigurine
 }: {
   snapshot: GameSnapshot;
@@ -2398,6 +2429,7 @@ function WaitingRoomOverview({
   changingParticipation: boolean;
   onChangeParticipation: (participates: boolean) => void;
   currentPlayer: GamePlayer | undefined;
+  onChooseDream: () => void;
   onChooseFigurine: () => void;
 }) {
   const players = snapshot.players.filter((player) => player.status === "JOINED");
@@ -2476,24 +2508,21 @@ function WaitingRoomOverview({
         )}
         {currentPlayer ? (
           <div className="mt-3 flex flex-col gap-3 rounded-xl bg-card p-4 text-sm min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+            {snapshot.game.rulesVersion === 2 && isDreamCell(currentPlayer.dreamCellIndex) ? (
+              <img src={`/dreams/${currentPlayer.dreamCellIndex}.webp`} alt="" width={96} height={64} loading="lazy" className="aspect-[3/2] w-24 shrink-0 rounded-lg object-cover" />
+            ) : null}
             <div className="min-w-0">
               <div className="font-extrabold text-ink">
-                {currentPlayer.figurine ? "Ваша фигурка выбрана" : "Выберите свою фигурку"}
+                Ваша мечта и фишка выбраны
               </div>
               <p className="mt-1 text-xs text-muted">
-                {gamePlayers.length - readyPlayers.length > 0
-                  ? `Без фигурки: ${gamePlayers.length - readyPlayers.length}`
-                  : "Все игроки выбрали фигурки."}
+                {isDreamCell(currentPlayer.dreamCellIndex) ? fastTrackCells[currentPlayer.dreamCellIndex]!.label : "Партия готова к запуску"}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-9 w-full shrink-0 px-3 text-xs min-[420px]:w-auto"
-              onClick={onChooseFigurine}
-            >
-              {currentPlayer.figurine ? "Сменить фигурку" : "Выбрать фигурку"}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              {snapshot.game.rulesVersion === 2 ? <Button type="button" variant="secondary" className="h-9 px-3 text-xs" onClick={onChooseDream}>Сменить мечту</Button> : null}
+              <Button type="button" variant="secondary" className="h-9 px-3 text-xs" onClick={onChooseFigurine}>Сменить фишку</Button>
+            </div>
           </div>
         ) : null}
         {canManage && !isSolo ? (

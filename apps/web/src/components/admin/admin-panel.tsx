@@ -328,7 +328,7 @@ function AdminDashboard({
             <CardTitle className="text-xl">Новая комната</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            <CreateGameForm token={token} allowCardSetSelection allowTesting />
+            <CreateGameForm token={token} allowCardSetSelection />
             <div className="border-t border-line pt-4">
               <JoinGameForm token={token} />
             </div>

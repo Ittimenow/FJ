@@ -45,6 +45,10 @@ export function FigurinePicker({
             <img
               src={figurineImagePath(figurine.id)}
               alt=""
+              width={64}
+              height={64}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full rounded-lg object-cover"
             />
             {isTaken ? (

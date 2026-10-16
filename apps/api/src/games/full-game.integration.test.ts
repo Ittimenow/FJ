@@ -52,12 +52,14 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
     await t.test("dream choice is compulsory and only accepts dream cells", async () => {
       snapshot = await solo();
       assert.equal(snapshot.game.rulesVersion, 2);
-      await assert.rejects(service.startGame(snapshot.game.id, admin!.id), /мечту/);
+      assert.equal(snapshot.players.find((p: any) => p.userId === admin!.id).figurine, null);
+      await assert.rejects(service.startGame(snapshot.game.id, admin!.id), /фигурки/);
       await assert.rejects(service.chooseDream(snapshot.game.id, admin!.id, 1), /клетку мечты/);
       await assert.rejects(service.chooseDream(snapshot.game.id, user!.id, 0), /не играете/);
       snapshot = (await service.chooseDream(snapshot.game.id, admin!.id, 0) as any).snapshot;
       assert.equal(snapshot.players.find((p: any) => p.userId === admin!.id).dreamCellIndex, 0);
       assert.equal((await service.getGame(snapshot.game.id, admin!.id) as any).players[0].dreamCellIndex, 0);
+      snapshot = (await service.chooseFigurine(snapshot.game.id, admin!.id, figurines[0]!.id) as any).snapshot;
       await db.user.update({ where: { id: admin!.id }, data: { role: "HOST" } });
       try { await assert.rejects(service.startGame(snapshot.game.id, admin!.id), /только администратору/); }
       finally { await db.user.update({ where: { id: admin!.id }, data: { role: "ADMIN" } }); }
@@ -132,6 +134,7 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
     await t.test("normal game continues after freedom, transfers once, and wins on income", async () => {
       snapshot = await solo(false);
       snapshot = (await service.chooseDream(snapshot.game.id, admin!.id, 0) as any).snapshot;
+      snapshot = (await service.chooseFigurine(snapshot.game.id, admin!.id, figurines[0]!.id) as any).snapshot;
       snapshot = (await service.startGame(snapshot.game.id, admin!.id) as any).snapshot;
       const player = snapshot.players[0];
       assert.equal(player.track, "RAT_RACE");
@@ -160,6 +163,7 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
     });
     await t.test("legacy rooms start without dreams and still end at financial freedom", async () => {
       snapshot = await solo(false);
+      snapshot = (await service.chooseFigurine(snapshot.game.id, admin!.id, figurines[0]!.id) as any).snapshot;
       await db.game.update({ where: { id: snapshot.game.id }, data: { rulesVersion: 1 } });
       await db.gamePlayer.updateMany({ where: { gameId: snapshot.game.id }, data: { dreamCellIndex: null } });
       snapshot = (await service.startGame(snapshot.game.id, admin!.id) as any).snapshot;

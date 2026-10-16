@@ -60,5 +60,5 @@ export function isFigurineId(value: string): value is FigurineId {
 }
 
 export function figurineImagePath(id: FigurineId | string) {
-  return `/figurines/${id}.png`;
+  return `/figurines/${id}.webp`;
 }

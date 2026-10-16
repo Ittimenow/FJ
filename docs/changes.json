@@ -4,6 +4,26 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "guide-dream-and-figurine-before-board",
+          "category": "improvement",
+          "summary": "Перед началом партии игрок последовательно выбирает мечту с иллюстрацией и фишку, а затем переходит на игровое поле."
+        },
+        {
+          "id": "optimize-dream-and-figurine-images",
+          "category": "improvement",
+          "summary": "Изображения мечт и фишек загружаются быстрее благодаря уменьшенному размеру и современному формату."
+        },
+        {
+          "id": "interleave-bots-with-people-at-start",
+          "category": "improvement",
+          "summary": "Перед стартом партии порядок ходов перемешивается, а боты распределяются между живыми игроками."
+        },
+        {
+          "id": "prefer-original-deck-and-simplify-creation",
+          "category": "improvement",
+          "summary": "При создании партии по умолчанию выбирается набор «Оригинал», а блок тестирования больше не показывается."
+        },
+        {
           "id": "download-card-workbook-as-binary-file",
           "category": "fix",
           "summary": "Выгрузка игровых карточек скачивается как открываемый Excel-файл вместо текста со списком байтов."

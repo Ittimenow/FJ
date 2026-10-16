@@ -1,7 +1,5 @@
 "use client";
 
-import { TestGameOptions, testOptionsFromForm } from "./test-game-options";
-
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,11 +23,9 @@ const requiredCardTypes = [
 
 export function CreateGameForm({
   token,
-  allowTesting = false,
   allowCardSetSelection = false
 }: {
   token: string;
-  allowTesting?: boolean;
   allowCardSetSelection?: boolean;
 }) {
   const router = useRouter();
@@ -54,13 +50,11 @@ export function CreateGameForm({
         const sets = (await response.json()) as GameCardSet[];
         if (cancelled) return;
         setCardSets(sets);
-        setCardSetId(
-          sets.find((set) => set.isDefault && isPlayableCardSet(set))?.id ??
-          sets.find(isPlayableCardSet)?.id ??
-          ""
-        );
+        const original = sets.find((set) => set.name.trim().toLocaleLowerCase("ru") === "оригинал" && isPlayableCardSet(set));
+        setCardSetId(original?.id ?? "");
+        if (!original) setCardSetsError("Набор «Оригинал» недоступен. Выберите другой заполненный набор.");
       } catch {
-        if (!cancelled) setCardSetsError("Не удалось загрузить наборы. Будет использован основной набор.");
+        if (!cancelled) setCardSetsError("Не удалось загрузить наборы. Обновите страницу и попробуйте снова.");
       } finally {
         if (!cancelled) setCardSetsLoading(false);
       }
@@ -83,7 +77,6 @@ export function CreateGameForm({
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          ...(allowTesting ? testOptionsFromForm(form) : {}),
           title: String(form.get("title") ?? ""),
           ...(allowCardSetSelection && cardSetId ? { cardSetId } : {}),
           timeLimitMinutes: Number(form.get("timeLimitMinutes") ?? 90),
@@ -93,7 +86,8 @@ export function CreateGameForm({
       });
 
       if (!response.ok) {
-        setError("Не удалось создать комнату. Проверьте настройки и попробуйте ещё раз.");
+        const result = await response.json().catch(() => null) as { message?: string | string[] } | null;
+        setError(typeof result?.message === "string" ? result.message : "Не удалось создать комнату. Проверьте настройки и попробуйте ещё раз.");
         return;
       }
 
@@ -189,7 +183,7 @@ export function CreateGameForm({
           <select
             id="game-card-set"
             value={cardSetId}
-            onChange={(event) => setCardSetId(event.target.value)}
+            onChange={(event) => { setCardSetId(event.target.value); setCardSetsError(null); }}
             className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
             disabled={cardSetsLoading || cardSets.length === 0}
           >
@@ -219,7 +213,6 @@ export function CreateGameForm({
               Math.floor((timeLimitMinutes * 60) / periodCount)
             )}. Между ними игра автоматически встанет на паузу.`}
       </p>
-      {allowTesting ? <TestGameOptions /> : null}
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">
           {error}

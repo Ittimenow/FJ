@@ -61,7 +61,7 @@ import { missingCardTypes } from "./card-set";
 import { JoinGameDto } from "./dto/join-game.dto";
 import { RepayLoanDto, TakeLoanDto } from "./dto/loan.dto";
 import { MarketSaleDecisionDto } from "./dto/market-sale.dto";
-import { nextAvailableSeat } from "./game-seating";
+import { interleavePlayers, nextAvailableSeat } from "./game-seating";
 import {
   gameTimeline,
   pauseGameTimeline,
@@ -414,10 +414,8 @@ export class GamesService {
               controller: PlayerController.HUMAN,
               seat: 1,
               color: playerColors[0] ?? null,
-              figurine: user.figurine && isFigurineId(user.figurine)
-                ? user.figurine
-                : null,
-              isReady: Boolean(user.figurine && isFigurineId(user.figurine)),
+              figurine: null,
+              isReady: false,
               position: -1
             },
             ...botPlayers
@@ -975,7 +973,19 @@ export class GamesService {
 
       const shuffledProfessions = [...professions].sort(() => Math.random() - 0.5);
 
-      for (const [index, player] of game.players.entries()) {
+      const turnOrder = game.mode === GameMode.SOLO
+        ? game.players
+        : interleavePlayers(game.players, (player) => player.controller === PlayerController.BOT);
+      if (game.mode !== GameMode.SOLO) {
+        await tx.gamePlayer.updateMany({
+          where: { id: { in: turnOrder.map((player) => player.id) } },
+          data: { seat: null }
+        });
+      }
+      for (const [index, player] of turnOrder.entries()) {
+        if (game.mode !== GameMode.SOLO) {
+          await tx.gamePlayer.update({ where: { id: player.id }, data: { seat: index + 1 } });
+        }
         const profession = shuffledProfessions[index % shuffledProfessions.length];
         if (!profession) continue;
         await tx.gamePlayer.update({
@@ -6087,10 +6097,10 @@ export class GamesService {
           select: { id: true, name: true }
         })
       : await this.prisma.cardSet.findFirst({
-          where: { isDefault: true },
+          where: { name: { equals: "Оригинал", mode: "insensitive" } },
           select: { id: true, name: true }
         });
-    if (!cardSet) throw new NotFoundException("Набор карточек не найден");
+    if (!cardSet) throw new NotFoundException(cardSetId ? "Набор карточек не найден" : "Набор «Оригинал» недоступен");
 
     const counts = await this.prisma.card.groupBy({
       by: ["cardType"],

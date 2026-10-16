@@ -1,7 +1,5 @@
 "use client";
 
-import { TestGameOptions, testOptionsFromForm } from "./test-game-options";
-
 import { Bot, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -15,7 +13,7 @@ type GameCardSet = {
   isDefault: boolean;
 };
 
-export function CreateSoloGameForm({ token, allowTesting = false }: { token: string; allowTesting?: boolean }) {
+export function CreateSoloGameForm({ token }: { token: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,10 +33,12 @@ export function CreateSoloGameForm({ token, allowTesting = false }: { token: str
         const sets = (await response.json()) as GameCardSet[];
         if (cancelled) return;
         setCardSets(sets);
-        setCardSetId(sets.find((set) => set.isDefault)?.id ?? sets[0]?.id ?? "");
+        const original = sets.find((set) => set.name.trim().toLocaleLowerCase("ru") === "оригинал");
+        setCardSetId(original?.id ?? "");
+        if (!original) setCardSetsError("Набор «Оригинал» недоступен. Выберите другой набор.");
       } catch {
         if (!cancelled) {
-          setCardSetsError("Не удалось загрузить наборы. Будет использован основной набор.");
+          setCardSetsError("Не удалось загрузить наборы. Обновите страницу и попробуйте снова.");
         }
       } finally {
         if (!cancelled) setCardSetsLoading(false);
@@ -62,13 +62,13 @@ export function CreateSoloGameForm({ token, allowTesting = false }: { token: str
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          ...(allowTesting ? testOptionsFromForm(form) : {}),
           botCount: Number(form.get("botCount") ?? 1),
           ...(cardSetId ? { cardSetId } : {})
         })
       });
       if (!response.ok) {
-        setError("Не удалось подготовить одиночную партию. Попробуйте ещё раз.");
+        const result = await response.json().catch(() => null) as { message?: string | string[] } | null;
+        setError(typeof result?.message === "string" ? result.message : "Не удалось подготовить одиночную партию. Попробуйте ещё раз.");
         return;
       }
       const snapshot = (await response.json()) as GameSnapshot;
@@ -117,13 +117,13 @@ export function CreateSoloGameForm({ token, allowTesting = false }: { token: str
           <select
             id="solo-card-set"
             value={cardSetId}
-            onChange={(event) => setCardSetId(event.target.value)}
+            onChange={(event) => { setCardSetId(event.target.value); setCardSetsError(null); }}
             disabled={cardSetsLoading || cardSets.length === 0}
             className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
           >
             {cardSetsLoading ? <option value="">Загружаем наборы…</option> : null}
             {!cardSetsLoading && cardSets.length === 0 ? (
-              <option value="">Основной набор</option>
+              <option value="">Нет доступных наборов</option>
             ) : null}
             {cardSets.map((set) => (
               <option key={set.id} value={set.id}>
@@ -143,7 +143,6 @@ export function CreateSoloGameForm({ token, allowTesting = false }: { token: str
         <ShieldCheck className="mt-0.5 shrink-0 text-[#7655c7]" size={15} aria-hidden="true" />
         Сбалансированные боты видят только открытые карточки и текущее состояние партии.
       </p>
-      {allowTesting ? <TestGameOptions /> : null}
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">
           {error}
@@ -153,7 +152,7 @@ export function CreateSoloGameForm({ token, allowTesting = false }: { token: str
         type="submit"
         variant="action"
         className="w-full"
-        disabled={loading || cardSetsLoading}
+        disabled={loading || cardSetsLoading || !cardSetId}
         aria-busy={loading || cardSetsLoading}
       >
         {loading ? "Готовим соперников..." : "Начать одиночную игру"}
