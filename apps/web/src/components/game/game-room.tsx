@@ -15,6 +15,7 @@ import {
   bankLoanPaymentCents,
   canEscapeRatRace,
   dealDownPaymentAmount,
+  isDealAuctionOpportunity,
   figurineImagePath,
   isBabyGiftWindowOpen,
   outstandingBankLoanBalanceCents,
@@ -567,7 +568,7 @@ export function GameRoom({
           name: gamePlayerName(player),
           status: !response
             ? "waiting"
-            : response.amountCents === null
+            : response.amountCents === null && !response.hasBid
               ? "declined"
               : "offered",
           amountCents: response?.amountCents ?? null
@@ -6784,22 +6785,8 @@ function latestDealCard(
     isStock,
     isAuctionEligible:
       !isStock &&
-      (category === "business" || isRentalRealEstateText(`${category} ${subcategory} ${title} ${bodyText}`))
+      isDealAuctionOpportunity(category, `${category} ${subcategory} ${title} ${bodyText}`)
   };
-}
-
-function isRentalRealEstateText(value: string) {
-  const normalized = value.toLowerCase().replace(/ё/g, "е");
-  if (
-    /part\s*time|брат\s+просит|другу\s+срочно|монет|гектар|свободная\s+земл|циркониев/.test(
-      normalized
-    )
-  ) {
-    return false;
-  }
-  return /(?:^|\s)(?:2у|3m|3м)(?:\s|$)|plex|duplex|коттедж|таунхаус|апартамент|квартирн(?:ый|ого)\s+(?:дом|комплекс)|дом:\s*\$/.test(
-    normalized
-  );
 }
 
 function stockSaleOfferForPlayer(

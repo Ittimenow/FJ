@@ -2,6 +2,8 @@ import { fastTrackCells, canEscapeRatRace } from "@cashflow/shared";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
   AssetStatus,
+  BankruptcyStatus,
+  BoardTrack,
   CardType,
   GamePlayerStatus,
   GameRole,
@@ -40,6 +42,7 @@ type BotPendingAction =
       gamePlayerId: string;
       cardId: number;
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      auctionAttempted?: boolean;
     }
   | {
       type: "stock_sale_window";
@@ -94,6 +97,7 @@ type BotAction =
   | { type: "take_loan"; playerId: string; amountCents: number; reason: string }
   | { type: "repay_loan"; playerId: string; liabilityId: string; amountCents: number; reason: string }
   | { type: "decline_deal"; playerId: string; reason: string }
+  | { type: "start_auction"; playerId: string; cardId: number; reason: string }
   | { type: "bid_auction"; playerId: string; amountCents: number; reason: string }
   | { type: "decline_auction"; playerId: string; reason: string }
   | { type: "select_auction"; playerId: string; buyerGamePlayerId: string; reason: string }
@@ -279,7 +283,7 @@ export class GamesBotService implements OnModuleInit {
       if (!offeredPlayer || offeredPlayer.controller !== PlayerController.BOT) {
         return null;
       }
-      return this.pendingActionForBot(offeredPlayer, pending);
+      return this.pendingActionForBot(offeredPlayer, pending, game.players);
     }
     if (pending?.type === "deal_auction") {
       const unresolvedBotBidder = game.players.find(
@@ -297,10 +301,26 @@ export class GamesBotService implements OnModuleInit {
       if (!resolved) return null;
       const seller = game.players.find((player) => player.id === pending.gamePlayerId);
       if (!seller || seller.controller !== PlayerController.BOT) return null;
+      const card = await this.prisma.card.findUnique({
+        where: { id: pending.cardId },
+        include: { meta: true, effects: true }
+      });
+      const meta = card
+        ? Object.fromEntries(card.meta.map((item) => [item.metaKey, item.metaValue]))
+        : {};
+      const downPaymentCents = card ? this.dealUnitCost(card, meta, false) : 0;
       const bestOffer = [...pending.responses]
         .filter(
           (response): response is { gamePlayerId: string; amountCents: number } =>
-            response.amountCents !== null
+            response.amountCents !== null &&
+            card !== null &&
+            game.players.some(
+              (player) =>
+                player.id === response.gamePlayerId &&
+                player.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED &&
+                (player.financialState?.cashCents ?? 0n) >=
+                  BigInt(downPaymentCents) + BigInt(response.amountCents ?? 0)
+            )
         )
         .sort((left, right) => right.amountCents - left.amountCents)[0];
       return bestOffer
@@ -313,7 +333,7 @@ export class GamesBotService implements OnModuleInit {
         : {
             type: "cancel_auction",
             playerId: seller.id,
-            reason: "другие игроки отказались от покупки возможности"
+            reason: "нет доступных предложений на покупку возможности"
           } satisfies BotAction;
     }
 
@@ -323,7 +343,7 @@ export class GamesBotService implements OnModuleInit {
     }
 
     if (pending && pending.gamePlayerId !== current.id) return null;
-    if (pending) return this.pendingActionForBot(current, pending);
+    if (pending) return this.pendingActionForBot(current, pending, game.players);
 
     if (current.financialState.bankruptcyStatus === "LIQUIDATING") {
       return this.bankruptcyAction(current);
@@ -352,7 +372,7 @@ export class GamesBotService implements OnModuleInit {
     return { type: "roll", playerId: current.id } satisfies BotAction;
   }
 
-  private async pendingActionForBot(player: BotPlayer, pending: BotPendingAction) {
+  private async pendingActionForBot(player: BotPlayer, pending: BotPendingAction, players: BotPlayer[]) {
     if (pending.type === "fast_track_choice") {
       const cell = fastTrackCells[pending.cellIndex]!;
       const canAfford = Number(player.financialState?.cashCents ?? 0n) >= pending.priceCents;
@@ -375,7 +395,7 @@ export class GamesBotService implements OnModuleInit {
     if (pending.type === "deal_card_drawn" || pending.type === "stock_sale_window") {
       const card = await this.prisma.card.findUnique({
         where: { id: pending.cardId },
-        include: { meta: true, effects: true }
+        include: { meta: true, effects: true, conditions: true }
       });
       if (!card) {
         return {
@@ -396,6 +416,24 @@ export class GamesBotService implements OnModuleInit {
         cashflowCents
       });
       if (!decision.buy) {
+        if (
+          pending.type === "deal_card_drawn" &&
+          !pending.auctionAttempted &&
+          this.games.isDealAuctionEligible(card) &&
+          players.some(
+            (candidate) =>
+              candidate.id !== player.id &&
+              candidate.track !== BoardTrack.FAST_TRACK &&
+              candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
+          )
+        ) {
+          return {
+            type: "start_auction",
+            playerId: player.id,
+            cardId: pending.cardId,
+            reason: "предлагаю другим игрокам возможность, которую сам не покупаю"
+          } satisfies BotAction;
+        }
         return {
           type: "decline_deal",
           playerId: player.id,
@@ -574,6 +612,8 @@ export class GamesBotService implements OnModuleInit {
         });
       case "decline_deal":
         return this.games.declineDeal(gameId, actorId);
+      case "start_auction":
+        return this.games.startDealAuction(gameId, actorId, { cardId: action.cardId });
       case "bid_auction":
         return this.games.bidOnDealAuction(gameId, actorId, {
           amountCents: action.amountCents

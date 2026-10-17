@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { BankruptcyStatus, CardType, GameRole, GameStatus } from "@prisma/client";
-import { GamesService } from "./games.service";
+import { isDealAuctionOpportunity } from "@cashflow/shared";
+import { GamesService, sealedDealAuctionResponses } from "./games.service";
 
 const card = {
   id: 42,
@@ -167,6 +168,67 @@ test("начинает аукцион недвижимости для остал
   });
 });
 
+test("разрешает аукцион квартиры малого круга, даже если в названии нет номера дома", async () => {
+  const apartment = {
+    ...card,
+    title: "Квартира на продажу: $40,000, +$140/мес",
+    bodyText: "Первоначальный взнос $4,000"
+  };
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: apartment.id,
+    cardType: CardType.SMALL_DEAL
+  }, apartment);
+
+  await setup.service.startDealAuction("game-1", seller.userId, { cardId: apartment.id });
+  assert.equal(setup.game.settings.pendingAction.type, "deal_auction");
+  await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1_000 });
+  await setup.service.declineDealAuction("game-1", secondBuyer.userId);
+  await setup.service.selectDealAuctionOffer("game-1", seller.userId, {
+    buyerGamePlayerId: buyer.id
+  });
+  assert.equal(setup.assets[0]?.gamePlayerId, buyer.id);
+  assert.equal(setup.states.get(seller.id)?.cashCents, 1_000n);
+});
+
+test("проверка предложения одинаково распознаёт недвижимость и исключает посторонние карты", () => {
+  assert.equal(isDealAuctionOpportunity("realestate", "Квартира на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("realestate", "Дом на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("business", "Предприятие на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("other", "3M дом на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("stock", "Акции компании"), false);
+  assert.equal(isDealAuctionOpportunity("other", "Редкая золотая монета"), false);
+});
+
+test("суммы закрытых ставок отсутствуют в общем состоянии до последнего ответа", () => {
+  const responses = [
+    { gamePlayerId: buyer.id, amountCents: 1_234 },
+    { gamePlayerId: secondBuyer.id, amountCents: null }
+  ];
+  assert.deepEqual(sealedDealAuctionResponses(responses), [
+    { gamePlayerId: buyer.id, amountCents: null, hasBid: true },
+    { gamePlayerId: secondBuyer.id, amountCents: null }
+  ]);
+  assert.equal(responses[0]?.amountCents, 1_234);
+  const service = fixture({}).service;
+  const publicPendingAction = (service as unknown as {
+    publicPendingAction: (pending: unknown) => unknown;
+  }).publicPendingAction.bind(service);
+  const incomplete = {
+    type: "deal_auction",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL,
+    bidderGamePlayerIds: [buyer.id, secondBuyer.id],
+    responses: [responses[0]]
+  };
+  assert.deepEqual((publicPendingAction(incomplete) as typeof incomplete).responses, [
+    { gamePlayerId: buyer.id, amountCents: null, hasBid: true }
+  ]);
+  assert.deepEqual(publicPendingAction({ ...incomplete, responses }), { ...incomplete, responses });
+});
+
 test("разрешает аукцион карточки бизнеса и записывает бизнес покупателю", async () => {
   const business = {
     ...card,
@@ -215,6 +277,53 @@ test("автоматически отказывает игрокам без вз
   }
 });
 
+test("отклоняет недопустимую ставку и повторный ответ", async () => {
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL
+  });
+  await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
+  for (const amountCents of [0, -100, 1.5, Number.MAX_SAFE_INTEGER + 1, 5_001]) {
+    await assert.rejects(
+      setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents }),
+      BadRequestException
+    );
+  }
+  assert.deepEqual(setup.game.settings.pendingAction.responses, []);
+  await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1 });
+  await assert.rejects(
+    setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 2 }),
+    ConflictException
+  );
+});
+
+test("до ответов всех игроков продавец не выбирает победителя, а после может закрыть аукцион", async () => {
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL
+  });
+  await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
+  await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1_000 });
+  await assert.rejects(
+    setup.service.selectDealAuctionOffer("game-1", seller.userId, {
+      buyerGamePlayerId: buyer.id
+    }),
+    BadRequestException
+  );
+  await setup.service.declineDealAuction("game-1", secondBuyer.userId);
+  await setup.service.cancelDealAuction("game-1", seller.userId);
+  assert.equal(setup.game.settings.pendingAction.type, "deal_card_drawn");
+  assert.equal(setup.game.settings.pendingAction.auctionAttempted, true);
+  assert.equal(setup.states.get(seller.id)?.cashCents, 0n);
+  assert.equal(setup.states.get(buyer.id)?.cashCents, 10_000n);
+  assert.equal(setup.assets.length, 0);
+  assert.equal(setup.advancedTurns(), 0);
+});
+
 test("когда ни у кого нет денег, аукцион сразу возвращает карточку владельцу", async () => {
   const setup = fixture({
     type: "deal_card_drawn",
@@ -227,6 +336,7 @@ test("когда ни у кого нет денег, аукцион сразу �
   try {
     await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
     assert.equal(setup.game.settings.pendingAction.type, "deal_card_drawn");
+    assert.equal(setup.game.settings.pendingAction.auctionAttempted, true);
   } finally {
     buyer.financialState.cashCents = 10_000n;
     secondBuyer.financialState.cashCents = 20_000n;
@@ -249,7 +359,8 @@ test("если все отказались, возвращает продавц�
     type: "deal_card_drawn",
     gamePlayerId: seller.id,
     cardId: card.id,
-    cardType: CardType.SMALL_DEAL
+    cardType: CardType.SMALL_DEAL,
+    auctionAttempted: true
   });
   assert.equal(setup.advancedTurns(), 0);
 });

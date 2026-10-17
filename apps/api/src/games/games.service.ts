@@ -27,6 +27,7 @@ import {
   bankLoanPaymentCents,
   cardActionTypes,
   dealDownPaymentAmount,
+  isDealAuctionOpportunity,
   isBabyGiftWindowOpen,
   canEscapeRatRace,
   legacyCardEffectAliases,
@@ -143,6 +144,7 @@ type GamePendingAction =
       gamePlayerId: string;
       cardId: number;
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      auctionAttempted?: boolean;
     }
   | {
       type: "stock_sale_window";
@@ -164,6 +166,7 @@ type GamePendingAction =
       responses: Array<{
         gamePlayerId: string;
         amountCents: number | null;
+        hasBid?: boolean;
       }>;
     }
   | {
@@ -209,6 +212,16 @@ interface GameSettings {
   pauseReason?: "manual" | "period_complete" | "player_left" | null;
   pausedAt?: string | null;
   cardDecks?: Partial<Record<CardType, CardDeckState>>;
+}
+
+export function sealedDealAuctionResponses(
+  responses: Array<{ gamePlayerId: string; amountCents: number | null }>
+) {
+  return responses.map((response) =>
+    response.amountCents === null
+      ? response
+      : { gamePlayerId: response.gamePlayerId, amountCents: null, hasBid: true }
+  );
 }
 
 interface CardDeckState {
@@ -2175,7 +2188,8 @@ export class GamesService {
             type: "deal_card_drawn",
             gamePlayerId: seller.id,
             cardId: card.id,
-            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL"
+            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
+            auctionAttempted: true
           }
         : {
             type: "deal_auction",
@@ -2260,6 +2274,9 @@ export class GamesService {
       }
 
       if (amountCents !== null) {
+        if (!Number.isSafeInteger(amountCents) || amountCents < 1) {
+          throw new BadRequestException("Цена предложения должна быть положительным целым числом");
+        }
         const card = await tx.card.findUnique({
           where: { id: pending.cardId },
           include: { meta: true, effects: true }
@@ -2289,7 +2306,8 @@ export class GamesService {
             type: "deal_card_drawn",
             gamePlayerId: pending.gamePlayerId,
             cardId: pending.cardId,
-            cardType: pending.cardType
+            cardType: pending.cardType,
+            auctionAttempted: true
           }
         : { ...pending, responses };
       const updated = await tx.game.updateMany({
@@ -2346,6 +2364,7 @@ export class GamesService {
         include: {
           players: {
             where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED },
+            include: { financialState: true },
             orderBy: { seat: "asc" }
           }
         }
@@ -2373,7 +2392,9 @@ export class GamesService {
         throw new BadRequestException("Выбранное предложение недоступно");
       }
       const buyer = game.players.find((candidate) => candidate.id === dto.buyerGamePlayerId);
-      if (!buyer) throw new BadRequestException("Покупатель больше не участвует в игре");
+      if (!buyer || buyer.financialState?.bankruptcyStatus === BankruptcyStatus.ELIMINATED) {
+        throw new BadRequestException("Покупатель больше не участвует в игре");
+      }
 
       const card = await tx.card.findUnique({
         where: { id: pending.cardId },
@@ -2499,7 +2520,8 @@ export class GamesService {
             type: "deal_card_drawn",
             gamePlayerId: pending.gamePlayerId,
             cardId: pending.cardId,
-            cardType: pending.cardType
+            cardType: pending.cardType,
+            auctionAttempted: true
           })
         }
       });
@@ -5694,7 +5716,7 @@ export class GamesService {
     );
   }
 
-  private isDealAuctionEligible(card: CardWithRules) {
+  isDealAuctionEligible(card: CardWithRules) {
     if (card.cardType !== CardType.SMALL_DEAL && card.cardType !== CardType.BIG_DEAL) {
       return false;
     }
@@ -5706,8 +5728,7 @@ export class GamesService {
     ) {
       return false;
     }
-    if (card.category?.toLowerCase() === "business") return true;
-    return isRentalRealEstateAsset(
+    return isDealAuctionOpportunity(card.category,
       `${card.category ?? ""} ${card.subcategory ?? ""} ${card.title} ${card.bodyText}`
     );
   }
@@ -5718,6 +5739,16 @@ export class GamesService {
     return pending.bidderGamePlayerIds.every((playerId) =>
       pending.responses.some((response) => response.gamePlayerId === playerId)
     );
+  }
+
+  private publicPendingAction(pending: GamePendingAction | null): GamePendingAction | null {
+    if (pending?.type !== "deal_auction" || this.dealAuctionResolved(pending)) {
+      return pending;
+    }
+    return {
+      ...pending,
+      responses: sealedDealAuctionResponses(pending.responses)
+    };
   }
 
   private metaMoneyCents(meta: Record<string, string>, key: string) {
@@ -5792,7 +5823,8 @@ export class GamesService {
         type: "deal_card_drawn",
         gamePlayerId: value.gamePlayerId,
         cardId: value.cardId,
-        cardType: value.cardType
+        cardType: value.cardType,
+        auctionAttempted: value.auctionAttempted === true
       };
     }
     if (
@@ -6452,7 +6484,7 @@ export class GamesService {
         rulesVersion: game.rulesVersion,
         isTest: game.isTest,
         fastTrackWorld: readFastTrackWorld(game.fastTrackWorld),
-        pendingAction: this.pendingAction(game.settings)
+        pendingAction: this.publicPendingAction(this.pendingAction(game.settings))
       },
       board: ratRaceBoard,
       fastTrackBoard: fastTrackCells,

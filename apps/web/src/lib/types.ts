@@ -372,6 +372,7 @@ export type GamePendingAction =
       gamePlayerId: string;
       cardId: number;
       cardType: "SMALL_DEAL" | "BIG_DEAL" | "FAST_TRACK";
+      auctionAttempted?: boolean;
     }
   | {
       type: "stock_sale_window";
@@ -393,6 +394,7 @@ export type GamePendingAction =
       responses: Array<{
         gamePlayerId: string;
         amountCents: number | null;
+        hasBid?: boolean;
       }>;
     }
   | {
