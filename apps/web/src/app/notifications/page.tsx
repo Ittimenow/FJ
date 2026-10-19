@@ -27,7 +27,7 @@ export default async function NotificationsPage() {
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-[#e8effe] text-journey"><Bell size={24} /></span>
           <div><h1 className="text-3xl font-extrabold tracking-[-0.03em] sm:text-4xl">Оповещения</h1><p className="mt-1 text-sm text-muted">Открытые игры и изменения ваших партий.</p></div>
         </div>
-        {!profile.user.timeZone ? <p className="mb-5 rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Чтобы видеть местное время игр, <Link href="/profile" className="font-bold text-journey underline">укажите часовой пояс в профиле</Link>.</p> : null}
+        {!profile.user.timeZone ? <p className="mb-5 rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Чтобы видеть местное время игр, <Link href="/profile" className="font-bold text-journey underline">укажите город в профиле</Link>.</p> : null}
         {notifications.items.length === 0 ? (
           <div className="rounded-2xl bg-white p-6 shadow-panel"><p className="font-bold">Сообщений пока нет</p><p className="mt-2 text-sm text-muted">Здесь появятся новые открытые игры.</p></div>
         ) : (

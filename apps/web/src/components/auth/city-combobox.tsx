@@ -10,6 +10,7 @@ export interface CityOption {
   id: string;
   name: string;
   region: string;
+  timeZone: string | null;
 }
 
 export function CityCombobox({
@@ -180,7 +181,9 @@ export function CityCombobox({
       </div>
       <input type="hidden" name="cityId" value={selected?.id ?? ""} />
       <FieldHint id={hintId}>
-        Выберите город из справочника — свободный текст не сохранится.
+        {selected?.timeZone
+          ? `Время игр будет показано по часовому поясу города: ${selected.timeZone.replaceAll("_", " ")}.`
+          : "Выберите город из справочника — часовой пояс определится автоматически."}
       </FieldHint>
       <FieldError id={errorId}>{error}</FieldError>
     </div>

@@ -12,7 +12,6 @@ import { publicApiBaseUrl } from "@/lib/api";
 import { PERSONAL_DATA_CONSENT_VERSION } from "@cashflow/shared";
 import { FieldError, FieldHint, FormNotice } from "./auth-form-feedback";
 import { CityCombobox } from "./city-combobox";
-import { TimeZoneSelect } from "@/components/profile/time-zone-select";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
@@ -32,7 +31,6 @@ type RegisterErrors = {
   displayName?: string | undefined;
   telegramChannel?: string | undefined;
   cityId?: string | undefined;
-  timeZone?: string | undefined;
   email?: string | undefined;
   password?: string | undefined;
   accountType?: string | undefined;
@@ -50,7 +48,6 @@ export function RegisterForm({
   const router = useRouter();
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [loading, setLoading] = useState(false);
-  const [timeZone, setTimeZone] = useState("");
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,13 +65,12 @@ export function RegisterForm({
       displayName: validateDisplayName(displayName) ?? undefined,
       telegramChannel: validateTelegramChannel(telegramChannel) ?? undefined,
       cityId: cityId ? undefined : "Выберите город из списка.",
-      timeZone: timeZone ? undefined : "Выберите часовой пояс.",
       email: validateEmail(email) ?? undefined,
       password: validatePassword(password) ?? undefined,
       accountType: validateAccountType(accountType) ? undefined : "Выберите, как вы планируете использовать аккаунт.",
       consent: personalDataConsent ? undefined : "Подтвердите согласие на обработку персональных данных."
     };
-    if (nextErrors.displayName || nextErrors.telegramChannel || nextErrors.cityId || nextErrors.timeZone || nextErrors.email || nextErrors.password || nextErrors.accountType || nextErrors.consent) {
+    if (nextErrors.displayName || nextErrors.telegramChannel || nextErrors.cityId || nextErrors.email || nextErrors.password || nextErrors.accountType || nextErrors.consent) {
       setErrors(nextErrors);
       const target = nextErrors.displayName
         ? "#register-name"
@@ -82,8 +78,6 @@ export function RegisterForm({
           ? "#register-telegram-channel"
           : nextErrors.cityId
             ? "#register-city"
-            : nextErrors.timeZone
-              ? "#register-time-zone"
             : nextErrors.email
               ? "#register-email"
               : nextErrors.password
@@ -106,7 +100,6 @@ export function RegisterForm({
           displayName,
           telegramChannel,
           cityId,
-          timeZone,
           accountType,
           personalDataConsent,
           consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -236,10 +229,6 @@ export function RegisterForm({
           error={errors.cityId}
           onChange={() => setErrors((current) => ({ ...current, cityId: undefined, form: undefined }))}
         />
-        <div>
-          <TimeZoneSelect id="register-time-zone" value={timeZone} onChange={(value) => { setTimeZone(value); setErrors((current) => ({ ...current, timeZone: undefined })); }} required />
-          <FieldError id="register-time-zone-error">{errors.timeZone}</FieldError>
-        </div>
         <div>
           <label htmlFor="register-email" className="mb-2 block text-sm font-extrabold text-ink">
             Электронная почта

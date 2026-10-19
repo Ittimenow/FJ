@@ -38,6 +38,13 @@ export class CreateGameDto extends TestGameOptionsDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(2)
+  @Max(12)
+  maxPlayers?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   @Min(0)
   @Max(3)
   botCount?: number;

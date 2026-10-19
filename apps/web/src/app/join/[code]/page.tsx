@@ -76,6 +76,7 @@ export default async function JoinByInvitePage({
 }
 
 function inviteErrorMessage(message: string) {
+  if (message === "Все места в игре заняты" || message === "Ведущий удалил вас из этой игры") return message;
   if (message === "Game not found") return "Комната не найдена или приглашение устарело.";
   if (message === "Only waiting games can be joined") {
     return "Партия уже началась или была завершена.";

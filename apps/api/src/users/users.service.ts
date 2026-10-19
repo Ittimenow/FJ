@@ -8,7 +8,6 @@ import { AccountStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { MailService } from "../mail/mail.service";
-import { validTimeZone } from "../games/scheduled-game";
 import { PrismaService } from "../prisma/prisma.service";
 import { cents, toSerializable } from "../common/json";
 import { ChangePasswordDto } from "./dto/change-password.dto";
@@ -39,7 +38,7 @@ export class UsersService {
         telegramMentionConsent: true,
         timeZone: true,
         openGameNotifications: true,
-        city: { select: { id: true, name: true, region: true } },
+        city: { select: { id: true, name: true, region: true, timeZone: true } },
         role: true,
         status: true,
         createdAt: true
@@ -131,19 +130,17 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    if (dto.timeZone !== undefined && !validTimeZone(dto.timeZone)) {
-      throw new BadRequestException("Выберите корректный часовой пояс.");
-    }
     if (dto.figurine != null && !isFigurineId(dto.figurine)) {
       throw new BadRequestException("Unknown figurine");
     }
-    if (dto.cityId !== undefined) {
-      const city = await this.prisma.city.findUnique({
+    const city = dto.cityId !== undefined
+      ? await this.prisma.city.findUnique({
         where: { id: dto.cityId },
-        select: { id: true }
-      });
-      if (!city) throw new BadRequestException("Выберите город из списка.");
-    }
+        select: { id: true, timeZone: true }
+      })
+      : null;
+    if (dto.cityId !== undefined && !city) throw new BadRequestException("Выберите город из списка.");
+    if (city && !city.timeZone) throw new BadRequestException("Для этого города пока не определён часовой пояс.");
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -162,7 +159,7 @@ export class UsersService {
         ...(dto.telegramMentionConsent !== undefined && {
           telegramMentionConsent: dto.telegramMentionConsent
         }),
-        ...(dto.timeZone !== undefined && { timeZone: dto.timeZone }),
+        ...(city && { timeZone: city.timeZone }),
         ...(dto.openGameNotifications !== undefined && { openGameNotifications: dto.openGameNotifications }),
         ...(dto.cityId !== undefined && { cityId: dto.cityId })
       },
@@ -181,7 +178,7 @@ export class UsersService {
         telegramMentionConsent: true,
         timeZone: true,
         openGameNotifications: true,
-        city: { select: { id: true, name: true, region: true } },
+        city: { select: { id: true, name: true, region: true, timeZone: true } },
         role: true,
         status: true
       }
@@ -202,6 +199,11 @@ export class UsersService {
       this.prisma.userNotification.count({ where: { userId, readAt: null } })
     ]);
     return { items, unreadCount };
+  }
+
+  async unreadNotificationCount(userId: string) {
+    const unreadCount = await this.prisma.userNotification.count({ where: { userId, readAt: null } });
+    return { unreadCount };
   }
 
   async readNotification(userId: string, notificationId: string) {

@@ -15,6 +15,7 @@ import { MonitoringExceptionFilter } from "./monitoring/monitoring-exception.fil
 import { MonitoringInterceptor } from "./monitoring/monitoring.interceptor";
 import { MonitoringModule } from "./monitoring/monitoring.module";
 import { PublicationsModule } from "./publications/publications.module";
+import { PushModule } from "./push/push.module";
 
 @Controller()
 class AppController {
@@ -107,7 +108,8 @@ function classifyDatabaseError(error: unknown) {
     UsersModule,
     GamesModule,
     FeedbackModule,
-    PublicationsModule
+    PublicationsModule,
+    PushModule
   ],
   controllers: [AppController],
   providers: [

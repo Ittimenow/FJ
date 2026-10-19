@@ -73,6 +73,7 @@ export function JoinGameForm({ token }: { token: string }) {
 }
 
 function joinErrorMessage(message: unknown) {
+  if (message === "Все места в игре заняты" || message === "Ведущий удалил вас из этой игры") return message;
   if (message === "Game not found") {
     return "Комната не найдена. Проверьте код комнаты.";
   }

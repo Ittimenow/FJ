@@ -5,7 +5,6 @@ import {
   BookOpenText,
   Boxes,
   Activity,
-  Bell,
   CircleHelp,
   Gamepad2,
   History,
@@ -91,14 +90,12 @@ export function AdminPanel({
   token,
   releases,
   currentVersion,
-  unreadNotifications
 }: {
   profile: ProfileResponse;
   games: GamesListResponse;
   token: string;
   releases: SystemRelease[];
   currentVersion: string;
-  unreadNotifications: number;
 }) {
   const searchParams = useSearchParams();
   const section = parseAdminSection(searchParams.get("section"));
@@ -123,8 +120,7 @@ export function AdminPanel({
           </div>
         </div>
       </section>
-      <Link href={"/notifications" as Route} className="inline-flex min-h-11 items-center gap-2 self-start rounded-xl bg-white px-4 text-sm font-bold text-journey shadow-panel"><Bell size={18} />Оповещения{unreadNotifications > 0 ? ` · ${unreadNotifications}` : ""}</Link>
-      {!profile.user.timeZone ? <p className="rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Выберите часовой пояс в профиле, чтобы видеть время открытых игр.</p> : null}
+      {!profile.user.timeZone ? <p className="rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Выберите город в профиле, чтобы видеть время открытых игр.</p> : null}
 
       <nav
         aria-label="Разделы административной панели"

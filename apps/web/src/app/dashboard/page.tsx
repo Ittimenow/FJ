@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Bot, ChevronDown, Clock3, History, Plus, UsersRound } from "lucide-react";
+import { ArrowRight, Bot, ChevronDown, Clock3, History, Plus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
@@ -12,7 +12,6 @@ import { CreateGameForm } from "@/components/game/create-game-form";
 import { CreateSoloGameForm } from "@/components/game/create-solo-game-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
-import { RescheduleGameForm } from "@/components/game/reschedule-game-form";
 import { apiFetch, isUnauthorizedApiError } from "@/lib/api";
 import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
 import { systemReleases } from "@/lib/changes";
@@ -20,16 +19,15 @@ import { money, shortDate } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
 import { gameReleaseVersion } from "@/lib/release";
 import { formatGameTime } from "@/lib/time-zones";
-import type { GameListItem, GamesListResponse, NotificationsResponse, ProfileResponse } from "@/lib/types";
+import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.accessToken) redirect("/login");
 
-  const [profile, games, notifications] = await Promise.all([
+  const [profile, games] = await Promise.all([
     apiFetch<ProfileResponse>("/users/me", session.accessToken),
-    apiFetch<GamesListResponse>("/games", session.accessToken),
-    apiFetch<NotificationsResponse>("/users/me/notifications", session.accessToken)
+    apiFetch<GamesListResponse>("/games", session.accessToken)
   ]).catch((error: unknown) => {
     if (isUnauthorizedApiError(error)) redirect("/login");
     throw error;
@@ -60,80 +58,51 @@ export default async function DashboardPage() {
           token={session.accessToken}
           releases={systemReleases}
           currentVersion={gameReleaseVersion}
-          unreadNotifications={notifications.unreadCount}
         />
       ) : (
         <div className="grid gap-4 sm:gap-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-ink sm:text-3xl">Мои игры</h1>
-            <Link href={"/notifications" as Route} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-journey shadow-panel focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"><Bell size={18} />Оповещения{notifications.unreadCount > 0 ? <span className="rounded-full bg-journey px-2 py-0.5 text-xs text-white">{notifications.unreadCount}</span> : null}</Link>
           </div>
-          {!profile.user.timeZone ? <p className="rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Чтобы видеть время открытых игр, <Link href="/profile" className="font-bold text-journey underline">выберите часовой пояс в профиле</Link>.</p> : null}
+          {!profile.user.timeZone ? <p className="rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Чтобы видеть время открытых игр, <Link href="/profile" className="font-bold text-journey underline">выберите город в профиле</Link>.</p> : null}
 
-          <details className="group overflow-hidden rounded-2xl bg-white shadow-panel">
-            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 bg-action px-5 py-3 text-ink transition hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/30 [&::-webkit-details-marker]:hidden">
-              <span className="flex items-center gap-3 text-base font-extrabold">
-                <Plus size={22} aria-hidden="true" />
-                Создать игру
-              </span>
-              <ChevronDown className="shrink-0 transition-transform group-open:rotate-180" size={20} aria-hidden="true" />
-            </summary>
-            <div className="grid gap-6 p-4 sm:p-6 lg:grid-cols-2">
-              <div className="min-w-0">
-                <CreateSoloGameForm token={session.accessToken} />
-              </div>
-              {canCreateGames ? (
-                <div className="min-w-0 border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                  <h2 className="mb-4 text-xl font-extrabold">Командная игра</h2>
+          <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(340px,0.8fr)] lg:items-start">
+            <details className="group overflow-hidden rounded-2xl bg-white shadow-panel lg:col-start-2 lg:row-start-1">
+              <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 bg-action px-5 py-3 text-ink transition hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-action/30 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-3 text-base font-extrabold">
+                  <Plus size={22} aria-hidden="true" />
+                  Создать игру
+                </span>
+                <ChevronDown className="shrink-0 transition-transform group-open:rotate-180" size={20} aria-hidden="true" />
+              </summary>
+              <div className="grid gap-6 p-4 sm:p-6">
+                <div className="min-w-0">
+                  <CreateSoloGameForm token={session.accessToken} />
+                </div>
+                {canCreateGames ? (
+                  <div className="min-w-0 border-t border-line pt-6">
+                    <h2 className="mb-4 text-xl font-extrabold">Командная игра</h2>
                     <CreateGameForm token={session.accessToken} timeZone={profile.user.timeZone} />
-                </div>
-              ) : null}
-            </div>
-          </details>
-
-          {currentGames.length > 0 ? (
-            <Card className="rounded-2xl border-0">
-              <CardHeader className="flex flex-row items-center justify-between gap-3">
-                <CardTitle className="text-lg sm:text-xl">Продолжить игру</CardTitle>
-                <Badge className="bg-[#e8effe] font-bold text-journey">{currentGames.length}</Badge>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {currentGames.map((game) => <GameCard key={game.id} game={game} showInvite timeZone={profile.user.timeZone} token={session.accessToken} canManage={Boolean(game.createdBy?.id === profile.user.id || profile.user.role === "ADMIN")} />)}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card className="rounded-2xl border-0">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Присоединиться к игре</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JoinGameForm token={session.accessToken} />
-              {openGames.length > 0 ? (
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-base font-extrabold">Доступные комнаты</h3>
-                    <Badge className="bg-card font-bold text-ink">{openGames.length}</Badge>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {openGames.map((game) => <GameCard key={game.id} game={game} timeZone={profile.user.timeZone} />)}
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+                ) : null}
+              </div>
+            </details>
 
-          <section className="rounded-2xl bg-ink p-4 text-white shadow-panel sm:p-6" aria-labelledby="dashboard-stats-title">
-            <h2 id="dashboard-stats-title" className="text-lg font-extrabold sm:text-xl">Моя статистика</h2>
-            <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-6">
-              <Metric label="Партий" value={profile.stats.gamesPlayed} />
-              <Metric label="Побед" value={profile.stats.wins} />
-              <Metric label="Выходов" value={profile.stats.escapedRatRace} />
-            </dl>
-            <p className="mt-4 border-t border-white/20 pt-3 text-sm text-white/80">
-              Средний денежный поток: <strong className="font-extrabold text-white">{money(profile.stats.averageMonthlyCashflowCents)}</strong>
-            </p>
-          </section>
+            {currentGames.length > 0 ? (
+              <Card className="rounded-2xl border-0 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:self-start">
+                <CardHeader className="flex flex-row items-center justify-between gap-3">
+                  <CardTitle className="text-lg sm:text-xl">Продолжить игру</CardTitle>
+                  <Badge className="bg-[#e8effe] font-bold text-journey">{currentGames.length}</Badge>
+                </CardHeader>
+                <CardContent className="grid gap-3 xl:grid-cols-2">
+                  {currentGames.map((game) => <GameCard key={game.id} game={game} showInvite timeZone={profile.user.timeZone} />)}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <JoinGameCard className={currentGames.length > 0 ? "lg:col-start-2 lg:row-start-2" : "lg:col-start-1 lg:row-start-1"} games={openGames} token={session.accessToken} timeZone={profile.user.timeZone} wide={currentGames.length === 0} />
+            <StatsCard className={currentGames.length > 0 ? "lg:col-start-2 lg:row-start-3" : "lg:col-start-2 lg:row-start-2"} stats={profile.stats} />
+          </div>
 
           <Card className="rounded-2xl border-0">
             <CardHeader className="flex flex-row items-center gap-3">
@@ -213,6 +182,66 @@ export default async function DashboardPage() {
   );
 }
 
+function JoinGameCard({
+  className,
+  games,
+  token,
+  timeZone,
+  wide = false
+}: {
+  className: string;
+  games: GameListItem[];
+  token: string;
+  timeZone: string | null;
+  wide?: boolean;
+}) {
+  return (
+    <Card className={`${className} rounded-2xl border-0`}>
+      <CardHeader>
+        <CardTitle className="text-lg sm:text-xl">Присоединиться к игре</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className={wide ? "lg:max-w-md" : undefined}>
+          <JoinGameForm token={token} />
+        </div>
+        {games.length > 0 ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-extrabold">Доступные комнаты</h3>
+              <Badge className="bg-card font-bold text-ink">{games.length}</Badge>
+            </div>
+            <div className={`grid gap-3 md:grid-cols-2 lg:grid-cols-1 ${wide ? "xl:grid-cols-2" : ""}`}>
+              {games.map((game) => <GameCard key={game.id} game={game} timeZone={timeZone} />)}
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatsCard({
+  className,
+  stats
+}: {
+  className: string;
+  stats: ProfileResponse["stats"];
+}) {
+  return (
+    <section className={`${className} rounded-2xl bg-ink p-4 text-white shadow-panel sm:p-6`} aria-labelledby="dashboard-stats-title">
+      <h2 id="dashboard-stats-title" className="text-lg font-extrabold sm:text-xl">Моя статистика</h2>
+      <dl className="mt-4 grid grid-cols-3 gap-2 sm:gap-6">
+        <Metric label="Партий" value={stats.gamesPlayed} />
+        <Metric label="Побед" value={stats.wins} />
+        <Metric label="Выходов" value={stats.escapedRatRace} />
+      </dl>
+      <p className="mt-4 border-t border-white/20 pt-3 text-sm text-white/80">
+        Средний денежный поток: <strong className="font-extrabold text-white">{money(stats.averageMonthlyCashflowCents)}</strong>
+      </p>
+    </section>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="min-w-0">
@@ -226,19 +255,17 @@ function GameCard({
   game,
   showInvite = false,
   timeZone = null,
-  token,
-  canManage = false
 }: {
   game: GameListItem;
   showInvite?: boolean;
   timeZone?: string | null;
-  token?: string;
-  canManage?: boolean;
 }) {
-  const players = game.players.filter((player) => player.role === "PLAYER");
+  const players = game.players.filter((player) => player.role === "PLAYER" && player.status === "JOINED");
   const botCount = players.filter((player) => player.controller === "BOT").length;
   const humanCount = players.length - botCount;
   const waiting = game.status === "WAITING";
+  const maxPlayers = game.maxPlayers ?? 6;
+  const full = game.mode === "MULTIPLAYER" && players.length >= maxPlayers;
   const gameHref = !showInvite && game.isPublic ? `/join/${game.code}` : `/games/${game.id}`;
 
   return (
@@ -267,6 +294,7 @@ function GameCard({
               ? `${humanCount} чел. · ${botCount} бот.`
               : `${humanCount} игроков`}
         </span>
+        {game.mode === "MULTIPLAYER" ? <span>{players.length}/{maxPlayers} мест</span> : null}
         <span className="inline-flex items-center gap-1.5">
           <Clock3 size={14} aria-hidden="true" />
           {game.isPublic && game.scheduledAt ? "Открытая игра" : shortDate(game.createdAt)}
@@ -274,15 +302,14 @@ function GameCard({
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
         {showInvite && waiting && game.mode === "MULTIPLAYER" ? <RoomInviteActions code={game.code} /> : <span />}
-        <Link
+        {!showInvite && full ? <span className="inline-flex h-11 items-center rounded-xl bg-white px-4 text-sm font-bold text-muted">Мест нет</span> : <Link
           href={gameHref as Route}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-journey px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(41,103,223,.2)] transition hover:-translate-y-0.5 hover:bg-[#1f56c8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
         >
           {waiting ? (game.mode === "SOLO" ? "Подготовиться" : showInvite ? "Открыть лобби" : "Присоединиться") : "Продолжить"}
           <ArrowRight size={15} aria-hidden="true" />
-        </Link>
+        </Link>}
       </div>
-      {canManage && token && timeZone && waiting && game.isPublic && game.scheduledAt ? <RescheduleGameForm gameId={game.id} scheduledAt={game.scheduledAt} timeZone={timeZone} token={token} /> : null}
     </article>
   );
 }

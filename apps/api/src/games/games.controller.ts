@@ -18,6 +18,7 @@ import {
 import { ChatDto } from "./dto/chat.dto";
 import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
+import { UpdateLobbyDto } from "./dto/update-lobby.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { UpdateGameScheduleDto } from "./dto/update-game-schedule.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
@@ -90,6 +91,27 @@ export class GamesController {
     const snapshot = await this.games.updateGameSchedule(id, user.userId, dto.scheduledLocal);
     this.realtime.broadcastSnapshot(id, snapshot);
     return snapshot;
+  }
+
+  @Patch(":id/lobby")
+  async updateLobby(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: UpdateLobbyDto) {
+    const result = await this.games.updateLobby(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/bots")
+  async addBot(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.addLobbyBot(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Delete(":id/players/:playerId")
+  async removePlayer(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Param("playerId") playerId: string) {
+    const result = await this.games.removeLobbyPlayer(id, user.userId, playerId);
+    this.realtime.broadcastAction(id, result);
+    return result;
   }
 
   @Post(":id/start")

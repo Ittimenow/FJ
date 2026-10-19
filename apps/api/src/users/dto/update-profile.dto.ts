@@ -45,11 +45,6 @@ export class UpdateProfileDto {
   telegramMentionConsent?: boolean;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  timeZone?: string;
-
-  @IsOptional()
   @IsBoolean()
   openGameNotifications?: boolean;
 

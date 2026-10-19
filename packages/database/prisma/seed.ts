@@ -9,6 +9,7 @@ import {
   PrismaClient,
   ProfessionLineSection
 } from "@prisma/client";
+import { russianCityTimeZone } from "../src/city-time-zone";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -208,6 +209,8 @@ async function seedCities(db: PrismaClient | Prisma.TransactionClient = prisma) 
   const autonomousRegionIndex = column("region_name_ao");
   const regionCodeIndex = column("region_iso_code");
   const fiasIdIndex = column("fias_id");
+  const latitudeIndex = column("lat");
+  const longitudeIndex = column("lon");
 
   const cities = rows.map((row) => {
     const values = parseCsvRow(row);
@@ -218,16 +221,38 @@ async function seedCities(db: PrismaClient | Prisma.TransactionClient = prisma) 
       name,
       searchName: normalizeCitySearchName(name),
       region: values[autonomousRegionIndex] || values[regionIndex] || "",
-      regionCode: values[regionCodeIndex] ?? ""
+      regionCode: values[regionCodeIndex] ?? "",
+      timeZone: russianCityTimeZone(
+        Number(values[latitudeIndex]),
+        Number(values[longitudeIndex]),
+        values[regionCodeIndex] ?? ""
+      )
     };
   });
 
-  if (cities.some((city) => !city.id || !city.name || !city.region)) {
+  if (cities.some((city) => !city.id || !city.name || !city.region || !city.timeZone)) {
     throw new Error("City reference data contains incomplete rows");
   }
 
   const result = await db.city.createMany({ data: cities, skipDuplicates: true });
-  console.log(`Synchronized Russian cities: ${cities.length} total, ${result.count} added`);
+  const cityIdsByTimeZone = new Map<string, string[]>();
+  for (const city of cities) {
+    const ids = cityIdsByTimeZone.get(city.timeZone) ?? [];
+    ids.push(city.id);
+    cityIdsByTimeZone.set(city.timeZone, ids);
+  }
+  for (const [timeZone, ids] of cityIdsByTimeZone) {
+    await db.city.updateMany({ where: { id: { in: ids } }, data: { timeZone } });
+  }
+  const updatedUsers = await db.$executeRaw`
+    UPDATE users
+    SET time_zone = cities.time_zone
+    FROM cities
+    WHERE users.city_id = cities.id
+      AND cities.time_zone IS NOT NULL
+      AND users.time_zone IS DISTINCT FROM cities.time_zone
+  `;
+  console.log(`Synchronized Russian cities: ${cities.length} total, ${result.count} added, ${updatedUsers} user time zones updated`);
 }
 
 function splitSqlStatements(sql: string): string[] {

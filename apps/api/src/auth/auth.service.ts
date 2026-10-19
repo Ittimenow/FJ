@@ -17,7 +17,6 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { TelegramRegistrationService } from "./telegram-registration.service";
-import { validTimeZone } from "../games/scheduled-game";
 
 const AVATAR_COLORS = [
   "#e11d48","#db2777","#9333ea","#7c3aed","#2563eb",
@@ -45,12 +44,12 @@ export class AuthService {
       this.prisma.user.count(),
       this.prisma.city.findUnique({
         where: { id: dto.cityId },
-        select: { id: true, name: true, region: true }
+        select: { id: true, name: true, region: true, timeZone: true }
       })
     ]);
     if (existing) throw new ConflictException("Аккаунт с такой электронной почтой уже существует.");
     if (!city) throw new BadRequestException("Выберите город из списка.");
-    if (!validTimeZone(dto.timeZone)) throw new BadRequestException("Выберите корректный часовой пояс.");
+    if (!city.timeZone) throw new BadRequestException("Для этого города пока не определён часовой пояс.");
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const adminEmails = (this.config.get<string>("ADMIN_EMAILS") ?? "")
@@ -65,7 +64,7 @@ export class AuthService {
           displayName: dto.displayName,
           telegramChannel: dto.telegramChannel,
           cityId: city.id,
-          timeZone: dto.timeZone,
+          timeZone: city.timeZone,
           avatarColor: randomAvatarColor() ?? null,
           role: registrationSystemRole(
             dto.accountType,

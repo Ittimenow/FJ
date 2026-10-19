@@ -20,7 +20,7 @@ export class CitiesService {
 
     return this.prisma.city.findMany({
       where: { searchName: { startsWith: query } },
-      select: { id: true, name: true, region: true },
+      select: { id: true, name: true, region: true, timeZone: true },
       orderBy: [{ name: "asc" }, { region: "asc" }],
       take: 20
     });

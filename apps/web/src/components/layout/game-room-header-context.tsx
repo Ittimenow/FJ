@@ -2,6 +2,7 @@
 
 import {
   Bot,
+  Bell,
   CircleDot,
   Circle,
   Orbit,
@@ -28,6 +29,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
+import { useUnreadNotifications } from "@/components/layout/notification-unread-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { shortDate } from "@/lib/format";
@@ -327,6 +329,7 @@ function HostShortcuts({ state, expanded = false }: { state: GameRoomHeaderState
 
 function MobileGameMenu({ state, profile }: { state: GameRoomHeaderState; profile: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const unreadNotifications = useUnreadNotifications();
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -348,16 +351,17 @@ function MobileGameMenu({ state, profile }: { state: GameRoomHeaderState; profil
     // remove the action before its click event. Outside clicks close above.
     if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
   }}>
-    <button ref={buttonRef} type="button" aria-label="Меню игры" title="Меню игры" aria-expanded={open} aria-haspopup="dialog"
+    <button ref={buttonRef} type="button" aria-label={unreadNotifications > 0 ? `Меню игры, непрочитанных оповещений: ${unreadNotifications}` : "Меню игры"} title="Меню игры" aria-expanded={open} aria-haspopup="dialog"
       onClick={() => setOpen((value) => !value)}
-      className="grid h-11 w-11 place-items-center rounded-xl text-ink hover:bg-white focus-visible:ring-4 focus-visible:ring-action/25">
+      className="relative grid h-11 w-11 place-items-center rounded-xl text-ink hover:bg-white focus-visible:ring-4 focus-visible:ring-action/25">
       <Menu size={21} aria-hidden="true" />
+      {unreadNotifications > 0 ? <span aria-hidden="true" className="absolute right-0 top-0 hidden min-h-5 min-w-5 place-items-center rounded-full bg-journey px-1 text-[10px] font-extrabold text-white max-[359px]:grid">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}
       {state.status === "PAUSED" ? <span className="sr-only">Игра на паузе</span> : null}
     </button>
     {open ? <div ref={panelRef} role="dialog" aria-label="Меню игры" className="game-mobile-menu rounded-2xl bg-white p-3 text-sm text-ink shadow-[0_18px_48px_rgba(5,18,45,.2)]">
       <div className="grid gap-1">
         {profile}
-        <a href="/notifications" className="rounded-xl px-2 py-3 font-bold text-ink hover:bg-card">Оповещения</a>
+        <a href="/notifications" className="flex items-center gap-2 rounded-xl px-2 py-3 font-bold text-ink hover:bg-card"><Bell size={17} aria-hidden="true" />Оповещения{unreadNotifications > 0 ? <span className="ml-auto rounded-full bg-journey px-2 py-0.5 text-xs text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</a>
         <HostShortcuts state={state} expanded />
         <ConnectionStatusControl state={state} showLabel />
       </div>

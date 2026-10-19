@@ -19,6 +19,7 @@ export interface ProfileResponse {
       id: string;
       name: string;
       region: string;
+      timeZone: string | null;
     } | null;
     role: "USER" | "HOST" | "ADMIN";
     status: "ACTIVE" | "BLOCKED" | "DELETED";
@@ -195,6 +196,7 @@ export interface GameListItem {
   players: Array<{
     id: string;
     role: string;
+    status: string;
     seat: number | null;
     guestName: string | null;
     controller: "HUMAN" | "BOT";
@@ -214,6 +216,9 @@ export interface GameSnapshot {
     status: "WAITING" | "IN_PROGRESS" | "PAUSED" | "ENDED" | "CANCELLED";
     mode: "MULTIPLAYER" | "SOLO";
     maxPlayers: number | null;
+    isPublic: boolean;
+    scheduledAt: string | null;
+    scheduleTimeZone: string | null;
     currentTurnIndex: number;
     currentRound: number;
     currentPlayerId: string | null;

@@ -12,7 +12,7 @@ import {
   isUnauthorizedApiError
 } from "@/lib/api";
 import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
-import type { GameSnapshot } from "@/lib/types";
+import type { GameSnapshot, ProfileResponse } from "@/lib/types";
 
 export default async function GamePage({
   params
@@ -23,6 +23,7 @@ export default async function GamePage({
   if (!session?.accessToken) redirect("/login");
 
   const { id } = await params;
+  const profile = await apiFetch<ProfileResponse>("/users/me", session.accessToken).catch(() => null);
   const snapshot = await apiFetch<GameSnapshot>(`/games/${id}`, session.accessToken).catch(
     (error: unknown) => {
       if (isUnauthorizedApiError(error)) redirect("/login");
@@ -87,6 +88,7 @@ export default async function GamePage({
         token={session.accessToken}
         currentUserId={session.user.id}
         currentUserRole={session.user.role}
+        timeZone={profile?.user.timeZone ?? null}
       />
     </AppShell>
   );

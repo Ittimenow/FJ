@@ -4,11 +4,11 @@ import test from "node:test";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { RegisterDto } from "./dto/register.dto";
-import { registrationSystemRole } from "./auth.service";
+import { AuthService, registrationSystemRole } from "./auth.service";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UpdateProfileDto } from "../users/dto/update-profile.dto";
 import { PERSONAL_DATA_CONSENT_VERSION } from "@cashflow/shared";
-import { SystemRole } from "@prisma/client";
+import { AccountStatus, SystemRole } from "@prisma/client";
 
 test("DTO регистрации нормализует данные", async () => {
   const dto = plainToInstance(RegisterDto, {
@@ -17,7 +17,6 @@ test("DTO регистрации нормализует данные", async () 
     displayName: "  Анна   Смирнова  ",
     telegramChannel: "  Example_Channel ",
     cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
-    timeZone: "Europe/Moscow",
     accountType: "PLAYER",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -56,7 +55,6 @@ test("DTO регистрации принимает аккаунт ведуще�
     displayName: "Анна",
     telegramChannel: "@host_channel",
     cityId: "d13945a8-7017-46ab-b1e6-ede1e89317ad",
-    timeZone: "Europe/Moscow",
     accountType: "HOST",
     personalDataConsent: true,
     consentVersion: PERSONAL_DATA_CONSENT_VERSION
@@ -85,6 +83,41 @@ test("выбор типа аккаунта преобразуется в без�
   assert.equal(registrationSystemRole("PLAYER", false), SystemRole.USER);
   assert.equal(registrationSystemRole("HOST", false), SystemRole.HOST);
   assert.equal(registrationSystemRole("HOST", true), SystemRole.ADMIN);
+});
+
+test("регистрация сохраняет часовой пояс выбранного города", async () => {
+  let createdData: Record<string, unknown> | null = null;
+  const user = {
+    id: "user-id", email: "host@example.com", displayName: "Ведущий",
+    telegramChannel: "@host_channel", role: SystemRole.HOST,
+    status: AccountStatus.ACTIVE, createdAt: new Date()
+  };
+  const prisma = {
+    user: { findUnique: async () => null, count: async () => 1 },
+    city: { findUnique: async () => ({
+      id: "city-id", name: "Якутск", region: "Республика Саха (Якутия)", timeZone: "Asia/Yakutsk"
+    }) },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
+      user: { create: async ({ data }: { data: Record<string, unknown> }) => {
+        createdData = data;
+        return user;
+      } },
+      personalDataConsent: { create: async () => ({}) }
+    })
+  };
+  const service = new AuthService(
+    prisma as never,
+    { sign: () => "token" } as never,
+    { get: () => null } as never,
+    {} as never,
+    { sendRegistration: async () => undefined } as never
+  );
+  await service.register({
+    email: user.email, password: "12345678", displayName: user.displayName,
+    telegramChannel: user.telegramChannel, cityId: "city-id", accountType: "HOST",
+    personalDataConsent: true, consentVersion: PERSONAL_DATA_CONSENT_VERSION
+  }, { ipAddress: null, userAgent: null });
+  assert.equal((createdData as Record<string, unknown> | null)?.timeZone, "Asia/Yakutsk");
 });
 
 test("DTO сброса пароля проверяет формат токена и длину пароля", async () => {

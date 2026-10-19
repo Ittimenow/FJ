@@ -30,6 +30,7 @@
     "prisma:prepare-open-game-notifications": "prisma db execute --file prisma/deploy/20261016_add_open_game_notifications.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
+    "@photostructure/tz-lookup": "11.7.0",
     "@prisma/client": "^5.22.0"
   },
   "devDependencies": {

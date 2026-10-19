@@ -21,6 +21,7 @@ export function NotificationAction({
           method: "PATCH", headers: { Authorization: `Bearer ${token}` }
         });
         if (!response.ok) throw new Error("Не удалось отметить сообщение прочитанным.");
+        window.dispatchEvent(new Event("notifications:changed"));
       }
       if (href) router.push(href as Route);
       else router.refresh();

@@ -5,6 +5,18 @@ import { plainToInstance } from "class-transformer";
 import { validateSync } from "class-validator";
 import { CreateGameDto } from "./dto/create-game.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
+import { UpdateLobbyDto } from "./dto/update-lobby.dto";
+
+test("лимит командной игры принимает от 2 до 12 мест", () => {
+  for (const Dto of [CreateGameDto, UpdateLobbyDto]) {
+    for (const maxPlayers of [2, 6, 12]) {
+      assert.deepEqual(validateSync(plainToInstance(Dto, { maxPlayers })), []);
+    }
+    for (const maxPlayers of [1, 13, 2.5]) {
+      assert.ok(validateSync(plainToInstance(Dto, { maxPlayers })).some((error) => error.property === "maxPlayers"));
+    }
+  }
+});
 
 for (const Dto of [CreateGameDto, CreateSoloGameDto]) {
   test(`${Dto.name} accepts seeded and generated card set IDs`, () => {

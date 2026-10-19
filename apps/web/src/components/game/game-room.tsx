@@ -84,6 +84,7 @@ import {
 } from "@/components/game/game-room-variant-two";
 import { childExpenseCalculation } from "@/components/game/child-expense";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
+import { LobbySettings } from "@/components/game/lobby-settings";
 import {
   cashChangeExpression,
   compactPlayerActionDetails,
@@ -175,12 +176,14 @@ export function GameRoom({
   initialSnapshot,
   token,
   currentUserId,
-  currentUserRole
+  currentUserRole,
+  timeZone
 }: {
   initialSnapshot: GameSnapshot;
   token: string;
   currentUserId: string;
   currentUserRole: "USER" | "HOST" | "ADMIN";
+  timeZone: string | null;
 }) {
   const router = useRouter();
   const [trackView, setTrackView] = useState<"RAT_RACE" | "FAST_TRACK" | null>(null);
@@ -224,6 +227,7 @@ export function GameRoom({
         : null)
   );
   const [figurineSaving, setFigurineSaving] = useState(false);
+  const [lobbyBusy, setLobbyBusy] = useState(false);
   const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -389,9 +393,14 @@ export function GameRoom({
   const currentPlayer = snapshot.players.find(
     (player) => player.id === snapshot.game.currentPlayerId
   );
-  const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER");
+  const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER" && player.status === "JOINED");
   const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
+  useEffect(() => {
+    if (initialSnapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED") && !snapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED")) {
+      router.replace("/dashboard");
+    }
+  }, [currentUserId, initialSnapshot.players, router, snapshot.players]);
   const ownFigurine = me?.figurine;
   const hasPlayerMembership = Boolean(me);
   const choosingDream = snapshot.game.status === "WAITING" && snapshot.game.rulesVersion === 2 && Boolean(me) && (!isDreamCell(me?.dreamCellIndex) || dreamPickerOpen);
@@ -440,6 +449,8 @@ export function GameRoom({
   const startDisabledReason =
     gamePlayers.length < 2
       ? "Для старта нужны минимум два игрока."
+      : gamePlayers.length > Math.min(snapshot.game.maxPlayers ?? 12, 12)
+        ? "Игроков больше установленного лимита."
       : humanGamePlayers.length === 0
         ? "Для старта нужен хотя бы один человек."
       : playersWithoutFigurines.length > 0
@@ -709,13 +720,13 @@ export function GameRoom({
 
   async function startGame() {
     setError(null);
+    if (lobbyBusy) return;
+    setLobbyBusy(true);
+    try {
     if (socketRef.current?.connected) {
-      try {
         const result = await emitWithAck("game:start", {});
+        if (result.message) throw new Error(result.message);
         applyActionResult(result);
-      } catch (event) {
-        setError(gameErrorMessage(event, "Не удалось начать партию"));
-      }
       return;
     }
 
@@ -728,10 +739,32 @@ export function GameRoom({
     );
     const result = await response.json();
     if (!response.ok) {
-      setError(gameErrorMessage(result.message, "Не удалось начать партию"));
-      return;
+      throw new Error(gameErrorMessage(result.message, "Не удалось начать партию"));
     }
     setSnapshot(result.snapshot ?? result);
+    } catch (event) {
+      setError(gameErrorMessage(event, "Не удалось начать партию"));
+    } finally {
+      setLobbyBusy(false);
+    }
+  }
+
+  async function lobbyAction(path: string, method: "POST" | "DELETE") {
+    if (lobbyBusy) return;
+    setLobbyBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${path}`, {
+        method, headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json() as GameActionResult;
+      if (!response.ok) throw new Error(gameErrorMessage(result.message, "Не удалось изменить состав игры"));
+      applyActionResult(result);
+    } catch (cause) {
+      setError(gameErrorMessage(cause, "Не удалось изменить состав игры"));
+    } finally {
+      setLobbyBusy(false);
+    }
   }
 
   async function pauseGame() {
@@ -774,8 +807,8 @@ export function GameRoom({
     }
   }
 
-  async function chooseFigurine() {
-    if (!figurineChoice) return;
+  async function chooseFigurine(figurine = figurineChoice) {
+    if (!figurine || figurineSaving || takenFigurines.includes(figurine)) return;
     setError(null);
     setFigurineSaving(true);
     try {
@@ -787,7 +820,7 @@ export function GameRoom({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ figurine: figurineChoice })
+          body: JSON.stringify({ figurine })
         }
       );
       const result = await response.json();
@@ -1358,9 +1391,9 @@ export function GameRoom({
         value={figurineChoice}
         taken={takenFigurines}
         saving={figurineSaving}
+        error={error}
         canClose={Boolean(me?.figurine)}
-        onChange={setFigurineChoice}
-        onConfirm={chooseFigurine}
+        onChange={(figurine) => { setFigurineChoice(figurine); void chooseFigurine(figurine); }}
         onClose={() => setFigurinePickerOpen(false)}
       />
       <BankDialog
@@ -1425,14 +1458,12 @@ export function GameRoom({
               </div>
             </div>
           ) : null}
-          <div className="mt-4 max-h-[min(65vh,600px)] overflow-y-auto pr-1"><FigurinePicker value={figurineChoice} taken={takenFigurines} onChange={setFigurineChoice} disabled={figurineSaving} /></div>
-          <Button type="button" variant="action" className="mt-4" onClick={chooseFigurine} disabled={!figurineChoice || figurineSaving || takenFigurines.includes(figurineChoice)}>
-            {figurineSaving ? "Сохраняем…" : "Выбрать фишку"}
-          </Button>
+          <div className="mt-4 max-h-[min(65vh,600px)] overflow-y-auto pr-1"><FigurinePicker value={figurineChoice} taken={takenFigurines} onChange={(figurine) => { setFigurineChoice(figurine); void chooseFigurine(figurine); }} disabled={figurineSaving} /></div>
+          {figurineSaving ? <p className="mt-3 text-sm" role="status">Сохраняем фишку…</p> : null}
         </section>
       ) : null}
 
-      {snapshot.game.status === "WAITING" && !choosingDream && !choosingFigurine ? (
+      {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
           snapshot={snapshot}
           isSolo={isSolo}
@@ -1440,8 +1471,14 @@ export function GameRoom({
           canStart={canStart}
           startDisabledReason={startDisabledReason}
           onStartGame={startGame}
+          startBusy={lobbyBusy}
           code={snapshot.game.code}
           token={token}
+          timeZone={timeZone}
+          isAdmin={isAdmin}
+          onSettingsSaved={setSnapshot}
+          onAddBot={() => void lobbyAction("bots", "POST")}
+          onRemovePlayer={(playerId) => void lobbyAction(`players/${playerId}`, "DELETE")}
           onAddUser={addUserToGame}
           canChangeParticipation={canChangeHostParticipation}
           participates={roomMembership?.role === "PLAYER"}
@@ -2226,6 +2263,7 @@ function HostPanel({
   gameId,
   token,
   onAddUser,
+  playerSlotsFull,
   canChangeParticipation,
   participates,
   changingParticipation,
@@ -2235,6 +2273,7 @@ function HostPanel({
   gameId: string;
   token: string;
   onAddUser: (body: { userId: string; role: string }) => void;
+  playerSlotsFull: boolean;
   canChangeParticipation: boolean;
   participates: boolean;
   changingParticipation: boolean;
@@ -2246,6 +2285,7 @@ function HostPanel({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState("PLAYER");
 
   useEffect(() => {
     const normalizedQuery = query.trim();
@@ -2294,8 +2334,6 @@ function HostPanel({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const role = String(form.get("role") ?? "PLAYER");
     if (!selectedUser) return;
     onAddUser({ userId: selectedUser.id, role });
     event.currentTarget.reset();
@@ -2331,7 +2369,7 @@ function HostPanel({
               type="button"
               className="mt-3 w-full"
               variant="secondary"
-              disabled={changingParticipation}
+              disabled={changingParticipation || (!participates && playerSlotsFull)}
               onClick={() => onChangeParticipation(!participates)}
             >
               {changingParticipation
@@ -2408,7 +2446,8 @@ function HostPanel({
                 name="role"
                 aria-label="Роль пользователя"
                 className="h-10 w-full appearance-none rounded-md border border-line bg-white px-3 pr-9 text-sm"
-                defaultValue="PLAYER"
+                value={role}
+                onChange={(event) => setRole(event.target.value)}
               >
                 <option value="PLAYER">Игрок</option>
                 <option value="BANKER">Банкир</option>
@@ -2416,8 +2455,9 @@ function HostPanel({
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" size={16} aria-hidden="true" />
             </div>
-            <Button type="submit" disabled={!selectedUser}>Добавить в игру</Button>
+            <Button type="submit" disabled={!selectedUser || (role === "PLAYER" && playerSlotsFull)}>Добавить в игру</Button>
           </div>
+          {playerSlotsFull ? <p className="mt-2 text-xs text-muted">Места для игроков заняты. Увеличьте лимит или освободите место.</p> : null}
         </form>
     </div>
   );
@@ -2430,8 +2470,14 @@ function WaitingRoomOverview({
   canStart,
   startDisabledReason,
   onStartGame,
+  startBusy,
   code,
   token,
+  timeZone,
+  isAdmin,
+  onSettingsSaved,
+  onAddBot,
+  onRemovePlayer,
   onAddUser,
   canChangeParticipation,
   participates,
@@ -2447,8 +2493,14 @@ function WaitingRoomOverview({
   canStart: boolean;
   startDisabledReason: string | null;
   onStartGame: () => void;
+  startBusy: boolean;
   code: string;
   token: string;
+  timeZone: string | null;
+  isAdmin: boolean;
+  onSettingsSaved: (snapshot: GameSnapshot) => void;
+  onAddBot: () => void;
+  onRemovePlayer: (playerId: string) => void;
   onAddUser: (body: { userId: string; role: string }) => void;
   canChangeParticipation: boolean;
   participates: boolean;
@@ -2467,7 +2519,20 @@ function WaitingRoomOverview({
   const figurinesReady = gamePlayers.length > 0 && readyPlayers.length === gamePlayers.length;
   const dreamsReady = snapshot.game.rulesVersion !== 2 || gamePlayers.every((player) => isDreamCell(player.dreamCellIndex));
   const completedChecks =
-    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(dreamsReady) + Number(canManage);
+    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(dreamsReady);
+  const [now, setNow] = useState(() => Date.now());
+  const [removeTarget, setRemoveTarget] = useState<GamePlayer | null>(null);
+  useEffect(() => {
+    if (removeTarget) document.getElementById("cancel-lobby-removal")?.focus();
+  }, [removeTarget]);
+  useEffect(() => {
+    if (!snapshot.game.scheduledAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [snapshot.game.scheduledAt]);
+  const secondsUntilStart = snapshot.game.scheduledAt ? Math.max(0, Math.ceil((new Date(snapshot.game.scheduledAt).getTime() - now) / 1000)) : 0;
+  const beforeStart = snapshot.game.isPublic && secondsUntilStart > 0;
+  const botCount = gamePlayers.filter((player) => player.controller === "BOT").length;
 
   return (
     <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
@@ -2489,12 +2554,16 @@ function WaitingRoomOverview({
           </div>
           <span className="inline-flex items-center gap-2 rounded-xl bg-[#e8effe] px-3 py-2 text-sm font-extrabold text-journey">
             <UsersRound size={16} aria-hidden="true" />
-            {isSolo && snapshot.game.maxPlayers
-              ? `${gamePlayers.length}/${snapshot.game.maxPlayers} игроков`
-              : `${gamePlayers.length} игроков`}
+            {`${gamePlayers.length}/${snapshot.game.maxPlayers ?? 6} игроков`}
           </span>
         </div>
 
+        {canManage && !isSolo ? <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-extrabold">Участники</h2>
+          <Button type="button" variant="secondary" className="gap-2" disabled={startBusy || botCount >= 3 || gamePlayers.length >= (snapshot.game.maxPlayers ?? 6)} onClick={onAddBot}>
+            <Bot size={17} aria-hidden="true" /> Добавить бота
+          </Button>
+        </div> : null}
         {players.length > 0 ? (
           <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {players.map((player) => {
@@ -2523,6 +2592,7 @@ function WaitingRoomOverview({
                   >
                     {ready ? "Готов" : !player.figurine ? "Без фигурки" : "Без мечты"}
                   </span>
+                  {canManage && !isSolo && player.userId !== snapshot.game.createdById && player.role !== "HOST" ? <button type="button" onClick={() => setRemoveTarget(player)} aria-label={`Удалить ${gamePlayerName(player)} из лобби`} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700"><X size={18} aria-hidden="true" /></button> : null}
                 </div>
               );
             })}
@@ -2532,7 +2602,7 @@ function WaitingRoomOverview({
             В комнате пока никого нет. Отправьте участникам код {snapshot.game.code}.
           </div>
         )}
-        {currentPlayer ? (
+        {currentPlayer?.figurine && (snapshot.game.rulesVersion !== 2 || isDreamCell(currentPlayer.dreamCellIndex)) ? (
           <div className="mt-3 flex flex-col gap-3 rounded-xl bg-card p-4 text-sm min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
             {snapshot.game.rulesVersion === 2 && isDreamCell(currentPlayer.dreamCellIndex) ? (
               <img src={`/dreams/${currentPlayer.dreamCellIndex}.webp`} alt="" width={96} height={64} loading="lazy" className="aspect-[3/2] w-24 shrink-0 rounded-lg bg-white object-contain" />
@@ -2552,11 +2622,15 @@ function WaitingRoomOverview({
           </div>
         ) : null}
         {canManage && !isSolo ? (
+          <LobbySettings snapshot={snapshot} token={token} timeZone={timeZone} isAdmin={isAdmin} onSaved={onSettingsSaved} />
+        ) : null}
+        {canManage && !isSolo ? (
           <HostPanel
             code={code}
             gameId={snapshot.game.id}
             token={token}
             onAddUser={onAddUser}
+            playerSlotsFull={gamePlayers.length >= (snapshot.game.maxPlayers ?? 6)}
             canChangeParticipation={canChangeParticipation}
             participates={participates}
             changingParticipation={changingParticipation}
@@ -2567,6 +2641,10 @@ function WaitingRoomOverview({
 
       <aside className="rounded-xl bg-card p-4 text-ink sm:p-5">
         <h2 className="text-lg font-extrabold">Готовность к старту</h2>
+        {snapshot.game.scheduledAt ? <div className="mt-3 rounded-xl bg-white p-3 text-sm">
+          <p className="font-bold">Начало: {new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short" }).format(new Date(snapshot.game.scheduledAt))}</p>
+          <p className="mt-1" role="timer">{beforeStart ? `До начала игры осталось ${formatLobbyCountdown(secondsUntilStart)}` : "Время начала наступило"}</p>
+        </div> : null}
         <div className="mt-4 space-y-3">
           <LobbyCheck
             complete={enoughPlayers}
@@ -2589,11 +2667,11 @@ function WaitingRoomOverview({
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#dce4ef]">
           <div
             className="h-full rounded-full bg-action transition-[width] duration-300"
-            style={{ width: `${Math.round((completedChecks / 5) * 100)}%` }}
+            style={{ width: `${Math.round((completedChecks / 4) * 100)}%` }}
           />
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
-          {canStart && !startDisabledReason
+          {beforeStart ? "Начать игру можно после назначенного времени." : canStart && !startDisabledReason
             ? "Все условия выполнены — можно начинать."
             : startDisabledReason ?? "Ожидаем действия ведущего."}
         </p>
@@ -2602,14 +2680,29 @@ function WaitingRoomOverview({
             className="mt-4 w-full"
             variant="action"
             onClick={onStartGame}
-            disabled={!canStart || Boolean(startDisabledReason)}
+            disabled={!canStart || Boolean(startDisabledReason) || beforeStart || startBusy}
           >
-            Начать партию
+            {startBusy ? "Запускаем…" : "Начать партию"}
           </Button>
         ) : null}
       </aside>
+      {removeTarget ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div role="alertdialog" aria-modal="true" aria-labelledby="remove-player-title" aria-describedby="remove-player-description" onKeyDown={(event) => { if (event.key === "Escape") setRemoveTarget(null); if (event.key === "Tab") { event.preventDefault(); const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button")); const index = buttons.indexOf(document.activeElement as HTMLButtonElement); buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus(); } }} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <h2 id="remove-player-title" className="text-xl font-extrabold">Удалить участника?</h2>
+          <p id="remove-player-description" className="mt-2 text-sm text-muted">{gamePlayerName(removeTarget)} будет удалён из лобби. Место снова станет свободным.</p>
+          <div className="mt-5 flex justify-end gap-2"><Button id="cancel-lobby-removal" type="button" variant="secondary" onClick={() => setRemoveTarget(null)}>Отмена</Button><Button type="button" variant="danger" disabled={startBusy} onClick={() => { onRemovePlayer(removeTarget.id); setRemoveTarget(null); }}>Удалить</Button></div>
+        </div>
+      </div> : null}
     </section>
   );
+}
+
+function formatLobbyCountdown(totalSeconds: number) {
+  const totalMinutes = Math.ceil(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const plural = (value: number, one: string, few: string, many: string) => value % 10 === 1 && value % 100 !== 11 ? one : value % 10 >= 2 && value % 10 <= 4 && (value % 100 < 12 || value % 100 > 14) ? few : many;
+  return hours > 0 ? `${hours} ${plural(hours, "час", "часа", "часов")} ${minutes} ${plural(minutes, "минута", "минуты", "минут")}` : `${minutes} ${plural(minutes, "минута", "минуты", "минут")}`;
 }
 
 function LobbyCheck({ complete, label }: { complete: boolean; label: string }) {
@@ -3322,18 +3415,18 @@ function FigurineDialog({
   value,
   taken,
   saving,
+  error,
   canClose,
   onChange,
-  onConfirm,
   onClose
 }: {
   open: boolean;
   value: string | null;
   taken: string[];
   saving: boolean;
+  error: string | null;
   canClose: boolean;
   onChange: (figurine: FigurineId) => void;
-  onConfirm: () => void;
   onClose: () => void;
 }) {
   if (!open) return null;
@@ -3356,6 +3449,7 @@ function FigurineDialog({
           </p>
         </div>
         <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+          {error ? <p role="alert" className="mb-3 text-sm font-bold text-red-700">{error}</p> : null}
           <FigurinePicker
             value={value}
             taken={taken}
@@ -3369,13 +3463,7 @@ function FigurineDialog({
               Отмена
             </Button>
           ) : null}
-          <Button
-            type="button"
-            onClick={onConfirm}
-            disabled={!value || saving || taken.includes(value)}
-          >
-            {saving ? "Сохраняем…" : "Выбрать"}
-          </Button>
+          {saving ? <p role="status" className="text-sm">Сохраняем фишку…</p> : null}
         </div>
       </div>
     </div>
@@ -5435,6 +5523,7 @@ const eventTitles: Record<string, string> = {
   "fast_track:declined": "Отказ от покупки",
   "fast_track:dream_influence": "Цена мечты увеличена",
   "game:created": "Игра создана",
+  "game:lobby_updated": "Настройки игры изменены",
   "game:started": "Игра запущена",
   "game:paused": "Игра поставлена на паузу",
   "game:resumed": "Игра продолжена",
@@ -5444,6 +5533,7 @@ const eventTitles: Record<string, string> = {
   "bot:decision": "Решение бота",
   "player:joined": "Игрок вошел в комнату",
   "player:added": "Игрок добавлен ведущим",
+  "player:removed": "Участник удалён из лобби",
   "player:roll_dice": "Бросок кубика",
   "player:move": "Перемещение по полю",
   "player:baby": "Рождение ребенка",

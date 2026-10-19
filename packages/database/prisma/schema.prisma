@@ -141,6 +141,7 @@ model User {
   events            GameEvent[]         @relation("UserEvents")
   chatMessages      GameChatMessage[]   @relation("UserChatMessages")
   notifications     UserNotification[]
+  pushSubscriptions PushSubscription[]
   feedbackMessages  FeedbackMessage[]   @relation("UserFeedback")
   passwordResetTokens PasswordResetToken[]
   personalDataConsents PersonalDataConsent[]
@@ -155,6 +156,7 @@ model City {
   searchName String @map("search_name")
   region     String
   regionCode String @map("region_code")
+  timeZone   String? @map("time_zone")
   users      User[]
 
   @@unique([name, region])
@@ -243,13 +245,47 @@ model UserNotification {
   kind      String
   dedupeKey String    @map("dedupe_key")
   readAt    DateTime? @map("read_at")
+  pushPreparedAt DateTime? @map("push_prepared_at")
   createdAt DateTime  @default(now()) @map("created_at")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   game      Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  pushDeliveries PushDelivery[]
 
   @@unique([userId, dedupeKey])
   @@index([userId, createdAt])
+  @@index([pushPreparedAt, createdAt])
   @@map("user_notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries PushDelivery[]
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model PushDelivery {
+  id             String   @id @default(uuid()) @db.Uuid
+  notificationId String   @map("notification_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  nextAttemptAt  DateTime @default(now()) @map("next_attempt_at")
+  attempts       Int      @default(0)
+  sentAt         DateTime? @map("sent_at")
+  failedAt       DateTime? @map("failed_at")
+  notification   UserNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscription   PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, subscriptionId])
+  @@index([sentAt, failedAt, nextAttemptAt])
+  @@map("push_deliveries")
 }
 
 model TelegramAnnouncement {

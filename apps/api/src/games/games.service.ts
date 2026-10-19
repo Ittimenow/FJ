@@ -56,6 +56,7 @@ import {
 } from "./dto/deal-auction.dto";
 import { ChatDto } from "./dto/chat.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
+import { UpdateLobbyDto } from "./dto/update-lobby.dto";
 import { scheduledInstant } from "./scheduled-game";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
@@ -249,7 +250,13 @@ const playerColors = [
   "#991b1b",
   "#0f766e",
   "#7c2d12",
-  "#3f3f46"
+  "#3f3f46",
+  "#1d4ed8",
+  "#7e22ce",
+  "#be185d",
+  "#0e7490",
+  "#4d7c0f",
+  "#92400e"
 ];
 
 const botActorPrefix = "bot:";
@@ -307,6 +314,7 @@ export class GamesService {
     );
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const botCount = dto.botCount ?? 0;
+    if (botCount > (dto.maxPlayers ?? 6)) throw new BadRequestException("Ботов больше, чем мест в игре");
     const botPlayers = createBotPlayers(botCount);
 
     const code = await this.generateGameCode();
@@ -321,7 +329,7 @@ export class GamesService {
         isPublic: Boolean(dto.isPublic),
         scheduledAt,
         scheduleTimeZone: dto.isPublic ? creator.timeZone : null,
-        maxPlayers: null,
+        maxPlayers: dto.maxPlayers ?? 6,
         cardSetId: cardSet.id,
         settings: {
           ...testSettings,
@@ -700,7 +708,7 @@ export class GamesService {
       status: { not: GameStatus.CANCELLED }
     };
     if (!canSeeAll) {
-      mineWhere.OR = [{ createdById: userId }, { players: { some: { userId } } }];
+      mineWhere.OR = [{ createdById: userId }, { players: { some: { userId, status: GamePlayerStatus.JOINED } } }];
     }
 
     const [mine, open] = await Promise.all([
@@ -780,22 +788,20 @@ export class GamesService {
       throw new BadRequestException("Присоединиться можно только до начала игры");
     }
 
-    const existing = game.players.find((player) => player.userId === userId);
-    if (existing) return this.snapshot(game.id);
-
     const role = dto.role ?? "PLAYER";
-    const occupiedSeats = new Set(
-      game.players
-        .map((player) => player.seat)
-        .filter((seat): seat is number => typeof seat === "number")
-    );
-    const seat: number | null =
-      role === "PLAYER" ? nextAvailableSeat(occupiedSeats) : null;
-    const color = seat
-      ? playerColors[(seat - 1) % playerColors.length] ?? null
-      : null;
-
+    const existing = game.players.find((player) => player.userId === userId);
+    if (existing?.status === GamePlayerStatus.KICKED) throw new ForbiddenException("Ведущий удалил вас из этой игры");
+    if (existing) return this.snapshot(game.id);
     await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, game.id);
+      const current = await tx.game.findUniqueOrThrow({ where: { id: game.id }, include: { players: true } });
+      if (current.status !== GameStatus.WAITING) throw new BadRequestException("Игра уже началась");
+      if (role === GameRole.PLAYER && current.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED).length >= (current.maxPlayers ?? 6)) {
+        throw new BadRequestException("Все места в игре заняты");
+      }
+      const occupiedSeats = current.players.map((player) => player.seat).filter((seat): seat is number => seat !== null);
+      const seat = role === GameRole.PLAYER ? nextAvailableSeat(occupiedSeats) : null;
+      const color = seat ? playerColors[(seat - 1) % playerColors.length] ?? null : null;
       const player = await tx.gamePlayer.create({
         data: {
           gameId: game.id,
@@ -845,6 +851,7 @@ export class GamesService {
     if (!targetUser) throw new NotFoundException("Активный пользователь не найден");
 
     await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: { players: true }
@@ -859,7 +866,10 @@ export class GamesService {
       const existing = game.players.find(
         (player) => player.userId === targetUser.id
       );
-      if (existing) return;
+      if (existing && existing.status !== GamePlayerStatus.KICKED) return;
+      if (dto.role === GameRole.PLAYER && game.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED).length >= (game.maxPlayers ?? 6)) {
+        throw new BadRequestException("Все места в игре заняты");
+      }
 
       const occupiedSeats = new Set(
         game.players
@@ -872,17 +882,15 @@ export class GamesService {
         ? playerColors[(seat - 1) % playerColors.length] ?? null
         : null;
 
-      const player = await tx.gamePlayer.create({
-        data: {
-          gameId,
-          userId: targetUser.id,
-          role: dto.role,
-          seat,
-          color,
-          isReady: dto.role !== GameRole.PLAYER,
-          position: -1
-        }
-      });
+      const player = existing
+        ? await tx.gamePlayer.update({ where: { id: existing.id }, data: {
+            role: dto.role, status: GamePlayerStatus.JOINED, leftAt: null, seat, color,
+            isReady: dto.role !== GameRole.PLAYER, dreamCellIndex: null, figurine: null, position: -1
+          } })
+        : await tx.gamePlayer.create({ data: {
+            gameId, userId: targetUser.id, role: dto.role, seat, color,
+            isReady: dto.role !== GameRole.PLAYER, position: -1
+          } });
 
       await this.appendEvents(tx, gameId, actorUserId, [
         {
@@ -1017,6 +1025,89 @@ export class GamesService {
     return this.getGame(gameId, actorUserId);
   }
 
+  async updateLobby(gameId: string, actorUserId: string, dto: UpdateLobbyDto) {
+    await this.ensureCanManageGame(gameId, actorUserId);
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: actorUserId }, select: { role: true, timeZone: true } });
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: true } });
+      if (game.mode !== GameMode.MULTIPLAYER || game.status !== GameStatus.WAITING) throw new BadRequestException("Настройки можно изменить только до начала командной игры");
+      const occupied = game.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED).length;
+      const maxPlayers = dto.maxPlayers ?? game.maxPlayers ?? 6;
+      if (maxPlayers < occupied) throw new BadRequestException("Лимит меньше числа игроков в лобби");
+      const isPublic = dto.isPublic ?? game.isPublic;
+      if (isPublic && game.isTest) throw new BadRequestException("Тестовую партию нельзя открыть для всех");
+      const scheduledAt = isPublic
+        ? dto.scheduledLocal ? scheduledInstant(dto.scheduledLocal, user.timeZone ?? "") : game.scheduledAt
+        : null;
+      if (isPublic && !scheduledAt) throw new BadRequestException("Укажите дату и время открытой игры");
+      const nextTitle = dto.title === undefined ? game.title : dto.title.trim();
+      if (!nextTitle) throw new BadRequestException("Укажите название игры");
+      let cardSetId = game.cardSetId;
+      let cardDecks: unknown = undefined;
+      if (dto.cardSetId && dto.cardSetId !== game.cardSetId) {
+        if (user.role !== SystemRole.ADMIN) throw new ForbiddenException("Выбирать набор карточек может только администратор");
+        const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
+        cardSetId = cardSet.id;
+        cardDecks = await this.initialCardDecks(tx, cardSet.id);
+      }
+      const settings = game.settings as Record<string, unknown>;
+      await tx.game.update({ where: { id: gameId }, data: {
+        title: nextTitle, maxPlayers, isPublic, scheduledAt,
+        scheduleTimeZone: isPublic ? user.timeZone : null,
+        scheduleRevision: game.scheduleRevision + (game.scheduledAt?.getTime() !== scheduledAt?.getTime() ? 1 : 0),
+        cardSetId,
+        settings: { ...settings, timeLimitMinutes: dto.timeLimitMinutes ?? settings.timeLimitMinutes ?? 90,
+          periodCount: dto.periodCount ?? settings.periodCount ?? 1,
+          ...(cardDecks ? { cardDecks } : {}) } as Prisma.InputJsonValue
+      } });
+      if (isPublic && !game.isPublic) {
+        const recipients = await tx.user.findMany({ where: { status: AccountStatus.ACTIVE, openGameNotifications: true, id: { not: actorUserId } }, select: { id: true } });
+        await tx.userNotification.createMany({ data: recipients.map((recipient) => ({ userId: recipient.id, gameId, kind: "OPEN_GAME_PUBLISHED", dedupeKey: `published:${gameId}` })), skipDuplicates: true });
+      } else if (isPublic && game.isPublic && game.scheduledAt?.getTime() !== scheduledAt?.getTime()) {
+        const participants = await tx.gamePlayer.findMany({ where: { gameId, userId: { not: null }, status: GamePlayerStatus.JOINED }, select: { userId: true } });
+        await tx.userNotification.createMany({ data: participants.filter((player) => player.userId !== actorUserId).map((player) => ({ userId: player.userId!, gameId, kind: "OPEN_GAME_RESCHEDULED", dedupeKey: `rescheduled:${gameId}:${game.scheduleRevision + 1}` })), skipDuplicates: true });
+      }
+      await this.appendEvents(tx, gameId, actorUserId, [{ type: "game:lobby_updated", payload: { maxPlayers, isPublic } }, { type: realtimeEvents.stateUpdate, payload: { reason: "lobby_updated" } }]);
+    });
+    return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
+  }
+
+  async addLobbyBot(gameId: string, actorUserId: string) {
+    await this.ensureCanManageGame(gameId, actorUserId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: true } });
+      if (game.mode !== GameMode.MULTIPLAYER || game.status !== GameStatus.WAITING) throw new BadRequestException("Ботов можно добавлять только до начала командной игры");
+      const joined = game.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED);
+      if (joined.length >= (game.maxPlayers ?? 6)) throw new BadRequestException("Все места в игре заняты");
+      if (joined.filter((player) => player.controller === PlayerController.BOT).length >= 3) throw new BadRequestException("В игре уже три бота");
+      const occupiedFigurines = new Set(joined.map((player) => player.figurine).filter((value): value is string => Boolean(value)));
+      const botIndex = botNames.findIndex((name) => !joined.some((player) => player.controller === PlayerController.BOT && player.guestName === name));
+      const [bot] = createBotPlayers(botIndex + 1, occupiedFigurines).slice(-1);
+      if (!bot) throw new BadRequestException("Не удалось добавить бота");
+      const seat = nextAvailableSeat(joined.map((player) => player.seat).filter((value): value is number => value !== null));
+      const player = await tx.gamePlayer.create({ data: { ...bot, gameId, seat, color: playerColors[(seat - 1) % playerColors.length] ?? null } });
+      await this.appendEvents(tx, gameId, actorUserId, [{ type: "player:added", gamePlayerId: player.id, payload: { bot: true } }, { type: realtimeEvents.stateUpdate, payload: { reason: "bot_added" } }]);
+    });
+    return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
+  }
+
+  async removeLobbyPlayer(gameId: string, actorUserId: string, playerId: string) {
+    await this.ensureCanManageGame(gameId, actorUserId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+      if (game.mode !== GameMode.MULTIPLAYER || game.status !== GameStatus.WAITING) throw new BadRequestException("Удалить участника можно только до начала командной игры");
+      const player = await tx.gamePlayer.findFirst({ where: { id: playerId, gameId, status: GamePlayerStatus.JOINED } });
+      if (!player) throw new NotFoundException("Участник не найден");
+      if (player.userId === game.createdById || player.role === GameRole.HOST) throw new BadRequestException("Ведущего нельзя удалить из лобби");
+      await tx.gamePlayer.update({ where: { id: player.id }, data: { status: GamePlayerStatus.KICKED, leftAt: new Date(), seat: null, figurine: null } });
+      await this.appendEvents(tx, gameId, actorUserId, [{ type: "player:removed", gamePlayerId: player.id, payload: { bot: player.controller === PlayerController.BOT } }, { type: realtimeEvents.stateUpdate, payload: { reason: "player_removed" } }]);
+    });
+    return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
+  }
+
   async startGame(gameId: string, userId: string) {
     await this.ensureCanManageGame(gameId, userId);
     const emittedEvents: PendingEvent[] = [];
@@ -1052,6 +1143,9 @@ export class GamesService {
       }
       if (game.players.length < 2) {
         throw new BadRequestException("Для начала игры нужно не менее двух игроков");
+      }
+      if (game.players.length > Math.min(game.maxPlayers ?? 12, 12)) {
+        throw new BadRequestException("Игроков больше установленного лимита");
       }
       if (game.players.every((player) => player.controller === PlayerController.BOT)) {
         throw new BadRequestException("Для начала игры нужен хотя бы один человек");
@@ -1361,6 +1455,7 @@ export class GamesService {
     await this.ensureCanManageGame(gameId, userId);
 
     await this.prisma.$transaction(async (tx) => {
+      await this.lockGame(tx, gameId);
       const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: { players: true }
@@ -1389,6 +1484,7 @@ export class GamesService {
         const currentPlayers = game.players.filter(
           (player) => player.role === GameRole.PLAYER && player.status === "JOINED"
         );
+        if (currentPlayers.length >= (game.maxPlayers ?? 6)) throw new BadRequestException("Все места в игре заняты");
         const occupiedSeats = new Set(
           currentPlayers
             .map((player) => player.seat)
@@ -6466,6 +6562,9 @@ export class GamesService {
         status: game.status,
         mode: game.mode,
         maxPlayers: game.maxPlayers,
+        isPublic: game.isPublic,
+        scheduledAt: game.scheduledAt,
+        scheduleTimeZone: game.scheduleTimeZone,
         currentTurnIndex: game.currentTurnIndex,
         currentRound: game.currentRound,
         currentPlayerId: currentPlayer?.id ?? null,

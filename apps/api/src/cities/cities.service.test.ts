@@ -13,18 +13,18 @@ test("поиск города запрашивает совпадения по �
     city: {
       findMany: async (args: unknown) => {
         receivedArgs = args;
-        return [{ id: "city-id", name: "Орёл", region: "Орловская область" }];
+        return [{ id: "city-id", name: "Орёл", region: "Орловская область", timeZone: "Europe/Moscow" }];
       }
     }
   } as never);
 
   const result = await service.search("Орё");
   assert.deepEqual(result, [
-    { id: "city-id", name: "Орёл", region: "Орловская область" }
+    { id: "city-id", name: "Орёл", region: "Орловская область", timeZone: "Europe/Moscow" }
   ]);
   assert.deepEqual(receivedArgs, {
     where: { searchName: { startsWith: "оре" } },
-    select: { id: true, name: true, region: true },
+    select: { id: true, name: true, region: true, timeZone: true },
     orderBy: [{ name: "asc" }, { region: "asc" }],
     take: 20
   });

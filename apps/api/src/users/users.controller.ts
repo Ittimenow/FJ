@@ -37,6 +37,11 @@ export class UsersController {
     return this.users.notifications(user.userId);
   }
 
+  @Get("me/notifications/unread-count")
+  unreadNotificationCount(@CurrentUser() user: AuthenticatedUser) {
+    return this.users.unreadNotificationCount(user.userId);
+  }
+
   @Patch("me/notifications/:id/read")
   readNotification(@CurrentUser() user: AuthenticatedUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.users.readNotification(user.userId, id);

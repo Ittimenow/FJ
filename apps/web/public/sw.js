@@ -64,3 +64,47 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+self.addEventListener("push", (event) => {
+  event.waitUntil((async () => {
+    let message = {};
+    try {
+      message = event.data?.json() ?? {};
+    } catch {
+      message = {};
+    }
+    const unreadCount = Number.isInteger(message.unreadCount)
+      ? Math.max(0, message.unreadCount) : null;
+    await self.registration.showNotification(message.title || "Новое оповещение", {
+      body: message.body || "В игре появилось новое сообщение.",
+      icon: "/pwa/icon-192.png",
+      badge: "/pwa/icon-192.png",
+      tag: typeof message.id === "string" ? message.id : "financial-journey-notification",
+      data: { url: "/notifications" }
+    });
+    if (unreadCount !== null && "setAppBadge" in self.navigator) {
+      try {
+        if (unreadCount > 0) await self.navigator.setAppBadge(unreadCount);
+        else await self.navigator.clearAppBadge();
+      } catch {
+        // Badging is optional on this platform.
+      }
+    }
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) client.postMessage({ type: "NOTIFICATIONS_CHANGED" });
+  })());
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const target = new URL("/notifications", self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = windows.find((client) => client.url === target);
+    if (existing) {
+      await existing.focus();
+    } else {
+      await self.clients.openWindow(target);
+    }
+  })());
+});
