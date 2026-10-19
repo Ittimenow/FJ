@@ -1,6 +1,6 @@
 import { normalizeTelegramChannel, TELEGRAM_CHANNEL_PATTERN } from "@cashflow/shared";
 import { Transform, Type } from "class-transformer";
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -26,11 +26,6 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   figurine?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(["classic", "journey"])
-  gameRoomView?: "classic" | "journey";
 
   @IsOptional()
   @Transform(({ value }) => typeof value === "string" ? normalizeTelegramChannel(value) : value)

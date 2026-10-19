@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "reserve-second-board-for-admin-preview",
+          "category": "improvement",
+          "summary": "Все обычные партии открываются на Поле 1, а администратор может отдельно посмотреть любую начатую или завершённую игру на Поле 2."
+        },
+        {
           "id": "open-notifications-in-menu-popover",
           "category": "improvement",
           "summary": "Оповещения открываются поверх текущего экрана, а полностью просмотренные сообщения автоматически становятся прочитанными и уменьшают счётчик."

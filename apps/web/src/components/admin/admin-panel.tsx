@@ -437,6 +437,18 @@ function RulesSection({
 function GameBoardSettings() {
   return (
     <div className="grid gap-5">
+      <section className="rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6" aria-labelledby="board-preview-heading">
+        <h2 id="board-preview-heading" className="text-xl font-extrabold">Поле 2 · предпросмотр</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75">
+          Откройте любую начатую или завершённую партию на Поле 2. Этот режим виден только администратору и не меняет поле у игроков.
+        </p>
+        <Link
+          href="/dashboard?section=games"
+          className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-action px-4 text-sm font-extrabold text-ink transition hover:bg-[#e77b1e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+        >
+          Выбрать игру
+        </Link>
+      </section>
       <Card className="rounded-2xl border-0">
         <CardHeader>
           <CardTitle className="text-xl">Игровое поле</CardTitle>

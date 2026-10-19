@@ -12,12 +12,15 @@ import {
   isUnauthorizedApiError
 } from "@/lib/api";
 import { avatarInitials, generateAvatarColor } from "@/lib/avatar-color";
+import { gameRoomViewForRole } from "@/lib/game-room-view";
 import type { GameSnapshot, ProfileResponse } from "@/lib/types";
 
 export default async function GamePage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }) {
   const session = await auth();
   if (!session?.accessToken) redirect("/login");
@@ -70,9 +73,8 @@ export default async function GamePage({
   const membership = snapshot.players.find(
     (player) => player.userId === session.user.id
   );
-  const gameRoomView = snapshot.players.find(
-    (player) => player.userId === session.user.id && player.role === "PLAYER"
-  )?.user?.gameRoomView ?? "classic";
+  const { preview } = await searchParams;
+  const gameRoomView = gameRoomViewForRole(profile?.user.role, preview);
 
   return (
     <AppShell
@@ -88,6 +90,7 @@ export default async function GamePage({
         token={session.accessToken}
         currentUserId={session.user.id}
         currentUserRole={session.user.role}
+        gameRoomView={gameRoomView}
         timeZone={profile?.user.timeZone ?? null}
       />
     </AppShell>

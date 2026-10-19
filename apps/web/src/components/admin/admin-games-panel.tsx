@@ -372,6 +372,11 @@ export function AdminGamesPanel({ token }: { token: string }) {
                           {game.title}
                         </Link>
                         <div className="mt-1 font-mono text-xs text-muted">{game.code}</div>
+                        {game.status !== "WAITING" && game.status !== "CANCELLED" ? (
+                          <Link className="mt-2 inline-flex min-h-9 items-center text-xs font-extrabold text-journey underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25" href={`/games/${game.id}?preview=journey`}>
+                            Посмотреть на Поле 2
+                          </Link>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 align-top"><GameStatus status={game.status} /></td>
                       <td className="px-4 py-3 align-top font-bold">{gameModeLabel(game.mode)}</td>
@@ -449,6 +454,11 @@ function GameCard({
             {game.title}
           </Link>
           <div className="mt-1 font-mono text-xs text-muted">{game.code}</div>
+          {game.status !== "WAITING" && game.status !== "CANCELLED" ? (
+            <Link className="mt-2 inline-flex min-h-9 items-center text-xs font-extrabold text-journey underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25" href={`/games/${game.id}?preview=journey`}>
+              Посмотреть на Поле 2
+            </Link>
+          ) : null}
         </div>
         <GameStatus status={game.status} />
       </div>

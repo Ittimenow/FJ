@@ -154,7 +154,6 @@ export class UsersService {
           gameExperience: dto.gameExperience
         }),
         ...(dto.figurine !== undefined && { figurine: dto.figurine || null }),
-        ...(dto.gameRoomView !== undefined && { gameRoomView: dto.gameRoomView }),
         ...(dto.telegramChannel !== undefined && { telegramChannel: dto.telegramChannel }),
         ...(dto.telegramMentionConsent !== undefined && {
           telegramMentionConsent: dto.telegramMentionConsent

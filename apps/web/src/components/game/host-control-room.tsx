@@ -30,11 +30,6 @@ import {
   type PlayerTurn
 } from "@/components/game/game-journal";
 import { GamePlayerMark } from "@/components/game/game-player-mark";
-import {
-  readDisplayFieldView,
-  setDisplayFieldView,
-  type DisplayFieldView
-} from "@/components/game/game-display";
 import { formatGameTime, useLiveGame, useRemainingSeconds } from "@/components/game/use-live-game";
 import { publicApiBaseUrl } from "@/lib/api";
 import { connectionPresentation } from "@/lib/connection-health";
@@ -57,7 +52,6 @@ export function HostControlRoom({
   const remaining = useRemainingSeconds(snapshot);
   const players = snapshot.players.filter((player) => player.role === "PLAYER");
   const currentPlayer = players.find((player) => player.id === snapshot.game.currentPlayerId);
-  const [displayView, setDisplayView] = useState<DisplayFieldView>("classic");
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [historyEvents, setHistoryEvents] = useState(initialSnapshot.events);
   const [archiveLoaded, setArchiveLoaded] = useState(initialSnapshot.events.length < 80);
@@ -73,19 +67,8 @@ export function HostControlRoom({
     setHistoryEvents((current) => mergeEvents(current, snapshot.events));
   }, [snapshot.events]);
 
-  useEffect(() => {
-    const storedView = readDisplayFieldView(snapshot.game.id);
-    if (storedView) setDisplayView(storedView);
-  }, [snapshot.game.id]);
-
-  function chooseDisplayView(view: DisplayFieldView) {
-    setDisplayView(view);
-    setDisplayFieldView(snapshot.game.id, view);
-  }
-
   function openDisplay() {
-    setDisplayFieldView(snapshot.game.id, displayView);
-    window.open(`/games/${snapshot.game.id}/display?view=${displayView}`, "_blank", "noopener,noreferrer");
+    window.open(`/games/${snapshot.game.id}/display`, "_blank", "noopener,noreferrer");
   }
 
   async function openPlayerDetails(playerId: string) {
@@ -177,22 +160,6 @@ export function HostControlRoom({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {currentPlayer?.track !== "FAST_TRACK" ? <div className="grid grid-cols-2 rounded-xl bg-white/10 p-1" role="group" aria-label="Вариант игрового поля">
-              {(["classic", "journey"] as DisplayFieldView[]).map((view, index) => (
-                <button
-                  key={view}
-                  type="button"
-                  aria-pressed={displayView === view}
-                  onClick={() => chooseDisplayView(view)}
-                  className={[
-                    "h-9 rounded-lg px-3 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action",
-                    displayView === view ? "bg-white text-ink" : "text-white/75 hover:bg-white/10 hover:text-white"
-                  ].join(" ")}
-                >
-                  Поле {index + 1}
-                </button>
-              ))}
-            </div> : null}
             <button
               type="button"
               onClick={openDisplay}

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, KeyRound, LayoutGrid, LogOut, Map, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { CheckCircle2, KeyRound, LogOut, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import { signOut } from "next-auth/react";
@@ -52,7 +52,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       profile.user.gameExperience != null ? Number(profile.user.gameExperience) : null,
     avatarUrl: profile.user.avatarUrl,
     figurine: profile.user.figurine,
-    gameRoomView: profile.user.gameRoomView,
     telegramChannel: profile.user.telegramChannel ?? "",
     telegramMentionConsent: profile.user.telegramMentionConsent,
     openGameNotifications: profile.user.openGameNotifications,
@@ -66,9 +65,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   );
   const [avatarPending, setAvatarPending] = useState<string | null | undefined>(undefined);
   const [figurine, setFigurine] = useState<string | null>(profile.user.figurine);
-  const [gameRoomView, setGameRoomView] = useState<"classic" | "journey">(
-    profile.user.gameRoomView
-  );
   const [telegramChannel, setTelegramChannel] = useState(profile.user.telegramChannel ?? "");
   const [telegramMentionConsent, setTelegramMentionConsent] = useState(
     profile.user.telegramMentionConsent
@@ -119,7 +115,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
     birthDate !== savedProfile.birthDate ||
     normalizedGameExperience !== savedProfile.gameExperience ||
     figurine !== savedProfile.figurine ||
-    gameRoomView !== savedProfile.gameRoomView ||
     normalizedTelegramChannel !== savedProfile.telegramChannel ||
     telegramMentionConsent !== savedProfile.telegramMentionConsent ||
     openGameNotifications !== savedProfile.openGameNotifications ||
@@ -162,7 +157,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
       gameExperience: normalizedGameExperience,
       avatarPending,
       figurine,
-      gameRoomView,
       telegramChannel: normalizedTelegramChannel,
       telegramMentionConsent,
       openGameNotifications,
@@ -212,9 +206,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         body.gameExperience = snapshot.gameExperience;
       }
       if (snapshot.figurine !== savedBefore.figurine) body.figurine = snapshot.figurine;
-      if (snapshot.gameRoomView !== savedBefore.gameRoomView) {
-        body.gameRoomView = snapshot.gameRoomView;
-      }
       if (snapshot.telegramChannel !== savedBefore.telegramChannel) {
         body.telegramChannel = snapshot.telegramChannel;
       }
@@ -250,7 +241,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         gameExperience: snapshot.gameExperience,
         avatarUrl: nextAvatarUrl,
         figurine: snapshot.figurine,
-        gameRoomView: snapshot.gameRoomView,
         telegramChannel: snapshot.telegramChannel,
         telegramMentionConsent: snapshot.telegramMentionConsent,
         openGameNotifications: snapshot.openGameNotifications,
@@ -652,47 +642,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                 </div>
               </div>
             </section>
-
-            <section
-              className="mt-7 border-t border-line/70 pt-7"
-              aria-labelledby="game-board-heading"
-            >
-              <div className="max-w-xl">
-                <h3 id="game-board-heading" className="text-lg font-extrabold">
-                  Дизайн игрового поля
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-muted">
-                  Выбранный вариант будет открываться во всех ваших партиях.
-                </p>
-              </div>
-              <div
-                className="mt-4 grid gap-3 sm:grid-cols-2"
-                role="radiogroup"
-                aria-label="Дизайн игрового поля"
-              >
-                <GameBoardChoice
-                  value="classic"
-                  label="Поле 1"
-                  description="Классическое круговое поле"
-                  selected={gameRoomView === "classic"}
-                  onSelect={(value) => {
-                    setGameRoomView(value);
-                    markProfileChanged(true);
-                  }}
-                />
-                <GameBoardChoice
-                  value="journey"
-                  label="Поле 2"
-                  badge="Бета"
-                  description="Карта финансового путешествия"
-                  selected={gameRoomView === "journey"}
-                  onSelect={(value) => {
-                    setGameRoomView(value);
-                    markProfileChanged(true);
-                  }}
-                />
-              </div>
-            </section>
           </div>
 
           </section>
@@ -871,69 +820,6 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
         </section>
       </div>
     </div>
-  );
-}
-
-function GameBoardChoice({
-  value,
-  label,
-  badge,
-  description,
-  selected,
-  onSelect
-}: {
-  value: "classic" | "journey";
-  label: string;
-  badge?: string;
-  description: string;
-  selected: boolean;
-  onSelect: (value: "classic" | "journey") => void;
-}) {
-  const Icon = value === "classic" ? LayoutGrid : Map;
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={() => onSelect(value)}
-      className={[
-        "overflow-hidden rounded-2xl bg-card p-2 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25",
-        selected ? "ring-2 ring-journey" : "hover:bg-[#f6eadc]"
-      ].join(" ")}
-    >
-      <span className="relative block aspect-[16/7] overflow-hidden rounded-xl bg-[#e9ddc7]" aria-hidden="true">
-        {value === "classic" ? (
-          <span className="absolute inset-[12%] rounded-[38%] border-[10px] border-white shadow-[0_8px_22px_rgba(27,57,118,.16)]">
-            <span className="absolute left-1/2 top-1/2 h-[38%] w-[38%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-journey/15" />
-          </span>
-        ) : (
-          <>
-            <span className="absolute left-[9%] top-[18%] h-[65%] w-[82%] rotate-[-4deg] rounded-[42%] border-[7px] border-white shadow-[0_8px_22px_rgba(27,57,118,.16)]" />
-            <span className="absolute left-[43%] top-[38%] h-8 w-12 rounded-lg bg-ink/85" />
-          </>
-        )}
-      </span>
-      <span className="flex items-center gap-3 px-2 py-3">
-        <span className={[
-          "grid h-10 w-10 shrink-0 place-items-center rounded-xl",
-          selected ? "bg-journey text-white" : "bg-white text-muted"
-        ].join(" ")}>
-          <Icon size={19} aria-hidden="true" />
-        </span>
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-extrabold">{label}</span>
-            {badge ? (
-              <span className="rounded-md bg-[#e8effe] px-2 py-0.5 text-[10px] font-extrabold text-journey">
-                {badge}
-              </span>
-            ) : null}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted">{description}</span>
-        </span>
-        {selected ? <CheckCircle2 className="ml-auto shrink-0 text-journey" size={20} aria-hidden="true" /> : null}
-      </span>
-    </button>
   );
 }
 

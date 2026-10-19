@@ -4,7 +4,7 @@ import { FastTrackBoard } from "./fast-track-panel";
 import { useBoardMovement } from "./use-board-movement";
 
 import { CircleDot, Clock3, Expand, MonitorUp } from "lucide-react";
-import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, useMemo, useRef } from "react";
 import { BroadcastGameSummary } from "@/components/game/broadcast-game-summary";
 import { GamePlayerMark } from "@/components/game/game-player-mark";
 import { formatGameTime, useLiveGame, useRemainingSeconds } from "@/components/game/use-live-game";
@@ -28,33 +28,8 @@ export function GameDisplay({
   const connectionStatus = connectionPresentation(connection.phase);
   const remaining = useRemainingSeconds(snapshot);
   const showFastTrack = snapshot.players.find((player) => player.id === snapshot.game.currentPlayerId)?.track === "FAST_TRACK";
-  const [view, setView] = useState(initialView);
+  const view = initialView;
   const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const key = displayViewKey(snapshot.game.id);
-    const stored = window.localStorage.getItem(key);
-    if (stored === "classic" || stored === "journey") setView(stored);
-
-    const channel = "BroadcastChannel" in window
-      ? new BroadcastChannel(`game-display-${snapshot.game.id}`)
-      : null;
-    if (channel) {
-      channel.onmessage = (event: MessageEvent<DisplayFieldView>) => {
-        if (event.data === "classic" || event.data === "journey") setView(event.data);
-      };
-    }
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === key && (event.newValue === "classic" || event.newValue === "journey")) {
-        setView(event.newValue);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      channel?.close();
-      window.removeEventListener("storage", onStorage);
-    };
-  }, [snapshot.game.id]);
 
   return (
     <div ref={rootRef} className="min-h-screen overflow-hidden bg-[#102a5c] p-3 text-white sm:p-4">
@@ -217,22 +192,4 @@ function classicCellPosition(index: number): CSSProperties {
   if (number <= 20) return { gridColumn: 21 - number, gridRow: 6 };
   if (number <= 24) return { gridColumn: 1, gridRow: 26 - number };
   return {};
-}
-
-export function setDisplayFieldView(gameId: string, view: DisplayFieldView) {
-  window.localStorage.setItem(displayViewKey(gameId), view);
-  if ("BroadcastChannel" in window) {
-    const channel = new BroadcastChannel(`game-display-${gameId}`);
-    channel.postMessage(view);
-    channel.close();
-  }
-}
-
-export function readDisplayFieldView(gameId: string): DisplayFieldView | null {
-  const stored = window.localStorage.getItem(displayViewKey(gameId));
-  return stored === "classic" || stored === "journey" ? stored : null;
-}
-
-function displayViewKey(gameId: string) {
-  return `financial-journey:display-view:${gameId}`;
 }

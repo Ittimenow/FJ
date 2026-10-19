@@ -177,12 +177,14 @@ export function GameRoom({
   token,
   currentUserId,
   currentUserRole,
+  gameRoomView,
   timeZone
 }: {
   initialSnapshot: GameSnapshot;
   token: string;
   currentUserId: string;
   currentUserRole: "USER" | "HOST" | "ADMIN";
+  gameRoomView: GameRoomView;
   timeZone: string | null;
 }) {
   const router = useRouter();
@@ -200,7 +202,6 @@ export function GameRoom({
   );
   const initialPreferredFigurine = initialMe?.user?.figurine;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const [gameRoomView] = useState<GameRoomView>(initialMe?.user?.gameRoomView ?? "classic");
   const [connection, setConnection] = useState<ConnectionDiagnostics>(
     initialConnectionDiagnostics
   );
