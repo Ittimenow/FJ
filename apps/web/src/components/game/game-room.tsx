@@ -1453,7 +1453,9 @@ export function GameRoom({
           <p className="mt-2 text-sm leading-6">Она будет представлять вас на обоих игровых кругах. У каждого игрока своя фишка.</p>
           {me && isDreamCell(me.dreamCellIndex) ? (
             <div className="mt-4 flex items-center gap-3 rounded-xl bg-card p-2 sm:p-3">
-              <img src={`/dreams/${me.dreamCellIndex}.webp`} alt="" width={96} height={64} className="aspect-[3/2] w-24 shrink-0 rounded-lg bg-white object-contain" />
+              <span className="relative aspect-[3/2] w-24 shrink-0 overflow-hidden rounded-lg">
+                <img src={`/dreams/${me.dreamCellIndex}.webp`} alt="" width={96} height={64} className="absolute inset-0 h-full w-full object-cover" />
+              </span>
               <div className="min-w-0"><p className="text-xs text-muted">Ваша мечта</p><p className="font-extrabold">{fastTrackCells[me.dreamCellIndex]!.label}</p>
                 <button type="button" className="mt-1 min-h-9 text-sm font-bold text-journey underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey" onClick={() => setDreamPickerOpen(true)}>Изменить мечту</button>
               </div>
@@ -2606,7 +2608,9 @@ function WaitingRoomOverview({
         {currentPlayer?.figurine && (snapshot.game.rulesVersion !== 2 || isDreamCell(currentPlayer.dreamCellIndex)) ? (
           <div className="mt-3 flex flex-col gap-3 rounded-xl bg-card p-4 text-sm min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
             {snapshot.game.rulesVersion === 2 && isDreamCell(currentPlayer.dreamCellIndex) ? (
-              <img src={`/dreams/${currentPlayer.dreamCellIndex}.webp`} alt="" width={96} height={64} loading="lazy" className="aspect-[3/2] w-24 shrink-0 rounded-lg bg-white object-contain" />
+              <span className="relative aspect-[3/2] w-24 shrink-0 overflow-hidden rounded-lg">
+                <img src={`/dreams/${currentPlayer.dreamCellIndex}.webp`} alt="" width={96} height={64} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+              </span>
             ) : null}
             <div className="min-w-0">
               <div className="font-extrabold text-ink">

@@ -100,27 +100,10 @@ export function AdminPanel({
 }) {
   const searchParams = useSearchParams();
   const section = parseAdminSection(searchParams.get("section"));
-  const activeMenuItem = allMenuItems.find((item) => item.id === section) ?? mainMenu[0];
-  const ActiveSectionIcon = activeMenuItem?.icon;
 
   return (
     <div className="grid gap-5 sm:gap-6">
-      <section className="rounded-2xl bg-ink p-5 text-white shadow-panel sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-3xl">
-            <h1 className="text-balance text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">
-              Управление порталом
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65 sm:text-base">
-              Контролируйте комнаты, аккаунты, игровые данные и обратную связь из одного рабочего пространства.
-            </p>
-          </div>
-          <div className="inline-flex items-center gap-2 self-start rounded-xl bg-white/10 px-3 py-2 text-sm font-extrabold sm:self-auto">
-            {ActiveSectionIcon ? <ActiveSectionIcon size={17} aria-hidden="true" /> : null}
-            {activeMenuItem?.label ?? "Обзор"}
-          </div>
-        </div>
-      </section>
+      <h1 className="sr-only">Администрирование</h1>
       {!profile.user.timeZone ? <p className="rounded-xl bg-[#fff0df] p-4 text-sm text-ink">Выберите город в профиле, чтобы видеть время открытых игр.</p> : null}
 
       <nav
@@ -142,10 +125,6 @@ export function AdminPanel({
       <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
         <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
           <nav className="overflow-hidden rounded-2xl bg-card shadow-panel" aria-label="Разделы административной панели">
-            <div className="border-b border-line/70 p-4">
-              <div className="text-base font-extrabold text-ink">Разделы управления</div>
-              <p className="mt-1 text-xs leading-5 text-muted">Рабочие инструменты администратора.</p>
-            </div>
             <div className="space-y-1 p-2">
               {mainMenu.map((item) => (
                 <MenuLink key={item.id} item={item} active={section === item.id} />

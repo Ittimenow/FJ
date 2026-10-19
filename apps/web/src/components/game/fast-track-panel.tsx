@@ -19,7 +19,9 @@ export function DreamPicker({ player, saving, onChoose }: { player: GamePlayer; 
         const selected = player.dreamCellIndex === cell.index;
         return <button type="button" disabled={saving} key={cell.index} aria-pressed={selected} onClick={() => onChoose(cell.index)}
           className={`flex min-w-0 flex-col overflow-hidden rounded-xl text-left text-sm leading-5 outline-none transition focus-visible:ring-4 focus-visible:ring-journey/30 ${selected ? "bg-[#eee8ff] text-[#57378f] ring-2 ring-[#7655c7]" : "bg-card hover:bg-surface"}`}>
-          <img src={`/dreams/${cell.index}.webp`} alt="" width={640} height={427} loading="lazy" decoding="async" className="block aspect-[3/2] w-full shrink-0 bg-white object-contain" />
+          <span className="relative block aspect-[3/2] w-full shrink-0 overflow-hidden">
+            <img src={`/dreams/${cell.index}.webp`} alt="" width={640} height={427} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+          </span>
           <span className="flex items-start justify-between gap-2 px-3 pt-3 font-extrabold">{cell.label}{selected ? <Check size={18} className="shrink-0" aria-hidden="true" /> : null}</span>
           <span className="px-3 pt-1 font-bold">{money(cell.cost)}</span>
           <span className="px-3 pb-3 pt-1 leading-5">{cell.description}</span>
