@@ -80,7 +80,7 @@ self.addEventListener("push", (event) => {
       icon: "/pwa/icon-192.png",
       badge: "/pwa/icon-192.png",
       tag: typeof message.id === "string" ? message.id : "financial-journey-notification",
-      data: { url: "/notifications" }
+      data: { url: "/dashboard?notifications=1" }
     });
     if (unreadCount !== null && "setAppBadge" in self.navigator) {
       try {
@@ -98,11 +98,18 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil((async () => {
-    const target = new URL("/notifications", self.location.origin).href;
+    const target = new URL("/dashboard?notifications=1", self.location.origin).href;
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const existing = windows.find((client) => client.url === target);
+    const existing = windows.find((client) => {
+      const url = new URL(client.url);
+      return url.origin === self.location.origin && (
+        url.pathname === "/dashboard" || url.pathname === "/profile" || url.pathname === "/guide" ||
+        url.pathname.startsWith("/games/") || url.pathname.startsWith("/join/")
+      );
+    });
     if (existing) {
       await existing.focus();
+      existing.postMessage({ type: "OPEN_NOTIFICATIONS" });
     } else {
       await self.clients.openWindow(target);
     }

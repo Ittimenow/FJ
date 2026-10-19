@@ -4,10 +4,14 @@ import { useSession } from "next-auth/react";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { publicApiBaseUrl } from "@/lib/api";
 
-const NotificationUnreadContext = createContext(0);
+const NotificationUnreadContext = createContext({ count: 0, notificationRead: () => {} });
 
 export function useUnreadNotifications() {
-  return useContext(NotificationUnreadContext);
+  return useContext(NotificationUnreadContext).count;
+}
+
+export function useNotificationRead() {
+  return useContext(NotificationUnreadContext).notificationRead;
 }
 
 export function NotificationUnreadProvider({ children }: { children: ReactNode }) {
@@ -15,6 +19,15 @@ export function NotificationUnreadProvider({ children }: { children: ReactNode }
   const token = session?.accessToken;
   const [count, setCount] = useState(0);
   const [pushVersion, setPushVersion] = useState(0);
+
+  const notificationRead = useCallback(() => {
+    setCount((current) => Math.max(0, current - 1));
+    if (typeof BroadcastChannel !== "undefined") {
+      const channel = new BroadcastChannel("financial-journey-notifications");
+      channel.postMessage("changed");
+      channel.close();
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -96,5 +109,5 @@ export function NotificationUnreadProvider({ children }: { children: ReactNode }
     }).catch(() => {});
   }, [token, count, pushVersion]);
 
-  return <NotificationUnreadContext.Provider value={count}>{children}</NotificationUnreadContext.Provider>;
+  return <NotificationUnreadContext.Provider value={{ count, notificationRead }}>{children}</NotificationUnreadContext.Provider>;
 }

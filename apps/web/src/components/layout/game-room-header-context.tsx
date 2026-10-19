@@ -361,7 +361,7 @@ function MobileGameMenu({ state, profile }: { state: GameRoomHeaderState; profil
     {open ? <div ref={panelRef} role="dialog" aria-label="Меню игры" className="game-mobile-menu rounded-2xl bg-white p-3 text-sm text-ink shadow-[0_18px_48px_rgba(5,18,45,.2)]">
       <div className="grid gap-1">
         {profile}
-        <a href="/notifications" className="flex items-center gap-2 rounded-xl px-2 py-3 font-bold text-ink hover:bg-card"><Bell size={17} aria-hidden="true" />Оповещения{unreadNotifications > 0 ? <span className="ml-auto rounded-full bg-journey px-2 py-0.5 text-xs text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</a>
+        <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent("notifications:open", { detail: buttonRef.current })); }} className="flex w-full items-center gap-2 rounded-xl px-2 py-3 text-left font-bold text-ink hover:bg-card"><Bell size={17} aria-hidden="true" />Оповещения{unreadNotifications > 0 ? <span className="ml-auto rounded-full bg-journey px-2 py-0.5 text-xs text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span> : null}</button>
         <HostShortcuts state={state} expanded />
         <ConnectionStatusControl state={state} showLabel />
       </div>

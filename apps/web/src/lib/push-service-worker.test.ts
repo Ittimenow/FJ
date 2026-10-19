@@ -17,7 +17,7 @@ test("service worker displays an incoming push and updates the app badge", async
     } },
     navigator: { setAppBadge: async (count: number) => { badges.push(count); } },
     clients: {
-      matchAll: async () => [{ postMessage: (message: unknown) => messages.push(message), url: "https://example.com/dashboard" }],
+      matchAll: async () => [{ postMessage: (message: unknown) => messages.push(message), focus: async () => {}, url: "https://example.com/dashboard" }],
       openWindow: async (url: string) => { opened.push(url); }
     },
     location: { origin: "https://example.com" }
@@ -40,5 +40,29 @@ test("service worker displays an incoming push and updates the app badge", async
     waitUntil: (promise: Promise<unknown>) => { work = promise; }
   });
   await work;
-  assert.deepEqual(opened, ["https://example.com/notifications"]);
+  assert.deepEqual(opened, []);
+  assert.equal((messages[1] as { type?: string } | undefined)?.type, "OPEN_NOTIFICATIONS");
+
+  worker.clients.matchAll = async () => [];
+  listeners.get("notificationclick")?.({
+    notification: { close: () => {} },
+    waitUntil: (promise: Promise<unknown>) => { work = promise; }
+  });
+  await work;
+  assert.deepEqual(opened, ["https://example.com/dashboard?notifications=1"]);
+
+  worker.clients.matchAll = async () => [{
+    postMessage: (message: unknown) => messages.push(message),
+    focus: async () => {},
+    url: "https://example.com/"
+  }];
+  listeners.get("notificationclick")?.({
+    notification: { close: () => {} },
+    waitUntil: (promise: Promise<unknown>) => { work = promise; }
+  });
+  await work;
+  assert.deepEqual(opened, [
+    "https://example.com/dashboard?notifications=1",
+    "https://example.com/dashboard?notifications=1"
+  ]);
 });

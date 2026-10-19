@@ -166,6 +166,16 @@ body.game-room-viewport-locked {
   overscroll-behavior: contain;
 }
 
+.app-shell-notifications-panel {
+  position: fixed;
+  z-index: 110;
+  top: calc(var(--app-shell-header-bottom) + 0.5rem);
+  right: max(0.75rem, env(safe-area-inset-right));
+  width: min(28rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - var(--app-shell-header-bottom) - 1.5rem);
+  overflow: hidden;
+}
+
 .game-mobile-menu .game-profile-link { width: auto; justify-content: flex-start; padding-inline: 0.5rem; }
 .game-mobile-menu .game-profile-name { display: inline; }
 

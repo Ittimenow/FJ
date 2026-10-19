@@ -176,6 +176,17 @@ export interface AdminGamesCatalogResponse {
   totalPages: number;
 }
 
+export interface AdminPortalStatsResponse {
+  totalGames: number;
+  waitingGames: number;
+  inProgressGames: number;
+  pausedGames: number;
+  endedGames: number;
+  cancelledGames: number;
+  humanWins: number;
+  humanEscapes: number;
+}
+
 export interface GameListItem {
   id: string;
   code: string;

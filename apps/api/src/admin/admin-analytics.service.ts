@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { GameMode, GameStatus, Prisma } from "@prisma/client";
+import { GameMode, GameRole, GameStatus, PlayerController, Prisma } from "@prisma/client";
+import { realtimeEvents } from "@cashflow/shared";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -20,6 +21,51 @@ export interface GameCatalogQuery extends AnalyticsQuery {
 @Injectable()
 export class AdminAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async portalStats() {
+    const completedHumanPlayer = {
+      gamePlayer: {
+        role: GameRole.PLAYER,
+        controller: PlayerController.HUMAN,
+        game: { status: GameStatus.ENDED }
+      }
+    };
+    const [statusRows, financialWins, survivalWins, escapes] = await Promise.all([
+      this.prisma.game.groupBy({
+        by: ["status"],
+        _count: { _all: true }
+      }),
+      this.prisma.playerFinancialState.count({
+        where: { ...completedHumanPlayer, wonAt: { not: null } }
+      }),
+      this.prisma.game.count({
+        where: {
+          status: GameStatus.ENDED,
+          events: {
+            some: {
+              type: realtimeEvents.gameEnded,
+              payload: { path: ["reason"], equals: "bots_eliminated" }
+            }
+          }
+        }
+      }),
+      this.prisma.playerFinancialState.count({
+        where: { ...completedHumanPlayer, escapedRatRaceAt: { not: null } }
+      })
+    ]);
+
+    const byStatus = Object.fromEntries(statusRows.map((row) => [row.status, row._count._all]));
+    return {
+      totalGames: statusRows.reduce((total, row) => total + row._count._all, 0),
+      waitingGames: byStatus[GameStatus.WAITING] ?? 0,
+      inProgressGames: byStatus[GameStatus.IN_PROGRESS] ?? 0,
+      pausedGames: byStatus[GameStatus.PAUSED] ?? 0,
+      endedGames: byStatus[GameStatus.ENDED] ?? 0,
+      cancelledGames: byStatus[GameStatus.CANCELLED] ?? 0,
+      humanWins: financialWins + survivalWins,
+      humanEscapes: escapes
+    };
+  }
 
   async listGames(query: AnalyticsQuery) {
     const where = this.gameWhere(query);

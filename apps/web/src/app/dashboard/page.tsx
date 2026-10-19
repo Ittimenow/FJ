@@ -19,7 +19,7 @@ import { money, shortDate } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
 import { gameReleaseVersion } from "@/lib/release";
 import { formatGameTime } from "@/lib/time-zones";
-import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
+import type { AdminPortalStatsResponse, GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -35,6 +35,9 @@ export default async function DashboardPage() {
   const canCreateGames =
     profile.user.role === "HOST" || profile.user.role === "ADMIN";
   const isAdmin = profile.user.role === "ADMIN";
+  const portalStats = isAdmin
+    ? await apiFetch<AdminPortalStatsResponse>("/admin/analytics/portal-stats", session.accessToken)
+    : null;
   const currentGames = games.mine.filter(
     (game) => game.status !== "ENDED" && game.status !== "CANCELLED"
   );
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
       {isAdmin ? (
         <AdminPanel
           profile={profile}
+          portalStats={portalStats!}
           games={games}
           token={session.accessToken}
           releases={systemReleases}

@@ -31,9 +31,8 @@ import { JoinGameForm } from "@/components/game/join-game-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SystemRelease } from "@/lib/changes";
-import { money } from "@/lib/format";
 import { gameStatusLabel } from "@/lib/game-labels";
-import type { GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
+import type { AdminPortalStatsResponse, GameListItem, GamesListResponse, ProfileResponse } from "@/lib/types";
 
 type AdminSection =
   | "dashboard"
@@ -86,12 +85,14 @@ const adminSections = new Set<AdminSection>([
 
 export function AdminPanel({
   profile,
+  portalStats,
   games,
   token,
   releases,
   currentVersion,
 }: {
   profile: ProfileResponse;
+  portalStats: AdminPortalStatsResponse;
   games: GamesListResponse;
   token: string;
   releases: SystemRelease[];
@@ -171,7 +172,7 @@ export function AdminPanel({
 
         <main className="min-w-0">
         {section === "dashboard" ? (
-          <AdminDashboard profile={profile} games={games} token={token} />
+          <AdminDashboard profile={profile} portalStats={portalStats} games={games} token={token} />
         ) : null}
         {section === "games" ? <AdminGamesPanel token={token} /> : null}
         {section === "users" ? (
@@ -282,10 +283,12 @@ function MobileMenuLink({ item, active }: { item: AdminMenuItem; active: boolean
 
 function AdminDashboard({
   profile,
+  portalStats,
   games,
   token
 }: {
   profile: ProfileResponse;
+  portalStats: AdminPortalStatsResponse;
   games: GamesListResponse;
   token: string;
 }) {
@@ -296,17 +299,24 @@ function AdminDashboard({
       <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
         <div>
           <h2 className="text-xl font-extrabold tracking-[-0.025em]">Состояние портала</h2>
-          <p className="mt-1 text-sm text-muted">Агрегированные результаты сыгранных партий.</p>
+          <p className="mt-1 text-sm text-muted">Все игры портала, включая тестовые, как в разделе «Игры» без фильтров.</p>
         </div>
-          <dl className="mt-5 grid grid-cols-2 gap-y-5 sm:grid-cols-4 sm:divide-x sm:divide-line/70">
-            <Metric label="Партий" value={profile.stats.gamesPlayed} />
-            <Metric label="Побед" value={profile.stats.wins} />
-            <Metric label="Выходов из крысиных бегов" value={profile.stats.escapedRatRace} />
-            <Metric
-              label="Средний денежный поток"
-              value={money(profile.stats.averageMonthlyCashflowCents)}
-            />
+        <dl className="mt-5 grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3">
+          <Metric label="Всего игр" value={portalStats.totalGames} />
+          <Metric label="Ожидают начала" value={portalStats.waitingGames} />
+          <Metric label="Идут" value={portalStats.inProgressGames} />
+          <Metric label="На паузе" value={portalStats.pausedGames} />
+          <Metric label="Завершены" value={portalStats.endedGames} />
+          <Metric label="Отменены" value={portalStats.cancelledGames} />
+        </dl>
+        <div className="mt-5 border-t border-line/70 pt-4">
+          <h3 className="text-sm font-extrabold text-ink">Результаты игроков</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">Только завершённые игры; результаты ботов не учитываются.</p>
+          <dl className="mt-3 grid grid-cols-2 gap-2 sm:max-w-md">
+            <Metric label="Побед" value={portalStats.humanWins} />
+            <Metric label="Выходов на большой круг" value={portalStats.humanEscapes} />
           </dl>
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_380px]">

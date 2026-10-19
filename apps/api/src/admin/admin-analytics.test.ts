@@ -50,6 +50,69 @@ test("каталог возвращает все страницы и перед�
   assert.equal(createdAt.lte.toISOString(), "2026-08-07T23:59:59.999Z");
 });
 
+test("сводка портала считает все игры и результаты людей в завершённых играх", async () => {
+  const playerFilters: unknown[] = [];
+  let survivalFilter: unknown;
+  const prisma = {
+    game: {
+      groupBy: async () => [
+        { status: GameStatus.WAITING, _count: { _all: 3 } },
+        { status: GameStatus.IN_PROGRESS, _count: { _all: 2 } },
+        { status: GameStatus.PAUSED, _count: { _all: 1 } },
+        { status: GameStatus.ENDED, _count: { _all: 18 } },
+        { status: GameStatus.CANCELLED, _count: { _all: 1 } }
+      ],
+      count: async ({ where }: { where: unknown }) => {
+        survivalFilter = where;
+        return 2;
+      }
+    },
+    playerFinancialState: {
+      count: async ({ where }: { where: unknown }) => {
+        playerFilters.push(where);
+        return playerFilters.length === 1 ? 10 : 15;
+      }
+    }
+  };
+  const stats = await new AdminAnalyticsService(prisma as never).portalStats();
+
+  assert.deepEqual(stats, {
+    totalGames: 25,
+    waitingGames: 3,
+    inProgressGames: 2,
+    pausedGames: 1,
+    endedGames: 18,
+    cancelledGames: 1,
+    humanWins: 12,
+    humanEscapes: 15
+  });
+  for (const filter of playerFilters) {
+    assert.deepEqual((filter as { gamePlayer: unknown }).gamePlayer, {
+      role: "PLAYER",
+      controller: "HUMAN",
+      game: { status: GameStatus.ENDED }
+    });
+  }
+  assert.deepEqual(survivalFilter, {
+    status: GameStatus.ENDED,
+    events: {
+      some: {
+        type: "game:ended",
+        payload: { path: ["reason"], equals: "bots_eliminated" }
+      }
+    }
+  });
+});
+
+test("сводка пустого портала возвращает нули", async () => {
+  const prisma = {
+    game: { groupBy: async () => [], count: async () => 0 },
+    playerFinancialState: { count: async () => 0 }
+  };
+  const stats = await new AdminAnalyticsService(prisma as never).portalStats();
+  assert.deepEqual(Object.values(stats), Array(8).fill(0));
+});
+
 test("выборочный экспорт включает каждую игру только один раз", async () => {
   let selectedIds: string[] = [];
   const createdAt = new Date("2026-08-07T10:00:00.000Z");

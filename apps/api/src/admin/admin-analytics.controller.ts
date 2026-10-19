@@ -16,6 +16,11 @@ import { ExportGamesDto } from "./dto/export-games.dto";
 export class AdminAnalyticsController {
   constructor(private readonly analytics: AdminAnalyticsService) {}
 
+  @Get("portal-stats")
+  portalStats() {
+    return this.analytics.portalStats();
+  }
+
   @Get("games")
   listGames(@Query() query: AnalyticsQuery) {
     return this.analytics.listGames(query);
