@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SessionProvider } from 'next-auth/react';
 import { GameRoom } from '../../apps/web/src/components/game/game-room';
 import { AppShell } from '../../apps/web/src/components/layout/app-shell';
 import { GameRoomHeaderProvider } from '../../apps/web/src/components/layout/game-room-header-context';
@@ -35,7 +36,7 @@ export function GameRoomFixture({ snapshot }: { snapshot: GameSnapshot }) {
       delete document.documentElement.dataset.roomReady;
     };
   }, [initialSnapshot]);
-  return <GameRoomHeaderProvider><AppShell userName="Анна" gameViewportMode={initialSnapshot.game.status === 'WAITING' ? null : initialSnapshot.players[0]!.user!.gameRoomView}>
-    <GameRoom key={version} initialSnapshot={restored} token="fixture" currentUserId={new URLSearchParams(location.search).get("viewer") ?? "admin"} currentUserRole="ADMIN" />
-  </AppShell></GameRoomHeaderProvider>;
+  return <SessionProvider session={null}><GameRoomHeaderProvider><AppShell userName="Анна" gameViewportMode={initialSnapshot.game.status === 'WAITING' ? null : initialSnapshot.players[0]!.user!.gameRoomView}>
+    <GameRoom key={version} initialSnapshot={restored} token="fixture" currentUserId={new URLSearchParams(location.search).get("viewer") ?? "admin"} currentUserRole="ADMIN" gameRoomView={initialSnapshot.players[0]!.user!.gameRoomView ?? 'classic'} timeZone={null} />
+  </AppShell></GameRoomHeaderProvider></SessionProvider>;
 }

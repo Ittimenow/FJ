@@ -1584,18 +1584,6 @@ export class GamesService {
         throw new BadRequestException("Завершите процедуру банкротства перед броском кубика");
       }
 
-      if (
-        game.rulesVersion === 2 &&
-        isDreamCell(currentPlayer.dreamCellIndex) &&
-        canEscapeRatRace(
-          Number(currentPlayer.financialState.passiveIncomeCents),
-          Number(currentPlayer.financialState.totalExpensesCents),
-          currentPlayer.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n)
-        )
-      ) {
-        throw new BadRequestException("Условия выхода выполнены. Перейдите на большой круг перед броском кубика");
-      }
-
       if (currentPlayer.financialState.bankruptcyTurns > 0) {
         const remaining = currentPlayer.financialState.bankruptcyTurns - 1;
         await tx.playerFinancialState.update({
@@ -6391,6 +6379,25 @@ export class GamesService {
 
     const stateSnapshot = await this.compactSnapshot(tx, gameId);
 
+    if (stateSnapshot.game.rulesVersion === 2 && stateSnapshot.game.status === GameStatus.IN_PROGRESS) {
+      const readyPlayers = stateSnapshot.players.filter((player) => {
+        const state = player.financialState;
+        return player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED && player.track === BoardTrack.RAT_RACE
+          && isDreamCell(player.dreamCellIndex) && state?.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING
+          && Boolean(state) && canEscapeRatRace(Number(state!.passiveIncomeCents), Number(state!.totalExpensesCents), player.liabilities.some((debt) => debt.type === "bank_loan" && Number(debt.balanceCents) > 0));
+      });
+      if (readyPlayers.length > 0) {
+        const existing = await tx.gameEvent.findMany({
+          where: { gameId, type: "player:fast_track_ready", gamePlayerId: { in: readyPlayers.map((player) => player.id) } },
+          select: { gamePlayerId: true }
+        });
+        const announced = new Set(existing.map((event) => event.gamePlayerId));
+        for (const player of readyPlayers) {
+          if (!announced.has(player.id)) events.push({ type: "player:fast_track_ready", gamePlayerId: player.id, payload: {} });
+        }
+      }
+    }
+
     for (const event of events) {
       const data: Prisma.GameEventUncheckedCreateInput = {
         gameId,
@@ -6466,6 +6473,7 @@ export class GamesService {
         userId: player.userId,
         seat: player.seat,
         role: player.role,
+        status: player.status,
         track: player.track,
         position: player.position,
         fastTrackPosition: player.fastTrackPosition,
@@ -6594,7 +6602,14 @@ export class GamesService {
       events: [...game.events].reverse(),
       chatMessages: [
         ...game.chatMessages,
-        ...gameChatNotices(game, noticeEvents.reverse(), game.players)
+        ...gameChatNotices(game, noticeEvents.reverse(), game.players, game.rulesVersion === 2 && game.status === GameStatus.IN_PROGRESS
+          ? activePlayers.filter((player) => {
+            const state = player.financialState;
+            return player.track === BoardTrack.RAT_RACE && state?.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING
+              && isDreamCell(player.dreamCellIndex) && Boolean(state)
+              && canEscapeRatRace(Number(state!.passiveIncomeCents), Number(state!.totalExpensesCents), player.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n));
+          }).map((player) => ({ id: player.id, createdAt: player.financialState!.updatedAt }))
+          : [])
       ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
       awards
     });

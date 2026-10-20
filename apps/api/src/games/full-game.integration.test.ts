@@ -160,7 +160,6 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
       const loan = await db.playerLiability.create({ data: { gamePlayerId: player.id, type: "bank_loan", name: "Кредит", balanceCents: 1000, paymentCents: 100 } });
       await assert.rejects(service.enterFastTrack(snapshot.game.id, admin!.id), /погашенные/);
       await db.playerLiability.delete({ where: { id: loan.id } });
-      await assert.rejects(service.rollDice(snapshot.game.id, admin!.id, { expectedTurn: `${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}` }), /Перейдите на большой круг/);
       snapshot = (await service.enterFastTrack(snapshot.game.id, admin!.id) as any).snapshot;
       assert.equal(snapshot.game.status, "IN_PROGRESS");
       assert.equal(snapshot.players[0].financialState.fastTrackStartIncomeCents, 200_100);
@@ -178,6 +177,19 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
       const lastState = await db.gameEvent.findFirst({ where: { gameId: snapshot.game.id, type: "state:update" }, orderBy: { sequence: "desc" } });
       assert.equal((lastState!.stateSnapshot as any).players[0].dreamCellIndex, 0);
       assert.equal((lastState!.stateSnapshot as any).game.fastTrackWorld.owners[45], player.id);
+    });
+    await t.test("ready player can keep playing on the small track", async () => {
+      snapshot = await solo(false);
+      snapshot = (await service.chooseDream(snapshot.game.id, admin!.id, 0) as any).snapshot;
+      snapshot = (await service.chooseFigurine(snapshot.game.id, admin!.id, figurines[0]!.id) as any).snapshot;
+      snapshot = (await service.startGame(snapshot.game.id, admin!.id) as any).snapshot;
+      const player = snapshot.players[0];
+      await db.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { passiveIncomeCents: 2001, totalExpensesCents: 2000 } });
+      const readySnapshot: any = await service.getGame(snapshot.game.id, admin!.id);
+      assert.ok(readySnapshot.chatMessages.some((message: any) => message.id === `notice:${snapshot.game.id}:fast-track-ready:${player.id}` && message.sender === "ADMINISTRATOR"));
+      snapshot = (await service.rollDice(snapshot.game.id, admin!.id, { expectedTurn: `${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}` }) as any).snapshot;
+      assert.equal(snapshot.players[0].track, "RAT_RACE");
+      assert.ok(snapshot.events.some((event: any) => event.type === "player:roll_dice" && event.gamePlayerId === player.id));
     });
     await t.test("legacy rooms start without dreams and still end at financial freedom", async () => {
       snapshot = await solo(false);

@@ -4,7 +4,8 @@ export const gameChatNoticeTypes = [
   "game:resumed",
   "game:ended",
   "bankruptcy:recovered",
-  "bankruptcy:eliminated"
+  "bankruptcy:eliminated",
+  "player:fast_track_ready"
 ];
 
 interface NoticeEvent {
@@ -24,7 +25,8 @@ interface NoticePlayer {
 export function gameChatNotices(
   game: { id: string; isTest: boolean; createdAt: Date },
   events: NoticeEvent[],
-  players: NoticePlayer[]
+  players: NoticePlayer[],
+  readyPlayers: Array<{ id: string; createdAt: Date }> = []
 ) {
   const messages = new Map<string, {
     id: string;
@@ -43,6 +45,9 @@ export function gameChatNotices(
 
   if (game.isTest) {
     add(`notice:${game.id}:test`, "Тестовая партия · результаты не учитываются в статистике и не публикуются", game.createdAt);
+  }
+  for (const player of readyPlayers) {
+    add(`notice:${game.id}:fast-track-ready:${player.id}`, `${playerName(player.id)}: условия выхода выполнены. В начале своего хода можно перейти на большой круг или бросить кубики и остаться на малом.`, player.createdAt);
   }
   for (const event of events) {
     const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
@@ -77,6 +82,10 @@ export function gameChatNotices(
       case "bankruptcy:eliminated":
         body = `${playerName(event.gamePlayerId)}: денежный поток не удалось восстановить — игрок выбыл из игры.`;
         break;
+      case "player:fast_track_ready":
+        body = `${playerName(event.gamePlayerId)}: условия выхода выполнены. В начале своего хода можно перейти на большой круг или бросить кубики и остаться на малом.`;
+        add(`notice:${game.id}:fast-track-ready:${event.gamePlayerId}`, body, event.createdAt);
+        continue;
       default:
         continue;
     }

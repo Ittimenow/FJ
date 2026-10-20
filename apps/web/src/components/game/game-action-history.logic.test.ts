@@ -56,7 +56,7 @@ test('a small-track player action appears before the active large-track player r
   assert.equal(pending[0]?.id,rolled[0]?.id);
 });
 test('history selects actions of all players, ordered newest first, without administrative or preparation messages',()=>{
-  const events=[event(1,'player:joined'),event(2,'player:roll_dice'),event(3,'state:update'),event(4,'fast_track:purchased','boris'),event(5,'game:paused'),event(6,'player:dream_chosen')];
+  const events=[event(1,'player:joined'),event(2,'player:roll_dice'),event(3,'state:update'),event(4,'fast_track:purchased','boris'),event(5,'game:paused'),event(6,'player:dream_chosen'),event(7,'player:fast_track_ready')];
   assert.deepEqual(playerActionEvents(events,players).map(e=>e.sequence),[4,2]);
 });
 test('replay overlap and repeated snapshots preserve every action once',()=>{

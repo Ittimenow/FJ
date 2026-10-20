@@ -12,6 +12,7 @@ export function DiceAction({
   diceValues,
   diceCount = diceValues.length,
   onRoll,
+  onEnterFastTrack,
   onSkip,
   rollLabel,
   statusLabel,
@@ -27,6 +28,7 @@ export function DiceAction({
   diceValues: number[];
   diceCount?: number;
   onRoll: () => void;
+  onEnterFastTrack?: (() => void) | undefined;
   onSkip?: (() => void) | undefined;
   rollLabel?: string | undefined;
   statusLabel?: string | undefined;
@@ -111,6 +113,13 @@ export function DiceAction({
           ))}
         </div> : null}
       </div>
+      {onEnterFastTrack && canRoll && !rolling && phase === "ready" ? <Button
+        type="button"
+        variant="secondary"
+        className="mb-2 min-h-10 w-full"
+        onClick={onEnterFastTrack}
+        disabled={disabled}
+      >На большой круг</Button> : null}
     </section>
   );
 }

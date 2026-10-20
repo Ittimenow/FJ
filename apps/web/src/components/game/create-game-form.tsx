@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
 
-export function CreateGameForm({ token }: {
+export function CreateGameForm({ token, compact = false }: {
   token: string;
   allowCardSetSelection?: boolean;
   timeZone?: string | null;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -36,9 +37,9 @@ export function CreateGameForm({ token }: {
   }
 
   return <div className="grid gap-3">
-    <p className="text-sm text-muted">Состав, время и остальные настройки задаются в лобби.</p>
+    {!compact ? <p className="text-sm text-muted">Состав, время и остальные настройки задаются в лобби.</p> : null}
     <Button type="button" variant="action" className="w-full" disabled={loading} onClick={() => void createGame()}>
-      {loading ? "Создаём лобби…" : "Создать командную игру"}
+      {loading ? "Создаём лобби…" : compact ? "Создать игру" : "Создать командную игру"}
     </Button>
     {error ? <p role="alert" className="text-sm font-bold text-red-700">{error}</p> : null}
   </div>;

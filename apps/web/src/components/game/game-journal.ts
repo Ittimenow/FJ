@@ -32,7 +32,8 @@ const nonGameplayPlayerEventTypes = new Set([
   "player:removed",
   "player:role_changed",
   "player:figurine_selected",
-  "player:dream_chosen"
+  "player:dream_chosen",
+  "player:fast_track_ready"
 ]);
 
 export function gameTurns(events: GameEvent[]): PlayerTurn[] {
@@ -105,7 +106,7 @@ export function latestGameTurn(snapshot: GameSnapshot) {
 }
 
 export function visibleTurnEvents(turn: PlayerTurn) {
-  return turn.events.filter((event) => event.type !== "state:update");
+  return turn.events.filter((event) => event.type !== "state:update" && event.type !== "player:fast_track_ready");
 }
 
 export function gamePlayerForEvent(event: GameEvent, players: GamePlayer[]) {

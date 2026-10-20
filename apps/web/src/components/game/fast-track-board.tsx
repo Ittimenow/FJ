@@ -9,7 +9,7 @@ import type { GamePlayer, GameSnapshot } from "@/lib/types";
 import { GameActionHistory } from "./game-action-history";
 import { GamePlayerMark } from "./game-player-mark";
 import { PlayerAvatar } from "./player-avatar";
-import { OtherPlayersList } from "./other-players-list";
+import { FastTrackResult, OtherPlayersList } from "./other-players-list";
 import { fastTrackCellEffect, purchasedFastTrackCells } from "./fast-track-presentation";
 import { useBoardMovement } from "./use-board-movement";
 import "./fast-track.css";
@@ -198,6 +198,7 @@ function PlayerOverview({ snapshot, player, mobile }: { snapshot: GameSnapshot; 
       <div className="player-goal-row"><span>Позиция</span><strong>{(player.fastTrackPosition ?? -1) < 0 ? "Старт" : `Клетка ${player.fastTrackPosition! + 1} · ${fastTrackCells[player.fastTrackPosition!]?.label}`}</strong></div>
       <div className="player-goal-row"><span>Благотворительность</span><strong>{state?.fastTrackCharity ? "Активна · 1–3 кубика" : "Не оплачена · 2 кубика"}</strong></div>
     </div> : <PlayerAssets snapshot={snapshot} player={player} />}
+    <section className="player-income-progress" aria-label="Ваш доход к победе"><FastTrackResult player={player} showDream={false} /></section>
     <OtherPlayersList className="mt-4 border-t border-line/70 pt-4" players={snapshot.players.filter((other) => other.role === "PLAYER" && other.id !== player.id)} currentPlayerId={snapshot.game.currentPlayerId} />
   </section>;
 }

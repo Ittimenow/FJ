@@ -4,6 +4,41 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "use-white-cash-result-badge",
+          "category": "improvement",
+          "summary": "Итог изменения наличных в истории хода показан на белой плашке с чёрным текстом."
+        },
+        {
+          "id": "clarify-cash-balance-in-action-history",
+          "category": "improvement",
+          "summary": "История хода показывает изменение наличных как расчёт с выделенным итогом."
+        },
+        {
+          "id": "show-game-created-time-in-player-time-zone",
+          "category": "fix",
+          "summary": "Время создания игры в списке отображается по часовому поясу игрока."
+        },
+        {
+          "id": "choose-when-to-enter-fast-track",
+          "category": "improvement",
+          "summary": "После выполнения условий выхода игрок может перейти на большой круг или продолжить бросать кубики на малом круге."
+        },
+        {
+          "id": "move-fast-track-guidance-to-chat",
+          "category": "improvement",
+          "summary": "Сообщение о готовности к большому кругу приходит в игровой чат от администратора и больше не занимает место над полем."
+        },
+        {
+          "id": "clarify-fast-track-cards-and-goal",
+          "category": "improvement",
+          "summary": "На большом круге решения по карточкам показывают их тип цветом и подписью, а карточка игрока показывает прогресс дохода к победе."
+        },
+        {
+          "id": "move-admin-create-game-action-to-top",
+          "category": "improvement",
+          "summary": "На дашборде администратора кнопка создания игры находится над статистикой, чтобы начать новую партию без прокрутки страницы."
+        },
+        {
           "id": "fill-dream-image-frames",
           "category": "fix",
           "summary": "Изображения мечт пропорционально заполняют одинаковые фреймы без белых полей на компьютере и телефоне."
@@ -76,7 +111,7 @@
         {
           "id": "guide-ready-players-to-fast-track",
           "category": "fix",
-          "summary": "Когда условия выхода с малого круга выполнены, игрок переходит на большой круг вместо нового броска и видит, когда переход станет доступен после аукциона."
+          "summary": "Когда условия выхода с малого круга выполнены, игрок может перейти на большой круг в начале хода после завершения обязательных действий."
         },
         {
           "id": "keep-game-header-controls-clear-on-narrow-phones",

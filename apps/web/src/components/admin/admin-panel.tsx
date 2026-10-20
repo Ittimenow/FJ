@@ -151,7 +151,7 @@ export function AdminPanel({
 
         <main className="min-w-0">
         {section === "dashboard" ? (
-          <AdminDashboard profile={profile} portalStats={portalStats} games={games} token={token} />
+          <AdminDashboard portalStats={portalStats} games={games} token={token} />
         ) : null}
         {section === "games" ? <AdminGamesPanel token={token} /> : null}
         {section === "users" ? (
@@ -261,12 +261,10 @@ function MobileMenuLink({ item, active }: { item: AdminMenuItem; active: boolean
 }
 
 function AdminDashboard({
-  profile,
   portalStats,
   games,
   token
 }: {
-  profile: ProfileResponse;
   portalStats: AdminPortalStatsResponse;
   games: GamesListResponse;
   token: string;
@@ -275,6 +273,10 @@ function AdminDashboard({
 
   return (
     <div className="grid gap-5">
+      <div className="sm:flex sm:justify-end">
+        <CreateGameForm token={token} compact />
+      </div>
+
       <section className="rounded-2xl bg-white p-5 shadow-panel sm:p-6">
         <div>
           <h2 className="text-xl font-extrabold tracking-[-0.025em]">Состояние портала</h2>
@@ -315,13 +317,10 @@ function AdminDashboard({
 
         <Card className="rounded-2xl border-0">
           <CardHeader>
-            <CardTitle className="text-xl">Новая комната</CardTitle>
+            <CardTitle className="text-xl">Присоединиться к игре</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <CreateGameForm token={token} allowCardSetSelection timeZone={profile.user.timeZone} />
-            <div className="border-t border-line pt-4">
-              <JoinGameForm token={token} />
-            </div>
+          <CardContent>
+            <JoinGameForm token={token} />
           </CardContent>
         </Card>
       </section>

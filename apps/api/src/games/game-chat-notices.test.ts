@@ -52,3 +52,16 @@ test("bankruptcy and winner messages identify the affected player", () => {
   assert.match(messages[1]!.body, /Анна:.*выбыл из игры/);
   assert.equal(messages[2]!.body, "Партия завершена. Победитель: Анна.");
 });
+
+test("fast-track readiness appears once as an administrator chat message", () => {
+  const readyAt = new Date("2026-09-20T10:10:00Z");
+  const messages = gameChatNotices({ ...game, isTest: false }, [], players, [{ id: "anna", createdAt: readyAt }]);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0]?.id, "notice:game-1:fast-track-ready:anna");
+  assert.equal(messages[0]?.sender, "ADMINISTRATOR");
+  assert.equal(messages[0]?.createdAt, readyAt);
+  assert.match(messages[0]!.body, /Анна: условия выхода выполнены.*бросить кубики/);
+  const persisted = gameChatNotices({ ...game, isTest: false }, [event("ready-1", "player:fast_track_ready")], players, [{ id: "anna", createdAt: readyAt }]);
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0]?.id, messages[0]?.id);
+});

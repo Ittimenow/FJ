@@ -7,10 +7,11 @@ export function money(value: number | null | undefined) {
   }).format(amount);
 }
 
-export function shortDate(value: string | Date | null | undefined) {
+export function shortDate(value: string | Date | null | undefined, timeZone?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
+    timeZone: timeZone ?? undefined
   }).format(new Date(value));
 }

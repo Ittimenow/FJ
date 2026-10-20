@@ -12,7 +12,8 @@ export type CashChangeExpression =
       kind: "equation";
       before: string;
       after: string;
-      delta: string;
+      operator: "+" | "−";
+      effect: string;
     }
   | {
       kind: "delta";
@@ -109,7 +110,8 @@ export function cashChangeExpression(change: CashChange): CashChangeExpression {
     kind: "equation",
     before: money(change.beforeCents),
     after: money(change.afterCents),
-    delta: `${positive ? "+" : "−"}${money(Math.abs(change.deltaCents))}`
+    operator: positive ? "+" : "−",
+    effect: money(Math.abs(change.deltaCents))
   };
 }
 

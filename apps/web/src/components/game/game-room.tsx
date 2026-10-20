@@ -1332,7 +1332,7 @@ export function GameRoom({
 
   const enterFastTrackAction = canEnterFastTrack ? (
     <Button variant="action" className="w-full" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>
-      Перейти на большой круг
+      На большой круг
     </Button>
   ) : null;
 
@@ -1375,9 +1375,10 @@ export function GameRoom({
         diceValues={diceFaces}
         diceCount={activeDiceCount}
         maxCompactViewportWidth={showFastTrack || gameRoomView === "classic" ? 1023 : 1279}
-        onSkip={canEnterFastTrack ? undefined : skipTurn}
-        rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
-        onRoll={() => { void (canEnterFastTrack ? fastAction("fast-track/enter") : rollDice()); }}
+        onSkip={skipTurn}
+        onEnterFastTrack={canEnterFastTrack ? () => { void fastAction("fast-track/enter"); } : undefined}
+        rollLabel={canEnterFastTrack ? "Бросить кубики" : undefined}
+        onRoll={() => { void rollDice(); }}
       />
       <GameEndPopup
         open={gameEndOpen && snapshot.game.status === "ENDED"}
@@ -1427,15 +1428,11 @@ export function GameRoom({
           {error}
         </div>
       ) : null}
-      {fastTrackReady && snapshot.game.status === "IN_PROGRESS" && !canEnterFastTrack ? (
-        <p role="status" className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">
-          Условия выхода выполнены. Перейти на большой круг можно в начале вашего следующего хода после завершения обязательных действий.
-        </p>
-      ) : null}
       {canEnterFastTrack && showFastTrack ? (
-        <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>
-          Перейти на большой круг
-        </Button>
+        <div className="hidden gap-2 lg:grid lg:grid-cols-2" aria-label="Выбор круга для хода">
+          <Button variant="secondary" disabled={fastBusy || rollingDice} onClick={() => void fastAction("fast-track/enter")}>На большой круг</Button>
+          <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => { setTrackView("RAT_RACE"); void rollDice(); }}>Бросить кубики</Button>
+        </div>
       ) : null}
       {snapshot.game.status === "WAITING" && me ? (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-ink shadow-panel" aria-label="Этапы подготовки партии">
@@ -1498,7 +1495,7 @@ export function GameRoom({
           snapshot={boardSnapshot}
           movingPlayerId={movement.movingPlayerId}
           currentUserId={currentUserId}
-          canRoll={canRoll && !pendingAction && !fastTrackReady}
+          canRoll={canRoll && !pendingAction}
           turnTabRequest={turnTabRequest}
           actions={
             <>
@@ -1511,10 +1508,11 @@ export function GameRoom({
                   statusLabel={canRoll ? "Ваш ход" : undefined}
                   idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
                   diceValues={diceFaces}
-                  rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
-                  onRoll={canEnterFastTrack ? () => void fastAction("fast-track/enter") : rollDice}
-                  onSkip={canEnterFastTrack ? undefined : skipTurn}
-                  disabled={canEnterFastTrack && fastBusy}
+                  onEnterFastTrack={canEnterFastTrack ? () => { void fastAction("fast-track/enter"); } : undefined}
+                  rollLabel={canEnterFastTrack ? "Бросить кубики" : undefined}
+                  onRoll={rollDice}
+                  onSkip={skipTurn}
+                  disabled={fastBusy}
                 />
               <ActionsPanel
               canChooseDeal={canChooseDeal}
@@ -1585,10 +1583,11 @@ export function GameRoom({
               statusLabel={canRoll ? "Ваш ход" : undefined}
               idleLabel={canRoll && pendingAction ? "Выберите действие" : undefined}
               diceValues={diceFaces}
-              rollLabel={canEnterFastTrack ? "Перейти на большой круг" : undefined}
-              onRoll={canEnterFastTrack ? () => void fastAction("fast-track/enter") : rollDice}
-              onSkip={canEnterFastTrack ? undefined : skipTurn}
-              disabled={canEnterFastTrack && fastBusy}
+              onEnterFastTrack={canEnterFastTrack ? () => { void fastAction("fast-track/enter"); } : undefined}
+              rollLabel={canEnterFastTrack ? "Бросить кубики" : undefined}
+              onRoll={rollDice}
+              onSkip={skipTurn}
+              disabled={fastBusy}
               pinnedToPanel
             />
             <ActionsPanel
@@ -5358,14 +5357,16 @@ function CashChangeVisualization({ change }: { change: CashChange }) {
   const expression = cashChangeExpression(change);
 
   return (
-    <div className="mt-1.5 inline-flex max-w-full min-w-0 flex-wrap items-center gap-2 rounded-md bg-white px-2.5 py-1.5 text-sm [overflow-wrap:anywhere]">
+    <div className="mt-1.5 inline-flex max-w-full min-w-0 flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]">
       <Banknote size={16} className="shrink-0 text-success" aria-hidden="true" />
       {expression.kind === "equation" ? (
         <>
-          <strong>{expression.before}</strong>
-          <span className="text-neutral-400" aria-hidden="true">→</span>
-          <strong className={positive ? "text-success" : "text-red-700"}>{expression.after}</strong>
-          <strong className={positive ? "text-success" : "text-red-700"}>({expression.delta})</strong>
+          <strong className="tabular-nums">{expression.before}</strong>
+          <span className={positive ? "font-semibold text-success" : "font-semibold text-red-700"}>{expression.operator}</span>
+          <strong className={`tabular-nums ${positive ? "text-success" : "text-red-700"}`}>{expression.effect}</strong>
+          <span className="sr-only">равно</span>
+          <span className="text-neutral-500" aria-hidden="true">→</span>
+          <strong className="rounded-md bg-white px-2.5 py-1 font-semibold tabular-nums text-black">{expression.after}</strong>
         </>
       ) : (
         <strong className={positive ? "text-success" : "text-red-700"}>
@@ -5582,7 +5583,7 @@ const eventTitles: Record<string, string> = {
   "bankruptcy:recovered": "Выход из банкротства",
   "bankruptcy:turn_skipped": "Ход пропущен после банкротства",
   "bankruptcy:eliminated": "Игрок выбыл из-за банкротства",
-  "paycheck:receive": "Получен cashflow",
+  "paycheck:receive": "Наличные",
   "doodad:paid": "Оплачена безделушка",
   "state:update": "Обновление состояния"
 };

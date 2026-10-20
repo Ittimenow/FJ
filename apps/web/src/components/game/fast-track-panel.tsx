@@ -71,7 +71,8 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   const canChooseDice = isTurn && !pending && player?.financialState?.fastTrackCharity;
   const actions = mine || canChooseDice ? <div className="fast-track-turn-options" aria-label="Действия большого круга">
     {canChooseDice ? <label className="dice-choice">Кубики <select aria-label="Количество кубиков" value={diceCount} onChange={(event) => onDiceCount(Number(event.target.value))} disabled={rolling || busy}>{[1, 2, 3].map((count) => <option key={count} value={count}>{count}</option>)}</select></label> : null}
-    {mine ? <div className="turn-decision">
+    {mine ? <div className={`turn-decision cell-${choiceCell?.type ?? "business"}`}>
+      <span className="turn-decision-type">{choiceCell?.type === "dream" ? "Мечта" : choiceCell?.type === "business" ? "Бизнес" : choiceCell?.type === "expense" ? "Расход" : "Событие"}</span>
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
       {resale ? <p className="turn-decision-note">Выкуп у игрока {gamePlayerName(owner)}. Деньги получит прежний владелец{choiceCell?.income ? ", доход CASHFLOW перейдёт вам" : ""}. При следующем выкупе цена снова удвоится.</p> : null}
       {!resale && (choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo") ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}

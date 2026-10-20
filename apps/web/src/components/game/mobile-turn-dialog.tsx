@@ -13,6 +13,7 @@ export function MobileTurnDialog({
   diceCount,
   maxCompactViewportWidth,
   onRoll,
+  onEnterFastTrack,
   onSkip,
   rollLabel
 }: {
@@ -24,6 +25,7 @@ export function MobileTurnDialog({
   diceCount: number;
   maxCompactViewportWidth: number;
   onRoll: () => void;
+  onEnterFastTrack?: (() => void) | undefined;
   onSkip?: (() => void) | undefined;
   rollLabel?: string | undefined;
 }) {
@@ -60,16 +62,19 @@ export function MobileTurnDialog({
             Пропустить ход
           </button> : null}
         </div>
-        {!showDice ? <Button
-          type="button"
-          variant="action"
-          className="h-12 min-w-0 flex-1 whitespace-nowrap px-1.5 text-xs text-white min-[360px]:px-3 min-[360px]:text-sm"
-          onClick={onRoll}
-          disabled={rolling || disabled}
-          aria-busy={rolling}
-        >
-          {rolling ? "Бросаем…" : rollLabel ?? (diceCount > 1 ? "Бросить кубики" : "Бросить кубик")}
-        </Button> : <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
+        {!showDice ? <div className="grid min-w-0 gap-1.5">
+          {onEnterFastTrack ? <Button type="button" variant="secondary" className="min-h-10 w-full px-2 text-xs min-[360px]:text-sm" onClick={onEnterFastTrack} disabled={disabled}>На большой круг</Button> : null}
+          <Button
+            type="button"
+            variant="action"
+            className="h-12 min-w-0 w-full whitespace-nowrap px-1.5 text-xs text-white min-[360px]:px-3 min-[360px]:text-sm"
+            onClick={onRoll}
+            disabled={rolling || disabled}
+            aria-busy={rolling}
+          >
+            {rolling ? "Бросаем…" : rollLabel ?? (diceCount > 1 ? "Бросить кубики" : "Бросить кубик")}
+          </Button>
+        </div> : <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">
               <DiceFace value={diceValue} rolling={phase === "rolling"} />

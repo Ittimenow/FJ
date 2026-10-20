@@ -58,7 +58,7 @@ test("full bank loan repayment unlocks escape without requiring profession debts
   );
 });
 
-test("ready player must enter the large track before another roll", async () => {
+test("ready player may roll on the small track", async () => {
   const game = {
     id: "game",
     status: GameStatus.IN_PROGRESS,
@@ -71,10 +71,14 @@ test("ready player must enter the large track before another roll", async () => 
       userId: "user",
       controller: PlayerController.HUMAN,
       track: BoardTrack.RAT_RACE,
+      position: 0,
       dreamCellIndex: 0,
       liabilities: [],
       financialState: {
         bankruptcyStatus: BankruptcyStatus.NONE,
+        charityTurns: 0,
+        bankruptcyTurns: 0,
+        downsizedTurns: 0,
         passiveIncomeCents: 2_001n,
         totalExpensesCents: 2_000n
       }
@@ -83,7 +87,8 @@ test("ready player must enter the large track before another roll", async () => 
   const service = Object.create(GamesService.prototype) as GamesService;
   (service as any).prisma = {
     $transaction: async (action: (tx: unknown) => Promise<unknown>) => action({
-      game: { findUniqueOrThrow: async () => game }
+      game: { findUniqueOrThrow: async () => game },
+      gamePlayer: { update: async () => { throw new Error("small-track roll proceeded"); } }
     })
   };
   (service as any).expireGameIfNeeded = async () => null;
@@ -91,6 +96,6 @@ test("ready player must enter the large track before another roll", async () => 
 
   await assert.rejects(
     service.rollDice(game.id, "user", { expectedTurn: "1:0" }),
-    /Перейдите на большой круг/
+    /small-track roll proceeded/
   );
 });

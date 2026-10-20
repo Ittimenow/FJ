@@ -48,6 +48,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.goto(url);
     await expect(page.locator('[data-fast-cell]')).toHaveCount(size.width < 1024 ? 0 : 48);
     await expect(page.getByRole('button', { name: /Оплатить/ })).toBeVisible();
+    await expect(page.locator('.turn-decision-type')).toHaveText('Бизнес');
     await expect(page.getByRole('tab')).toHaveCount(size.width < 1024 ? 3 : 0);
     await expect(page.locator('.cell-number,.cell-letter,.mobile-detail,.is-selected')).toHaveCount(0);
     await expect(page.locator('[data-fast-cell] button,[data-fast-cell][aria-pressed]')).toHaveCount(0);
@@ -61,6 +62,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     }
     if (size.width >= 1024) await expect(page.locator('[data-fast-cell="1"]').getByRole('img', { name: 'Владелец: Анна', exact: true })).toHaveCount(1);
     if (size.width < 1024) await page.getByRole('tab', { name: 'Игрок', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Ваш доход к победе' }).getByText('Доход к победе', { exact: true })).toBeVisible();
     expect(await page.locator('.player-metrics > div').evaluateAll(items => new Set(items.map(item => item.getBoundingClientRect().top)).size)).toBe(1);
     if (size.width < 1024) {
       await expect(page.locator('.player-overview .player-assets')).toHaveCount(0);
@@ -117,6 +119,14 @@ test('mobile buyout shows the previous owner and doubled price', async ({ page }
   await page.goto(`${fixtureUrl}?mode=buyout`);
   await expect(page.getByText('Выкуп у игрока Борис', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Выкупить 240 000 $' })).toBeVisible();
+});
+
+test('large-track dream choice has a labeled dream appearance', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=dream-choice`);
+  const decision = page.locator('.turn-decision');
+  await expect(decision).toHaveClass(/cell-dream/);
+  await expect(decision.locator('.turn-decision-type')).toHaveText('Мечта');
 });
 
 // Resizing preserves the continuous route and its semantic cell colors.
@@ -472,6 +482,24 @@ test(`large track animates humans and queued bot moves through each route cell a
 });
 }
 
+test('ready player can roll and remain on the small track', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=room`);
+  await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+  await page.evaluate(() => {
+    const snapshot = structuredClone((window as any).roomSnapshot);
+    snapshot.players[0].financialState.passiveIncomeCents = 10000;
+    window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+  });
+  const actions = page.getByRole('region', { name: 'Действия текущего хода' });
+  await expect(actions.getByRole('button', { name: 'На большой круг' })).toBeVisible();
+  await actions.getByRole('button', { name: 'Бросить кубики' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).roomSnapshot.events.some((event: any) => event.type === 'player:roll_dice'))).toBe(true);
+  await expect.poll(() => page.evaluate(() => (window as any).roomSnapshot.players[0].track)).toBe('RAT_RACE');
+  await expect(page.getByRole('tab', { name: 'Расходы', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Поле большого круга' })).toHaveCount(0);
+});
+
 test('reduced motion immediately shows the final large-track position', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${fixtureUrl}?mode=movement`);
@@ -686,13 +714,28 @@ for (const width of [1440, 390]) {
       window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
     });
     const history = page.getByRole('region', { name: 'История действий игроков', exact: true }).filter({ visible: true });
-    const entry = history.getByRole('button', { name: 'Перейти на большой круг', exact: true });
+    const entry = history.getByRole('button', { name: 'На большой круг', exact: true });
     const primaryEntry = width >= 1024
-      ? page.getByRole('region', { name: 'Бросок кубика' }).filter({ visible: true }).getByRole('button', { name: 'Перейти на большой круг' })
-      : page.getByRole('region', { name: 'Действия текущего хода' }).getByRole('button', { name: 'Перейти на большой круг' });
+      ? page.getByRole('region', { name: 'Бросок кубика' }).filter({ visible: true }).getByRole('button', { name: 'На большой круг' })
+      : page.getByRole('region', { name: 'Действия текущего хода' }).getByRole('button', { name: 'На большой круг' });
     await expect(entry).toBeVisible();
     await expect(primaryEntry).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Бросить кубик', exact: true }).filter({ visible: true })).toHaveCount(0);
+    const rollEntry = width >= 1024
+      ? page.getByRole('region', { name: 'Бросок кубика' }).filter({ visible: true }).getByRole('button', { name: 'Бросить кубики', exact: true })
+      : page.getByRole('region', { name: 'Действия текущего хода' }).getByRole('button', { name: 'Бросить кубики', exact: true });
+    await expect(rollEntry).toBeVisible();
+    await page.getByRole('button', { name: 'Большой круг', exact: true }).click();
+    if (width >= 1024) {
+      const choices = page.getByLabel('Выбор круга для хода');
+      await expect(choices.getByRole('button', { name: 'На большой круг' })).toBeVisible();
+      await expect(choices.getByRole('button', { name: 'Бросить кубики' })).toBeVisible();
+    } else {
+      const choices = page.getByRole('region', { name: 'Действия текущего хода' });
+      await expect(choices.getByRole('button', { name: 'На большой круг' })).toBeVisible();
+      await expect(choices.getByRole('button', { name: 'Бросить кубики' })).toBeVisible();
+    }
+    await page.getByRole('button', { name: 'Малый круг', exact: true }).click();
+    if (width < 1024) await page.getByRole('tab', { name: 'Ход', exact: true }).click();
     await page.evaluate(() => {
       const snapshot = structuredClone((window as any).roomSnapshot);
       snapshot.game.currentPlayerId = snapshot.players[1].id;
@@ -700,7 +743,7 @@ for (const width of [1440, 390]) {
       window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
     });
     await expect(entry).toHaveCount(0);
-    await expect(page.getByText('Условия выхода выполнены. Перейти на большой круг можно в начале вашего следующего хода после завершения обязательных действий.')).toBeVisible();
+    await expect(page.getByText('Условия выхода выполнены. Перейти на большой круг можно в начале вашего следующего хода после завершения обязательных действий.')).toHaveCount(0);
     await page.evaluate(() => {
       const snapshot = structuredClone((window as any).roomSnapshot);
       snapshot.game.currentPlayerId = snapshot.players[0].id;

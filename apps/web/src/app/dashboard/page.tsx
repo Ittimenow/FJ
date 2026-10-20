@@ -301,7 +301,7 @@ function GameCard({
         {game.mode === "MULTIPLAYER" ? <span>{players.length}/{maxPlayers} мест</span> : null}
         <span className="inline-flex items-center gap-1.5">
           <Clock3 size={14} aria-hidden="true" />
-          {game.isPublic && game.scheduledAt ? "Открытая игра" : shortDate(game.createdAt)}
+          {game.isPublic && game.scheduledAt ? "Открытая игра" : shortDate(game.createdAt, timeZone)}
         </span>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">

@@ -49,7 +49,7 @@ export function OtherPlayersList({ players, currentPlayerId, className = "" }: {
   </section>;
 }
 
-function FastTrackResult({ player }: { player: GamePlayer }) {
+export function FastTrackResult({ player, showDream = true }: { player: GamePlayer; showDream?: boolean }) {
   const state = player.financialState!;
   const increase = (state.fastTrackIncomeCents ?? 0) - (state.fastTrackStartIncomeCents ?? 0);
   const percentage = Math.round(Math.min(100, Math.max(0, increase / 50_000 * 100)));
@@ -60,7 +60,7 @@ function FastTrackResult({ player }: { player: GamePlayer }) {
     </div>
     <PlayerProgress value={increase} max={50_000} label={`Прирост дохода ${money(increase)} из ${money(50_000)}`} complete={increase >= 50_000} />
     <p className="mt-1.5 text-xs text-neutral-600">Прирост {increase >= 0 ? "+" : "−"}{money(Math.abs(increase))}</p>
-    <p className="mt-1 break-words text-xs text-neutral-600">Мечта: <strong>{dream?.label ?? "Не выбрана"}</strong></p>
+    {showDream ? <p className="mt-1 break-words text-xs text-neutral-600">Мечта: <strong>{dream?.label ?? "Не выбрана"}</strong></p> : null}
   </div>;
 }
 

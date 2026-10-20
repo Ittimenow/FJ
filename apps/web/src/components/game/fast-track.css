@@ -135,6 +135,8 @@
 :where(.fast-track) .player-goal-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; line-height: 1.5; }
 :where(.fast-track) .player-goal-row > span { color: #52617c; }
 :where(.fast-track) .player-goal-row > strong { min-width: 0; max-width: 60%; text-align: right; overflow-wrap: anywhere; }
+:where(.fast-track) .player-income-progress { margin-top: 18px; border-radius: 10px; background: #faf2e8; padding: 12px; }
+:where(.fast-track) .player-income-progress > div { margin-top: 0; }
 :where(.fast-track) .player-assets { margin-top: 18px; }
 :where(.fast-track) .player-section-heading { margin: 0 0 9px; font-size: 14px; font-weight: 800; line-height: 1.4; }
 :where(.fast-track) .purchased-cards { display: grid; gap: 8px; }
@@ -148,6 +150,14 @@
 :where(.fast-track) .turn-waiting { margin: 0; color: #52617c; font-size: 12px; line-height: 1.5; }
 :where(.fast-track) .turn-waiting { margin-bottom: 12px; }
 :where(.fast-track) .turn-decision { margin-bottom: 12px; border-radius: 10px; background: #faf2e8; padding: 12px; }
+:where(.fast-track) .turn-decision.cell-business { background: var(--business-soft); }
+:where(.fast-track) .turn-decision.cell-dream { background: var(--dream-soft); }
+:where(.fast-track) .turn-decision.cell-expense { background: var(--expense-soft); }
+:where(.fast-track) .turn-decision.cell-positive { background: var(--positive-soft); }
+:where(.fast-track) .turn-decision-type { display: inline-block; margin-bottom: 8px; border-radius: 999px; background: #d1e3ca; padding: 4px 10px; color: #35512d; font-size: 12px; font-weight: 800; }
+:where(.fast-track) .turn-decision.cell-dream .turn-decision-type { background: #eecbd5; color: #7a3449; }
+:where(.fast-track) .turn-decision.cell-expense .turn-decision-type { background: #e1d2ea; color: #604271; }
+:where(.fast-track) .turn-decision.cell-positive .turn-decision-type { background: #f3e4ad; color: #705719; }
 :where(.fast-track) .turn-decision-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; line-height: 1.4; }
 :where(.fast-track) .turn-decision-heading span { flex-shrink: 0; font-weight: 800; }
 :where(.fast-track) .turn-decision-note { margin: 8px 0 0; color: #405372; font-size: 12px; line-height: 1.5; }

@@ -59,7 +59,7 @@ export function playerActionEvents(events: GameEvent[], players: GamePlayer[], o
     }
   }
   return mergeActionEvents([], events).filter((event) => {
-    if (event.type === "state:update" || event.type.startsWith("game:") || preparationEvents.has(event.type)) return false;
+    if (event.type === "state:update" || event.type === "player:fast_track_ready" || event.type.startsWith("game:") || preparationEvents.has(event.type)) return false;
     const player = gamePlayerForEvent(event, players);
     if (!player || (onlyPlayerId && player.id !== onlyPlayerId)) return false;
     if (!fastTrackOnly) return true;

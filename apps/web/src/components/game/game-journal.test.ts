@@ -7,7 +7,8 @@ import {
   latestGameTurn,
   playerGameStatus,
   shouldShowTurnEventGroupIdentity,
-  turnsForPlayer
+  turnsForPlayer,
+  visibleTurnEvents
 } from "./game-journal";
 import type { GameEvent, GamePlayer, GameSnapshot } from "@/lib/types";
 
@@ -35,6 +36,13 @@ test("groups completed turns per player", () => {
   assert.equal(turns[0]?.complete, true);
   assert.equal(turns[1]?.complete, false);
   assert.equal(turnsForPlayer(events, "p1").length, 1);
+});
+
+test("fast-track readiness is reserved for chat, not the turn journal", () => {
+  const ready = event(2, "player:fast_track_ready", "p1");
+  assert.deepEqual(gameTurns([ready]), []);
+  const turn = gameTurns([event(1, "player:roll_dice", "p1"), ready])[0]!;
+  assert.deepEqual(visibleTurnEvents(turn).map((item) => item.type), ["player:roll_dice"]);
 });
 
 test("prefers the open current turn for broadcast", () => {
