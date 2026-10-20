@@ -151,10 +151,11 @@ async function ensureDatabaseRole(env) {
 }
 
 async function ensureInfrastructure(env) {
-  if (canRun(dockerCommand, ["--version"])) {
+  if (canRun(dockerCommand, ["info", "--format", "{{.ServerVersion}}"])) {
     log("Starting PostgreSQL and Redis with Docker Compose.");
     await run(dockerCommand, ["compose", "up", "-d"], { env });
   } else {
+    log("Docker is unavailable. Using local PostgreSQL and Redis when installed.");
     const postgres = resolveExecutable([
       `${homebrewPostgresBin}/postgres`,
       "/usr/local/opt/postgresql@16/bin/postgres",

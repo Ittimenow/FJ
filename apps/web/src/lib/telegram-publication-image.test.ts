@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { ImageResponse } from "next/og";
+import { loadAwardImageSources } from "./award-image.server";
+import { publicationImageOptions } from "./publication-font.server";
 import {
   loadPublicationFigurines,
   size,
@@ -58,10 +60,12 @@ test("Telegram publication card renders a real PNG with summary data", async () 
 
   const figurineSources = await loadPublicationFigurines(post);
   assert.match(figurineSources["rubber-duck"] ?? "", /^data:image\/png;base64,/);
+  const awardSources = await loadAwardImageSources(["deal_hunter"]);
+  assert.match(awardSources.deal_hunter ?? "", /^data:image\/png;base64,/);
 
   const response = new ImageResponse(
-    createElement(TelegramPublicationCard, { post, figurineSources }),
-    size
+    createElement(TelegramPublicationCard, { post, figurineSources, awardSources }),
+    await publicationImageOptions(size)
   );
   const png = new Uint8Array(await response.arrayBuffer());
 

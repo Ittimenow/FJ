@@ -74,6 +74,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FigurinePicker } from "@/components/figurine-picker";
+import { AwardCards } from "@/components/results/award-cards";
 import {
   DealAuctionDialog,
   type DealAuctionPlayerRow
@@ -1857,7 +1858,7 @@ function GameEndPopup({
         aria-modal="true"
         aria-labelledby="game-end-title"
         aria-describedby={presentation.description ? "game-end-description" : undefined}
-        className="game-end-dialog flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[#fff9f1] shadow-[0_34px_90px_rgba(5,18,45,.35)]"
+        className="game-end-dialog flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[#fff9f1] shadow-[0_34px_90px_rgba(5,18,45,.35)]"
       >
         <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <div className={cn("text-center", !EndIcon && "pt-2")}>
@@ -1918,7 +1919,7 @@ function GameEndPopup({
             </section>
           ) : null}
 
-          {awards.length ? <GameEndAwards awards={awards.slice(0, 7)} /> : null}
+          {awards.length ? <GameEndAwards awards={awards} /> : null}
         </div>
 
         <div className="shrink-0 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(27,57,118,.10)] sm:px-6 sm:pb-5 sm:pt-4">
@@ -1933,8 +1934,8 @@ function GameEndPopup({
 
 function GameEndAwards({ awards }: { awards: GameAward[] }) {
   return (
-    <section className="mt-6 overflow-hidden rounded-2xl bg-[#fff0cf]" aria-labelledby="game-end-awards-title">
-      <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
+    <section className="mt-7" aria-labelledby="game-end-awards-title">
+      <div className="mb-4 flex items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f5aa24] text-[#17243f] shadow-[0_8px_20px_rgba(155,99,11,.18)]">
           <Trophy size={20} aria-hidden="true" />
         </span>
@@ -1943,17 +1944,7 @@ function GameEndAwards({ awards }: { awards: GameAward[] }) {
           <p className="mt-0.5 text-xs font-semibold text-[#715719]">Только результаты с тремя и более действиями</p>
         </div>
       </div>
-      <ol className="divide-y divide-[#ead49b] bg-white/55 px-4 sm:px-5">
-        {awards.map((award) => (
-          <li key={award.kind} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-4">
-            <span className="min-w-0">
-              <span className="block font-extrabold text-ink">{award.title}</span>
-              <span className="mt-0.5 block text-sm font-semibold text-[#657597]">{award.playerName}</span>
-            </span>
-            <span className="text-sm font-extrabold text-[#8a5a08] sm:text-right">{award.result}</span>
-          </li>
-        ))}
-      </ol>
+      <AwardCards awards={awards} layout="dialog" />
     </section>
   );
 }

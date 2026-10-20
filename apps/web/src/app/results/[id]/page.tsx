@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, Clock3, TrendingUp, Trophy, UsersRound, WalletCards } from "lucide-react";
 import { BrandLogo } from "@/components/layout/brand-logo";
+import { AwardCards } from "@/components/results/award-cards";
 import { money } from "@/lib/format";
 import { publicResult } from "@/lib/results";
 
@@ -59,8 +60,8 @@ export default async function ResultPage({ params }: PageProps) {
         ) : null}
 
         {facts.awards?.length ? (
-          <section className="mt-12 overflow-hidden rounded-2xl bg-[#fff0cf] shadow-[0_20px_48px_rgba(125,87,18,.12)]" aria-labelledby="result-awards-title">
-            <div className="flex items-center gap-4 px-6 pb-5 pt-6 sm:px-8 sm:pt-8">
+          <section className="mt-12" aria-labelledby="result-awards-title">
+            <div className="mb-5 flex items-center gap-4">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#f5aa24] text-ink shadow-[0_10px_24px_rgba(155,99,11,.2)]">
                 <Trophy size={23} aria-hidden="true" />
               </span>
@@ -69,17 +70,7 @@ export default async function ResultPage({ params }: PageProps) {
                 <p className="mt-1 text-sm font-semibold text-[#715719]">В каждой номинации — минимум три действия и только один лидер</p>
               </div>
             </div>
-            <ol className="divide-y divide-[#ead49b] bg-white/55 px-6 sm:px-8">
-              {facts.awards.slice(0, 7).map((award) => (
-                <li key={award.kind} className="grid gap-1 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-6">
-                  <span className="min-w-0">
-                    <span className="block text-base font-extrabold text-ink">{award.title}</span>
-                    <span className="mt-1 block text-sm font-semibold text-muted">{mention(award.mention)}</span>
-                  </span>
-                  <span className="text-sm font-extrabold text-[#8a5a08] sm:text-right">{award.result}</span>
-                </li>
-              ))}
-            </ol>
+            <AwardCards awards={facts.awards} playerLabel="mention" />
           </section>
         ) : null}
 

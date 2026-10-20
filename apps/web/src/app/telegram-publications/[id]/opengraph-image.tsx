@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
 import React from "react";
+import { PublicationAwardTile } from "@/components/results/publication-award-tile";
+import { loadAwardImageSources } from "@/lib/award-image.server";
+import { publicationImageOptions } from "@/lib/publication-font.server";
 import { telegramChannelPostCard } from "@/lib/telegram-posts";
 import type { TelegramChannelPostCard } from "@/lib/types";
 
@@ -17,22 +20,26 @@ type FigurineSources = Record<string, string>;
 export default async function TelegramPublicationImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const post = await telegramChannelPostCard(id);
+  const imageOptions = await publicationImageOptions(size);
   if (!post) {
     return new ImageResponse(
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#faf2e8", color: "#17243f", fontSize: 54, fontWeight: 800 }}>Финансовое путешествие</div>,
-      size
+      imageOptions
     );
   }
   const figurineSources = await loadPublicationFigurines(post);
-  return new ImageResponse(<TelegramPublicationCard post={post} figurineSources={figurineSources} />, size);
+  const awardSources = await loadAwardImageSources(post.items.flatMap((item) => item.summary.facts.awards ?? []).slice(0, 3).map((award) => award.kind));
+  return new ImageResponse(<TelegramPublicationCard post={post} figurineSources={figurineSources} awardSources={awardSources} />, imageOptions);
 }
 
 export function TelegramPublicationCard({
   post,
-  figurineSources = {}
+  figurineSources = {},
+  awardSources = {}
 }: {
   post: TelegramChannelPostCard;
   figurineSources?: FigurineSources;
+  awardSources?: Record<string, string>;
 }) {
   const facts = post.items.map((item) => item.summary.facts);
   const players = publicationPlayers(post);
@@ -64,9 +71,9 @@ export function TelegramPublicationCard({
         </div>
       </div>
 
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", marginTop: 28, width: 930 }}>
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", marginTop: 28, width: awards.length ? 710 : 930 }}>
         <div style={{ display: "flex", fontSize: titleSize, lineHeight: 1.04, letterSpacing: "-0.035em", fontWeight: 800 }}>{post.title}</div>
-        <div style={{ display: "flex", marginTop: 15, maxWidth: 850, color: "#526487", fontSize: 19, lineHeight: 1.3 }}>{supportingText}</div>
+        <div style={{ display: "flex", marginTop: 15, maxWidth: 690, color: "#526487", fontSize: 19, lineHeight: 1.3 }}>{supportingText}</div>
         <div style={{ display: "flex", alignItems: "center", marginTop: 18, color: "#17243f", fontSize: 17 }}>
           <Fact value={facts.length} label={plural(facts.length, "игра", "игры", "игр")} />
           <Separator />
@@ -74,16 +81,12 @@ export function TelegramPublicationCard({
           <Separator />
           <Fact value={rounds} label={plural(rounds, "раунд", "раунда", "раундов")} />
         </div>
-        {awards.length ? (
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            {awards.map((award) => (
-              <div key={`${award.kind}-${award.playerId}`} style={{ maxWidth: 290, display: "flex", borderRadius: 10, background: "#fff0cf", color: "#715719", padding: "8px 11px", fontSize: 13, fontWeight: 800, overflow: "hidden" }}>
-                {award.title}: {award.mention}
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
+      {awards.length ? (
+        <div style={{ position: "absolute", top: 132, right: 54, width: 300, display: "flex", flexDirection: "column", gap: 8 }}>
+          {awards.map((award) => <PublicationAwardTile key={`${award.kind}-${award.playerId}`} award={award} source={awardSources[award.kind]} />)}
+        </div>
+      ) : null}
 
       <div style={{ position: "absolute", left: 54, right: 54, bottom: 42, height: 184, display: "flex", alignItems: "center", borderRadius: 26, background: "#102a5c", padding: "20px 24px", boxShadow: "0 20px 45px rgba(27,57,118,.18)" }}>
         <div style={{ width: 134, display: "flex", flexDirection: "column", alignSelf: "stretch", justifyContent: "center" }}>

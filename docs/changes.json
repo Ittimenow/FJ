@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "start-local-services-when-docker-is-unavailable",
+          "category": "fix",
+          "summary": "Локальный сервер запускается через установленные PostgreSQL и Redis, если служба Docker недоступна."
+        },
+        {
+          "id": "illustrate-game-award-results-and-publications",
+          "category": "improvement",
+          "summary": "Награды партии показаны карточками с иллюстрациями в итогах игры и на изображениях публикаций."
+        },
+        {
           "id": "use-white-cash-result-badge",
           "category": "improvement",
           "summary": "Итог изменения наличных в истории хода показан на белой плашке с чёрным текстом."
