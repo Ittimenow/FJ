@@ -70,6 +70,7 @@ import {
   useState
 } from "react";
 import { io, Socket } from "socket.io-client";
+import { acceptGameSnapshot } from "@/lib/game-snapshot-order";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -285,7 +286,7 @@ export function GameRoom({
         leaveGamePage();
         return;
       }
-      setSnapshot(value);
+      setSnapshot((current) => acceptGameSnapshot(current, value));
     });
     socket.on("game:deleted", () => leaveGamePage());
     socket.on(realtimeEvents.chatMessage, (message) => {
@@ -322,10 +323,24 @@ export function GameRoom({
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!socket.connected) socket.connect();
+      void fetch(`${publicApiBaseUrl()}/api/games/${initialSnapshot.game.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000)
+      }).then((response) => response.ok ? response.json() as Promise<GameSnapshot> : null)
+        .then((value) => {
+          if (value?.game?.id) setSnapshot((current) => acceptGameSnapshot(current, value));
+        }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
 
     return () => {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -744,7 +759,7 @@ export function GameRoom({
     if (!response.ok) {
       throw new Error(gameErrorMessage(result.message, "Не удалось начать партию"));
     }
-    setSnapshot(result.snapshot ?? result);
+    setSnapshot((current) => acceptGameSnapshot(current, result.snapshot ?? result));
     } catch (event) {
       setError(gameErrorMessage(event, "Не удалось начать партию"));
     } finally {
@@ -835,7 +850,7 @@ export function GameRoom({
             : result.message ?? "Не удалось выбрать фигурку"
         );
       }
-      setSnapshot(result.snapshot ?? result);
+      setSnapshot((current) => acceptGameSnapshot(current, result.snapshot ?? result));
       setFigurinePickerOpen(false);
       if (snapshot.game.mode === "SOLO") await startGame();
     } catch (event) {
@@ -863,7 +878,7 @@ export function GameRoom({
       setError(gameErrorMessage(result.message, "Не удалось добавить пользователя"));
       return;
     }
-    setSnapshot(result.snapshot ?? result);
+    setSnapshot((current) => acceptGameSnapshot(current, result.snapshot ?? result));
   }
 
   async function changeHostParticipation(participates: boolean) {
@@ -888,7 +903,7 @@ export function GameRoom({
         );
         return;
       }
-      setSnapshot(result.snapshot ?? result);
+      setSnapshot((current) => acceptGameSnapshot(current, result.snapshot ?? result));
     } finally {
       setChangingParticipation(false);
     }
@@ -958,12 +973,13 @@ export function GameRoom({
   }
 
   function applyActionResult(result: GameActionResult) {
-    if (result.snapshot?.game?.id) {
-      if (result.snapshot.game.status === "CANCELLED") {
+    const nextSnapshot = result.snapshot;
+    if (nextSnapshot?.game?.id) {
+      if (nextSnapshot.game.status === "CANCELLED") {
         leaveGamePage();
         return;
       }
-      setSnapshot(result.snapshot);
+      setSnapshot((current) => acceptGameSnapshot(current, nextSnapshot));
     }
   }
 
@@ -1479,7 +1495,7 @@ export function GameRoom({
           token={token}
           timeZone={timeZone}
           isAdmin={isAdmin}
-          onSettingsSaved={setSnapshot}
+          onSettingsSaved={(value) => setSnapshot((current) => acceptGameSnapshot(current, value))}
           onAddBot={(level) => void lobbyAction("bots", "POST", { level })}
           onRemovePlayer={(playerId) => void lobbyAction(`players/${playerId}`, "DELETE")}
           onAddUser={addUserToGame}

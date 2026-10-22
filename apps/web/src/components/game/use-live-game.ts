@@ -14,6 +14,7 @@ import {
   type ConnectionDiagnostics
 } from "@/lib/connection-health";
 import type { GameSnapshot } from "@/lib/types";
+import { acceptGameSnapshot } from "@/lib/game-snapshot-order";
 
 type ActionResult = { snapshot?: GameSnapshot; message?: string };
 
@@ -65,7 +66,7 @@ export function useLiveGame(initialSnapshot: GameSnapshot, token: string) {
     });
     socket.on(realtimeEvents.stateUpdate, (value: GameSnapshot) => {
       if (value?.game?.id) {
-        setSnapshot(value);
+        setSnapshot((current) => acceptGameSnapshot(current, value));
         setError(null);
       }
     });
@@ -94,10 +95,24 @@ export function useLiveGame(initialSnapshot: GameSnapshot, token: string) {
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!socket.connected) socket.connect();
+      void fetch(`${publicApiBaseUrl()}/api/games/${initialSnapshot.game.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000)
+      }).then((response) => response.ok ? response.json() as Promise<GameSnapshot> : null)
+        .then((value) => {
+          if (value?.game?.id) setSnapshot((current) => acceptGameSnapshot(current, value));
+        }).catch(() => {});
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
     socket.on("game:deleted", () => setError("Партия была удалена. Вернитесь в личный кабинет."));
     return () => {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -141,7 +156,8 @@ export function useLiveGame(initialSnapshot: GameSnapshot, token: string) {
       );
       const result = (await response.json()) as ActionResult;
       if (!response.ok) throw new Error(result.message ?? "Не удалось изменить состояние партии");
-      if (result.snapshot) setSnapshot(result.snapshot);
+      const nextSnapshot = result.snapshot;
+      if (nextSnapshot) setSnapshot((current) => acceptGameSnapshot(current, nextSnapshot));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось изменить состояние партии");
     } finally {

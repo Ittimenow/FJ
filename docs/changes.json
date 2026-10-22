@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "speed-up-dice-and-refresh-game-state",
+          "category": "fix",
+          "summary": "Бросок кубика обрабатывается быстрее, а состояние партии обновляется у игроков после задержки связи или возвращения в приложение."
+        },
+        {
           "id": "manage-bot-name-availability",
           "category": "improvement",
           "summary": "В админке можно исключать имена из выбора для новых ботов и возвращать их, сохраняя имена в уже созданных партиях."

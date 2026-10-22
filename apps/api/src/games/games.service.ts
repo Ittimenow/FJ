@@ -6397,24 +6397,22 @@ export class GamesService {
       }
     }
 
-    for (const event of events) {
-      const data: Prisma.GameEventUncheckedCreateInput = {
+    const eventRows: Prisma.GameEventCreateManyInput[] = events.map((event, index) => {
+      const data: Prisma.GameEventCreateManyInput = {
         gameId,
-          actorUserId: persistedActorUserId,
+        actorUserId: persistedActorUserId,
         gamePlayerId: event.gamePlayerId ?? null,
         type: event.type,
-        sequence,
+        sequence: sequence + index,
         payload: toSerializable(event.payload) as Prisma.InputJsonValue
       };
       if (event.type === realtimeEvents.stateUpdate) {
         data.stateSnapshot = stateSnapshot as unknown as Prisma.InputJsonValue;
       }
-
-      await tx.gameEvent.create({
-        data
-      });
-      sequence += 1;
-    }
+      return data;
+    });
+    await tx.gameEvent.createMany({ data: eventRows });
+    sequence += eventRows.length;
 
     if (events.some((event) => event.type === realtimeEvents.gameEnded)) {
       const endedGame = await tx.game.findUniqueOrThrow({ where: { id: gameId }, select: { isTest: true } });
