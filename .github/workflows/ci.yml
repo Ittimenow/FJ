@@ -153,8 +153,6 @@ jobs:
             trap report_deploy_result EXIT
 
             stage "Prepare repository"
-            timeout 30s docker run --rm -v /opt/fj:/opt/fj --entrypoint sh caddy:2-alpine \
-              -c 'chown -R 1000:1000 /opt/fj'
             cd /opt/fj
             timeout 1m git fetch origin main
             git reset --hard "$DEPLOY_SHA"

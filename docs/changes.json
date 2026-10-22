@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "avoid-recursive-vps-ownership-change",
+          "category": "fix",
+          "summary": "Обновление игры на сервере больше не задерживается из-за смены владельца всех файлов и резервных копий."
+        },
+        {
           "id": "speed-up-dice-and-refresh-game-state",
           "category": "fix",
           "summary": "Бросок кубика обрабатывается быстрее, а состояние партии обновляется у игроков после задержки связи или возвращения в приложение."
