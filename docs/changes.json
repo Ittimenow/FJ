@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "manage-bot-name-availability",
+          "category": "improvement",
+          "summary": "В админке можно исключать имена из выбора для новых ботов и возвращать их, сохраняя имена в уже созданных партиях."
+        },
+        {
           "id": "allow-full-bot-lobbies-with-editable-name-pool",
           "category": "feature",
           "summary": "Ведущий может заполнять свободные места ботами, а их случайные имена выбираются из списка, который администратор может пополнять."

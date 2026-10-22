@@ -241,6 +241,7 @@ model Game {
 model BotName {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique @db.VarChar(15)
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("bot_names")

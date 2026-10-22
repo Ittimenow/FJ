@@ -305,7 +305,7 @@ export class GamesService {
     count: number,
     occupied = new Set<string>()
   ) {
-    const entries = await db.botName.findMany({ select: { name: true } });
+    const entries = await db.botName.findMany({ where: { isActive: true }, select: { name: true } });
     const names = entries.map((entry) => entry.name);
     const selected: string[] = [];
     for (let index = 0; index < count; index += 1) {

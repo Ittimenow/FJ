@@ -31,7 +31,7 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listBotNames() {
-    return this.prisma.botName.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+    return this.prisma.botName.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }], select: { id: true, name: true, isActive: true } });
   }
 
   async createBotName(value: string) {
@@ -44,10 +44,25 @@ export class AdminService {
       throw new ConflictException("Такое имя уже есть в списке");
     }
     try {
-      return await this.prisma.botName.create({ data: { name }, select: { id: true, name: true } });
+      return await this.prisma.botName.create({ data: { name }, select: { id: true, name: true, isActive: true } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new ConflictException("Такое имя уже есть в списке");
+      }
+      throw error;
+    }
+  }
+
+  async setBotNameActive(id: string, isActive: boolean) {
+    try {
+      return await this.prisma.botName.update({
+        where: { id },
+        data: { isActive },
+        select: { id: true, name: true, isActive: true }
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new NotFoundException("Имя бота не найдено");
       }
       throw error;
     }

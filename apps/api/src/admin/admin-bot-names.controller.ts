@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
 import { SystemRole } from "@prisma/client";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { Roles } from "../common/roles.decorator";
@@ -20,5 +20,15 @@ export class AdminBotNamesController {
   @Post()
   create(@Body() dto: CreateBotNameDto) {
     return this.admin.createBotName(dto.name);
+  }
+
+  @Delete(":id")
+  remove(@Param("id", ParseUUIDPipe) id: string) {
+    return this.admin.setBotNameActive(id, false);
+  }
+
+  @Patch(":id/restore")
+  restore(@Param("id", ParseUUIDPipe) id: string) {
+    return this.admin.setBotNameActive(id, true);
   }
 }
