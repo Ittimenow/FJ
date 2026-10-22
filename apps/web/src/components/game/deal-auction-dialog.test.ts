@@ -37,6 +37,28 @@ test("предложение отображается в карточке ход
   assert.match(html, /до <strong>1\s\$<\/strong>/);
 });
 
+test("игрок без наличных видит возможность взять кредит и сам отказаться", () => {
+  const html = renderToStaticMarkup(createElement(DealAuctionDialog, {
+    open: true,
+    role: "bidder",
+    card: { title: "Бизнес", bodyText: "", downPaymentCents: 5_000, cashflowCents: 100 },
+    rows: [],
+    resolved: false,
+    hasResponded: false,
+    bidDraft: "",
+    currentCashCents: 0,
+    submitting: false,
+    onBidDraftChange: () => {},
+    onBid: () => {},
+    onDecline: () => {},
+    onSelect: () => {},
+    onCancel: () => {}
+  }));
+  assert.match(html, /можете взять кредит или отказаться самостоятельно/);
+  assert.match(html, /Отказаться/);
+  assert.doesNotMatch(html, /отказ учтён автоматически/);
+});
+
 test("принимает только целую положительную ставку в доступном диапазоне", () => {
   assert.equal(validDealAuctionBid(1_000, 7_000), true);
   assert.equal(validDealAuctionBid(1, 1), true);

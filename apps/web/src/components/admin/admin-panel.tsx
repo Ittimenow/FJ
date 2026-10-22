@@ -3,6 +3,7 @@
 import { fastTrackBoard, ratRaceBoard } from "@cashflow/shared";
 import {
   BookOpenText,
+  Bot,
   Boxes,
   Activity,
   CircleHelp,
@@ -20,6 +21,7 @@ import { useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import { useMemo } from "react";
 import { AdminCardsPanel } from "@/components/admin/admin-cards-panel";
+import { AdminBotNamesPanel } from "@/components/admin/admin-bot-names-panel";
 import { AdminChangesPanel } from "@/components/admin/admin-changes-panel";
 import { AdminFeedbackPanel } from "@/components/admin/admin-feedback-panel";
 import { AdminGamesPanel } from "@/components/admin/admin-games-panel";
@@ -39,6 +41,7 @@ type AdminSection =
   | "games"
   | "users"
   | "cards"
+  | "bot-names"
   | "rules"
   | "board"
   | "feedback"
@@ -64,6 +67,7 @@ const mainMenu: AdminMenuItem[] = [
 
 const settingsMenu: AdminMenuItem[] = [
   { id: "cards", label: "Карточки игры", icon: Boxes },
+  { id: "bot-names", label: "Имена ботов", icon: Bot },
   { id: "rules", label: "Справочник правил", icon: BookOpenText },
   { id: "board", label: "Игровое поле", icon: MapIcon }
 ];
@@ -75,6 +79,7 @@ const adminSections = new Set<AdminSection>([
   "games",
   "users",
   "cards",
+  "bot-names",
   "rules",
   "board",
   "feedback",
@@ -176,6 +181,7 @@ export function AdminPanel({
             </CardContent>
           </Card>
         ) : null}
+        {section === "bot-names" ? <AdminBotNamesPanel token={token} /> : null}
         {section === "rules" ? <GameRulesSettings /> : null}
         {section === "board" ? <GameBoardSettings /> : null}
         {section === "feedback" ? (
@@ -490,12 +496,12 @@ const cardFieldRules: RuleRow[] = [
   },
   {
     key: "meta",
-    rule: "Пары ключ-значение для цены, тикера, закладной, cashflow и дополнительных правил.",
+    rule: "Пары ключ-значение для цены, тикера, закладной, денежного потока и дополнительных правил.",
     example: "symbol = POP1"
   },
   {
     key: "effects",
-    rule: "Действия карточки: списать деньги, изменить cashflow, создать долг, изменить акции.",
+    rule: "Действия карточки: списать деньги, изменить денежный поток, создать долг, изменить акции.",
     example: "cash_delta = -500"
   },
   {
@@ -576,7 +582,7 @@ const cardEffectRules: RuleRow[] = [
   },
   {
     key: "cashflow.adjust",
-    rule: "Изменяет ежемесячный cashflow. Плюс добавляет пассивный доход, минус добавляет расход.",
+    rule: "Изменяет ежемесячный денежный поток. Плюс добавляет пассивный доход, минус добавляет расход.",
     example: "cashflow.adjust = 1000"
   },
   {

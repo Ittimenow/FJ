@@ -11,6 +11,7 @@ const seller = {
     cashCents: 0n,
     totalIncomeCents: 1_000n,
     totalExpensesCents: 1_000n,
+    passiveIncomeCents: 0n,
     monthlyCashflowCents: 0n,
     bankruptcyStatus: BankruptcyStatus.NONE
   }
@@ -19,7 +20,12 @@ const buyer = {
   id: "buyer",
   controller: PlayerController.HUMAN,
   track: BoardTrack.RAT_RACE,
-  financialState: { bankruptcyStatus: BankruptcyStatus.NONE, cashCents: 10_000n }
+  financialState: {
+    bankruptcyStatus: BankruptcyStatus.NONE,
+    cashCents: 10_000n,
+    passiveIncomeCents: 0n,
+    totalExpensesCents: 1_000n
+  }
 };
 const card = {
   id: 42,
@@ -30,7 +36,7 @@ const card = {
   meta: [
     { metaKey: "price", metaValue: "40000" },
     { metaKey: "down_payment", metaValue: "5000" },
-    { metaKey: "cashflow_monthly", metaValue: "0" }
+    { metaKey: "cashflow_monthly", metaValue: "100" }
   ],
   effects: [],
   conditions: []
@@ -87,7 +93,7 @@ test("бот выбирает платежеспособную ставку, е�
     cardType: "SMALL_DEAL",
     bidderGamePlayerIds: [buyer.id, secondBuyer.id],
     responses: [
-      { gamePlayerId: buyer.id, amountCents: 500 },
+      { gamePlayerId: buyer.id, amountCents: 600 },
       { gamePlayerId: secondBuyer.id, amountCents: 1_000 }
     ]
   };
@@ -108,6 +114,25 @@ test("бот выбирает платежеспособную ставку, е�
   );
 });
 
+test("бот не принимает символическую ставку за доходную квартиру", async () => {
+  const service = fixture();
+  const game = {
+    status: GameStatus.IN_PROGRESS,
+    players: [seller, buyer],
+    settings: {
+      pendingAction: {
+        type: "deal_auction",
+        gamePlayerId: seller.id,
+        cardId: card.id,
+        cardType: "SMALL_DEAL",
+        bidderGamePlayerIds: [buyer.id],
+        responses: [{ gamePlayerId: buyer.id, amountCents: 1 }]
+      }
+    }
+  };
+  assert.equal((await service.nextAction(game)).type, "cancel_auction");
+});
+
 test("бот не запускает аукцион повторно и не пытается продавать без покупателей", async () => {
   const service = fixture();
   const pending = {
@@ -121,4 +146,11 @@ test("бот не запускает аукцион повторно и не п�
     "decline_deal"
   );
   assert.equal((await service.pendingActionForBot(seller, pending, [seller])).type, "decline_deal");
+  assert.equal(
+    (await service.pendingActionForBot(seller, pending, [
+      seller,
+      { ...buyer, financialState: { ...buyer.financialState, cashCents: 5_000n } }
+    ])).type,
+    "decline_deal"
+  );
 });

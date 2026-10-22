@@ -38,7 +38,7 @@ export function OtherPlayersList({ players, currentPlayerId, className = "" }: {
               <span>{fastTrack ? "Большой круг" : "Малый круг"}</span>
               {state ? <>
                 <span>Наличные {money(state.cashCents)}</span>
-                <span>{fastTrack ? `CASHFLOW ${money(state.fastTrackIncomeCents ?? 0)}` : `Поток ${money(state.monthlyCashflowCents)}/мес`}</span>
+                <span>{fastTrack ? `Денежный поток ${money(state.fastTrackIncomeCents ?? 0)}` : `Поток ${money(state.monthlyCashflowCents)}/мес`}</span>
               </> : null}
             </div>
             {state ? fastTrack ? <FastTrackResult player={player} /> : <PlayerFreedomMini player={player} /> : null}

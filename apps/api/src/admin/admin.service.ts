@@ -12,6 +12,7 @@ import { validate } from "class-validator";
 import { toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { missingCardTypes } from "../games/card-set";
+import { normalizeBotName, validBotName } from "../games/bot-names";
 import { AdminCardDto } from "./dto/card.dto";
 import { CreateCardSetDto, UpdateCardSetDto } from "./dto/card-set.dto";
 import { AdminCreateUserDto } from "./dto/create-user.dto";
@@ -28,6 +29,29 @@ const requiredCardTypeLabels: Partial<Record<CardType, string>> = {
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listBotNames() {
+    return this.prisma.botName.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
+  }
+
+  async createBotName(value: string) {
+    const name = normalizeBotName(value);
+    if (!validBotName(name)) {
+      throw new BadRequestException("Имя должно содержать одно или два слова и не более 15 символов");
+    }
+    const existing = await this.prisma.botName.findMany({ select: { name: true } });
+    if (existing.some((entry) => entry.name.toLocaleLowerCase("ru-RU") === name.toLocaleLowerCase("ru-RU"))) {
+      throw new ConflictException("Такое имя уже есть в списке");
+    }
+    try {
+      return await this.prisma.botName.create({ data: { name }, select: { id: true, name: true } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictException("Такое имя уже есть в списке");
+      }
+      throw error;
+    }
+  }
 
   async listCardSets() {
     const [sets, activeCounts] = await Promise.all([

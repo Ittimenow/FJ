@@ -46,6 +46,6 @@ export class CreateGameDto extends TestGameOptionsDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  @Max(3)
+  @Max(12)
   botCount?: number;
 }

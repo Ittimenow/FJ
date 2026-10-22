@@ -114,10 +114,8 @@ export function DealAuctionDialog({
               <div className="mt-4 flex items-start gap-3 rounded-2xl bg-[#fff5e8] p-4 text-sm text-ink" role="status">
                 <Hourglass className="mt-0.5 shrink-0 text-[#c56b1a]" size={19} aria-hidden="true" />
                 <div>
-                  <div className="font-extrabold">{maxBidCents < 1 ? "Ставка недоступна" : "Ответ принят"}</div>
-                  <p className="mt-1 leading-5 text-[#76532e]">{maxBidCents < 1
-                    ? "Для участия нужны наличные на первоначальный взнос и ставку от $1. Ваш отказ учтён автоматически."
-                    : "Ожидаем решения остальных игроков и выбор владельца хода."}</p>
+                  <div className="font-extrabold">Ответ принят</div>
+                  <p className="mt-1 leading-5 text-[#76532e]">Ожидаем решения остальных игроков и выбор владельца хода.</p>
                 </div>
               </div>
             ) : (
@@ -150,7 +148,9 @@ export function DealAuctionDialog({
                   </Button>
                 </div>
                 <p className="mt-2 text-xs leading-5 text-muted">
-                  После первоначального взноса вы можете предложить до <strong>{money(maxBidCents)}</strong>.
+                  {maxBidCents < 1
+                    ? "Для предложения нужны наличные на первоначальный взнос и ставку от $1. Вы можете взять кредит или отказаться самостоятельно."
+                    : <>После первоначального взноса вы можете предложить до <strong>{money(maxBidCents)}</strong>.</>}
                 </p>
                 <Button
                   variant="secondary"

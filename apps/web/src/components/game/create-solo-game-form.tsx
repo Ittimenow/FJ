@@ -1,9 +1,10 @@
 "use client";
 
-import { Bot, ShieldCheck } from "lucide-react";
+import { Bot, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { BotLevelButtons, type BotLevelValue } from "./bot-level-buttons";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
 
@@ -21,6 +22,8 @@ export function CreateSoloGameForm({ token }: { token: string }) {
   const [cardSetId, setCardSetId] = useState("");
   const [cardSetsLoading, setCardSetsLoading] = useState(true);
   const [cardSetsError, setCardSetsError] = useState<string | null>(null);
+  const [botLevels, setBotLevels] = useState<BotLevelValue[]>(["balanced_v1"]);
+  const [newBotLevel, setNewBotLevel] = useState<BotLevelValue>("balanced_v1");
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +56,6 @@ export function CreateSoloGameForm({ token }: { token: string }) {
     event.preventDefault();
     setLoading(true);
     setError(null);
-    const form = new FormData(event.currentTarget);
     try {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/solo`, {
         method: "POST",
@@ -62,7 +64,8 @@ export function CreateSoloGameForm({ token }: { token: string }) {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          botCount: Number(form.get("botCount") ?? 1),
+          botCount: botLevels.length,
+          botLevels,
           ...(cardSetId ? { cardSetId } : {})
         })
       });
@@ -94,54 +97,80 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label htmlFor="solo-bot-count" className="mb-2 block text-sm font-extrabold text-ink">
-            Соперники
-          </label>
-          <select
-            id="solo-bot-count"
-            name="botCount"
-            defaultValue="1"
-            className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
-          >
-            <option value="1">1 бот</option>
-            <option value="2">2 бота</option>
-            <option value="3">3 бота</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="solo-card-set" className="mb-2 block text-sm font-extrabold text-ink">
-            Набор карточек
-          </label>
-          <select
-            id="solo-card-set"
-            value={cardSetId}
-            onChange={(event) => { setCardSetId(event.target.value); setCardSetsError(null); }}
-            disabled={cardSetsLoading || cardSets.length === 0}
-            className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
-          >
-            {cardSetsLoading ? <option value="">Загружаем наборы…</option> : null}
-            {!cardSetsLoading && cardSets.length === 0 ? (
-              <option value="">Нет доступных наборов</option>
-            ) : null}
-            {cardSets.map((set) => (
-              <option key={set.id} value={set.id}>
-                {set.name}{set.isDefault ? " — основной" : ""}
-              </option>
-            ))}
-          </select>
-          {cardSetsError ? (
-            <p className="mt-2 text-xs font-medium leading-5 text-red-700" role="alert">
-              {cardSetsError}
-            </p>
+      <div>
+        <label htmlFor="solo-card-set" className="mb-2 block text-sm font-extrabold text-ink">
+          Набор карточек
+        </label>
+        <select
+          id="solo-card-set"
+          value={cardSetId}
+          onChange={(event) => { setCardSetId(event.target.value); setCardSetsError(null); }}
+          disabled={cardSetsLoading || cardSets.length === 0}
+          className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
+        >
+          {cardSetsLoading ? <option value="">Загружаем наборы…</option> : null}
+          {!cardSetsLoading && cardSets.length === 0 ? (
+            <option value="">Нет доступных наборов</option>
           ) : null}
-        </div>
+          {cardSets.map((set) => (
+            <option key={set.id} value={set.id}>
+              {set.name}{set.isDefault ? " — основной" : ""}
+            </option>
+          ))}
+        </select>
+        {cardSetsError ? (
+          <p className="mt-2 text-xs font-medium leading-5 text-red-700" role="alert">
+            {cardSetsError}
+          </p>
+        ) : null}
       </div>
+
+      <section aria-labelledby="solo-opponents-title" className="grid gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 id="solo-opponents-title" className="text-sm font-extrabold text-ink">Соперники</h3>
+          <span className="text-xs font-bold text-muted">{botLevels.length} из 3</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <BotLevelButtons label="Уровень нового соперника" value={newBotLevel} onChange={setNewBotLevel} disabled={loading || botLevels.length >= 3} />
+          <Button
+            type="button"
+            variant="secondary"
+            className="gap-2"
+            disabled={loading || botLevels.length >= 3}
+            onClick={() => setBotLevels((levels) => levels.length < 3 ? [...levels, newBotLevel] : levels)}
+          >
+            <Plus size={17} aria-hidden="true" /> Добавить соперника
+          </Button>
+        </div>
+        <div className="grid gap-2" aria-live="polite">
+          {botLevels.map((level, index) => (
+            <div key={index} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-card px-3 py-2 text-sm text-ink">
+              <span className="inline-flex items-center gap-2 font-bold"><Bot size={17} aria-hidden="true" /> Соперник {index + 1}</span>
+              <BotLevelButtons
+                label={`Уровень соперника ${index + 1}`}
+                value={level}
+                onChange={(value) => setBotLevels((levels) => levels.map((current, position) => position === index ? value : current))}
+                disabled={loading}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 gap-1 px-2 text-xs"
+                disabled={loading || botLevels.length === 1}
+                onClick={() => setBotLevels((levels) => levels.filter((_, position) => position !== index))}
+                aria-label={`Удалить соперника ${index + 1}`}
+                title={botLevels.length === 1 ? "Для игры нужен хотя бы один соперник" : undefined}
+              >
+                <Trash2 size={16} aria-hidden="true" /><span className="hidden sm:inline">Удалить</span>
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <p className="inline-flex items-start gap-2 text-xs leading-5 text-muted">
         <ShieldCheck className="mt-0.5 shrink-0 text-[#7655c7]" size={15} aria-hidden="true" />
-        Сбалансированные боты видят только открытые карточки и текущее состояние партии.
+        Все уровни сложности используют только открытые карточки и текущее состояние партии.
       </p>
       {error ? (
         <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700" role="alert">

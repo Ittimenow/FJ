@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { publicApiBaseUrl } from "@/lib/api";
 
 const USER_KEY = "financial-journey-push-user";
@@ -149,10 +150,10 @@ export function PushNotificationSettings({ token, userId }: { token: string; use
       {status === "enabled" ? <p className="mt-1 text-xs text-muted">Системные уведомления включены на этом устройстве.</p> : null}
       {status === "available" ? <p className="mt-1 text-xs text-muted">Получайте сообщения о новых играх и изменениях ваших партий, даже когда приложение закрыто.</p> : null}
       {status === "available" || status === "enabled" ? (
-        <button type="button" disabled={busy} onClick={() => void (status === "enabled" ? disable() : enable())}
-          className="mt-3 min-h-11 rounded-xl bg-journey px-4 text-sm font-bold text-white disabled:opacity-60">
+        <Button type="button" disabled={busy} onClick={() => void (status === "enabled" ? disable() : enable())}
+          className="mt-3">
           {busy ? "Подождите…" : status === "enabled" ? "Отключить на устройстве" : "Включить на устройстве"}
-        </button>
+        </Button>
       ) : null}
       {error ? <p role="alert" className="mt-2 text-xs text-red-700">{error}</p> : null}
     </div>

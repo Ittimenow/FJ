@@ -211,9 +211,11 @@ async function setupDatabaseIfNeeded() {
 
   await run(npmCommand, ["run", "prisma:prepare-full-game", "--workspace=@cashflow/database"]);
   await run(npmCommand, ["run", "prisma:prepare-open-game-notifications", "--workspace=@cashflow/database"]);
+  await run(npmCommand, ["run", "prisma:prepare-bot-names", "--workspace=@cashflow/database"]);
 
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"]);
+  await run(npmCommand, ["run", "prisma:seed-bot-names", "--workspace=@cashflow/database"]);
 
   log("Verifying database schema.");
   await run(npmCommand, ["run", "db:verify"]);

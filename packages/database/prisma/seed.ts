@@ -10,6 +10,7 @@ import {
   ProfessionLineSection
 } from "@prisma/client";
 import { russianCityTimeZone } from "../src/city-time-zone";
+import { seedBotNames } from "./seed-bot-names";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -853,6 +854,7 @@ async function main() {
   await seedCities();
   await seedProfessions();
   await seedCards();
+  await seedBotNames(prisma);
 }
 
 main()

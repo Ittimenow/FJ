@@ -282,7 +282,7 @@ function HostPlayerCard({
       {state ? (
         <dl className="mt-2 grid h-10 shrink-0 grid-cols-3 gap-1.5">
           <PlayerMetric label="Наличные" value={money(state.cashCents)} />
-          <PlayerMetric label={player.track === "FAST_TRACK" ? "Доход CASHFLOW" : "Денежный поток"} value={signedMoney(player.track === "FAST_TRACK" ? state.fastTrackIncomeCents ?? 0 : state.monthlyCashflowCents)} tone="positive" />
+          <PlayerMetric label="Денежный поток" value={signedMoney(player.track === "FAST_TRACK" ? state.fastTrackIncomeCents ?? 0 : state.monthlyCashflowCents)} tone="positive" />
           <PlayerMetric label={player.track === "FAST_TRACK" ? "До победы" : "Пассивный доход"} value={player.track === "FAST_TRACK" ? money(Math.max(0, (state.fastTrackStartIncomeCents ?? 0) + 50_000 - (state.fastTrackIncomeCents ?? 0))) : `${money(state.passiveIncomeCents)}/мес`} />
         </dl>
       ) : <p className="mt-3 rounded-xl bg-card p-3 text-xs text-muted">Финансы появятся после старта партии.</p>}

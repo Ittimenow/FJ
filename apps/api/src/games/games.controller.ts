@@ -7,6 +7,7 @@ import {
 } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
+import { AddBotDto } from "./dto/add-bot.dto";
 import { BabyGiftDto } from "./dto/baby-gift.dto";
 import { RepayBankruptcyDebtDto, SellBankruptcyAssetDto } from "./dto/bankruptcy.dto";
 import { BuyDealDto } from "./dto/buy-deal.dto";
@@ -101,8 +102,8 @@ export class GamesController {
   }
 
   @Post(":id/bots")
-  async addBot(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    const result = await this.games.addLobbyBot(id, user.userId);
+  async addBot(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: AddBotDto) {
+    const result = await this.games.addLobbyBot(id, user.userId, dto.level);
     this.realtime.broadcastAction(id, result);
     return result;
   }

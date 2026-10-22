@@ -43,6 +43,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { selectGameAwards } from "./game-awards.logic";
+import { chooseBotName } from "./bot-names";
 import { assetRealEstate, cardRealEstate, realEstateAssetName } from "./real-estate";
 import { gameChatNotices, gameChatNoticeTypes } from "./game-chat-notices";
 import { AddGameUserDto } from "./dto/add-game-user.dto";
@@ -260,16 +261,16 @@ const playerColors = [
 ];
 
 const botActorPrefix = "bot:";
-const botNames = ["Марина", "Алексей", "София"];
 const preferredBotFigurines = ["robot", "detective", "owl"];
 
-function createBotPlayers(botCount: number, occupiedFigurines = new Set<string>()) {
+export function createBotPlayers(names: string[], occupiedFigurines = new Set<string>()) {
   const availableFigurines = figurines
     .map((figurine) => figurine.id)
     .filter((figurine) => !occupiedFigurines.has(figurine));
 
-  return preferredBotFigurines.slice(0, botCount).map((preferred, index) => {
-    const figurine = !occupiedFigurines.has(preferred)
+  return names.map((name, index) => {
+    const preferred = preferredBotFigurines[index];
+    const figurine = preferred && !occupiedFigurines.has(preferred)
       ? preferred
       : availableFigurines.find((candidate) => !occupiedFigurines.has(candidate));
     if (!figurine) {
@@ -278,7 +279,7 @@ function createBotPlayers(botCount: number, occupiedFigurines = new Set<string>(
     occupiedFigurines.add(figurine);
     return {
       dreamCellIndex: fastTrackDreams[index % fastTrackDreams.length]!.index,
-      guestName: botNames[index] ?? `Бот ${index + 1}`,
+      guestName: name,
       role: GameRole.PLAYER,
       controller: PlayerController.BOT,
       botStrategy: "balanced_v1",
@@ -299,6 +300,23 @@ export class GamesService {
     return `${botActorPrefix}${gamePlayerId}`;
   }
 
+  private async drawBotNames(
+    db: PrismaService | Prisma.TransactionClient,
+    count: number,
+    occupied = new Set<string>()
+  ) {
+    const entries = await db.botName.findMany({ select: { name: true } });
+    const names = entries.map((entry) => entry.name);
+    const selected: string[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const name = chooseBotName(names, occupied);
+      if (!name) throw new BadRequestException("Для новых ботов не хватает имён. Добавьте имена в админке.");
+      selected.push(name);
+      occupied.add(name.toLocaleLowerCase("ru-RU"));
+    }
+    return selected;
+  }
+
   async createGame(userId: string, dto: CreateGameDto) {
     const creator = await this.ensureHostOrAdmin(userId);
     if (dto.isPublic && dto.testing) throw new BadRequestException("Тестовую партию нельзя открыть для всех.");
@@ -314,8 +332,8 @@ export class GamesService {
     );
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const botCount = dto.botCount ?? 0;
-    if (botCount > (dto.maxPlayers ?? 6)) throw new BadRequestException("Ботов больше, чем мест в игре");
-    const botPlayers = createBotPlayers(botCount);
+    if (botCount >= (dto.maxPlayers ?? 6)) throw new BadRequestException("Оставьте одно место для игрока-человека");
+    const botPlayers = createBotPlayers(await this.drawBotNames(this.prisma, botCount));
 
     const code = await this.generateGameCode();
     const game = await this.prisma.$transaction(async (tx) => {
@@ -423,6 +441,9 @@ export class GamesService {
 
     const testSettings = this.testGameSettings(user.role, dto);
     const botCount = dto.botCount;
+    if (dto.botLevels && dto.botLevels.length !== botCount) {
+      throw new BadRequestException("Укажите уровень сложности для каждого бота");
+    }
     const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const code = await this.generateGameCode();
@@ -430,8 +451,9 @@ export class GamesService {
     if (user.figurine && isFigurineId(user.figurine)) {
       occupiedFigurines.add(user.figurine);
     }
-    const botPlayers = createBotPlayers(botCount, occupiedFigurines).map((player, index) => ({
+    const botPlayers = createBotPlayers(await this.drawBotNames(this.prisma, botCount), occupiedFigurines).map((player, index) => ({
       ...player,
+      botStrategy: dto.botLevels?.[index] ?? player.botStrategy,
       seat: index + 2,
       color: playerColors[index + 1] ?? null
     }));
@@ -1073,7 +1095,7 @@ export class GamesService {
     return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
   }
 
-  async addLobbyBot(gameId: string, actorUserId: string) {
+  async addLobbyBot(gameId: string, actorUserId: string, level: "beginner_v1" | "balanced_v1" | "expert_v1" = "balanced_v1") {
     await this.ensureCanManageGame(gameId, actorUserId);
     await this.prisma.$transaction(async (tx) => {
       await this.lockGame(tx, gameId);
@@ -1081,13 +1103,19 @@ export class GamesService {
       if (game.mode !== GameMode.MULTIPLAYER || game.status !== GameStatus.WAITING) throw new BadRequestException("Ботов можно добавлять только до начала командной игры");
       const joined = game.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED);
       if (joined.length >= (game.maxPlayers ?? 6)) throw new BadRequestException("Все места в игре заняты");
-      if (joined.filter((player) => player.controller === PlayerController.BOT).length >= 3) throw new BadRequestException("В игре уже три бота");
+      if (
+        joined.every((player) => player.controller === PlayerController.BOT) &&
+        joined.length >= (game.maxPlayers ?? 6) - 1
+      ) {
+        throw new BadRequestException("Оставьте одно место для игрока-человека");
+      }
       const occupiedFigurines = new Set(joined.map((player) => player.figurine).filter((value): value is string => Boolean(value)));
-      const botIndex = botNames.findIndex((name) => !joined.some((player) => player.controller === PlayerController.BOT && player.guestName === name));
-      const [bot] = createBotPlayers(botIndex + 1, occupiedFigurines).slice(-1);
+      const occupiedNames = new Set(joined.filter((player) => player.controller === PlayerController.BOT).map((player) => (player.guestName ?? "").toLocaleLowerCase("ru-RU")));
+      const [name] = await this.drawBotNames(tx, 1, occupiedNames);
+      const [bot] = createBotPlayers([name!], occupiedFigurines);
       if (!bot) throw new BadRequestException("Не удалось добавить бота");
       const seat = nextAvailableSeat(joined.map((player) => player.seat).filter((value): value is number => value !== null));
-      const player = await tx.gamePlayer.create({ data: { ...bot, gameId, seat, color: playerColors[(seat - 1) % playerColors.length] ?? null } });
+      const player = await tx.gamePlayer.create({ data: { ...bot, botStrategy: level, gameId, seat, color: playerColors[(seat - 1) % playerColors.length] ?? null } });
       await this.appendEvents(tx, gameId, actorUserId, [{ type: "player:added", gamePlayerId: player.id, payload: { bot: true } }, { type: realtimeEvents.stateUpdate, payload: { reason: "bot_added" } }]);
     });
     return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
@@ -2260,29 +2288,14 @@ export class GamesService {
         throw new BadRequestException("В игре нет участников, которым можно предложить возможность");
       }
 
-      const downPaymentCents = this.dealDownPaymentCents(card);
-      const responses = candidates
-        .filter((candidate) =>
-          (candidate.financialState?.cashCents ?? 0n) < downPaymentCents + 1n
-        )
-        .map((candidate) => ({ gamePlayerId: candidate.id, amountCents: null }));
-      const noOffersPossible = responses.length === bidderGamePlayerIds.length;
-      const nextPending: GamePendingAction = noOffersPossible
-        ? {
-            type: "deal_card_drawn",
-            gamePlayerId: seller.id,
-            cardId: card.id,
-            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
-            auctionAttempted: true
-          }
-        : {
-            type: "deal_auction",
-            gamePlayerId: seller.id,
-            cardId: card.id,
-            cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
-            bidderGamePlayerIds,
-            responses
-          };
+      const nextPending: GamePendingAction = {
+        type: "deal_auction",
+        gamePlayerId: seller.id,
+        cardId: card.id,
+        cardType: card.cardType as "SMALL_DEAL" | "BIG_DEAL",
+        bidderGamePlayerIds,
+        responses: []
+      };
       const started = await tx.game.updateMany({
         where: {
           id: gameId,
@@ -2302,23 +2315,9 @@ export class GamesService {
           bidderGamePlayerIds
         }
       });
-      for (const response of responses) {
-        emittedEvents.push({
-          type: realtimeEvents.dealAuctionDecline,
-          gamePlayerId: response.gamePlayerId,
-          payload: { cardId: card.id, reason: "insufficient_cash" }
-        });
-      }
-      if (noOffersPossible) {
-        emittedEvents.push({
-          type: realtimeEvents.dealAuctionCancel,
-          gamePlayerId: seller.id,
-          payload: { cardId: card.id, reason: "no_offers" }
-        });
-      }
       emittedEvents.push({
         type: realtimeEvents.stateUpdate,
-        payload: { reason: noOffersPossible ? "deal_auction_no_offers" : "deal_auction_started" }
+        payload: { reason: "deal_auction_started" }
       });
       await this.appendEvents(tx, gameId, userId, emittedEvents);
     });

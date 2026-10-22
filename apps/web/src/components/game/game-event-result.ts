@@ -135,7 +135,7 @@ export function compactPlayerActionDetails(event: GameEvent): string[] | null {
         cost === null
           ? null
           : `${hasMultipleUnits ? "Сумма" : "Стоимость"}: ${money(cost)}`,
-        cashflow === null ? null : `Cashflow: ${money(cashflow)}/мес`
+        cashflow === null ? null : `Денежный поток: ${money(cashflow)}/мес`
       ]);
     }
     case "card:stock_quantity_changed": {

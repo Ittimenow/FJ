@@ -27,7 +27,9 @@
     "test": "node --import tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit",
     "prisma:prepare-full-game": "prisma db execute --file prisma/deploy/20260919_add_full_game.sql --schema prisma/schema.prisma",
-    "prisma:prepare-open-game-notifications": "prisma db execute --file prisma/deploy/20261016_add_open_game_notifications.sql --schema prisma/schema.prisma"
+    "prisma:prepare-open-game-notifications": "prisma db execute --file prisma/deploy/20261016_add_open_game_notifications.sql --schema prisma/schema.prisma",
+    "prisma:prepare-bot-names": "prisma db execute --file prisma/deploy/20261022_add_bot_names.sql --schema prisma/schema.prisma",
+    "prisma:seed-bot-names": "tsx prisma/seed-bot-names.ts"
   },
   "dependencies": {
     "@photostructure/tz-lookup": "11.7.0",

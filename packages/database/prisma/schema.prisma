@@ -238,6 +238,14 @@ model Game {
   @@map("games")
 }
 
+model BotName {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(15)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("bot_names")
+}
+
 model UserNotification {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid

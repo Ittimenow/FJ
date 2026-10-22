@@ -20,11 +20,13 @@ import { randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   botCashReserve,
+  botLevel,
   botStockSaleQuantity,
   chooseBotDealType,
   chooseBotDoodadPayment,
   decideBotDeal,
   decideBotAuctionBid,
+  minimumBotAuctionBid,
   shouldAcceptBotCharity,
   shouldSellBotMarketAsset,
   type BotFinancialSnapshot
@@ -309,6 +311,10 @@ export class GamesBotService implements OnModuleInit {
         ? Object.fromEntries(card.meta.map((item) => [item.metaKey, item.metaValue]))
         : {};
       const downPaymentCents = card ? this.dealUnitCost(card, meta, false) : 0;
+      const cashflowCents = card
+        ? this.effectAmount(card.effects, cardActionTypes.cashflowAdjust) ??
+          this.metaAmount(meta.cashflow_monthly)
+        : 0;
       const bestOffer = [...pending.responses]
         .filter(
           (response): response is { gamePlayerId: string; amountCents: number } =>
@@ -318,6 +324,11 @@ export class GamesBotService implements OnModuleInit {
               (player) =>
                 player.id === response.gamePlayerId &&
                 player.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED &&
+                (response.amountCents ?? 0) >= (minimumBotAuctionBid({
+                  cashflowCents,
+                  buyerPassiveIncomeCents: Number(player.financialState?.passiveIncomeCents ?? 0n),
+                  buyerTotalExpensesCents: Number(player.financialState?.totalExpensesCents ?? 0n)
+                }) ?? Number.POSITIVE_INFINITY) &&
                 (player.financialState?.cashCents ?? 0n) >=
                   BigInt(downPaymentCents) + BigInt(response.amountCents ?? 0)
             )
@@ -356,8 +367,9 @@ export class GamesBotService implements OnModuleInit {
 
     const state = this.financialSnapshot(current);
     const bankLoan = current.liabilities.find((liability) => liability.type === "bank_loan");
+    const level = botLevel(current.botStrategy);
     const repayable = Math.floor(
-      Math.max(0, state.cashCents - botCashReserve(state)) / 1_000
+      Math.max(0, state.cashCents - botCashReserve(state, level)) / 1_000
     ) * 1_000;
     if (bankLoan && repayable >= 1_000) {
       return {
@@ -382,7 +394,7 @@ export class GamesBotService implements OnModuleInit {
     }
     const state = this.financialSnapshot(player);
     if (pending.type === "choose_deal") {
-      const cardType = chooseBotDealType(state) as CardType;
+      const cardType = chooseBotDealType(state, botLevel(player.botStrategy)) as CardType;
       return {
         type: "draw",
         playerId: player.id,
@@ -414,17 +426,24 @@ export class GamesBotService implements OnModuleInit {
         isStock,
         unitCostCents,
         cashflowCents
-      });
+      }, botLevel(player.botStrategy));
       if (!decision.buy) {
         if (
           pending.type === "deal_card_drawn" &&
           !pending.auctionAttempted &&
           this.games.isDealAuctionEligible(card) &&
+          cashflowCents > 0 &&
           players.some(
             (candidate) =>
               candidate.id !== player.id &&
               candidate.track !== BoardTrack.FAST_TRACK &&
-              candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED
+              candidate.financialState?.bankruptcyStatus !== BankruptcyStatus.ELIMINATED &&
+              Number(candidate.financialState?.cashCents ?? 0n) >=
+                unitCostCents + (minimumBotAuctionBid({
+                  cashflowCents,
+                  buyerPassiveIncomeCents: Number(candidate.financialState?.passiveIncomeCents ?? 0n),
+                  buyerTotalExpensesCents: Number(candidate.financialState?.totalExpensesCents ?? 0n)
+                }) ?? Number.POSITIVE_INFINITY)
           )
         ) {
           return {
@@ -457,7 +476,7 @@ export class GamesBotService implements OnModuleInit {
       } satisfies BotAction;
     }
     if (pending.type === "charity_choice") {
-      const decision = shouldAcceptBotCharity(state, pending.donationCents);
+      const decision = shouldAcceptBotCharity(state, pending.donationCents, botLevel(player.botStrategy));
       return {
         type: decision.accepted ? "accept_charity" : "decline_charity",
         playerId: player.id,
@@ -465,7 +484,7 @@ export class GamesBotService implements OnModuleInit {
       } satisfies BotAction;
     }
     if (pending.type === "doodad_payment_choice") {
-      const decision = chooseBotDoodadPayment(state, pending.cashPriceCents);
+      const decision = chooseBotDoodadPayment(state, pending.cashPriceCents, botLevel(player.botStrategy));
       return {
         type: "pay_doodad",
         playerId: player.id,
@@ -478,8 +497,10 @@ export class GamesBotService implements OnModuleInit {
       const decision = shouldSellBotMarketAsset({
         proceedsCents: pending.proceedsCents,
         downPaymentCents: Number(asset?.downPaymentCents ?? 0n),
-        cashflowCents: pending.cashflowCents
-      });
+        cashflowCents: pending.cashflowCents,
+        passiveIncomeCents: Number(player.financialState?.passiveIncomeCents ?? 0n),
+        totalExpensesCents: Number(player.financialState?.totalExpensesCents ?? 0n)
+      }, botLevel(player.botStrategy));
       return {
         type: decision.accepted ? "sell_market" : "decline_market",
         playerId: player.id,
@@ -503,7 +524,7 @@ export class GamesBotService implements OnModuleInit {
       availableQuantity,
       averageCostCents: availableQuantity > 0 ? totalCost / availableQuantity : 0,
       salePriceCents: pending.salePriceCents
-    });
+    }, botLevel(player.botStrategy));
     return decision.quantity > 0
       ? {
           type: "sell_stock",
@@ -541,7 +562,7 @@ export class GamesBotService implements OnModuleInit {
     const decision = decideBotAuctionBid(this.financialSnapshot(player), {
       downPaymentCents,
       cashflowCents
-    });
+    }, botLevel(player.botStrategy));
     return decision.amountCents === null
       ? {
           type: "decline_auction",
@@ -660,7 +681,8 @@ export class GamesBotService implements OnModuleInit {
       cashCents: Number(state.cashCents),
       totalIncomeCents: Number(state.totalIncomeCents),
       totalExpensesCents: Number(state.totalExpensesCents),
-      monthlyCashflowCents: Number(state.monthlyCashflowCents)
+      monthlyCashflowCents: Number(state.monthlyCashflowCents),
+      passiveIncomeCents: Number(state.passiveIncomeCents)
     };
   }
 

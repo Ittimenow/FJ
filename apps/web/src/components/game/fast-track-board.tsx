@@ -181,11 +181,11 @@ function PlayerOverview({ snapshot, player, mobile }: { snapshot: GameSnapshot; 
     <div className="player-identity"><PlayerAvatar player={player} /><div><h3 className="player-name">{gamePlayerName(player)}</h3><p className="player-profession">{player.profession?.name ?? "Предприниматель"}</p></div></div>
     <dl className="player-metrics">
       <div><dt>Наличные</dt><dd>{money(state?.cashCents ?? 0)}</dd></div>
-      <div><dt>Доход CASHFLOW</dt><dd>{money(income)}</dd></div>
+      <div><dt>Денежный поток</dt><dd>{money(income)}</dd></div>
       <div className="is-positive"><dt>Прирост дохода</dt><dd>{income >= initial ? "+" : "−"}{money(Math.abs(income - initial))}</dd></div>
     </dl>
     <div className="player-goal">
-      {mobile ? <><h4 className="player-section-heading">Цель игры</h4><p className="player-goal-summary">Для победы купите свою мечту или увеличьте доход CASHFLOW на {money(50_000)}.</p></> : null}
+      {mobile ? <><h4 className="player-section-heading">Цель игры</h4><p className="player-goal-summary">Для победы купите свою мечту или увеличьте денежный поток на {money(50_000)}.</p></> : null}
       <div className="player-goal-row"><span>Финансовая цель</span><strong>+{money(50_000)} к доходу</strong></div>
       {mobile ? <>
         <div className="player-goal-row"><span>Начальный доход</span><strong>{money(initial)}</strong></div>

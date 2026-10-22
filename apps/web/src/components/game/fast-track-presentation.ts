@@ -4,10 +4,10 @@ import type { GamePlayer } from "../../lib/types";
 
 export function fastTrackCellEffect(cell: FastTrackCell) {
   switch (cell.rule.kind) {
-    case "business": return `+${money(cell.income)} CASHFLOW`;
+    case "business": return `+${money(cell.income)} к денежному потоку`;
     case "chance_business": return `+${money(cell.income)} при ${cell.rule.minimum}–6`;
     case "ipo": return `+${money(cell.rule.payout)} при ${cell.rule.minimum === 6 ? "6" : `${cell.rule.minimum}–6`}`;
-    case "cashflow": return "+Доход CASHFLOW";
+    case "cashflow": return "+Денежный поток";
     case "charity": return "1–3 кубика до конца игры";
     case "half_cash": return "−50% наличных";
     case "lose_cash": return "Все наличные теряются";

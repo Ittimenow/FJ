@@ -2,6 +2,7 @@
 
 import { fastTrackCells, isDreamCell } from "@cashflow/shared";
 import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
+import { BotLevelButtons, type BotLevelValue } from "./bot-level-buttons";
 import { MobileTurnDialog } from "./mobile-turn-dialog";
 import { boardStepDuration } from "./board-movement";
 import { useBoardMovement } from "./use-board-movement";
@@ -751,13 +752,14 @@ export function GameRoom({
     }
   }
 
-  async function lobbyAction(path: string, method: "POST" | "DELETE") {
+  async function lobbyAction(path: string, method: "POST" | "DELETE", body?: Record<string, unknown>) {
     if (lobbyBusy) return;
     setLobbyBusy(true);
     setError(null);
     try {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${path}`, {
-        method, headers: { Authorization: `Bearer ${token}` }
+        method, headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {})
       });
       const result = await response.json() as GameActionResult;
       if (!response.ok) throw new Error(gameErrorMessage(result.message, "Не удалось изменить состав игры"));
@@ -1478,7 +1480,7 @@ export function GameRoom({
           timeZone={timeZone}
           isAdmin={isAdmin}
           onSettingsSaved={setSnapshot}
-          onAddBot={() => void lobbyAction("bots", "POST")}
+          onAddBot={(level) => void lobbyAction("bots", "POST", { level })}
           onRemovePlayer={(playerId) => void lobbyAction(`players/${playerId}`, "DELETE")}
           onAddUser={addUserToGame}
           canChangeParticipation={canChangeHostParticipation}
@@ -1996,7 +1998,7 @@ function GameEndFinancialMetrics({ state }: { state: FinancialState }) {
   const onFastTrack = (state.fastTrackStartIncomeCents ?? 0) > 0;
   const metrics = [
     {
-      label: onFastTrack ? "Доход CASHFLOW" : "Пассивный доход",
+      label: onFastTrack ? "Денежный поток" : "Пассивный доход",
       value: onFastTrack ? money(state.fastTrackIncomeCents) : `${money(state.passiveIncomeCents)}/мес`,
       className: "bg-[#edf6e9] text-[#3f5b35]"
     },
@@ -2492,7 +2494,7 @@ function WaitingRoomOverview({
   timeZone: string | null;
   isAdmin: boolean;
   onSettingsSaved: (snapshot: GameSnapshot) => void;
-  onAddBot: () => void;
+  onAddBot: (level: BotLevelValue) => void;
   onRemovePlayer: (playerId: string) => void;
   onAddUser: (body: { userId: string; role: string }) => void;
   canChangeParticipation: boolean;
@@ -2525,7 +2527,9 @@ function WaitingRoomOverview({
   }, [snapshot.game.scheduledAt]);
   const secondsUntilStart = snapshot.game.scheduledAt ? Math.max(0, Math.ceil((new Date(snapshot.game.scheduledAt).getTime() - now) / 1000)) : 0;
   const beforeStart = snapshot.game.isPublic && secondsUntilStart > 0;
-  const botCount = gamePlayers.filter((player) => player.controller === "BOT").length;
+  const humanCount = gamePlayers.filter((player) => player.controller === "HUMAN").length;
+  const botSlotsFull = gamePlayers.length >= (snapshot.game.maxPlayers ?? 6) - (humanCount === 0 ? 1 : 0);
+  const [newBotLevel, setNewBotLevel] = useState<BotLevelValue>("balanced_v1");
 
   return (
     <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
@@ -2551,11 +2555,14 @@ function WaitingRoomOverview({
           </span>
         </div>
 
-        {canManage && !isSolo ? <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+        {canManage && !isSolo ? <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-extrabold">Участники</h2>
-          <Button type="button" variant="secondary" className="gap-2" disabled={startBusy || botCount >= 3 || gamePlayers.length >= (snapshot.game.maxPlayers ?? 6)} onClick={onAddBot}>
-            <Bot size={17} aria-hidden="true" /> Добавить бота
-          </Button>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+            <BotLevelButtons label="Уровень нового бота" value={newBotLevel} onChange={setNewBotLevel} disabled={startBusy} />
+            <Button type="button" variant="secondary" className="gap-2" disabled={startBusy || botSlotsFull} title={botSlotsFull && humanCount === 0 ? "Оставьте место для игрока-человека" : undefined} onClick={() => onAddBot(newBotLevel)}>
+              <Bot size={17} aria-hidden="true" /> Добавить бота
+            </Button>
+          </div>
         </div> : null}
         {players.length > 0 ? (
           <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -2568,7 +2575,7 @@ function WaitingRoomOverview({
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-extrabold">
                       {player.controller === "BOT"
-                        ? `${gamePlayerName(player)} · бот`
+                        ? `${gamePlayerName(player)} · ${player.botStrategy === "beginner_v1" ? "новичок" : player.botStrategy === "expert_v1" ? "эксперт" : "опытный бот"}`
                         : player.user?.displayName ?? player.guestName ?? gameRoles[player.role] ?? "Участник"}
                     </div>
                     <div className="mt-0.5 text-xs text-muted">
@@ -6020,7 +6027,7 @@ function eventDetails(event: GameEvent) {
     case "fast_track:purchased":
       return compactDetails([textDetail("Возможность", payload.title), moneyDetail("Вложено", payload.costCents), moneyDetail("Доход", payload.incomeCents), textDetail("Результат", payload.success ? "Успех" : "Инвестиция не принесла дохода")]);
     case "fast_track:sold":
-      return compactDetails([textDetail("Возможность", payload.title), toNumber(payload.incomeChangeCents) ? moneyDetail("Изменение дохода CASHFLOW", payload.incomeChangeCents) : null]);
+      return compactDetails([textDetail("Возможность", payload.title), toNumber(payload.incomeChangeCents) ? moneyDetail("Изменение денежного потока", payload.incomeChangeCents) : null]);
     case "fast_track:cashflow":
     case "fast_track:expense":
       return compactDetails([textDetail("Клетка", payload.title), moneyDetail("Сумма", payload.amountCents)]);

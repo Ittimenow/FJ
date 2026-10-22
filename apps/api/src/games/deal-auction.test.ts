@@ -255,7 +255,7 @@ test("разрешает аукцион карточки бизнеса и за�
   assert.equal(setup.states.get(buyer.id)?.cashCents, 4_999n);
 });
 
-test("автоматически отказывает игрокам без взноса и одного доллара", async () => {
+test("ждёт ответа игрока без наличных и позволяет ему предложить цену после получения денег", async () => {
   const setup = fixture({
     type: "deal_card_drawn",
     gamePlayerId: seller.id,
@@ -266,9 +266,10 @@ test("автоматически отказывает игрокам без вз
   buyer.financialState.cashCents = 5_001n;
   try {
     await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
-    assert.deepEqual(setup.game.settings.pendingAction.responses, [
-      { gamePlayerId: secondBuyer.id, amountCents: null }
-    ]);
+    assert.deepEqual(setup.game.settings.pendingAction.responses, []);
+    secondBuyer.financialState.cashCents = 5_001n;
+    setup.states.get(secondBuyer.id)!.cashCents = 5_001n;
+    await setup.service.bidOnDealAuction("game-1", secondBuyer.userId, { amountCents: 1 });
     await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1 });
     assert.equal(setup.game.settings.pendingAction.responses.length, 2);
   } finally {
@@ -324,7 +325,7 @@ test("до ответов всех игроков продавец не выби
   assert.equal(setup.advancedTurns(), 0);
 });
 
-test("когда ни у кого нет денег, аукцион сразу возвращает карточку владельцу", async () => {
+test("когда ни у кого нет денег, аукцион ждёт личного отказа каждого", async () => {
   const setup = fixture({
     type: "deal_card_drawn",
     gamePlayerId: seller.id,
@@ -335,6 +336,11 @@ test("когда ни у кого нет денег, аукцион сразу �
   secondBuyer.financialState.cashCents = 4_999n;
   try {
     await setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id });
+    assert.equal(setup.game.settings.pendingAction.type, "deal_auction");
+    assert.deepEqual(setup.game.settings.pendingAction.responses, []);
+    await setup.service.declineDealAuction("game-1", buyer.userId);
+    assert.equal(setup.game.settings.pendingAction.type, "deal_auction");
+    await setup.service.declineDealAuction("game-1", secondBuyer.userId);
     assert.equal(setup.game.settings.pendingAction.type, "deal_card_drawn");
     assert.equal(setup.game.settings.pendingAction.auctionAttempted, true);
   } finally {

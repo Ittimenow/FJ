@@ -4,6 +4,46 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "allow-full-bot-lobbies-with-editable-name-pool",
+          "category": "feature",
+          "summary": "Ведущий может заполнять свободные места ботами, а их случайные имена выбираются из списка, который администратор может пополнять."
+        },
+        {
+          "id": "add-solo-opponents-individually",
+          "category": "improvement",
+          "summary": "В одиночной партии соперники добавляются по одному с выбранным уровнем сложности и могут быть удалены до начала игры."
+        },
+        {
+          "id": "use-game-controls-for-bot-level-and-player-profile",
+          "category": "improvement",
+          "summary": "Уровень бота выбирается тремя игровыми кнопками, а настройки профиля используют элементы в стиле игры вместо системных переключателей и списков."
+        },
+        {
+          "id": "use-russian-financial-terms-in-game-ui",
+          "category": "improvement",
+          "summary": "На игровом поле, в подсказках и истории английский термин заменён понятными русскими названиями денежного потока и дня дохода."
+        },
+        {
+          "id": "explain-bot-difficulty-rules",
+          "category": "improvement",
+          "summary": "Правила каждого уровня ботов собраны в понятном справочнике, а объяснение продажи акций показывает верный порог прибыли."
+        },
+        {
+          "id": "choose-individual-bot-difficulty",
+          "category": "feature",
+          "summary": "При создании одиночной партии можно выбрать уровень каждого бота: новичок, опытный или эксперт; их решения учитывают разные приоритеты."
+        },
+        {
+          "id": "require-personal-auction-decline-regardless-of-cash",
+          "category": "fix",
+          "summary": "Участники аукциона сами решают, предложить цену после получения денег или отказаться, даже если на момент приглашения им не хватает наличных."
+        },
+        {
+          "id": "bots-value-auctions-and-rental-income",
+          "category": "improvement",
+          "summary": "Боты избегают бесперспективных аукционов и учитывают доход соперников и собственных активов при продаже."
+        },
+        {
           "id": "start-local-services-when-docker-is-unavailable",
           "category": "fix",
           "summary": "Локальный сервер запускается через установленные PostgreSQL и Redis, если служба Docker недоступна."

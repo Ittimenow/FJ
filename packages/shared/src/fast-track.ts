@@ -26,7 +26,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "2б",
     "type": "business",
     "label": "Семейная сеть ресторанов",
-    "description": "Добровольная покупка при остановке. После покупки денежный поток прибавляется к доходу Дня CASHFLOW.",
+    "description": "Добровольная покупка при остановке. После покупки денежный поток прибавляется к доходу Дня дохода.",
     "cost": 300000,
     "income": 14000,
     "rule": {
@@ -76,7 +76,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "6б",
     "type": "business",
     "label": "Ресторан быстрого питания (3 торговые точки)",
-    "description": "Три торговые точки. Покупка увеличивает доход Дня CASHFLOW на $5 000.",
+    "description": "Три торговые точки. Покупка увеличивает доход Дня дохода на $5 000.",
     "cost": 120000,
     "income": 5000,
     "rule": {
@@ -113,7 +113,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "9б",
     "type": "business",
     "label": "Компания коммунальных услуг",
-    "description": "Покупка увеличивает доход Дня CASHFLOW на $10 000.",
+    "description": "Покупка увеличивает доход Дня дохода на $10 000.",
     "cost": 200000,
     "income": 10000,
     "rule": {
@@ -152,8 +152,8 @@ export const fastTrackCells: FastTrackCell[] = [
     "index": 11,
     "code": "12о",
     "type": "positive",
-    "label": "День CASHFLOW",
-    "description": "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.",
+    "label": "День дохода",
+    "description": "При прохождении или остановке игрок получает текущий доход Дня дохода.",
     "cost": 0,
     "income": 0,
     "rule": {
@@ -253,7 +253,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "20б",
     "type": "business",
     "label": "Салоны красоты (3 кабинета)",
-    "description": "Три кабинета. Покупка увеличивает доход Дня CASHFLOW на $10 000.",
+    "description": "Три кабинета. Покупка увеличивает доход Дня дохода на $10 000.",
     "cost": 250000,
     "income": 10000,
     "rule": {
@@ -353,8 +353,8 @@ export const fastTrackCells: FastTrackCell[] = [
     "index": 27,
     "code": "28о",
     "type": "positive",
-    "label": "День CASHFLOW",
-    "description": "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.",
+    "label": "День дохода",
+    "description": "При прохождении или остановке игрок получает текущий доход Дня дохода.",
     "cost": 0,
     "income": 0,
     "rule": {
@@ -428,7 +428,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "34б",
     "type": "business",
     "label": "60-квартирный доходный дом",
-    "description": "После покупки денежный поток прибавляется к доходу Дня CASHFLOW.",
+    "description": "После покупки денежный поток прибавляется к доходу Дня дохода.",
     "cost": 300000,
     "income": 8000,
     "rule": {
@@ -453,7 +453,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "36б",
     "type": "business",
     "label": "Франшиза пиццерий (2 торговые точки)",
-    "description": "Две торговые точки. Покупка увеличивает доход Дня CASHFLOW на $7 000.",
+    "description": "Две торговые точки. Покупка увеличивает доход Дня дохода на $7 000.",
     "cost": 225000,
     "income": 7000,
     "rule": {
@@ -479,7 +479,7 @@ export const fastTrackCells: FastTrackCell[] = [
     "code": "38б",
     "type": "business",
     "label": "Склад на 200 мини-хранилищ",
-    "description": "После покупки денежный поток прибавляется к доходу Дня CASHFLOW.",
+    "description": "После покупки денежный поток прибавляется к доходу Дня дохода.",
     "cost": 200000,
     "income": 6000,
     "rule": {
@@ -554,8 +554,8 @@ export const fastTrackCells: FastTrackCell[] = [
     "index": 43,
     "code": "44о",
     "type": "positive",
-    "label": "День CASHFLOW",
-    "description": "При прохождении или остановке игрок получает текущий доход Дня CASHFLOW.",
+    "label": "День дохода",
+    "description": "При прохождении или остановке игрок получает текущий доход Дня дохода.",
     "cost": 0,
     "income": 0,
     "rule": {

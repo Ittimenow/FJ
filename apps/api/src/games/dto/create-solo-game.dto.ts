@@ -1,6 +1,7 @@
 import { TestGameOptionsDto } from "./fast-track.dto";
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { botLevels, type BotLevel } from "../bot-strategy";
 
 export class CreateSoloGameDto extends TestGameOptionsDto {
   @IsOptional()
@@ -18,4 +19,11 @@ export class CreateSoloGameDto extends TestGameOptionsDto {
   @Min(1)
   @Max(3)
   botCount!: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @IsIn(botLevels, { each: true })
+  botLevels?: BotLevel[];
 }

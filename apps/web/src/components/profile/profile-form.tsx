@@ -37,6 +37,20 @@ function toDateInputValue(iso: string | null): string {
   return iso.slice(0, 10);
 }
 
+function toReadableDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+}
+
+function parseReadableDate(value: string): string | null {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const iso = `${year}-${month}-${day}`;
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso && parsed <= new Date() ? iso : null;
+}
+
 interface ProfileFormProps {
   profile: ProfileResponse;
   token: string;
@@ -60,6 +74,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   const [displayName, setDisplayName] = useState(profile.user.displayName);
   const [gender, setGender] = useState(profile.user.gender ?? "");
   const [birthDate, setBirthDate] = useState(toDateInputValue(profile.user.birthDate));
+  const [birthDateText, setBirthDateText] = useState(toReadableDate(toDateInputValue(profile.user.birthDate)));
   const [gameExperience, setGameExperience] = useState(
     profile.user.gameExperience != null ? String(profile.user.gameExperience) : ""
   );
@@ -99,13 +114,14 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
   const displayNameValid = normalizedDisplayName.length > 0;
   const telegramError = validateTelegramChannel(normalizedTelegramChannel);
   const cityValid = city !== null;
+  const birthDateValid = birthDateText.trim() === "" || parseReadableDate(birthDateText) !== null;
   const gameExperienceValid =
     normalizedGameExperience === null ||
-    (Number.isInteger(normalizedGameExperience) &&
+    (/^\d{1,3}$/.test(gameExperience) && Number.isInteger(normalizedGameExperience) &&
       normalizedGameExperience >= 0 &&
       normalizedGameExperience <= 100);
   const profileFormValid =
-    displayNameValid && gameExperienceValid && telegramError === null && cityValid;
+    displayNameValid && gameExperienceValid && telegramError === null && cityValid && birthDateValid;
   const hasAvatarChanges =
     avatarPending !== undefined && avatarPending !== savedProfile.avatarUrl;
   const hasProfileChanges =
@@ -466,10 +482,10 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div className="space-y-2">
                   <span className="block text-sm font-extrabold text-ink">Оповещения</span>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card p-3 text-sm leading-5 text-ink">
-                    <input type="checkbox" checked={openGameNotifications} onChange={(event) => { setOpenGameNotifications(event.target.checked); markProfileChanged(true); }} className="mt-0.5 h-4 w-4 accent-journey" />
+                  <button type="button" role="switch" aria-checked={openGameNotifications} onClick={() => { setOpenGameNotifications((value) => !value); markProfileChanged(true); }} className="flex w-full items-start justify-between gap-3 rounded-xl bg-card p-3 text-left text-sm leading-5 text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
                     <span><strong className="block">Новые открытые игры</strong><span className="mt-1 block text-xs text-muted">Сообщать о новых партиях. Изменения игр, к которым вы присоединились, приходят отдельно.</span></span>
-                  </label>
+                    <span aria-hidden="true" className={`mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition-colors ${openGameNotifications ? "bg-journey" : "bg-line"}`}><span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${openGameNotifications ? "translate-x-5" : ""}`} /></span>
+                  </button>
                   <PushNotificationSettings token={token} userId={profile.user.id} />
                 </div>
                 <div className="space-y-2">
@@ -538,23 +554,15 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                   >
                     {telegramError ?? "Имя пользователя из 5–32 латинских букв, цифр или подчёркиваний."}
                   </p>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card p-3 text-sm leading-5 text-ink">
-                    <input
-                      type="checkbox"
-                      checked={telegramMentionConsent}
-                      onChange={(event) => {
-                        setTelegramMentionConsent(event.target.checked);
-                        markProfileChanged(true);
-                      }}
-                      className="mt-0.5 h-4 w-4 accent-journey"
-                    />
+                  <button type="button" role="switch" aria-checked={telegramMentionConsent} onClick={() => { setTelegramMentionConsent((value) => !value); markProfileChanged(true); }} className="flex w-full items-start justify-between gap-3 rounded-xl bg-card p-3 text-left text-sm leading-5 text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
                     <span>
                       <strong className="block">Разрешить публичное упоминание</strong>
                       <span className="mt-1 block text-xs text-muted">
                         В итогах завершённой игры появится ссылка на ваш Telegram. Без согласия будет показано только игровое имя.
                       </span>
                     </span>
-                  </label>
+                    <span aria-hidden="true" className={`mt-0.5 flex h-6 w-11 shrink-0 items-center rounded-full p-1 transition-colors ${telegramMentionConsent ? "bg-journey" : "bg-line"}`}><span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${telegramMentionConsent ? "translate-x-5" : ""}`} /></span>
+                  </button>
                 </div>
 
                 <CityCombobox
@@ -568,22 +576,14 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                 />
 
                 <div className="space-y-2">
-                  <label htmlFor="profile-gender" className="text-sm font-extrabold text-ink">
+                  <span className="block text-sm font-extrabold text-ink">
                     Пол <span className="font-normal text-muted">(необязательно)</span>
-                  </label>
-                  <select
-                    id="profile-gender"
-                    value={gender}
-                    onChange={(event) => {
-                      setGender(event.target.value);
-                      markProfileChanged(true);
-                    }}
-                    className="h-12 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
-                  >
-                    <option value="">Не указан</option>
-                    <option value="male">Мужской</option>
-                    <option value="female">Женский</option>
-                  </select>
+                  </span>
+                  <div role="group" aria-label="Пол" className="flex flex-wrap gap-1 rounded-xl bg-card p-1">
+                    {([{ value: "", label: "Не указан" }, { value: "male", label: "Мужской" }, { value: "female", label: "Женский" }] as const).map((option) => (
+                      <button key={option.label} type="button" aria-pressed={gender === option.value} onClick={() => { setGender(option.value); markProfileChanged(true); }} className={`min-h-11 flex-1 rounded-lg px-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${gender === option.value ? "bg-journey text-white shadow-sm" : "text-ink hover:bg-white"}`}>{option.label}</button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -593,13 +593,19 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <Input
                       id="profile-birth-date"
-                      type="date"
-                      value={birthDate}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="ДД.ММ.ГГГГ"
+                      value={birthDateText}
                       onChange={(event) => {
-                        setBirthDate(event.target.value);
-                        markProfileChanged(true);
+                        const value = event.target.value.slice(0, 10);
+                        setBirthDateText(value);
+                        const parsed = value.trim() === "" ? "" : parseReadableDate(value);
+                        if (parsed !== null) setBirthDate(parsed);
+                        markProfileChanged();
                       }}
-                      max={new Date().toISOString().slice(0, 10)}
+                      aria-invalid={!birthDateValid}
+                      aria-describedby={!birthDateValid ? "profile-birth-date-error" : undefined}
                       className="h-12 min-w-0"
                     />
                     {computedAge !== null ? (
@@ -608,6 +614,7 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                       </span>
                     ) : null}
                   </div>
+                  {!birthDateValid ? <p id="profile-birth-date-error" className="text-xs text-red-700">Введите дату в формате ДД.ММ.ГГГГ, не позднее сегодняшнего дня.</p> : null}
                 </div>
 
                 <div className="space-y-2 sm:col-span-2 sm:max-w-[calc(50%_-_0.625rem)]">
@@ -616,11 +623,9 @@ export function ProfileForm({ profile, token }: ProfileFormProps) {
                   </label>
                   <Input
                     id="profile-experience"
-                    type="number"
+                    type="text"
                     inputMode="numeric"
-                    min={0}
-                    max={100}
-                    step={1}
+                    maxLength={3}
                     value={gameExperience}
                     onChange={(event) => {
                       setGameExperience(event.target.value);

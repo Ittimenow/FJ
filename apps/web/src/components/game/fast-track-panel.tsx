@@ -41,7 +41,7 @@ export function FastTrackFinances({ player }: { player: GamePlayer }) {
     <h3 className="text-lg font-extrabold">{gamePlayerName(player)} · большой круг</h3>
     <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-3 text-sm">
       <div><dt>Наличные</dt><dd className="text-xl font-extrabold tabular-nums">{money(state?.cashCents ?? 0)}</dd></div>
-      <div><dt>Доход CASHFLOW</dt><dd className="text-xl font-extrabold tabular-nums">{money(income)}</dd></div>
+      <div><dt>Денежный поток</dt><dd className="text-xl font-extrabold tabular-nums">{money(income)}</dd></div>
       <div><dt>Прирост дохода</dt><dd className="text-xl font-extrabold tabular-nums">{income >= initial ? "+" : "−"}{money(Math.abs(income - initial))}</dd></div>
     </dl>
     <progress className="fast-track-progress mt-4 h-2 w-full" value={Math.max(0, income - initial)} max={50_000} aria-label="Прирост дохода к победе" />
@@ -74,8 +74,8 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
     {mine ? <div className={`turn-decision cell-${choiceCell?.type ?? "business"}`}>
       <span className="turn-decision-type">{choiceCell?.type === "dream" ? "Мечта" : choiceCell?.type === "business" ? "Бизнес" : choiceCell?.type === "expense" ? "Расход" : "Событие"}</span>
       <div className="turn-decision-heading"><strong>{choiceCell?.label}</strong><span>{money(mine.priceCents)}</span></div>
-      {resale ? <p className="turn-decision-note">Выкуп у игрока {gamePlayerName(owner)}. Деньги получит прежний владелец{choiceCell?.income ? ", доход CASHFLOW перейдёт вам" : ""}. При следующем выкупе цена снова удвоится.</p> : null}
-      {!resale && (choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo") ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К доходу CASHFLOW: +{money(choiceCell.income)}</p> : null}
+      {resale ? <p className="turn-decision-note">Выкуп у игрока {gamePlayerName(owner)}. Деньги получит прежний владелец{choiceCell?.income ? ", денежный поток перейдёт вам" : ""}. При следующем выкупе цена снова удвоится.</p> : null}
+      {!resale && (choiceCell?.rule.kind === "chance_business" || choiceCell?.rule.kind === "ipo") ? <p className="turn-decision-note">После оплаты бросается одна кость. Для успеха нужно {choiceCell.rule.minimum}–6. При неудаче вложение теряется. При успехе: {choiceCell.rule.kind === "ipo" ? `${money(choiceCell.rule.payout)} наличными` : `+${money(choiceCell.income)} к доходу`}.</p> : choiceCell?.income ? <p className="turn-decision-note">К денежному потоку: +{money(choiceCell.income)}</p> : null}
       <div className="turn-actions"><button type="button" className="turn-action" aria-label={`${resale ? "Выкупить" : "Оплатить"} ${money(mine.priceCents)}`} disabled={!isTurn || busy || (player?.financialState?.cashCents ?? 0) < mine.priceCents} onClick={() => onDecision(true, mine.decisionId)}>{resale ? "Выкупить" : "Купить"}</button><button type="button" className="turn-action" aria-label="Отказаться и завершить ход" disabled={!isTurn || busy} onClick={() => onDecision(false, mine.decisionId)}>Отказаться</button></div>
       {(player?.financialState?.cashCents ?? 0) < mine.priceCents ? <p className="turn-decision-note">Недостаточно наличных. На большом круге кредиты недоступны.</p> : null}
     </div> : null}

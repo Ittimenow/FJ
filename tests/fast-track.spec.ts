@@ -107,7 +107,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 900 }, 
     await page.goto(`${url}?mode=admin`);
     await page.getByRole('checkbox', { name: 'Начать сразу на большом круге' }).check();
     await expect(page.getByLabel('Наличные каждого игрока, $')).toHaveValue('500000');
-    await expect(page.getByLabel('Начальный доход CASHFLOW, $')).toHaveValue('100000');
+    await expect(page.getByLabel('Начальный денежный поток, $')).toHaveValue('100000');
     await page.screenshot({ path: join(output, `admin-${size.width}.png`), fullPage: true });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
@@ -618,7 +618,7 @@ for (const scenario of [{ width: 390, mode: 'mixed-history' }, { width: 1440, mo
     await expect(boris).toContainText('Борис');
     await expect(boris.getByRole('img', { name: 'Большой круг', exact: true })).toBeVisible();
     await expect(boris.locator('[data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
-    await expect(boris).toContainText(/CASHFLOW 139\s000/);
+    await expect(boris).toContainText(/Денежный поток 139\s000/);
     await expect(boris.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '39000');
     await expect(boris.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '50000');
     await expect(vera).toContainText('Вера');

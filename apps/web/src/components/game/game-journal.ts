@@ -170,7 +170,7 @@ export function eventHeadline(event: GameEvent) {
   const payload = event.payload;
   switch (event.type) {
     case "player:dream_chosen": return `Выбрана мечта «${payload.title ?? ""}»`;
-    case "fast_track:cashflow": return `Доход CASHFLOW: +${formatWholeMoney(payload.amountCents)}`;
+    case "fast_track:cashflow": return `Денежный поток: +${formatWholeMoney(payload.amountCents)}`;
     case "fast_track:expense": return `${payload.title}: −${formatWholeMoney(payload.amountCents)}`;
     case "fast_track:purchased": return payload.success === false ? `Инвестиция не принесла доход: ${payload.title}` : `${payload.previousOwnerId ? "Выкуплено" : "Оплачено"}: ${payload.title}`;
     case "fast_track:sold": return `Продано: ${payload.title}`;
