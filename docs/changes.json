@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "resume-bot-after-action-limit",
+          "category": "fix",
+          "summary": "Бот продолжает ход после серии автоматических действий, не оставляя партию в ожидании."
+        },
+        {
           "id": "reduce-production-image-and-allow-slow-vps-pulls",
           "category": "fix",
           "summary": "Обновление игры на сервере скачивает меньший образ и дольше ожидает его при медленном соединении."

@@ -231,7 +231,7 @@ export class GamesBotService implements OnModuleInit {
     } finally {
       this.metrics.record("bot run", performance.now() - runStartedAt, runOutcome);
       await this.releaseLease(gameId, leaseToken);
-      if (exhaustedStepBudget) this.kick(gameId);
+      if (exhaustedStepBudget) setTimeout(() => this.kick(gameId), 0);
     }
   }
 
