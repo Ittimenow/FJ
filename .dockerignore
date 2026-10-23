@@ -9,12 +9,14 @@
 .game-release-version
 node_modules
 apps/web/.next
+apps/web/.next-dev
 apps/api/dist
 packages/*/dist
 coverage
 build
 reports
 backups
+distr
 dist/*
 !dist/recognized_original_cards_ru.json
 !dist/seed_cards.sql

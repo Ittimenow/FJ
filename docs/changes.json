@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "reduce-production-image-and-allow-slow-vps-pulls",
+          "category": "fix",
+          "summary": "Обновление игры на сервере скачивает меньший образ и дольше ожидает его при медленном соединении."
+        },
+        {
           "id": "avoid-recursive-vps-ownership-change",
           "category": "fix",
           "summary": "Обновление игры на сервере больше не задерживается из-за смены владельца всех файлов и резервных копий."

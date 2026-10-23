@@ -41,6 +41,9 @@ RUN npm run build --workspace=@cashflow/shared
 RUN npm run build --workspace=@cashflow/database
 RUN npm run build --workspace=@cashflow/api
 RUN npm run build --workspace=@cashflow/web
+RUN npm prune --omit=dev \
+  && npm run db:generate \
+  && rm -rf apps/web/.next/cache node_modules/next/next-swc-fallback node_modules/@next/swc-*
 
 FROM node:22-bookworm-slim AS runner
 
