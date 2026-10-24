@@ -75,3 +75,29 @@ test("полностью видимая карточка читается без
   await page.screenshot({ path: join(output, "notifications-desktop.png") });
   console.log(`Notifications screenshots: ${output}`);
 });
+
+test("оповещение о добавлении игрока открывает лобби по нажатию на карточку", async ({ page }) => {
+  const added = { ...items[0], kind: "GAME_PLAYER_ADDED", game: { ...items[0].game, id: "invited-game", title: "Командная игра" } };
+  await page.route(`${origin}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (["/", "/index.html", "/app.js", "/style.css"].includes(url.pathname)) {
+      await route.fulfill({ path: join(output, url.pathname === "/" ? "index.html" : url.pathname.slice(1)) });
+    } else if (url.pathname === "/api/users/me/notifications/unread-count") {
+      await route.fulfill({ json: { unreadCount: 1 } });
+    } else if (url.pathname === "/api/users/me/notifications") {
+      await route.fulfill({ json: { items: [added], unreadCount: 1 } });
+    } else if (url.pathname === "/api/users/me") {
+      await route.fulfill({ json: { user: { timeZone: "Europe/Moscow" } } });
+    } else if (url.pathname.endsWith("/read")) {
+      await route.fulfill({ json: { ok: true } });
+    } else {
+      await route.fulfill({ status: 404 });
+    }
+  });
+  await page.goto(`${origin}/`);
+  await page.getByRole("button", { name: /Оповещения/ }).click();
+  const card = page.getByRole("link", { name: /Вас добавили в игру/ });
+  await expect(card).toHaveAttribute("href", "/games/invited-game");
+  await card.click();
+  await expect(page).toHaveURL(`${origin}/games/invited-game`);
+});

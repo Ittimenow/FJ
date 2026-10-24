@@ -30,4 +30,5 @@ test("11 ботов получают разные имена и фишки ря�
   assert.equal(new Set(players.map((player) => player.guestName)).size, 11);
   assert.equal(new Set(players.map((player) => player.figurine)).size, 11);
   assert.ok(players.every((player) => player.figurine !== "robot"));
+  assert.equal(new Set(players.map((player) => player.dreamCellIndex)).size, 11);
 });

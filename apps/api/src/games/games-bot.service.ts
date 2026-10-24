@@ -1,4 +1,4 @@
-import { fastTrackCells, canEscapeRatRace } from "@cashflow/shared";
+import { fastTrackCells, fastTrackPrice, readFastTrackWorld, canEscapeRatRace } from "@cashflow/shared";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
   AssetStatus,
@@ -22,12 +22,14 @@ import {
   botCashReserve,
   botLevel,
   botStockSaleQuantity,
+  chooseBotFastTrackDice,
   chooseBotDealType,
   chooseBotDoodadPayment,
   decideBotDeal,
   decideBotAuctionBid,
   minimumBotAuctionBid,
   shouldAcceptBotCharity,
+  shouldEnterBotFastTrack,
   shouldSellBotMarketAsset,
   type BotFinancialSnapshot
 } from "./bot-strategy";
@@ -93,7 +95,7 @@ type BotPlayer = Prisma.GamePlayerGetPayload<{
 type BotAction =
   | { type: "enter_fast_track"; playerId: string; reason: string }
   | { type: "fast_track_decision"; playerId: string; buy: boolean; decisionId: string; reason: string }
-  | { type: "roll"; playerId: string }
+  | { type: "roll"; playerId: string; diceCount?: number }
   | { type: "draw"; playerId: string; cardType: CardType; reason: string }
   | { type: "buy"; playerId: string; cardId: number; quantity: number; reason: string }
   | { type: "take_loan"; playerId: string; amountCents: number; reason: string }
@@ -360,14 +362,19 @@ export class GamesBotService implements OnModuleInit {
       return this.bankruptcyAction(current);
     }
 
-    if (current.track === "FAST_TRACK") return { type: "roll", playerId: current.id } satisfies BotAction;
-    if (game.rulesVersion === 2 && canEscapeRatRace(Number(current.financialState.passiveIncomeCents), Number(current.financialState.totalExpensesCents), current.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n))) {
+    const level = botLevel(current.botStrategy);
+    const state = this.financialSnapshot(current);
+    if (current.track === "FAST_TRACK") return {
+      type: "roll", playerId: current.id,
+      diceCount: chooseBotFastTrackDice(current.fastTrackPosition, current.dreamCellIndex, state.cashCents, current.financialState.fastTrackCharity, level)
+    } satisfies BotAction;
+    const dreamCell = fastTrackCells[current.dreamCellIndex ?? -1];
+    const dreamPrice = dreamCell ? fastTrackPrice(dreamCell, current.id, current.dreamCellIndex, readFastTrackWorld(game.fastTrackWorld)) : 0;
+    if (game.rulesVersion === 2 && canEscapeRatRace(Number(current.financialState.passiveIncomeCents), Number(current.financialState.totalExpensesCents), current.liabilities.some((debt) => debt.type === "bank_loan" && debt.balanceCents > 0n)) &&
+      shouldEnterBotFastTrack(state, dreamPrice, current.dreamCellIndex ?? -1, level)) {
       return { type: "enter_fast_track", playerId: current.id, reason: "пассивный доход покрывает расходы, банковские кредиты погашены — перехожу на большой круг" } satisfies BotAction;
     }
-
-    const state = this.financialSnapshot(current);
     const bankLoan = current.liabilities.find((liability) => liability.type === "bank_loan");
-    const level = botLevel(current.botStrategy);
     const repayable = Math.floor(
       Math.max(0, state.cashCents - botCashReserve(state, level)) / 1_000
     ) * 1_000;
@@ -388,7 +395,10 @@ export class GamesBotService implements OnModuleInit {
     if (pending.type === "fast_track_choice") {
       const cell = fastTrackCells[pending.cellIndex]!;
       const canAfford = Number(player.financialState?.cashCents ?? 0n) >= pending.priceCents;
-      const buy = canAfford && (cell.rule.kind !== "dream" || player.dreamCellIndex === cell.index);
+      const dream = fastTrackCells[player.dreamCellIndex ?? -1];
+      const protectsDream = botLevel(player.botStrategy) === "expert_v1" && cell.rule.kind === "charity" &&
+        dream && Number(player.financialState?.cashCents ?? 0n) - pending.priceCents < dream.cost;
+      const buy = canAfford && !protectsDream && (cell.rule.kind !== "dream" || player.dreamCellIndex === cell.index);
       return { type: "fast_track_decision", playerId: player.id, buy, decisionId: pending.decisionId,
         reason: buy ? "наличных достаточно: приближаюсь к своей мечте или увеличению дохода" : "сохраняю наличные для своей мечты и доходных бизнесов" } satisfies BotAction;
     }
@@ -425,7 +435,11 @@ export class GamesBotService implements OnModuleInit {
         title: card.title,
         isStock,
         unitCostCents,
-        cashflowCents
+        cashflowCents,
+        ...(isStock ? {
+          priceMinCents: this.metaAmount(meta.price_min),
+          priceMaxCents: this.metaAmount(meta.price_max)
+        } : {})
       }, botLevel(player.botStrategy));
       if (!decision.buy) {
         if (
@@ -476,7 +490,7 @@ export class GamesBotService implements OnModuleInit {
       } satisfies BotAction;
     }
     if (pending.type === "charity_choice") {
-      const decision = shouldAcceptBotCharity(state, pending.donationCents, botLevel(player.botStrategy));
+      const decision = shouldAcceptBotCharity(state, pending.donationCents, botLevel(player.botStrategy), player.position);
       return {
         type: decision.accepted ? "accept_charity" : "decline_charity",
         playerId: player.id,
@@ -616,7 +630,7 @@ export class GamesBotService implements OnModuleInit {
       case "enter_fast_track": return this.games.enterFastTrack(gameId, actorId);
       case "fast_track_decision": return this.games.decideFastTrack(gameId, actorId, { buy: action.buy, decisionId: action.decisionId });
       case "roll":
-        return this.games.rollDice(gameId, actorId);
+        return this.games.rollDice(gameId, actorId, action.diceCount ? { diceCount: action.diceCount } : {});
       case "draw":
         return this.games.drawCard(gameId, actorId, { cardType: action.cardType });
       case "buy":
@@ -682,7 +696,8 @@ export class GamesBotService implements OnModuleInit {
       totalIncomeCents: Number(state.totalIncomeCents),
       totalExpensesCents: Number(state.totalExpensesCents),
       monthlyCashflowCents: Number(state.monthlyCashflowCents),
-      passiveIncomeCents: Number(state.passiveIncomeCents)
+      passiveIncomeCents: Number(state.passiveIncomeCents),
+      bankLoanBalanceCents: (player.liabilities ?? []).filter((liability) => liability.type === "bank_loan").reduce((sum, liability) => sum + Number(liability.balanceCents), 0)
     };
   }
 

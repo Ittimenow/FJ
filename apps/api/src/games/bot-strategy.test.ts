@@ -5,6 +5,11 @@ import {
   botLevel,
   botDealReserve,
   botStockSaleQuantity,
+  chooseBotDream,
+  chooseBotFastTrackDice,
+  estimateBotEscapeCapital,
+  firstTurnDreamProbability,
+  shouldEnterBotFastTrack,
   chooseBotDoodadPayment,
   chooseBotDealType,
   decideBotAuctionBid,
@@ -179,7 +184,7 @@ test("balanced bot spends only a small amount on discounted stocks", () => {
     cashflowCents: 0
   });
   assert.equal(cheap.buy, true);
-  assert.equal(cheap.quantity, 100);
+  assert.equal(cheap.quantity, 180);
   assert.equal(decideBotDeal(stableState, {
     title: "Акции по $40",
     isStock: true,
@@ -217,6 +222,65 @@ test("объяснение продажи акций показывает пор
   assert.match(botStockSaleQuantity(offer, "beginner_v1").reason, /35%/);
   assert.match(botStockSaleQuantity(offer, "balanced_v1").reason, /20%/);
   assert.match(botStockSaleQuantity(offer, "expert_v1").reason, /12%/);
+});
+
+test("слабые боты получают случайную мечту, эксперт выбирает доступную на первом броске", () => {
+  assert.notEqual(chooseBotDream("beginner_v1", () => 0), chooseBotDream("beginner_v1", () => 1));
+  assert.notEqual(chooseBotDream("balanced_v1", () => 0), chooseBotDream("balanced_v1", () => 1));
+  assert.equal(firstTurnDreamProbability(6), 6 / 36);
+  assert.equal(chooseBotDream("expert_v1", () => 0), 6);
+  assert.notEqual(chooseBotDream("expert_v1", () => 0, new Set([6])), 6);
+});
+
+test("расчёт капитала требует доход строго выше расходов", () => {
+  assert.deepEqual(estimateBotEscapeCapital(1_000, 0, 8_000, 300), {
+    neededIncomeCents: 1_001, assetCount: 4, capitalCents: 32_000
+  });
+  assert.deepEqual(estimateBotEscapeCapital(1_000, 0, 8_000, 500), {
+    neededIncomeCents: 1_001, assetCount: 3, capitalCents: 24_000
+  });
+});
+
+test("эксперт откладывает выход при нехватке денег на мечту", () => {
+  const state = { ...stableState, cashCents: 0, passiveIncomeCents: 1_100 };
+  assert.equal(shouldEnterBotFastTrack(state, 125_000, 6, "expert_v1"), false);
+  assert.equal(shouldEnterBotFastTrack({ ...state, cashCents: 30_000 }, 125_000, 6, "expert_v1"), true);
+  assert.equal(shouldEnterBotFastTrack(state, 125_000, 6, "balanced_v1"), true);
+});
+
+test("эксперт берёт посильный кредит под доходный дом даже при дорогом платеже", () => {
+  const decision = decideBotDeal({
+    cashCents: 1_500, totalIncomeCents: 1_800, totalExpensesCents: 1_000,
+    monthlyCashflowCents: 800, passiveIncomeCents: 0
+  }, { title: "Дом", isStock: false, unitCostCents: 8_000, cashflowCents: 300 }, "expert_v1");
+  assert.equal(decision.buy, true);
+  assert.equal(decision.loanAmountCents, 8_000);
+});
+
+test("акции по доллару эксперт покупает без лимита в сто штук и может взять кредит", () => {
+  const state = { cashCents: 2_000, totalIncomeCents: 1_800, totalExpensesCents: 1_000,
+    monthlyCashflowCents: 800, passiveIncomeCents: 0 };
+  const offer = { title: "Акции", isStock: true, unitCostCents: 1, cashflowCents: 0,
+    priceMinCents: 1, priceMaxCents: 40 };
+  const financed = decideBotDeal(state, offer, "expert_v1");
+  assert.equal(financed.loanAmountCents, 4_000);
+  const purchased = decideBotDeal({ ...state, cashCents: 6_000, monthlyCashflowCents: 400,
+    bankLoanBalanceCents: 4_000 }, offer, "expert_v1");
+  assert.equal(purchased.loanAmountCents, 0);
+  assert.equal(purchased.quantity, 4_500);
+  assert.equal(decideBotDeal(state, { ...offer, unitCostCents: 40 }, "expert_v1").buy, false);
+});
+
+test("благотворительность позволяет эксперту выбрать выгодное число кубиков", () => {
+  assert.equal(chooseBotFastTrackDice(-1, 6, 150_000, true, "expert_v1"), 2);
+  assert.equal(chooseBotFastTrackDice(4, 6, 150_000, true, "expert_v1"), 1);
+  assert.equal(chooseBotFastTrackDice(4, 6, 150_000, false, "expert_v1"), 2);
+});
+
+test("эксперт раньше принимает благотворительность ради быстрых ходов", () => {
+  const state = { ...stableState, cashCents: 2_000, totalExpensesCents: 3_000, passiveIncomeCents: 0 };
+  assert.equal(shouldAcceptBotCharity(state, 500, "expert_v1", 3).accepted, true);
+  assert.equal(shouldAcceptBotCharity(state, 500, "expert_v1", 15).accepted, false);
 });
 
 test("balanced bot bids for a profitable opportunity without spending its reserve", () => {

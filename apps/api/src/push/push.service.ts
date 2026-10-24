@@ -40,6 +40,7 @@ export function allowedPushEndpoint(value: string): boolean {
 }
 
 function pushText(kind: string) {
+  if (kind === "GAME_PLAYER_ADDED") return { title: "Вас добавили в игру", body: "Откройте оповещение, чтобы перейти в лобби игры." };
   if (kind === "OPEN_GAME_CANCELLED") return { title: "Игра отменена", body: "Откройте оповещения, чтобы узнать подробности." };
   if (kind === "OPEN_GAME_RESCHEDULED") return { title: "Время игры изменено", body: "Откройте оповещения, чтобы узнать новое время." };
   return { title: "Новая открытая игра", body: "В разделе оповещений появилась новая партия." };

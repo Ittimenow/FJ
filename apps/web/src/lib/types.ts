@@ -115,7 +115,7 @@ export interface NotificationsResponse {
   unreadCount: number;
   items: Array<{
     id: string;
-    kind: "OPEN_GAME_PUBLISHED" | "OPEN_GAME_RESCHEDULED" | "OPEN_GAME_CANCELLED";
+    kind: "OPEN_GAME_PUBLISHED" | "OPEN_GAME_RESCHEDULED" | "OPEN_GAME_CANCELLED" | "GAME_PLAYER_ADDED";
     readAt: string | null;
     createdAt: string;
     game: {

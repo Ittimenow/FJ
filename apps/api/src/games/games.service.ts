@@ -1,4 +1,4 @@
-import { fastTrackCells, fastTrackDreams, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackOwner, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
+import { fastTrackCells, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackOwner, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
 import { TestGameOptionsDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import {
   BadRequestException,
@@ -40,6 +40,7 @@ import {
   figurines
 } from "@cashflow/shared";
 import { randomInt, randomUUID } from "node:crypto";
+import { chooseBotDream, type BotLevel } from "./bot-strategy";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { selectGameAwards } from "./game-awards.logic";
@@ -263,7 +264,7 @@ const playerColors = [
 const botActorPrefix = "bot:";
 const preferredBotFigurines = ["robot", "detective", "owl"];
 
-export function createBotPlayers(names: string[], occupiedFigurines = new Set<string>()) {
+export function createBotPlayers(names: string[], occupiedFigurines = new Set<string>(), levels: readonly BotLevel[] = [], occupiedDreams = new Set<number>()) {
   const availableFigurines = figurines
     .map((figurine) => figurine.id)
     .filter((figurine) => !occupiedFigurines.has(figurine));
@@ -277,8 +278,10 @@ export function createBotPlayers(names: string[], occupiedFigurines = new Set<st
       throw new BadRequestException("Не хватает свободных фигурок для ботов");
     }
     occupiedFigurines.add(figurine);
+    const dreamCellIndex = chooseBotDream(levels[index] ?? "balanced_v1", randomInt, occupiedDreams);
+    occupiedDreams.add(dreamCellIndex);
     return {
-      dreamCellIndex: fastTrackDreams[index % fastTrackDreams.length]!.index,
+      dreamCellIndex,
       guestName: name,
       role: GameRole.PLAYER,
       controller: PlayerController.BOT,
@@ -451,7 +454,7 @@ export class GamesService {
     if (user.figurine && isFigurineId(user.figurine)) {
       occupiedFigurines.add(user.figurine);
     }
-    const botPlayers = createBotPlayers(await this.drawBotNames(this.prisma, botCount), occupiedFigurines).map((player, index) => ({
+    const botPlayers = createBotPlayers(await this.drawBotNames(this.prisma, botCount), occupiedFigurines, dto.botLevels).map((player, index) => ({
       ...player,
       botStrategy: dto.botLevels?.[index] ?? player.botStrategy,
       seat: index + 2,
@@ -914,6 +917,13 @@ export class GamesService {
             isReady: dto.role !== GameRole.PLAYER, position: -1
           } });
 
+      await tx.userNotification.create({ data: {
+        userId: targetUser.id,
+        gameId,
+        kind: "GAME_PLAYER_ADDED",
+        dedupeKey: `added:${gameId}:${randomUUID()}`
+      } });
+
       await this.appendEvents(tx, gameId, actorUserId, [
         {
           type: "player:added",
@@ -1112,7 +1122,8 @@ export class GamesService {
       const occupiedFigurines = new Set(joined.map((player) => player.figurine).filter((value): value is string => Boolean(value)));
       const occupiedNames = new Set(joined.filter((player) => player.controller === PlayerController.BOT).map((player) => (player.guestName ?? "").toLocaleLowerCase("ru-RU")));
       const [name] = await this.drawBotNames(tx, 1, occupiedNames);
-      const [bot] = createBotPlayers([name!], occupiedFigurines);
+      const occupiedDreams = new Set(joined.map((player) => player.dreamCellIndex).filter((value): value is number => value !== null));
+      const [bot] = createBotPlayers([name!], occupiedFigurines, [level], occupiedDreams);
       if (!bot) throw new BadRequestException("Не удалось добавить бота");
       const seat = nextAvailableSeat(joined.map((player) => player.seat).filter((value): value is number => value !== null));
       const player = await tx.gamePlayer.create({ data: { ...bot, botStrategy: level, gameId, seat, color: playerColors[(seat - 1) % playerColors.length] ?? null } });
