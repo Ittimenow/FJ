@@ -192,7 +192,7 @@
 :where(.fast-track) .fast-track-tab-panel .player-goal { margin-top: 20px; }
 :where(.fast-track) .fast-track-tab-panel .player-goal .player-section-heading { margin: 0; }
 :where(.fast-track) .player-goal-summary { margin: 0; color: #405372; font-size: 14px; line-height: 1.5; }
-:where(.fast-track) .fast-track-timeline { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: auto; height: 88px; box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 8px calc(50% - 23px) 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: #fff9f199; list-style: none; }
+:where(.fast-track) .fast-track-timeline { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: auto; height: 88px; box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 8px calc(50% - 23px) 12px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-y; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 12px; background: #fff9f199; list-style: none; }
 :where(.fast-track) .fast-track-timeline::-webkit-scrollbar { display: none; }
 :where(.fast-track) .fast-track-timeline-cell { --timeline-color: #657597; min-width: 0; scroll-snap-align: center; text-align: center; }
 :where(.fast-track) .timeline-business { --timeline-color: #587424; }

@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "keep-mobile-game-scroll-position",
+          "category": "fix",
+          "summary": "На телефоне блок хода остаётся у нижнего края экрана, игровое поле не двигается от касания, а движение фишек не прокручивает страницу."
+        },
+        {
+          "id": "limit-stalled-production-deploy",
+          "category": "fix",
+          "summary": "Обновление игры на сервере быстрее сообщает об ошибке, если скачивание или запуск затянулись."
+        },
+        {
           "id": "resume-bot-after-action-limit",
           "category": "fix",
           "summary": "Бот продолжает ход после серии автоматических действий, не оставляя партию в ожидании."

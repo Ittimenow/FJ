@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { DiceFace } from "./dice-action";
 
@@ -42,8 +43,9 @@ export function MobileTurnDialog({
   if (!open || !mobileViewport) return null;
   const showDice = rolling || phase !== "ready";
 
-  return (
-    <div className="mobile-turn-bar pointer-events-none fixed inset-x-0 bottom-0 z-[80] pb-[max(.75rem,env(safe-area-inset-bottom))] pl-[max(.75rem,env(safe-area-inset-left))] pr-[max(.75rem,env(safe-area-inset-right))]">
+  return <>
+    <span className="mobile-turn-bar-anchor" aria-hidden="true" />
+    {createPortal(<div className="mobile-turn-bar pointer-events-none fixed inset-x-0 bottom-0 z-[80] pb-[max(.75rem,env(safe-area-inset-bottom))] pl-[max(.75rem,env(safe-area-inset-left))] pr-[max(.75rem,env(safe-area-inset-right))]">
       <div
         role="region"
         aria-label="Действия текущего хода"
@@ -82,6 +84,6 @@ export function MobileTurnDialog({
           ))}
         </div>}
       </div>
-    </div>
-  );
+    </div>, document.body)}
+  </>;
 }

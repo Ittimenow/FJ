@@ -105,6 +105,7 @@ jobs:
       - build
       - image
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     permissions:
       packages: read
@@ -122,7 +123,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: APP_IMAGE,DEPLOY_SHA,GHCR_TOKEN,GHCR_USERNAME
-          command_timeout: 45m
+          command_timeout: 15m
           script: |
             set -eu
 
@@ -165,7 +166,7 @@ jobs:
             registry_logged_in=1
 
             stage "Pull production image"
-            timeout 35m docker compose --env-file .env.vps -f docker-compose.vps.yml pull app
+            timeout 10m docker compose --env-file .env.vps -f docker-compose.vps.yml pull app
 
             stage "Start services and wait for health checks"
             timeout 4m docker compose --env-file .env.vps -f docker-compose.vps.yml \

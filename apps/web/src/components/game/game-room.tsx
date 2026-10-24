@@ -3130,12 +3130,13 @@ function MobileBoard({
   const followedPlayer = snapshot.players.find((player) => player.id === movingPlayerId) ?? selectedPlayer;
   const targetCellIndex = followedPlayer?.track === "RAT_RACE" && followedPlayer.position >= 0 ? followedPlayer.position : 0;
   useEffect(() => {
-    const target = scrollRef.current?.querySelector<HTMLElement>(
+    const container = scrollRef.current;
+    const target = container?.querySelector<HTMLElement>(
       `[data-board-cell="${targetCellIndex}"]`
     );
-    target?.scrollIntoView({
-      block: "nearest",
-      inline: "center",
+    if (!container || !target) return;
+    container.scrollTo({
+      left: target.offsetLeft - container.clientWidth / 2 + target.clientWidth / 2,
       behavior: "instant"
     });
   }, [snapshot.game.id, targetCellIndex]);
@@ -3145,7 +3146,7 @@ function MobileBoard({
       <div className="min-w-0 max-w-full overflow-hidden rounded-xl bg-card/60">
         <div
           ref={scrollRef}
-          className="grid h-[88px] w-full min-w-0 max-w-full touch-pan-x snap-x snap-mandatory grid-flow-col auto-cols-auto overflow-x-auto overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="relative grid h-[88px] w-full min-w-0 max-w-full touch-pan-y snap-x snap-mandatory grid-flow-col auto-cols-auto overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Малый круг"
         >
           {snapshot.board.map((cell) => {
