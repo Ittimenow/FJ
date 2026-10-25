@@ -155,6 +155,9 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
       snapshot = (await service.startGame(snapshot.game.id, admin!.id) as any).snapshot;
       const player = snapshot.players[0];
       assert.equal(player.track, "RAT_RACE");
+      for (const participant of snapshot.players) {
+        assert.equal(participant.financialState.cashCents, participant.financialState.monthlyCashflowCents);
+      }
       await db.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { passiveIncomeCents: 2001, totalExpensesCents: 2000, cashCents: 10_000 } });
       assert.equal(await (service as any).checkGameWon(db, player.id, []), false);
       const loan = await db.playerLiability.create({ data: { gamePlayerId: player.id, type: "bank_loan", name: "Кредит", balanceCents: 1000, paymentCents: 100 } });

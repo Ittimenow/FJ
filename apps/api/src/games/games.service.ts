@@ -3859,11 +3859,14 @@ export class GamesService {
     const totalExpenses = profession.totalExpensesCents ?? 0n;
     const baseExpenses =
       totalExpenses > liabilityPayments ? totalExpenses - liabilityPayments : 0n;
+    const monthlyCashflow = profession.monthlyCashflowCents ??
+      ((profession.totalIncomeCents ??
+        (profession.salaryCents ?? 0n) + (profession.passiveIncomeCents ?? 0n)) - totalExpenses);
 
     await tx.playerFinancialState.create({
       data: {
         gamePlayerId,
-        cashCents: profession.savingsCents ?? 0n,
+        cashCents: monthlyCashflow,
         salaryCents: profession.salaryCents ?? 0n,
         basePassiveIncomeCents: profession.passiveIncomeCents ?? 0n,
         passiveIncomeCents: profession.passiveIncomeCents ?? 0n,
@@ -3872,9 +3875,7 @@ export class GamesService {
           (profession.salaryCents ?? 0n) + (profession.passiveIncomeCents ?? 0n),
         baseExpensesCents: baseExpenses,
         totalExpensesCents: totalExpenses,
-        monthlyCashflowCents:
-          profession.monthlyCashflowCents ??
-          ((profession.totalIncomeCents ?? 0n) - totalExpenses),
+        monthlyCashflowCents: monthlyCashflow,
         perChildCostCents: profession.perChildCostCents ?? 0n
       }
     });

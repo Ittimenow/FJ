@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "start-with-profession-monthly-cashflow",
+          "category": "fix",
+          "summary": "В начале партии каждый игрок получает наличными сумму своего месячного денежного потока."
+        },
+        {
+          "id": "preview-illustrated-game-board",
+          "category": "feature",
+          "summary": "На отдельной странице можно оценить компактное поле для телефона, посмотреть ближайшие клетки и узнать число шагов до выбранной цели."
+        },
+        {
           "id": "notify-player-added-by-host",
           "category": "feature",
           "summary": "Игрок получает оповещение, когда ведущий добавляет его в партию, и может перейти из него в лобби игры."
