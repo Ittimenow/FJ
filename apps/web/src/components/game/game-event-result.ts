@@ -141,9 +141,14 @@ export function compactPlayerActionDetails(event: GameEvent): string[] | null {
     case "card:stock_quantity_changed": {
       const before = optionalPayloadNumber(payload, "beforeQuantity");
       const after = optionalPayloadNumber(payload, "afterQuantity");
-      return before === null || after === null
-        ? []
-        : [`Акции: ${before} → ${after}`];
+      const symbol = typeof payload.symbol === "string" ? payload.symbol.trim() : "";
+      const assetName = typeof payload.assetName === "string" ? payload.assetName.trim() : "";
+      return compactDetails([
+        assetName ? `Пакет: ${assetName}` : null,
+        before === null || after === null
+          ? null
+          : `Акции${symbol ? ` ${symbol}` : ""}: ${before} → ${after}`
+      ]);
     }
     default:
       return null;

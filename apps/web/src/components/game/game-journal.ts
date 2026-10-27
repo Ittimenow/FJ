@@ -197,7 +197,9 @@ export function eventHeadline(event: GameEvent) {
     case "card:no_matching_assets":
       return "Подходящих активов нет";
     case "card:stock_quantity_changed":
-      return "Изменилось количество акций";
+      return typeof payload.symbol === "string" && payload.symbol.trim()
+        ? `Изменилось количество акций ${payload.symbol.trim()}`
+        : "Изменилось количество акций";
     case "deal:choice_required":
       return "Выбирает размер сделки";
     case "deal:buy":

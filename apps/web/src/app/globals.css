@@ -96,21 +96,6 @@ body.game-room-viewport-locked {
   scrollbar-gutter: stable;
 }
 
-.game-end-overlay {
-  top: var(--app-shell-header-bottom);
-  display: grid;
-  overflow: hidden;
-  padding-top: clamp(0.5rem, 1.5vh, 1rem);
-  padding-right: max(0.75rem, env(safe-area-inset-right));
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  padding-left: max(0.75rem, env(safe-area-inset-left));
-  place-items: center;
-}
-
-.game-end-dialog {
-  max-height: 100%;
-}
-
 .bank-dialog-overlay {
   top: var(--app-shell-header-bottom);
   display: grid;

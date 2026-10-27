@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  eventHeadline,
   gamePlayerForEvent,
   gameTurns,
   groupTurnEventsByPlayer,
@@ -22,6 +23,13 @@ function event(sequence: number, type: string, playerId?: string, payload = {}):
     gamePlayer: playerId ? { id: playerId, seat: 1, role: "PLAYER" } : null
   };
 }
+
+test("заголовок изменения акций называет компанию из сохранённого события", () => {
+  assert.equal(
+    eventHeadline(event(1, "card:stock_quantity_changed", "p1", { symbol: "OK4U" })),
+    "Изменилось количество акций OK4U"
+  );
+});
 
 test("groups completed turns per player", () => {
   const events = [

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { GameRoom } from "@/components/game/game-room";
@@ -20,7 +21,7 @@ export default async function GamePage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ preview?: string }>;
+  searchParams: Promise<{ preview?: string; view?: string }>;
 }) {
   const session = await auth();
   if (!session?.accessToken) redirect("/login");
@@ -73,7 +74,10 @@ export default async function GamePage({
   const membership = snapshot.players.find(
     (player) => player.userId === session.user.id
   );
-  const { preview } = await searchParams;
+  const { preview, view } = await searchParams;
+  if (snapshot.game.status === "ENDED" && view !== "game") {
+    redirect(`/games/${id}/results` as Route);
+  }
   const gameRoomView = gameRoomViewForRole(profile?.user.role, preview);
 
   return (
@@ -85,6 +89,13 @@ export default async function GamePage({
       userAvatarColor={userAvatarColor}
       userInitials={userInitials}
     >
+      {snapshot.game.status === "ENDED" ? (
+        <div className="mx-auto mb-3 w-full max-w-7xl px-3 pt-3 sm:px-6">
+          <Link href={`/games/${id}/results` as Route} className="inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-extrabold text-journey shadow-panel focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+            Вернуться к результатам
+          </Link>
+        </div>
+      ) : null}
       <GameRoom
         initialSnapshot={snapshot}
         token={session.accessToken}
@@ -92,6 +103,7 @@ export default async function GamePage({
         currentUserRole={session.user.role}
         gameRoomView={gameRoomView}
         timeZone={profile?.user.timeZone ?? null}
+        stayOnEndedGame={view === "game"}
       />
     </AppShell>
   );

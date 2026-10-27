@@ -265,6 +265,23 @@ export interface GameSnapshot {
   awards: GameAward[];
 }
 
+export interface GameResultsResponse {
+  game: GameSnapshot["game"];
+  players: GamePlayer[];
+  awards: GameAward[];
+  winnerId: string | null;
+  reason: string | null;
+  playerResults: Array<{
+    playerId: string;
+    totalTurns: number;
+    smallCircleTurns: number;
+    bigCircleTurns: number;
+    childrenBorn: number;
+    dismissals: number;
+    entry: { financialState: FinancialState; assets: PlayerAsset[] } | null;
+  }>;
+}
+
 export interface GameAward {
   kind: string;
   title: string;

@@ -44,6 +44,7 @@ import { chooseBotDream, type BotLevel } from "./bot-strategy";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
 import { selectGameAwards } from "./game-awards.logic";
+import { playerResultCounts } from "./game-results.logic";
 import { chooseBotName } from "./bot-names";
 import { assetRealEstate, cardRealEstate, realEstateAssetName } from "./real-estate";
 import { gameChatNotices, gameChatNoticeTypes } from "./game-chat-notices";
@@ -788,6 +789,56 @@ export class GamesService {
     await this.ensureGameAccess(gameId, userId);
     await this.syncGameTimelineIfNeeded(gameId);
     return this.snapshot(gameId);
+  }
+
+  async getGameResults(gameId: string, userId: string) {
+    await this.ensureGameAccess(gameId, userId);
+    await this.syncGameTimelineIfNeeded(gameId);
+    const snapshot = await this.snapshot(gameId);
+    if (snapshot.game.status !== GameStatus.ENDED) {
+      throw new BadRequestException("Итоги появятся после завершения партии");
+    }
+    const events = await this.prisma.gameEvent.findMany({
+      where: { gameId },
+      select: { sequence: true, type: true, gamePlayerId: true, payload: true },
+      orderBy: { sequence: "asc" }
+    });
+    const escapes = events.filter((event) => event.type === "player:escaped_rat_race" && event.gamePlayerId);
+    const entries = await Promise.all(escapes.map(async (event) => {
+      const update = await this.prisma.gameEvent.findFirst({
+        where: { gameId, sequence: { gt: event.sequence }, type: realtimeEvents.stateUpdate, stateSnapshot: { not: Prisma.DbNull } },
+        select: { stateSnapshot: true },
+        orderBy: { sequence: "asc" }
+      });
+      const saved = update?.stateSnapshot as { players?: Array<{ id: string; financialState?: unknown; assets?: unknown[] }> } | null;
+      const player = saved?.players?.find((item) => item.id === event.gamePlayerId);
+      return [event.gamePlayerId!, player?.financialState
+        ? { financialState: player.financialState, assets: Array.isArray(player.assets) ? player.assets : [] }
+        : null] as const;
+    }));
+    const entryByPlayer = new Map(entries);
+    const playerResults = snapshot.players.filter((player) => player.role === GameRole.PLAYER).map((player) => ({
+      playerId: player.id,
+      ...playerResultCounts(events, player.id),
+      entry: entryByPlayer.get(player.id) ?? null
+    }));
+    const endEvent = [...events].reverse().find((event) => event.type === realtimeEvents.gameEnded);
+    const endPayload = endEvent?.payload && typeof endEvent.payload === "object" && !Array.isArray(endEvent.payload)
+      ? endEvent.payload as Record<string, unknown> : {};
+    return {
+      game: snapshot.game,
+      players: snapshot.players,
+      awards: snapshot.awards,
+      playerResults,
+      winnerId: typeof endPayload.winnerGamePlayerId === "string"
+        ? endPayload.winnerGamePlayerId
+        : snapshot.players.find((player) => player.financialState?.wonAt)?.id
+          ?? (endPayload.reason === "bots_eliminated"
+            ? snapshot.players.find((player) => player.role === GameRole.PLAYER && player.controller === PlayerController.HUMAN && player.status === GamePlayerStatus.JOINED)?.id
+            : null)
+          ?? null,
+      reason: typeof endPayload.reason === "string" ? endPayload.reason : null
+    };
   }
 
   async joinGame(userId: string, dto: JoinGameDto) {
@@ -4982,6 +5033,7 @@ export class GamesService {
       },
       select: {
         id: true,
+        name: true,
         gamePlayerId: true,
         quantity: true,
         units: true
@@ -5046,6 +5098,7 @@ export class GamesService {
         payload: {
           title,
           symbol: normalizedSymbol,
+          assetName: asset.name,
           effectType: actionType,
           beforeQuantity,
           afterQuantity

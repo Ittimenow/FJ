@@ -95,7 +95,7 @@ test("показывает стоимость единичного актива 
   );
 });
 
-test("показывает только итоговое количество акций", () => {
+test("показывает тикер в старой записи об изменении акций", () => {
   assert.deepEqual(
     compactPlayerActionDetails(
       gameEvent("card:stock_quantity_changed", {
@@ -106,7 +106,21 @@ test("показывает только итоговое количество а
         afterQuantity: 125
       })
     ),
-    ["Акции: 250 → 125"]
+    ["Акции OK4U: 250 → 125"]
+  );
+});
+
+test("показывает название пакета в новой записи об изменении акций", () => {
+  assert.deepEqual(
+    compactPlayerActionDetails(
+      gameEvent("card:stock_quantity_changed", {
+        symbol: "OK4U",
+        assetName: "Акции OK4U: $10",
+        beforeQuantity: 300,
+        afterQuantity: 150
+      })
+    ),
+    ["Пакет: Акции OK4U: $10", "Акции OK4U: 300 → 150"]
   );
 });
 

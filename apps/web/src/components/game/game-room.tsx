@@ -50,14 +50,13 @@ import {
   Plus,
   ReceiptText,
   ShieldCheck,
-  Trophy,
   UserRound,
   UserX,
   UsersRound,
   X
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import {
   CSSProperties,
   FormEvent,
@@ -76,7 +75,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FigurinePicker } from "@/components/figurine-picker";
-import { AwardCards } from "@/components/results/award-cards";
 import {
   DealAuctionDialog,
   type DealAuctionPlayerRow
@@ -95,11 +93,7 @@ import {
   eventReasonLabel,
   type CashChange
 } from "@/components/game/game-event-result";
-import {
-  gameEndPresentation,
-  type GameEndIcon,
-  type GameEndTone
-} from "@/components/game/game-end-result";
+import { gameEndPresentation } from "@/components/game/game-end-result";
 import {
   canAffordPurchaseCents,
   changeStockCostCents,
@@ -132,7 +126,6 @@ import { gameStatusLabel, localizeGameText } from "@/lib/game-labels";
 import { cn } from "@/lib/utils";
 import type {
   FinancialState,
-  GameAward,
   GameEvent,
   GamePlayer,
   GameSnapshot,
@@ -181,7 +174,8 @@ export function GameRoom({
   currentUserId,
   currentUserRole,
   gameRoomView,
-  timeZone
+  timeZone,
+  stayOnEndedGame = false
 }: {
   initialSnapshot: GameSnapshot;
   token: string;
@@ -189,6 +183,7 @@ export function GameRoom({
   currentUserRole: "USER" | "HOST" | "ADMIN";
   gameRoomView: GameRoomView;
   timeZone: string | null;
+  stayOnEndedGame?: boolean;
 }) {
   const router = useRouter();
   const [trackView, setTrackView] = useState<"RAT_RACE" | "FAST_TRACK" | null>(null);
@@ -232,14 +227,12 @@ export function GameRoom({
   );
   const [figurineSaving, setFigurineSaving] = useState(false);
   const [lobbyBusy, setLobbyBusy] = useState(false);
-  const [gameEndOpen, setGameEndOpen] = useState(initialSnapshot.game.status === "ENDED");
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mobileBoardRef = useRef<HTMLDivElement>(null);
   const expirationRefreshRef = useRef(false);
   const lastDiagnosticReportRef = useRef(0);
-  const previousGameStatusRef = useRef(initialSnapshot.game.status);
   const decisionSubmissionRef = useRef(false);
 
   const setGameRoomHeader = useSetGameRoomHeader();
@@ -412,7 +405,6 @@ export function GameRoom({
     (player) => player.id === snapshot.game.currentPlayerId
   );
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER" && player.status === "JOINED");
-  const winner = gamePlayers.find((player) => Boolean(player.financialState?.wonAt));
   const me = gamePlayers.find((player) => player.userId === currentUserId);
   useEffect(() => {
     if (initialSnapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED") && !snapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED")) {
@@ -476,9 +468,6 @@ export function GameRoom({
         : snapshot.game.rulesVersion === 2 && gamePlayers.some((player) => player.status === "JOINED" && !isDreamCell(player.dreamCellIndex))
           ? "Все игроки должны выбрать мечту большого круга."
           : null;
-  const gameEndEvent = [...snapshot.events]
-    .reverse()
-    .find((event) => event.type === realtimeEvents.gameEnded);
   const selectedPlayer = me ?? gamePlayers[0];
   const canRoll =
     snapshot.game.status === "IN_PROGRESS" &&
@@ -720,14 +709,10 @@ export function GameRoom({
   }, [currentStockSaleResetKey]);
 
   useEffect(() => {
-    if (
-      snapshot.game.status === "ENDED" &&
-      previousGameStatusRef.current !== "ENDED"
-    ) {
-      setGameEndOpen(true);
+    if (snapshot.game.status === "ENDED" && !stayOnEndedGame) {
+      router.replace(`/games/${snapshot.game.id}/results` as Route);
     }
-    previousGameStatusRef.current = snapshot.game.status;
-  }, [snapshot.game.status]);
+  }, [router, snapshot.game.id, snapshot.game.status, stayOnEndedGame]);
 
   useEffect(() => {
     if (canRoll && !pendingAction && !rollingDice) {
@@ -1399,14 +1384,6 @@ export function GameRoom({
         rollLabel={canEnterFastTrack ? "Бросить кубики" : undefined}
         onRoll={() => { void rollDice(); }}
       />
-      <GameEndPopup
-        open={gameEndOpen && snapshot.game.status === "ENDED"}
-        winner={winner}
-        player={me}
-        awards={snapshot.awards ?? []}
-        reason={typeof gameEndEvent?.payload.reason === "string" ? gameEndEvent.payload.reason : null}
-        onClose={() => setGameEndOpen(false)}
-      />
       <FigurineDialog
         open={figurinePickerOpen && snapshot.game.status === "WAITING" && Boolean(me)}
         value={figurineChoice}
@@ -1840,260 +1817,6 @@ function BankruptcyPanel({
   );
 }
 
-
-function GameEndPopup({
-  open,
-  winner,
-  player,
-  awards,
-  reason,
-  onClose
-}: {
-  open: boolean;
-  winner: GamePlayer | undefined;
-  player: GamePlayer | undefined;
-  awards: GameAward[];
-  reason: string | null;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-
-  const winnerState = winner?.financialState;
-  const playerState = player?.financialState;
-  const featuredPlayer = winner ?? player;
-  const featuredState = featuredPlayer?.financialState;
-  const playerIsWinner = Boolean(winner && player && winner.id === player.id);
-  const presentation = gameEndPresentation({
-    reason,
-    winnerName: winner ? gamePlayerName(winner) : null
-  });
-  const EndIcon = presentation.icon ? gameEndIcons[presentation.icon] : null;
-
-  return (
-    <div className="game-end-overlay fixed inset-0 z-[70] bg-black/55">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="game-end-title"
-        aria-describedby={presentation.description ? "game-end-description" : undefined}
-        className="game-end-dialog flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[#fff9f1] shadow-[0_34px_90px_rgba(5,18,45,.35)]"
-      >
-        <div className="app-shell-overlay-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
-          <div className={cn("text-center", !EndIcon && "pt-2")}>
-            {EndIcon ? (
-              <span
-                className={`mx-auto grid h-12 w-12 place-items-center rounded-2xl shadow-[0_8px_22px_rgba(27,57,118,.14)] ${gameEndToneClasses[presentation.tone]}`}
-              >
-                <EndIcon size={25} aria-hidden="true" />
-              </span>
-            ) : null}
-            <h2
-              id="game-end-title"
-              aria-label={presentation.tone === "victory" ? presentation.title : undefined}
-              className={cn(
-                "font-extrabold tracking-[-0.025em] text-ink",
-                EndIcon ? "mt-3 text-2xl sm:text-3xl" : "text-3xl sm:text-4xl"
-              )}
-            >
-              {presentation.tone === "victory" ? (
-                <ArchedVictoryTitle />
-              ) : (
-                presentation.title
-              )}
-            </h2>
-            {presentation.description ? (
-              <p id="game-end-description" className="mx-auto mt-2 max-w-lg text-sm text-[#657597]">
-                {presentation.description}
-              </p>
-            ) : null}
-          </div>
-
-          {featuredPlayer ? (
-            <div className="mt-5 flex flex-col items-center text-center">
-              <PlayerIdentityMark player={featuredPlayer} size="lg" />
-              <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.025em] text-ink sm:text-3xl">
-                {gamePlayerName(featuredPlayer)}
-              </h3>
-              <p className="mt-1 text-base font-semibold text-[#657597]">
-                {featuredPlayer.profession?.name ?? "Профессия не выдана"}
-              </p>
-            </div>
-          ) : null}
-
-          {featuredState ? (
-            <section className="mt-6" aria-labelledby="featured-financial-result">
-              <h3 id="featured-financial-result" className="text-lg font-extrabold text-ink">
-                {winner ? "Финансовый итог победителя" : "Ваш финансовый итог"}
-              </h3>
-              <GameEndFinancialMetrics state={featuredState} />
-              <GameEndAssets assets={featuredPlayer?.assets ?? []} />
-            </section>
-          ) : null}
-
-          {playerState && winnerState && !playerIsWinner ? (
-            <section className="mt-6 rounded-xl bg-white p-4 shadow-[0_14px_36px_rgba(27,57,118,.09)]">
-              <h3 className="font-extrabold text-ink">Ваш результат</h3>
-              <ResultFinancialComparison state={playerState} showCash />
-            </section>
-          ) : null}
-
-          {awards.length ? <GameEndAwards awards={awards} /> : null}
-        </div>
-
-        <div className="shrink-0 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(27,57,118,.10)] sm:px-6 sm:pb-5 sm:pt-4">
-          <Button className="min-h-[52px] w-full" onClick={onClose}>
-            {playerState ? "Посмотреть свои результаты" : "Закрыть"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GameEndAwards({ awards }: { awards: GameAward[] }) {
-  return (
-    <section className="mt-7" aria-labelledby="game-end-awards-title">
-      <div className="mb-4 flex items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#f5aa24] text-[#17243f] shadow-[0_8px_20px_rgba(155,99,11,.18)]">
-          <Trophy size={20} aria-hidden="true" />
-        </span>
-        <div>
-          <h3 id="game-end-awards-title" className="text-lg font-extrabold text-ink">Награды партии</h3>
-          <p className="mt-0.5 text-xs font-semibold text-[#715719]">Только результаты с тремя и более действиями</p>
-        </div>
-      </div>
-      <AwardCards awards={awards} layout="dialog" />
-    </section>
-  );
-}
-
-function ArchedVictoryTitle() {
-  const letters = ["П", "о", "б", "е", "д", "а", "!"];
-  const arc = [
-    { y: 5, rotate: -7 },
-    { y: 1, rotate: -4 },
-    { y: -2, rotate: -2 },
-    { y: -3, rotate: 0 },
-    { y: -2, rotate: 2 },
-    { y: 1, rotate: 4 },
-    { y: 5, rotate: 7 }
-  ];
-
-  return (
-    <span className="inline-flex min-h-12 items-start justify-center leading-none" aria-hidden="true">
-      {letters.map((letter, index) => (
-        <span
-          key={`${letter}-${index}`}
-          className="inline-block origin-bottom"
-          style={{ transform: `translateY(${arc[index]?.y ?? 0}px) rotate(${arc[index]?.rotate ?? 0}deg)` }}
-        >
-          {letter}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-const gameEndIcons: Record<GameEndIcon, LucideIcon> = {
-  "shield-check": ShieldCheck,
-  hourglass: Hourglass,
-  "user-x": UserX,
-  "circle-off": CircleOff,
-  "circle-alert": CircleAlert
-};
-
-const gameEndToneClasses: Record<GameEndTone, string> = {
-  victory: "bg-[#fff0df] text-[#c0560c]",
-  survival: "bg-[#edf6e9] text-[#3f5b35]",
-  timeout: "bg-[#eaf0fd] text-[#1b3976]",
-  danger: "bg-[#fff0eb] text-[#9d3c22]",
-  neutral: "bg-[#eef1f6] text-[#52617e]"
-};
-
-function GameEndFinancialMetrics({ state }: { state: FinancialState }) {
-  const onFastTrack = (state.fastTrackStartIncomeCents ?? 0) > 0;
-  const metrics = [
-    {
-      label: onFastTrack ? "Денежный поток" : "Пассивный доход",
-      value: onFastTrack ? money(state.fastTrackIncomeCents) : `${money(state.passiveIncomeCents)}/мес`,
-      className: "bg-[#edf6e9] text-[#3f5b35]"
-    },
-    {
-      label: onFastTrack ? "Начальный доход" : "Расходы",
-      value: onFastTrack ? money(state.fastTrackStartIncomeCents) : `${money(state.totalExpensesCents)}/мес`,
-      className: "bg-[#fff0eb] text-[#9d3c22]"
-    },
-    {
-      label: "Осталось наличных",
-      value: money(state.cashCents),
-      className: "bg-[#eaf0fd] text-[#1b3976]"
-    },
-    {
-      label: onFastTrack ? "Прирост дохода" : "Денежный поток",
-      value: onFastTrack ? money((state.fastTrackIncomeCents ?? 0) - (state.fastTrackStartIncomeCents ?? 0)) : `${money(state.monthlyCashflowCents)}/мес`,
-      className:
-        state.monthlyCashflowCents >= 0
-          ? "bg-[#e8f5ef] text-[#216547]"
-          : "bg-[#fff0eb] text-[#9d3c22]"
-    }
-  ];
-
-  return (
-    <dl className="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
-      {metrics.map((metric) => (
-        <div key={metric.label} className={`min-w-0 rounded-xl p-3 sm:p-4 ${metric.className}`}>
-          <dt className="text-xs font-bold leading-4 opacity-80">{metric.label}</dt>
-          <dd className="mt-1 break-words text-base font-extrabold leading-5 sm:text-lg">
-            {metric.value}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function GameEndAssets({ assets }: { assets: GamePlayer["assets"] }) {
-  return (
-    <div className="mt-5">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="font-extrabold text-ink">Активы</h3>
-        <span className="text-sm font-bold text-[#657597]">
-          {assets.length === 0 ? "Нет активов" : `${assets.length} шт.`}
-        </span>
-      </div>
-
-      {assets.length === 0 ? (
-        <p className="mt-2 rounded-xl bg-white px-4 py-3 text-sm text-[#657597]">
-          К завершению партии активов не осталось.
-        </p>
-      ) : (
-        <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-          {assets.map((asset) => (
-            <li
-              key={asset.id}
-              className="flex min-w-0 items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-[0_8px_22px_rgba(27,57,118,.07)]"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#eef3e8] text-[#3f5b35]">
-                <BriefcaseBusiness size={17} aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-extrabold text-ink" title={asset.name}>
-                  {asset.name}
-                </span>
-                <span className="mt-0.5 block text-xs font-semibold text-[#657597]">
-                  {asset.quantity > 1 ? `${asset.quantity} шт. · ` : ""}
-                  {asset.cashflowCents === 0
-                    ? "без денежного потока"
-                    : `${money(asset.cashflowCents)}/мес`}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 function gameEndReasonText(reason: string | null) {
   return gameEndPresentation({ reason }).description;
@@ -5825,6 +5548,7 @@ function eventDetails(event: GameEvent) {
       return compactDetails([
         textDetail("Карточка", payload.title),
         textDetail("Тикер", payload.symbol),
+        textDetail("Пакет", payload.assetName),
         textDetail("Эффект", stockEffectLabel(String(payload.effectType ?? ""))),
         numericDetail("Было акций", payload.beforeQuantity),
         numericDetail("Стало акций", payload.afterQuantity)

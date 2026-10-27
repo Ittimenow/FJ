@@ -87,6 +87,11 @@ export class GamesController {
     return this.games.getGame(id, user.userId);
   }
 
+  @Get(":id/results")
+  results(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.games.getGameResults(id, user.userId);
+  }
+
   @Patch(":id/schedule")
   async updateSchedule(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: UpdateGameScheduleDto) {
     const snapshot = await this.games.updateGameSchedule(id, user.userId, dto.scheduledLocal);
