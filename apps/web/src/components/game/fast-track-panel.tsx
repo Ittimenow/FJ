@@ -66,6 +66,8 @@ export function FastTrackPanel({ snapshot, player, onRoll, onSkip, rolling, phas
   const resale = Boolean(ownerId && choiceCell?.rule.kind !== "ipo");
   const statusLabel = snapshot.game.status === "ENDED" ? "Партия завершена" : snapshot.game.status === "PAUSED" ? "Партия на паузе" : isTurn ? "Ваш ход" : `Ходит: ${gamePlayerName(snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId))}`;
   const diceAction = <DiceAction canRoll={Boolean(isTurn && !pending)} rolling={rolling} phase={phase} disabled={busy}
+      currentPlayer={snapshot.players.find((item) => item.id === snapshot.game.currentPlayerId)}
+      isMine={isTurn}
       statusLabel={statusLabel} idleLabel={isTurn && pending ? "Выберите действие" : undefined}
       diceValues={diceValues} diceCount={diceCount} onRoll={onRoll} onSkip={onSkip} pinnedToPanel replaceButtonWithDice />;
   const canChooseDice = isTurn && !pending && player?.financialState?.fastTrackCharity;

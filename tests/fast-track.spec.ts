@@ -857,7 +857,7 @@ for (const track of ['small', 'large']) {
       const history = page.locator('.game-action-history:visible');
       await expect(history.locator('.game-action-entry')).toHaveCount(1);
       await expect(history.locator('[data-action-id]')).toHaveCount(2);
-      await expect(history.getByRole('button', { name: 'Только свои', exact: true })).toBeVisible();
+      await expect(history.getByRole('switch', { name: 'Важное' })).toHaveText('Все ходы');
       await page.screenshot({ path: join(output, `restored-${track}-${width}.png`), fullPage: true });
       if (width < 1024) {
         const box = await controls.boundingBox();
@@ -909,7 +909,7 @@ test('live turn groups and history filters update for both players before the tu
     await expect(history(view).locator('.game-turn-other-action')).toHaveCount(2);
     await expect(history(view).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
     await expect(history(view).locator('.game-turn-other-action [data-turn-identity="boris"]')).toBeVisible();
-    await history(view).getByRole('button', { name: 'Только свои', exact: true }).click();
+    await history(view).getByRole('switch', { name: 'Важное' }).click();
     await expect(history(view).locator('.game-action-entry')).toHaveCount(1);
   }
   await expect(history(page).locator('.game-action-entry')).toContainText('Анна');
@@ -918,13 +918,55 @@ test('live turn groups and history filters update for both players before the tu
   await update(5, 'loan:repay');
   await expect(history(page).locator('[data-action-id]')).toHaveCount(3);
   await expect(history(other).locator('[data-action-id]')).toHaveCount(2);
-  await history(other).getByRole('button', { name: 'Все игроки', exact: true }).click();
+  await history(other).getByRole('switch', { name: 'Важное' }).click();
   await expect(history(other).locator('.game-action-entry').first()).toContainText('Анна');
   await expect(history(other).locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'live-5');
   await expect(history(other).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
   await page.screenshot({ path: join(output, 'restored-history-desktop.png'), fullPage: true });
   await other.screenshot({ path: join(output, 'restored-history-mobile.png'), fullPage: true });
   await other.close();
+});
+
+test('mobile important history offers congratulations and names the active player', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=room&multiplayer=1&viewer=second-user`);
+  await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+  await page.getByRole('tab', { name: 'Ход', exact: true }).click();
+  const bar = page.locator('.mobile-turn-bar');
+  await expect(bar.getByRole('status', { name: 'Сейчас ходит Анна' })).toBeVisible();
+  await expect(bar.getByRole('button', { name: /Бросить кубик/ })).toHaveCount(0);
+  const history = page.locator('.game-action-history:visible');
+  const filter = history.getByRole('switch', { name: 'Важное' });
+  const width = (await filter.boundingBox())!.width;
+  await filter.click();
+  await expect(filter).toHaveText('Важное');
+  expect((await filter.boundingBox())!.width).toBe(width);
+  await page.evaluate(() => {
+    const snapshot = structuredClone((window as any).roomSnapshot);
+    snapshot.players.find((player: any) => player.id === 'boris').controller = 'HUMAN';
+    snapshot.events.push({ id: 'birth-1', sequence: 1, type: 'player:baby', createdAt: new Date().toISOString(), gamePlayer: { id: 'anna', seat: 1, role: 'PLAYER' }, payload: {} });
+    window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+  });
+  await expect(history.locator('[data-action-id="birth-1"]')).toBeVisible();
+  await expect(history.getByRole('button', { name: 'Поздравить' })).toBeVisible();
+});
+
+test('mobile important history keeps the existing auction decision', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=room&multiplayer=1&viewer=second-user`);
+  await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+  await page.getByRole('tab', { name: 'Ход', exact: true }).click();
+  await page.locator('.game-action-history:visible').getByRole('switch', { name: 'Важное' }).click();
+  await page.evaluate(() => {
+    const snapshot = structuredClone((window as any).roomSnapshot);
+    snapshot.players.find((player: any) => player.id === 'boris').controller = 'HUMAN';
+    snapshot.game.pendingAction = { type: 'deal_auction', gamePlayerId: 'anna', cardId: 77, cardType: 'SMALL_DEAL', bidderGamePlayerIds: ['boris'], responses: [] };
+    snapshot.events.push({ id: 'auction-card', sequence: 1, type: 'card:draw', createdAt: new Date().toISOString(), gamePlayer: { id: 'anna', seat: 1, role: 'PLAYER' }, payload: { id: 77, cardType: 'SMALL_DEAL', title: 'Квартира', bodyText: 'Продажа квартиры', category: 'real_estate', meta: { price: 10000 }, effects: [] } });
+    window.dispatchEvent(new CustomEvent('fixture:room-update', { detail: snapshot }));
+  });
+  const history = page.locator('.game-action-history:visible');
+  await expect(history.getByRole('heading', { name: 'Вам предлагают возможность' })).toBeVisible();
+  await expect(history.getByRole('button', { name: 'Отказаться', exact: true })).toBeVisible();
 });
 
 for (const track of ['small', 'large']) {
@@ -990,7 +1032,7 @@ for (const track of ['small', 'large']) {
       const decision = card.getByLabel('Текущее решение', { exact: true });
       await expect(decision).toBeVisible();
       await expect(decision.getByRole('button', { name: track === 'large' ? /Оплатить/ : 'Мелкая сделка', exact: track !== 'large' })).toBeVisible();
-      expect((await history.getByRole('group', { name: 'Фильтр истории действий' }).boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y);
+      expect((await history.getByRole('switch', { name: 'Важное' }).boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y);
       await expect(card.locator('.game-turn-timeline')).toHaveCount(1);
       await expect(card.locator('[data-action-id]')).toHaveCount(4);
       await expect(card.locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'turn-layout-2');

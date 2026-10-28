@@ -1,4 +1,5 @@
 import type { GameEvent, GamePlayer } from "../../lib/types";
+import { isBabyGiftWindowOpen } from "@cashflow/shared";
 import { gamePlayerForEvent, gameTurns, playerIdForTurn } from "./game-journal";
 
 const preparationEvents = new Set([
@@ -13,8 +14,9 @@ export function mergeActionEvents(current: GameEvent[], incoming: GameEvent[]) {
 }
 
 /** One card belongs to the turn owner; other participants stay inside that turn. */
-export function playerActionTurns(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false, currentPlayerId?: string | null) {
+export function playerActionTurns(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false, currentPlayerId?: string | null, additionalEventIds?: ReadonlySet<string>) {
   const visibleIds = new Set(playerActionEvents(events, players, onlyPlayerId).map((event) => event.id));
+  for (const id of additionalEventIds ?? []) visibleIds.add(id);
   const fastTrackIds = new Set(fastTrackOnly ? playerActionEvents(events, players, null, true).map((event) => event.id) : []);
   const resolved = events.map((event) => {
     const player = gamePlayerForEvent(event, players);
@@ -28,8 +30,8 @@ export function playerActionTurns(events: GameEvent[], players: GamePlayer[], on
     const player = players.find((item) => item.id === ownerId);
     if (!player) return [];
     const currentFastTrackPreparation = !started && !turn.complete && player.id === currentPlayerId && player.track === "FAST_TRACK";
-    if (fastTrackOnly && !currentFastTrackPreparation && !turn.events.some((event) => fastTrackIds.has(event.id))) return [];
-    const visible = turn.events.filter((event) => visibleIds.has(event.id) && (!fastTrackOnly || fastTrackIds.has(event.id) || !["player:roll_dice", "player:move"].includes(event.type)));
+    if (fastTrackOnly && !currentFastTrackPreparation && !turn.events.some((event) => fastTrackIds.has(event.id) || additionalEventIds?.has(event.id))) return [];
+    const visible = turn.events.filter((event) => visibleIds.has(event.id) && (!fastTrackOnly || fastTrackIds.has(event.id) || additionalEventIds?.has(event.id) || !["player:roll_dice", "player:move"].includes(event.type)));
     const otherActions: Array<{ player: GamePlayer; events: GameEvent[] }> = [];
     for (const event of visible) {
       const author = gamePlayerForEvent(event, players);
@@ -47,6 +49,36 @@ export function playerActionTurns(events: GameEvent[], players: GamePlayer[], on
       otherActions
     }];
   }).sort((a, b) => b.sequence - a.sequence);
+}
+
+/** Events about the viewer that may happen during somebody else's turn. */
+export function importantActionEventIds(events: GameEvent[], players: GamePlayer[], viewerPlayerId: string, gameStatus?: string) {
+  const ids = new Set<string>();
+  const viewer = players.find((player) => player.id === viewerPlayerId);
+  const isActiveViewer = viewer?.controller === "HUMAN" && viewer.status === "JOINED";
+  const giftedBirthIds = new Set(events.filter((event) => event.type === "player:baby_gift" && event.payload.senderGamePlayerId === viewerPlayerId)
+    .map((event) => event.payload.birthEventId));
+  for (const event of playerActionEvents(events, players)) {
+    if (gamePlayerForEvent(event, players)?.id === viewerPlayerId) {
+      ids.add(event.id);
+      continue;
+    }
+    const payload = event.payload;
+    if (event.type === "player:baby" && isActiveViewer && gameStatus !== "ENDED" && gameStatus !== "CANCELLED"
+      && !giftedBirthIds.has(event.id) && isBabyGiftWindowOpen(events, event.sequence)) {
+      ids.add(event.id);
+      continue;
+    }
+    if (event.type === "fast_track:dream_influence" && typeof viewer?.dreamCellIndex === "number"
+      && payload.cellIndex === viewer.dreamCellIndex) {
+      ids.add(event.id);
+      continue;
+    }
+    if ([payload.recipientGamePlayerId, payload.buyerGamePlayerId, payload.sellerGamePlayerId, payload.previousOwnerId]
+      .includes(viewerPlayerId) || [payload.bidderGamePlayerIds, payload.sellerGamePlayerIds]
+      .some((value) => Array.isArray(value) && value.includes(viewerPlayerId))) ids.add(event.id);
+  }
+  return ids;
 }
 
 export function playerActionEvents(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false) {

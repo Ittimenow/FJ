@@ -1,0 +1,3 @@
+.current-turn-identity-icon { animation: current-turn-bob 1.8s cubic-bezier(.2,.8,.2,1) infinite; transform-origin: 50% 80%; }
+@keyframes current-turn-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-3px) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .current-turn-identity-icon { animation: none; } }

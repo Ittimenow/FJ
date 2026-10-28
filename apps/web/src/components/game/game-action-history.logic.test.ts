@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { mergeActionEvents, playerActionEvents, playerActionTurns } from './game-action-history.logic';
+import { importantActionEventIds, mergeActionEvents, playerActionEvents, playerActionTurns } from './game-action-history.logic';
 import type { GameEvent, GamePlayer } from '../../lib/types';
 // Shared is a CommonJS workspace; load its runtime exports through the same boundary.
 const require = createRequire(import.meta.url);
@@ -68,6 +68,34 @@ test('history identifies actions with only a payload player id or an actor user 
   const payloadEvent={...event(2,'baby:gift'),gamePlayer:null,payload:{senderGamePlayerId:'boris'}};
   const actorEvent={...event(1,'player:roll_dice'),gamePlayer:null,actor:{id:'u1',displayName:'Анна'}};
   assert.deepEqual(playerActionEvents([payloadEvent,actorEvent],players).map(e=>e.sequence),[2,1]);
+});
+test('important history includes own actions, gifts received, and an open chance to congratulate', () => {
+  const participants = players.map((player) => ({ ...player, controller: 'HUMAN', status: 'JOINED' })) as GamePlayer[];
+  const events = [
+    event(1, 'player:roll_dice', 'boris'),
+    event(2, 'player:baby', 'boris'),
+    event(3, 'loan:take', 'anna'),
+    event(4, 'player:baby_gift', 'boris', { senderGamePlayerId: 'boris', recipientGamePlayerId: 'anna', birthEventId: 'e0' })
+  ];
+  const important = importantActionEventIds(events, participants, 'anna', 'IN_PROGRESS');
+  assert.deepEqual([...important].sort(), ['e2', 'e3', 'e4']);
+  const turns = playerActionTurns(events, participants, 'anna', false, 'boris', important);
+  assert.deepEqual(turns[0]?.events.map((item) => item.id), ['e4', 'e2']);
+  assert.deepEqual(turns[0]?.otherActions.flatMap((group) => group.events.map((item) => item.id)), ['e3']);
+});
+test('important history stops offering a congratulation after a gift or its turn window', () => {
+  const participants = players.map((player) => ({ ...player, controller: 'HUMAN', status: 'JOINED' })) as GamePlayer[];
+  const birth = event(1, 'player:baby', 'boris');
+  const gift = event(2, 'player:baby_gift', 'anna', { senderGamePlayerId: 'anna', recipientGamePlayerId: 'boris', birthEventId: birth.id });
+  assert.equal(importantActionEventIds([birth, gift], participants, 'anna', 'IN_PROGRESS').has(birth.id), false);
+  assert.equal(importantActionEventIds([birth], participants, 'anna', 'ENDED').has(birth.id), false);
+  const expired = [birth, ...[2, 3, 4, 5].map((sequence) => event(sequence, 'player:roll_dice', 'boris'))];
+  assert.equal(importantActionEventIds(expired, participants, 'anna', 'IN_PROGRESS').has(birth.id), false);
+});
+test('important history includes another player changing the price of the viewers dream', () => {
+  const participants = players.map((player) => ({ ...player, dreamCellIndex: player.id === 'anna' ? 12 : 8 })) as GamePlayer[];
+  const dream = event(1, 'fast_track:dream_influence', 'boris', { cellIndex: 12 });
+  assert.equal(importantActionEventIds([dream], participants, 'anna', 'IN_PROGRESS').has(dream.id), true);
 });
 test('purchased cards reflect owned businesses, purchased dreams and paid charity, excluding other players',()=>{
   const player={...players[0],financialState:{fastTrackCharity:true}} as GamePlayer;

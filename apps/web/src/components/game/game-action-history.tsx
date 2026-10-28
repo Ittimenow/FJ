@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GameEvent, GamePlayer } from "@/lib/types";
 import { eventHeadline } from "./game-journal";
-import { mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
+import { importantActionEventIds, mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
 import { PlayerAvatar } from "./player-avatar";
 import "./game-action-history.css";
 
-export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, fastTrackOnly = false, loadEarlier, renderAction, header }: {
+export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, fastTrackOnly = false, gameStatus, loadEarlier, renderAction, header }: {
   gameId: string;
   events: GameEvent[];
   players: GamePlayer[];
@@ -19,6 +19,7 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   currentTurnKey?: string;
   currentAction?: ReactNode;
   fastTrackOnly?: boolean;
+  gameStatus?: string;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
   renderAction?: (event: GameEvent, allEvents: GameEvent[]) => ReactNode;
   header?: ReactNode;
@@ -28,7 +29,7 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   const [archiveLoaded, setArchiveLoaded] = useState(events.length < 80);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [onlyMine, setOnlyMine] = useState(false);
+  const [importantOnly, setImportantOnly] = useState(false);
   useEffect(() => {
     setHistory(events);
     setVisibleCount(10);
@@ -36,8 +37,11 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
     setError(null);
   }, [gameId]);
   useEffect(() => { setHistory((current) => mergeActionEvents(current, events)); }, [events]);
-  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId, onlyMine, fastTrackOnly]);
-  const turns = playerActionTurns(history, players, onlyPlayerId ?? (onlyMine ? viewerPlayerId : null), fastTrackOnly, currentTurnPlayerId);
+  useEffect(() => { setVisibleCount(10); }, [onlyPlayerId, importantOnly, fastTrackOnly]);
+  const importantIds = importantOnly && viewerPlayerId
+    ? importantActionEventIds(history, players, viewerPlayerId, gameStatus)
+    : undefined;
+  const turns = playerActionTurns(history, players, onlyPlayerId ?? (importantOnly ? viewerPlayerId : null), fastTrackOnly, currentTurnPlayerId, importantIds);
   const currentPlayer = players.find((player) => player.id === currentTurnPlayerId);
   let decisionTurnId: string | null = null;
   if (currentAction && currentPlayer) {
@@ -77,8 +81,11 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
 
   return <section className="game-action-history min-w-0" aria-label={fastTrackOnly ? "История большого круга" : "История действий игроков"}>
     {header}
-    {viewerPlayerId ? <div className="game-history-filter mb-3 flex flex-wrap justify-end gap-1" role="group" aria-label="Фильтр истории действий">
-      {[{ mine: true, label: "Только свои" }, { mine: false, label: "Все игроки" }].map(({ mine, label }) => <button key={label} type="button" aria-pressed={onlyMine === mine} onClick={() => setOnlyMine(mine)} className={`min-h-9 rounded-lg px-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey ${onlyMine === mine ? "bg-journey text-white" : "bg-surface text-ink hover:bg-line/50"}`}>{label}</button>)}
+    {viewerPlayerId ? <div className="game-history-filter mb-3 flex justify-end">
+      <button type="button" role="switch" aria-label="Важное" aria-checked={importantOnly} onClick={() => setImportantOnly((value) => !value)} className="game-history-switch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey">
+        <span className="game-history-switch-knob" aria-hidden="true" />
+        <span>{importantOnly ? "Важное" : "Все ходы"}</span>
+      </button>
     </div> : null}
     <ol className="game-turn-list m-0 list-none space-y-3 p-0" aria-live="polite" aria-busy={loading}>
       {actions.slice(0, visibleCount).map((turn) => <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 rounded-xl bg-surface p-3 [overflow-wrap:anywhere]">

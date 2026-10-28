@@ -1372,7 +1372,10 @@ export function GameRoom({
       )}
     >
       <MobileTurnDialog
-        open={Boolean(me) && snapshot.game.status === "IN_PROGRESS" && ((canRoll && !pendingAction) || rollingDice || turnAnimationPhase !== "ready")}
+        open={Boolean(me) && snapshot.game.status === "IN_PROGRESS"}
+        currentPlayer={currentPlayer ?? null}
+        isMine={currentPlayer?.id === me?.id}
+        canRoll={canRoll && !pendingAction}
         phase={turnAnimationPhase}
         disabled={fastBusy}
         rolling={rollingDice}
@@ -1496,6 +1499,8 @@ export function GameRoom({
           actions={
             <>
                 <DiceAction
+                  currentPlayer={currentPlayer}
+                  isMine={isMyTurn}
                   className="hidden xl:block"
                   pinnedToPanel
                   canRoll={canRoll && !pendingAction}
@@ -1573,6 +1578,8 @@ export function GameRoom({
         >
           <>
             <DiceAction
+              currentPlayer={currentPlayer}
+              isMine={isMyTurn}
               canRoll={canRoll && !pendingAction}
               rolling={rollingDice}
               phase={turnAnimationPhase}
@@ -4682,6 +4689,7 @@ function GameTurnFeed({
     events={events}
     players={players}
     fastTrackOnly={fastTrackOnly}
+    gameStatus={gameStatus}
     viewerPlayerId={currentGamePlayerId}
     currentTurnPlayerId={turnPlayerId}
     currentTurnKey={turnKey}

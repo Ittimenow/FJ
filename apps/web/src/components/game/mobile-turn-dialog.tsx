@@ -3,10 +3,15 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import type { GamePlayer } from "@/lib/types";
+import { CurrentTurnIdentity } from "./current-turn-identity";
 import { DiceFace } from "./dice-action";
 
 export function MobileTurnDialog({
   open,
+  currentPlayer,
+  isMine,
+  canRoll,
   rolling,
   phase = "ready",
   disabled = false,
@@ -19,6 +24,9 @@ export function MobileTurnDialog({
   rollLabel
 }: {
   open: boolean;
+  currentPlayer: GamePlayer | null;
+  isMine: boolean;
+  canRoll: boolean;
   rolling: boolean;
   phase?: "ready" | "rolling" | "moving" | "landed";
   disabled?: boolean;
@@ -40,7 +48,7 @@ export function MobileTurnDialog({
     return () => media.removeEventListener("change", updateViewport);
   }, [maxCompactViewportWidth]);
 
-  if (!open || !mobileViewport) return null;
+  if (!open || !mobileViewport || !currentPlayer) return null;
   const showDice = rolling || phase !== "ready";
 
   return <>
@@ -51,9 +59,9 @@ export function MobileTurnDialog({
         aria-label="Действия текущего хода"
         className="pointer-events-auto mx-auto grid w-full max-w-sm grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-2xl bg-[#fff5ed] p-2 shadow-[0_18px_48px_rgba(5,18,45,.28)]"
       >
-        <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0 text-[#7b3f17]">
-          <h3 className="text-sm font-semibold">Ваш ход</h3>
-          {onSkip ? <button
+        <div className="min-w-0 text-[#7b3f17]">
+          <CurrentTurnIdentity player={currentPlayer} isMine={isMine} />
+          {isMine && canRoll && onSkip ? <button
             type="button"
             className="mt-0.5 rounded-md text-xs font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onSkip}
@@ -64,7 +72,13 @@ export function MobileTurnDialog({
             Пропустить ход
           </button> : null}
         </div>
-        {!showDice ? <div className="grid min-w-0 gap-1.5">
+        {showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
+          {diceValues.map((diceValue, index) => (
+            <div key={index} className="-m-5 scale-50">
+              <DiceFace value={diceValue} rolling={phase === "rolling"} />
+            </div>
+          ))}
+        </div> : !isMine || !canRoll ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">{isMine ? "Выберите действие во вкладке «Ход»" : "Ожидайте своего хода"}</p> : <div className="grid min-w-0 gap-1.5">
           {onEnterFastTrack ? <Button type="button" variant="secondary" className="min-h-10 w-full px-2 text-xs min-[360px]:text-sm" onClick={onEnterFastTrack} disabled={disabled}>На большой круг</Button> : null}
           <Button
             type="button"
@@ -76,12 +90,6 @@ export function MobileTurnDialog({
           >
             {rolling ? "Бросаем…" : rollLabel ?? (diceCount > 1 ? "Бросить кубики" : "Бросить кубик")}
           </Button>
-        </div> : <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
-          {diceValues.map((diceValue, index) => (
-            <div key={index} className="-m-5 scale-50">
-              <DiceFace value={diceValue} rolling={phase === "rolling"} />
-            </div>
-          ))}
         </div>}
       </div>
     </div>, document.body)}

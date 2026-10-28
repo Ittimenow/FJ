@@ -82,7 +82,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
   const overview = focusPlayer ? <PlayerOverview snapshot={snapshot} player={focusPlayer} mobile={mobile} /> : <p className="turn-waiting">На большом круге пока нет игроков.</p>;
   const turn = <section className="turn-activity" aria-label="Ход и история игроков">
     {!mobile ? diceAction : null}
-    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly viewerPlayerId={player?.id ?? null} currentTurnPlayerId={snapshot.game.currentPlayerId} currentTurnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`} currentAction={actions} />}
+    {history ?? <GameActionHistory key={snapshot.game.id} gameId={snapshot.game.id} events={snapshot.events} players={snapshot.players} fastTrackOnly gameStatus={snapshot.game.status} viewerPlayerId={player?.id ?? null} currentTurnPlayerId={snapshot.game.currentPlayerId} currentTurnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`} currentAction={actions} />}
   </section>;
   const tabs = [
     { id: "turn", label: "Ход", icon: Dices },

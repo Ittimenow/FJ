@@ -3,10 +3,14 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import type { GamePlayer } from "@/lib/types";
+import { CurrentTurnIdentity } from "./current-turn-identity";
 import "./dice-action.css";
 
 export function DiceAction({
   canRoll,
+  currentPlayer,
+  isMine = false,
   rolling,
   phase = "ready",
   diceValues,
@@ -23,6 +27,8 @@ export function DiceAction({
   className
 }: {
   canRoll: boolean;
+  currentPlayer?: GamePlayer | null | undefined;
+  isMine?: boolean;
   rolling: boolean;
   phase?: "ready" | "rolling" | "moving" | "landed";
   diceValues: number[];
@@ -79,8 +85,9 @@ export function DiceAction({
           pinnedToPanel && "min-h-[4.5rem]"
         )}
       >
-        <div className="min-w-[5.5rem] max-w-[7.5rem] shrink-0">
-          <h3 className="text-sm font-semibold text-[#7b3f17]">{status}</h3>
+        <div className="min-w-[5.5rem] max-w-[9rem] shrink-0 text-[#7b3f17]">
+          {currentPlayer ? <CurrentTurnIdentity player={currentPlayer} isMine={isMine} /> : <h3 className="text-sm font-semibold">{status}</h3>}
+          {currentPlayer && (phase !== "ready" || statusLabel === "Партия на паузе" || statusLabel === "Партия завершена") ? <p className="mt-0.5 text-[11px] leading-4">{status}</p> : null}
           {canRoll && !rolling && onSkip ? (
             <button
               type="button"
