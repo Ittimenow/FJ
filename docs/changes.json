@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "restore-game-history-release-check",
+          "category": "fix",
+          "summary": "Исправлена ошибка проверки истории действий, которая останавливала выпуск обновления игры."
+        },
+        {
           "id": "mobile-turn-identity-and-important-history",
           "category": "improvement",
           "summary": "В мобильном блоке хода показаны фишка и имя текущего игрока, а переключатель истории помогает видеть личные действия и события, требующие ответа."
