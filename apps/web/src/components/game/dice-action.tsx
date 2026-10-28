@@ -95,7 +95,7 @@ export function DiceAction({
               disabled={disabled}
               className="mt-0.5 rounded-md text-xs font-medium text-[#7b3f17] underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c]"
             >
-              Пропустить ход
+              Пропустить
             </button>
           ) : null}
         </div>
@@ -115,7 +115,7 @@ export function DiceAction({
         {showDice ? <div className="dice-action-values flex shrink-0 gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="scale-[.58] -m-4">
-              <DiceFace value={diceValue} rolling={phase === "rolling"} />
+              <DiceFace value={diceValue} rolling={phase === "rolling"} direction={index % 2 === 0 ? "right" : "left"} />
             </div>
           ))}
         </div> : null}
@@ -131,14 +131,14 @@ export function DiceAction({
   );
 }
 
-export function DiceFace({ value, rolling }: { value: number; rolling: boolean }) {
+export function DiceFace({ value, rolling, direction = "right" }: { value: number; rolling: boolean; direction?: "right" | "left" }) {
   const dots = diceDots[Math.min(Math.max(value, 1), 6)] ?? diceDots[6] ?? [];
 
   return (
     <div
       className={[
         "relative h-20 w-20 rounded-xl border-2 border-ink bg-white shadow-panel transition-transform",
-        rolling ? "dice-face--rolling" : ""
+        rolling ? `dice-face--rolling dice-face--roll-${direction}` : ""
       ].join(" ")}
       aria-label={`На кубике ${value}`}
     >

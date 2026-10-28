@@ -342,7 +342,7 @@ for (const size of [{width:1366,height:768},{width:1920,height:1080},{width:2560
       const after=await shell.boundingBox();
       expect(after).toEqual(bounds);
       expect(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight&&document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      await expect(page.getByRole('button',{name:'Пропустить ход',exact:true})).toBeVisible();
+      await expect(page.getByRole('button',{name:'Пропустить',exact:true})).toBeVisible();
       expect(errors).toEqual([]);
     });
   }
@@ -354,12 +354,12 @@ for(const count of [2,3]) {
     await page.goto(`${fixtureUrl}?mode=desktop-large`);
     await page.getByLabel('Количество кубиков').selectOption(String(count));
     await expect(page.getByLabel('Результат броска')).toHaveCount(0);
-    await page.getByRole('button',{name:'Пропустить ход',exact:true}).click();
+    await page.getByRole('button',{name:'Пропустить',exact:true}).click();
     await expect(page.locator('output')).toHaveText('Ход пропущен');
     await page.getByRole('button',{name:'Бросить кубики',exact:true}).click();
     await expect(page.getByRole('button',{name:'Бросить кубики',exact:true})).toHaveCount(0);
     await expect(page.getByLabel('Результат броска').locator('[aria-label^="На кубике"]')).toHaveCount(count);
-    await expect(page.getByRole('heading',{name:'Ход выполнен',exact:true})).toBeVisible();
+    await expect(page.getByText('Ход выполнен', { exact: true })).toBeVisible();
     await page.evaluate(()=>window.dispatchEvent(new Event('fixture:next-turn')));
     await expect(page.getByRole('button',{name:'Бросить кубики',exact:true})).toBeEnabled();
     await expect(page.getByLabel('Результат броска')).toHaveCount(0);
@@ -415,7 +415,7 @@ for (const width of [320, 390, 430]) {
     await page.getByRole('tab', { name: /^Ход/ }).click();
     await expect(page.locator('.dice-action')).toHaveCount(0);
     await expect(bar.getByRole('heading', { name: 'Ваш ход', exact: true })).toBeVisible();
-    await expect(bar.getByRole('button', { name: 'Пропустить ход', exact: true })).toBeVisible();
+    await expect(bar.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
     await expect(page.locator('.game-action-entry [data-player-id="boris"]').first()).toHaveAttribute('data-figurine', 'cat-in-box');
     await page.getByLabel('Количество кубиков').selectOption('3');
     const bounds = await bar.boundingBox();
@@ -851,6 +851,8 @@ for (const track of ['small', 'large']) {
       await roll.click();
       await expect(roll).toHaveCount(0);
       await expect(controls.locator('.dice-face--rolling')).toHaveCount(track === 'large' ? 2 : 1);
+      await expect(controls.locator('.dice-face--rolling').first()).toHaveCSS('animation-name', 'dice-roll-top');
+      if (track === 'large') await expect(controls.locator('.dice-face--rolling').nth(1)).toHaveClass(/dice-face--roll-left/);
       await expect(controls.locator('.dice-face--rolling')).toHaveCount(0);
       const values = track === 'large' ? [1, 2] : [3];
       for (const value of values) await expect(controls.getByLabel(`На кубике ${value}`, { exact: true })).toBeVisible();
@@ -877,6 +879,17 @@ for (const track of ['small', 'large']) {
     });
   }
 }
+
+test('dice faces stay still when reduced motion is requested', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${fixtureUrl}?mode=room&allFast=1`);
+  await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+  await page.locator('.mobile-turn-bar').getByRole('button', { name: 'Бросить кубики' }).click();
+  const die = page.locator('.mobile-turn-bar .dice-face--rolling').first();
+  await expect(die).toBeVisible();
+  await expect(die).toHaveCSS('animation-name', 'none');
+});
 
 test('live turn groups and history filters update for both players before the turn ends', async ({ page, context }) => {
   const other = await context.newPage();
@@ -938,9 +951,24 @@ test('mobile important history offers congratulations and names the active playe
   const history = page.locator('.game-action-history:visible');
   const filter = history.getByRole('switch', { name: 'Важное' });
   const width = (await filter.boundingBox())!.width;
+  expect(width).toBeLessThanOrEqual(102);
+  const gap = await filter.evaluate((element) => {
+    const text = element.lastElementChild!.getBoundingClientRect();
+    const knob = element.firstElementChild!.getBoundingClientRect();
+    return knob.left - text.right;
+  });
+  expect(gap).toBeLessThanOrEqual(8);
   await filter.click();
   await expect(filter).toHaveText('Важное');
   expect((await filter.boundingBox())!.width).toBe(width);
+  await expect(filter.locator('.game-history-switch-knob')).toHaveCSS('transform', 'none');
+  const checkedGap = await filter.evaluate((element) => {
+    const text = element.lastElementChild!.getBoundingClientRect();
+    const knob = element.firstElementChild!.getBoundingClientRect();
+    return text.left - knob.right;
+  });
+  expect(checkedGap).toBeGreaterThanOrEqual(0);
+  expect(checkedGap).toBeLessThanOrEqual(8);
   await page.evaluate(() => {
     const snapshot = structuredClone((window as any).roomSnapshot);
     snapshot.players.find((player: any) => player.id === 'boris').controller = 'HUMAN';
@@ -1000,7 +1028,7 @@ for (const track of ['small', 'large']) {
       if (track === 'large') await expect(route.locator('.bg-action')).toHaveCount(0);
       const bar = page.locator('.mobile-turn-bar');
       await expect(bar.getByRole('heading', { name: 'Ваш ход', exact: true })).toBeVisible();
-      await expect(bar.getByRole('button', { name: 'Пропустить ход', exact: true })).toBeVisible();
+      await expect(bar.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
       await expect(bar.locator('svg')).toHaveCount(0);
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: join(output, `turn-layout-${track}-${width}-tokens.png`), fullPage: true });

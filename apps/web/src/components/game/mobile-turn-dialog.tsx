@@ -66,16 +66,16 @@ export function MobileTurnDialog({
             className="mt-0.5 rounded-md text-xs font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e6a06c] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onSkip}
             disabled={showDice || disabled}
-            aria-label="Пропустить ход"
-            title="Пропустить ход"
+            aria-label="Пропустить"
+            title="Пропустить"
           >
-            Пропустить ход
+            Пропустить
           </button> : null}
         </div>
         {showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">
-              <DiceFace value={diceValue} rolling={phase === "rolling"} />
+              <DiceFace value={diceValue} rolling={phase === "rolling"} direction={index % 2 === 0 ? "right" : "left"} />
             </div>
           ))}
         </div> : !isMine || !canRoll ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">{isMine ? "Выберите действие во вкладке «Ход»" : "Ожидайте своего хода"}</p> : <div className="grid min-w-0 gap-1.5">

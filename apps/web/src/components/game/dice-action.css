@@ -2,8 +2,13 @@
 .dice-action-row { display: flex; align-items: center; gap: 8px; min-height: 48px; padding-block: 6px; }
 .dice-action-row > button { min-width: 96px; font-size: 14px; }
 .dice-action-row--replace .dice-action-values { flex: 1 1 0; min-width: 0; justify-content: center; }
-.dice-face--rolling { animation: dice-tumble 180ms ease-in-out infinite alternate; }
-@keyframes dice-tumble { from { transform: translateY(-4px) rotate(-12deg); } to { transform: translateY(3px) rotate(14deg); } }
+.dice-face--rolling { --roll-from: -12px; --roll-to: 12px; animation: dice-roll-top 680ms ease-in-out infinite; will-change: transform; }
+.dice-face--roll-left { --roll-from: 12px; --roll-to: -12px; animation-delay: -140ms; }
+@keyframes dice-roll-top {
+  0% { transform: translateX(var(--roll-from)) rotate(-180deg); box-shadow: 0 3px 5px rgba(23,36,63,.16); }
+  50% { transform: translateX(var(--roll-to)) rotate(0deg); box-shadow: 0 10px 16px rgba(23,36,63,.22); }
+  100% { transform: translateX(var(--roll-from)) rotate(180deg); box-shadow: 0 3px 5px rgba(23,36,63,.16); }
+}
 @media (prefers-reduced-motion: reduce) { .dice-face--rolling { animation: none; } }
 @container (max-width: 360px) {
   .dice-action-row.has-many-dice:not(.dice-action-row--replace) { flex-wrap: wrap; }

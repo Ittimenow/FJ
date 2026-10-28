@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "compact-history-switch-and-rolling-dice",
+          "category": "improvement",
+          "summary": "Переключатель истории стал компактнее, пропуск хода получил короткую подпись, а кубики при броске катятся и вращаются."
+        },
+        {
           "id": "restore-game-history-release-check",
           "category": "fix",
           "summary": "Исправлена ошибка проверки истории действий, которая останавливала выпуск обновления игры."

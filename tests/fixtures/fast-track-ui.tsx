@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { SessionProvider } from 'next-auth/react';
 import { DreamPicker, FastTrackPanel } from '../../apps/web/src/components/game/fast-track-panel';
 import { GameActionHistory } from '../../apps/web/src/components/game/game-action-history';
 import { ratRaceBoard } from '@cashflow/shared';
@@ -47,8 +48,8 @@ function App(){
  const renderFeed=(action?:React.ReactNode)=><GameActionHistory gameId="synthetic" currentAction={action} currentTurnPlayerId={snapshot.game.currentPlayerId} currentTurnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`} players={snapshot.players} events={mode==='archive'?archiveWindow:snapshot.events} fastTrackOnly={mode!=='small'&&mode!=='desktop-small'} loadEarlier={async()=>{if(++attempts.current===1)throw new Error('Не удалось загрузить историю партии');return [...archived,...archiveWindow];}}/>;
  const feed=renderFeed();
  const fast=<FastTrackPanel key={boardVersion} snapshot={snapshot} player={snapshot.players[0]} rolling={rolling} phase={phase} diceValues={Array.from({length:count},(_,i)=>i+4)} diceCount={count} onDiceCount={setCount} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} busy={false} onDecision={(buy)=>{setDecision(false);setPhase('ready');setNotice(buy?'Покупка принята':'Отказ принят')}}>{renderFeed}</FastTrackPanel>;
- const floating=<MobileTurnDialog open={(!decision||phase!=="ready")&&snapshot.game.status==='IN_PROGRESS'&&snapshot.game.currentPlayerId==='anna'} rolling={rolling} phase={phase} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1023} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} />;
- if(mode==='mobile-room') return <GameMenuFixture>{fast}<MobileTurnDialog open={!decision||phase!=="ready"} rolling={rolling} phase={phase} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1023} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} /><output>{notice}</output></GameMenuFixture>;
+ const floating=<MobileTurnDialog open={(!decision||phase!=="ready")&&snapshot.game.status==='IN_PROGRESS'&&snapshot.game.currentPlayerId==='anna'} currentPlayer={snapshot.players[0]} isMine canRoll={!decision} rolling={rolling} phase={phase} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1023} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} />;
+ if(mode==='mobile-room') return <GameMenuFixture>{fast}<MobileTurnDialog open={!decision||phase!=="ready"} currentPlayer={snapshot.players[0]} isMine canRoll={!decision} rolling={rolling} phase={phase} diceCount={count} diceValues={[4,5,6].slice(0,count)} maxCompactViewportWidth={1023} onRoll={roll} onSkip={()=>setNotice('Ход пропущен')} /><output>{notice}</output></GameMenuFixture>;
  if(mode==='desktop-small'||mode==='desktop-large') {
    const small=mode==='desktop-small';
    const view=new URLSearchParams(location.search).get('view')==='journey'?'journey':'classic';
@@ -64,4 +65,4 @@ function App(){
  }
  return <main style={{maxWidth:1440,margin:'0 auto',padding:16}}><header style={{marginBottom:16}}><strong>Финансовое путешествие · демонстрационные данные</strong></header>{lobby?<DreamPicker key={boardVersion} player={player} saving={dreamSaving} onChoose={index=>{if(mode==='lobby-delayed'){pendingDream.current=index;setDreamSaving(true);}else setPlayer({...player,dreamCellIndex:index});}}/>:mode==='admin'?<form><TestGameOptions/></form>:mode==='small'?<section style={{maxWidth:420}} aria-label="Ход и история игроков"><DiceAction canRoll rolling={false} diceValues={[4]} onRoll={()=>setNotice('Бросок принят')} onSkip={()=>setNotice('Ход пропущен')}/>{feed}</section>:<>{fast}{floating}</>}<output>{notice}</output></main>
 }
-createRoot(document.getElementById('root')!).render(<App/>);
+createRoot(document.getElementById('root')!).render(<SessionProvider session={null}><App/></SessionProvider>);
