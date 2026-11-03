@@ -168,9 +168,24 @@ test("начинает аукцион недвижимости для остал
   });
 });
 
+test("не запускает аукцион повторно после закрытия без продажи", async () => {
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: card.id,
+    cardType: CardType.SMALL_DEAL,
+    auctionAttempted: true
+  });
+  await assert.rejects(
+    setup.service.startDealAuction("game-1", seller.userId, { cardId: card.id }),
+    /Эту возможность сейчас нельзя выставить на аукцион/
+  );
+});
+
 test("разрешает аукцион квартиры малого круга, даже если в названии нет номера дома", async () => {
   const apartment = {
     ...card,
+    category: "real_estate",
     title: "Квартира на продажу: $40,000, +$140/мес",
     bodyText: "Первоначальный взнос $4,000"
   };
@@ -192,13 +207,60 @@ test("разрешает аукцион квартиры малого круга
   assert.equal(setup.states.get(seller.id)?.cashCents, 1_000n);
 });
 
-test("проверка предложения одинаково распознаёт недвижимость и исключает посторонние карты", () => {
+test("проверка предложения учитывает тексты всех передаваемых возможностей", () => {
   assert.equal(isDealAuctionOpportunity("realestate", "Квартира на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("real_estate", "Квартира на продажу"), true);
   assert.equal(isDealAuctionOpportunity("realestate", "Дом на продажу"), true);
   assert.equal(isDealAuctionOpportunity("business", "Предприятие на продажу"), true);
   assert.equal(isDealAuctionOpportunity("other", "3M дом на продажу"), true);
+  assert.equal(isDealAuctionOpportunity("land", "Купите сами или продайте это право другому игроку"), true);
+  assert.equal(isDealAuctionOpportunity("partnership", "Купите сами или продайте это право другому игроку"), true);
+  assert.equal(isDealAuctionOpportunity("collectible", "Используйте сами или продайте другому игроку"), true);
+  assert.equal(isDealAuctionOpportunity("loan", "Купите сами или продайте это право другому игроку"), true);
+  assert.equal(isDealAuctionOpportunity("realestate", "Расход по недвижимости: заплатите за ремонт"), false);
+  assert.equal(isDealAuctionOpportunity("realestate", "Расход по недвижимости: $2,000"), false);
+  assert.equal(isDealAuctionOpportunity("expense", "Дом на продажу"), false);
   assert.equal(isDealAuctionOpportunity("stock", "Акции компании"), false);
+  assert.equal(isDealAuctionOpportunity("certificate", "Каждый может купить или продать сертификат"), false);
   assert.equal(isDealAuctionOpportunity("other", "Редкая золотая монета"), false);
+});
+
+test("сервер не выставляет на аукцион расход по недвижимости", () => {
+  const service = fixture({}).service;
+  assert.equal(service.isDealAuctionEligible({
+    ...card,
+    title: "Расход по недвижимости: $2,000",
+    bodyText: "Если у вас есть 8-плекс, заплатите за ремонт",
+    effects: [{ effectType: "conditional_cash_delta", amountCents: -2_000n, payload: {} }]
+  } as never), false);
+});
+
+test("разрешает передачу права на землю и записывает покупателю именно землю", async () => {
+  const land = {
+    ...card,
+    id: 44,
+    category: "land",
+    title: "10 акров свободной земли: $5,000",
+    bodyText: "Купите сами или продайте это право другому игроку",
+    meta: [
+      { metaKey: "price", metaValue: "5000" },
+      { metaKey: "down_payment", metaValue: "5000" }
+    ]
+  };
+  const setup = fixture({
+    type: "deal_card_drawn",
+    gamePlayerId: seller.id,
+    cardId: land.id,
+    cardType: CardType.SMALL_DEAL
+  }, land);
+  await setup.service.startDealAuction("game-1", seller.userId, { cardId: land.id });
+  await setup.service.bidOnDealAuction("game-1", buyer.userId, { amountCents: 1 });
+  await setup.service.declineDealAuction("game-1", secondBuyer.userId);
+  await setup.service.selectDealAuctionOffer("game-1", seller.userId, {
+    buyerGamePlayerId: buyer.id
+  });
+  assert.equal(setup.assets[0]?.type, "land");
+  assert.equal(setup.assets[0]?.name, land.title);
 });
 
 test("суммы закрытых ставок отсутствуют в общем состоянии до последнего ответа", () => {

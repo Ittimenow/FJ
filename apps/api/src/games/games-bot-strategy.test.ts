@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BoardTrack, GameStatus, PlayerController } from "@prisma/client";
+import { BankruptcyStatus, BoardTrack, GameStatus, PlayerController } from "@prisma/client";
 import { GamesBotService } from "./games-bot.service";
 
 function botGame(cash: number, track: BoardTrack, charity = false) {
@@ -30,4 +30,26 @@ test("эксперт не тратит на благотворительност
   const rich = botGame(300_000, BoardTrack.FAST_TRACK).players[0];
   assert.equal((await service.pendingActionForBot(poor, pending, [poor])).buy, false);
   assert.equal((await service.pendingActionForBot(rich, pending, [rich])).buy, true);
+});
+
+test("банкротящийся бот продаёт актив вместо решения по оставшейся сделке", async () => {
+  const service = new GamesBotService({} as never, {} as never, {} as never, {} as never, {} as never) as any;
+  const game = botGame(100, BoardTrack.RAT_RACE) as any;
+  game.players[0]!.financialState.bankruptcyStatus = BankruptcyStatus.LIQUIDATING;
+  game.players[0]!.assets = [{ id: "asset", quantity: 2, cashflowCents: 10n }];
+
+  for (const pendingAction of [
+    { type: "deal_card_drawn", gamePlayerId: "bot", cardId: 42, cardType: "SMALL_DEAL" },
+    { type: "stock_sale_window", gamePlayerId: "bot", cardId: 42, cardType: "SMALL_DEAL",
+      salePriceCents: 100, symbol: "ABC", sellerGamePlayerIds: ["bot"], resolvedGamePlayerIds: [] }
+  ]) {
+    game.settings = { pendingAction };
+    assert.deepEqual(await service.nextAction(game), {
+      type: "sell_bankruptcy_asset",
+      playerId: "bot",
+      assetId: "asset",
+      quantity: 2,
+      reason: "при банкротстве сначала продаётся актив с наименьшим денежным потоком"
+    });
+  }
 });

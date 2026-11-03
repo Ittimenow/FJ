@@ -554,7 +554,13 @@ export function GameRoom({
   const latestDealDecisionCard =
     ownPendingAction?.type === "deal_card_drawn" ||
     ownPendingAction?.type === "stock_sale_window"
-      ? latestBuyableCard
+      ? latestBuyableCard && {
+          ...latestBuyableCard,
+          isAuctionEligible:
+            latestBuyableCard.isAuctionEligible &&
+            ownPendingAction.type === "deal_card_drawn" &&
+            !ownPendingAction.auctionAttempted
+        }
       : null;
   const dealAuction = pendingAction?.type === "deal_auction" ? pendingAction : null;
   const dealAuctionCard = useMemo(

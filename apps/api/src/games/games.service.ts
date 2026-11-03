@@ -1810,6 +1810,32 @@ export class GamesService {
         where: { id: currentPlayer.id },
         select: { status: true }
       });
+      if (emittedEvents.some((event) =>
+        event.type === "bankruptcy:declared" && event.gamePlayerId === currentPlayer.id
+      )) {
+        const currentGame = await tx.game.findUniqueOrThrow({ where: { id: gameId } });
+        const pending = this.pendingAction(currentGame.settings);
+        if (pending?.gamePlayerId === currentPlayer.id) {
+          await tx.game.update({
+            where: { id: gameId },
+            data: { settings: this.settingsWithPending(currentGame.settings, null) }
+          });
+        }
+        if (currentPlayerStatus.status === GamePlayerStatus.JOINED) {
+          const state = await tx.playerFinancialState.findUniqueOrThrow({
+            where: { gamePlayerId: currentPlayer.id }
+          });
+          if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) {
+            await this.advanceTurn(tx, game, activeIndex);
+          }
+        }
+        emittedEvents.push({
+          type: realtimeEvents.stateUpdate,
+          payload: { reason: "bankruptcy_updated" }
+        });
+        await this.appendEvents(tx, gameId, userId, emittedEvents);
+        return;
+      }
       if (currentPlayerStatus.status !== GamePlayerStatus.JOINED) {
         await this.appendEvents(tx, gameId, userId, emittedEvents);
         return;
@@ -2325,7 +2351,8 @@ export class GamesService {
         currentPlayer.id !== seller.id ||
         pending?.type !== "deal_card_drawn" ||
         pending.gamePlayerId !== seller.id ||
-        pending.cardId !== dto.cardId
+        pending.cardId !== dto.cardId ||
+        pending.auctionAttempted
       ) {
         throw new ForbiddenException("Эту возможность сейчас нельзя выставить на аукцион");
       }
@@ -2336,7 +2363,7 @@ export class GamesService {
       });
       if (!card) throw new NotFoundException("Карточка не найдена");
       if (!this.isDealAuctionEligible(card)) {
-        throw new BadRequestException("На аукцион можно выставить возможность с недвижимостью или бизнесом");
+        throw new BadRequestException("Эту возможность нельзя предложить другим игрокам");
       }
 
       const candidates = game.players.filter(
@@ -5294,6 +5321,21 @@ export class GamesService {
       where: { gamePlayerId }
     });
     if (state.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING) return state;
+
+    const bankruptPlayer = await tx.gamePlayer.findUniqueOrThrow({
+      where: { id: gamePlayerId },
+      select: { gameId: true }
+    });
+    const bankruptGame = await tx.game.findUniqueOrThrow({
+      where: { id: bankruptPlayer.gameId },
+      select: { settings: true }
+    });
+    if (this.pendingAction(bankruptGame.settings)?.gamePlayerId === gamePlayerId) {
+      await tx.game.update({
+        where: { id: bankruptPlayer.gameId },
+        data: { settings: this.settingsWithPending(bankruptGame.settings, null) }
+      });
+    }
 
     if (state.monthlyCashflowCents > 0n) {
       state = await tx.playerFinancialState.update({

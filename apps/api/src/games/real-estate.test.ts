@@ -28,6 +28,19 @@ test("physical-deck residential cards retain their exact type and unit count", (
   assert.equal(realEstateFromText("24-квартирные апартаменты")?.target, "apartment");
 });
 
+test("доля партнёра не становится недвижимостью из-за упоминания дома", () => {
+  const asset = {
+    name: "Требуется партнёр: $25,000",
+    sourceCard: {
+      category: "partnership",
+      title: "Требуется партнёр",
+      bodyText: "Партнёр финансирует строительство дома"
+    }
+  };
+  assert.equal(assetRealEstate(asset), null);
+  assert.equal(realEstateAssetName(asset), asset.name);
+});
+
 test("market offers include only the requested home type, even for old generic asset names", async () => {
   const service = new GamesService({} as never) as any;
   const assets = [apartment, ...["house3m", "4plex", "8plex"].map(type => cards.find((card: any) => card.subcategory === type && card.cardType !== "MARKET"))].map((card, index) => ({

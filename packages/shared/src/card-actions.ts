@@ -34,11 +34,22 @@ export function dealDownPaymentAmount(
 }
 
 export function isDealAuctionOpportunity(category: string | null | undefined, cardText: string) {
-  const normalizedCategory = category?.toLowerCase();
-  if (normalizedCategory === "business" || normalizedCategory === "realestate") return true;
+  const normalizedCategory = category?.toLowerCase().replace(/[\s_-]/g, "");
   const normalized = cardText.toLowerCase().replace(/ё/g, "е");
-  if (/part\s*time|брат\s+просит|другу\s+срочно|монет|гектар|свободная\s+земл|циркониев/.test(normalized)) {
+  if (
+    normalizedCategory === "stock" ||
+    normalizedCategory === "certificate" ||
+    normalizedCategory === "expense" ||
+    /(?:акци|stock|share|сертификат|взаимн\w*\s+фонд|никто не может купить или продать)/.test(normalized)
+  ) {
     return false;
   }
-  return /(?:^|\s)(?:2у|3m|3м)(?:\s|$)|plex|duplex|коттедж|таунхаус|апартамент|квартирн(?:ый|ого)\s+(?:дом|комплекс)|дом:\s*\$/.test(normalized);
+  if (
+    /(?:продай(?:те)?|продать)\s+(?:это\s+)?(?:право\s+)?друг(?:ому|им)(?:\s+игрок(?:у|ам))?/.test(normalized)
+  ) {
+    return true;
+  }
+  if (/(?:^|[^\p{L}])(?:расход|ущерб|ремонт)(?=$|[^\p{L}])|заплатите|оплатите/u.test(normalized)) return false;
+  if (normalizedCategory === "business" || normalizedCategory === "realestate") return true;
+  return /(?:^|\s)(?:2у|3m|3м)(?:\s|$)|plex|duplex|коттедж|таунхаус|апартамент|квартирн(?:ый|ого)\s+(?:дом|комплекс)|квартир[аыу]\s+на\s+продажу|дом\s+на\s+продажу|дом:\s*\$/.test(normalized);
 }

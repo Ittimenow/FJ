@@ -265,6 +265,14 @@ export class GamesBotService implements OnModuleInit {
   private async nextAction(game: NonNullable<Awaited<ReturnType<GamesBotService["loadGame"]>>>) {
     if (game.status !== GameStatus.IN_PROGRESS || game.players.length === 0) return null;
     const pending = this.pendingAction(game.settings);
+    const current = game.players[game.currentTurnIndex % game.players.length];
+    if (
+      current?.controller === PlayerController.BOT &&
+      current.financialState?.bankruptcyStatus === BankruptcyStatus.LIQUIDATING &&
+      pending?.gamePlayerId === current.id
+    ) {
+      return this.bankruptcyAction(current);
+    }
     if (pending?.type === "stock_sale_window") {
       const unresolvedBotSeller = game.players.find(
         (player) =>
@@ -350,17 +358,16 @@ export class GamesBotService implements OnModuleInit {
           } satisfies BotAction;
     }
 
-    const current = game.players[game.currentTurnIndex % game.players.length];
     if (!current || current.controller !== PlayerController.BOT || !current.financialState) {
       return null;
     }
 
-    if (pending && pending.gamePlayerId !== current.id) return null;
-    if (pending) return this.pendingActionForBot(current, pending, game.players);
-
     if (current.financialState.bankruptcyStatus === "LIQUIDATING") {
       return this.bankruptcyAction(current);
     }
+
+    if (pending && pending.gamePlayerId !== current.id) return null;
+    if (pending) return this.pendingActionForBot(current, pending, game.players);
 
     const level = botLevel(current.botStrategy);
     const state = this.financialSnapshot(current);

@@ -40,7 +40,7 @@ export function cardRealEstate(card: PropertyCard): RealEstate | null {
 }
 
 export function assetRealEstate(asset: { name: string; sourceCard?: PropertyCard | null }) {
-  if (asset.sourceCard?.category && /^(stock|business|loan|land|collectible|network_marketing)$/.test(asset.sourceCard.category)) return null;
+  if (asset.sourceCard?.category && /^(stock|business|partnership|loan|land|collectible|certificate|network_marketing)$/.test(asset.sourceCard.category)) return null;
   return (asset.sourceCard ? cardRealEstate(asset.sourceCard) : null) ?? realEstateFromText(asset.name);
 }
 

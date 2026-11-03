@@ -4,6 +4,21 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "prevent-repeat-deal-auction",
+          "category": "fix",
+          "summary": "После аукциона без продажи та же возможность больше не предлагается игрокам повторно."
+        },
+        {
+          "id": "allow-auction-for-transferable-deals",
+          "category": "fix",
+          "summary": "Передаваемые возможности, включая малые сделки с недвижимостью, землёй и долями, теперь можно предложить другим игрокам на аукционе."
+        },
+        {
+          "id": "resume-bot-bankruptcy-instead-of-deal",
+          "category": "fix",
+          "summary": "Бот при банкротстве прекращает выбор сделки и продолжает обязательные действия, поэтому партия не зависает."
+        },
+        {
           "id": "compact-history-switch-and-rolling-dice",
           "category": "improvement",
           "summary": "Переключатель истории стал компактнее, пропуск хода получил короткую подпись, а кубики при броске катятся и вращаются."
