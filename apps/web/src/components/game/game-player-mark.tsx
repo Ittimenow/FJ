@@ -1,7 +1,7 @@
 "use client";
 
 import { figurineImagePath } from "@cashflow/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer } from "@/lib/types";
@@ -18,10 +18,12 @@ export function GamePlayerMark({
   className?: string;
 }) {
   const name = gamePlayerName(player);
-  const figurine = player.figurine ?? player.user?.figurine;
-  const avatar = player.user?.avatarUrl;
-  const imageUrl = figurine ? figurineImagePath(figurine) : avatar;
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const figurine = player.figurine;
+  const [imageAttempt, setImageAttempt] = useState(0);
+  useEffect(() => setImageAttempt(0), [figurine]);
+  const imageUrl = figurine && imageAttempt < 2
+    ? imageAttempt === 0 ? figurineImagePath(figurine) : `/figurines/${figurine}.png`
+    : null;
   const sizeClass = {
     sm: "h-8 w-8 text-xs",
     md: "h-11 w-11 text-xs",
@@ -43,8 +45,8 @@ export function GamePlayerMark({
       data-player-id={player.id}
       data-figurine={figurine ?? undefined}
     >
-      {imageUrl && imageUrl !== failedUrl ? (
-        <img src={imageUrl} alt="" className={`h-full w-full ${figurine ? "object-contain" : "object-cover"}`} onError={() => setFailedUrl(imageUrl)} />
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="h-full w-full object-contain" onError={() => setImageAttempt((attempt) => Math.min(2, attempt + 1))} />
       ) : (
         <UserRound className="h-2/3 w-2/3" aria-hidden="true" />
       )}

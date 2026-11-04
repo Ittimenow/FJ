@@ -63,6 +63,7 @@ export interface GameRoomHeaderState {
   onResume: (() => void) | null;
   hostDisplayView: "classic" | "journey" | null;
   viewportMode?: "classic" | "journey" | null;
+  mobileHeaderHidden?: boolean;
   trackView: "RAT_RACE" | "FAST_TRACK" | null;
   onTrackChange: (track: "RAT_RACE" | "FAST_TRACK") => void;
   onCheckConnection: () => void;
@@ -96,7 +97,7 @@ export function GameRoomViewport({ initialMode, children }: {
 }) {
   const context = useContext(GameRoomHeaderContext);
   const mode = context?.state?.viewportMode === undefined ? initialMode : context.state.viewportMode;
-  return <div className={`min-h-screen min-w-0 bg-surface text-ink${mode ? ` app-shell--game-${mode}-active` : ""}`}>{children}</div>;
+  return <div className={`min-h-screen min-w-0 bg-surface text-ink${mode ? ` app-shell--game-${mode}-active` : ""}${context?.state?.mobileHeaderHidden ? " app-shell--game-header-hidden" : ""}`}>{children}</div>;
 }
 
 export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {
@@ -113,7 +114,14 @@ export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {
     if (!header) return;
     const style = document.documentElement.style;
     const previous = style.getPropertyValue("--app-shell-header-bottom");
-    const measure = () => style.setProperty("--app-shell-header-bottom", `${header.getBoundingClientRect().bottom}px`);
+    const previousHeight = style.getPropertyValue("--game-header-height");
+    const previousInert = header.inert;
+    const measure = () => {
+      const height = header.getBoundingClientRect().height;
+      style.setProperty("--game-header-height", `${height}px`);
+      style.setProperty("--app-shell-header-bottom", state?.mobileHeaderHidden ? "0px" : `${height}px`);
+      header.inert = Boolean(state?.mobileHeaderHidden && window.matchMedia("(max-width: 1023px)").matches);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(header);
@@ -121,8 +129,11 @@ export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {
       observer.disconnect();
       if (previous) style.setProperty("--app-shell-header-bottom", previous);
       else style.removeProperty("--app-shell-header-bottom");
+      if (previousHeight) style.setProperty("--game-header-height", previousHeight);
+      else style.removeProperty("--game-header-height");
+      header.inert = previousInert;
     };
-  }, [Boolean(state)]);
+  }, [Boolean(state), state?.mobileHeaderHidden]);
 
   return (
     <div ref={rootRef} className={`col-start-2 row-start-1 flex min-w-0 justify-end${state ? " xl:justify-center" : ""}`}>

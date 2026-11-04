@@ -74,9 +74,9 @@ export function DealAuctionDialog({
   const offeredRows = rows.filter((row) => row.status === "offered");
 
   return (
-    <section aria-labelledby={titleId} className="min-w-0 rounded-xl bg-card p-4 sm:p-5">
-        <div className="flex shrink-0 items-start gap-3 rounded-xl bg-[#e8effe] p-4">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-journey text-white shadow-[0_9px_24px_rgba(41,103,223,.24)]">
+    <section aria-labelledby={titleId} className="min-w-0 rounded-xl bg-card p-3 sm:p-4">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 shrink-0 text-journey">
             <Gavel size={21} aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -97,12 +97,12 @@ export function DealAuctionDialog({
             {card.bodyText ? (
               <p className="mt-2 break-words text-sm leading-6 text-muted">{card.bodyText}</p>
             ) : null}
-            <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-              <div className="rounded-xl bg-[#faf2e8] px-3 py-2.5">
+            <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-sm">
+              <div>
                 <dt className="text-xs font-bold text-muted">Первоначальный взнос</dt>
                 <dd className="mt-0.5 font-extrabold tabular-nums text-ink">{money(card.downPaymentCents)}</dd>
               </div>
-              <div className="rounded-xl bg-[#edf5e2] px-3 py-2.5">
+              <div>
                 <dt className="text-xs font-bold text-[#5e742e]">Денежный поток</dt>
                 <dd className="mt-0.5 font-extrabold tabular-nums text-ink">{money(card.cashflowCents)}/мес</dd>
               </div>

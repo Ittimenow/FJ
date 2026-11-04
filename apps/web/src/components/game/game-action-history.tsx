@@ -87,9 +87,9 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
         <span>{importantOnly ? "Важное" : "Все ходы"}</span>
       </button>
     </div> : null}
-    <ol className="game-turn-list m-0 list-none space-y-3 p-0" aria-live="polite" aria-busy={loading}>
-      {actions.slice(0, visibleCount).map((turn) => <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 rounded-xl bg-surface p-3 [overflow-wrap:anywhere]">
-        <TurnPlayer player={turn.player} />
+    <ol className="game-turn-list m-0 list-none p-0" aria-live="polite" aria-busy={loading}>
+      {actions.slice(0, visibleCount).map((turn) => <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 border-t-2 border-line pt-4 pb-5 [overflow-wrap:anywhere] first:border-t-0 first:pt-0">
+        <TurnPlayer player={turn.player} turnHeading />
         <ol className="game-turn-timeline m-0 list-none p-0">
           {turn.id === decisionTurnId ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение">{currentAction}</li> : null}
           {turn.events.map((event) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
@@ -108,9 +108,9 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   </section>;
 }
 
-function TurnPlayer({ player }: { player: GamePlayer }) {
+function TurnPlayer({ player, turnHeading = false }: { player: GamePlayer; turnHeading?: boolean }) {
   return <div className="mb-2 flex items-center gap-2" data-turn-identity={player.id}>
     <PlayerAvatar player={player} className="h-7 w-7" />
-    <span className="min-w-0 break-words text-xs font-extrabold text-ink">{gamePlayerName(player)}</span>
+    <span className="min-w-0 break-words text-xs font-extrabold text-ink">{turnHeading ? `Ход: ${gamePlayerName(player)}` : gamePlayerName(player)}</span>
   </div>;
 }

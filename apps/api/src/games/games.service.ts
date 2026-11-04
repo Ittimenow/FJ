@@ -6638,6 +6638,36 @@ export class GamesService {
     const activePlayers = game.players.filter(
       (player) => player.role === GameRole.PLAYER && player.status === "JOINED"
     );
+    const missingFigurineIds = activePlayers.filter((player) => !player.figurine || !isFigurineId(player.figurine)).map((player) => player.id);
+    const figurineSelections = missingFigurineIds.length > 0
+      ? await this.prisma.gameEvent.findMany({
+          where: { gameId, type: "player:figurine_selected", gamePlayerId: { in: missingFigurineIds } },
+          select: { gamePlayerId: true, payload: true },
+          orderBy: { sequence: "desc" }
+        })
+      : [];
+    const selectedFigurines = new Map<string, string>();
+    for (const selection of figurineSelections) {
+      const figurine = selection.payload && typeof selection.payload === "object" && !Array.isArray(selection.payload)
+        ? selection.payload.figurine
+        : null;
+      if (selection.gamePlayerId && typeof figurine === "string" && isFigurineId(figurine) && !selectedFigurines.has(selection.gamePlayerId)) {
+        selectedFigurines.set(selection.gamePlayerId, figurine);
+      }
+    }
+    if (game.status !== GameStatus.WAITING) {
+      const occupied = new Set([
+        ...activePlayers.map((player) => player.figurine).filter((value): value is string => Boolean(value && isFigurineId(value))),
+        ...selectedFigurines.values()
+      ]);
+      for (const player of activePlayers) {
+        if ((player.figurine && isFigurineId(player.figurine)) || selectedFigurines.has(player.id)) continue;
+        const available = figurines.find((figurine) => !occupied.has(figurine.id));
+        if (!available) break;
+        selectedFigurines.set(player.id, available.id);
+        occupied.add(available.id);
+      }
+    }
     const currentPlayer =
       activePlayers.length > 0
         ? activePlayers[game.currentTurnIndex % activePlayers.length]
@@ -6701,6 +6731,7 @@ export class GamesService {
       fastTrackBoard: fastTrackCells,
       players: game.players.map((player) => ({
         ...player,
+        figurine: player.figurine && isFigurineId(player.figurine) ? player.figurine : selectedFigurines.get(player.id) ?? null,
         assets: player.assets.map((asset) => ({ ...asset, name: realEstateAssetName(asset) }))
       })),
       events: [...game.events].reverse(),

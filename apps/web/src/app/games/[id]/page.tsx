@@ -85,7 +85,7 @@ export default async function GamePage({
       gameViewportMode={snapshot.game.status === "WAITING" ? null : gameRoomView}
       userName={userName}
       userAvatarUrl={membership?.user?.avatarUrl ?? null}
-      userFigurine={membership?.figurine ?? membership?.user?.figurine ?? session.user.figurine}
+      userFigurine={membership?.role === "PLAYER" ? membership.figurine : session.user.figurine}
       userAvatarColor={userAvatarColor}
       userInitials={userInitials}
     >

@@ -209,13 +209,21 @@
 :where(.fast-track) .fast-track-tablist button:focus-visible,
 :where(.fast-track) .fast-track-tab-panel:focus-visible,
 :where(.fast-track) .fast-track-timeline:focus-visible { outline: 2px solid #718866; outline-offset: -2px; }
+@media (max-width: 1023px) {
+  .game-room--fast-track-active > .fast-track { min-height: 0; flex: 1 1 auto; }
+  :where(.fast-track) .fast-track-mobile { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: 0; margin: 0; }
+  :where(.fast-track) .fast-track-timeline { flex: 0 0 auto; border-radius: 0; }
+  :where(.fast-track) .fast-track-tabs { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; border-radius: 0; box-shadow: none; }
+  :where(.fast-track) .fast-track-tablist { flex: 0 0 auto; }
+  :where(.fast-track) .fast-track-tab-panel:not([hidden]) { min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom))); }
+}
 @media (max-width: 860px) {
   :where(.fast-track) .mobile-controls { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 1023px) {
   :where(.fast-track) .board-shell { display: none; }
-  .fast-track.scroll-board { overflow: visible; overscroll-behavior: auto; }
+  .fast-track.scroll-board { overflow: hidden; }
   :where(.fast-track) .mobile-controls { min-width: 0; }
   :where(.fast-track) .mobile-controls .player-overview,
   :where(.fast-track) .mobile-controls .turn-activity { overflow: visible; max-height: none; overscroll-behavior: auto; }

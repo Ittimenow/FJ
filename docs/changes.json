@@ -4,6 +4,16 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "pin-mobile-game-controls-and-restore-figurines",
+          "category": "improvement",
+          "summary": "На телефоне поле и вкладки остаются сверху, меню скрывается и возвращается свайпом, ходы в истории легче различить, а в старых партиях снова видны фишки игроков."
+        },
+        {
+          "id": "simplify-game-cards-and-lobby-status",
+          "category": "improvement",
+          "summary": "На игровом поле стало меньше вложенных плашек, показатели игрока помещаются в две колонки на телефоне, а готовность участника показана под его данными."
+        },
+        {
           "id": "prevent-repeat-deal-auction",
           "category": "fix",
           "summary": "После аукциона без продажи та же возможность больше не предлагается игрокам повторно."

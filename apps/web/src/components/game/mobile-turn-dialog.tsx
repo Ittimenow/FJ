@@ -12,6 +12,7 @@ export function MobileTurnDialog({
   currentPlayer,
   isMine,
   canRoll,
+  paused = false,
   rolling,
   phase = "ready",
   disabled = false,
@@ -27,6 +28,7 @@ export function MobileTurnDialog({
   currentPlayer: GamePlayer | null;
   isMine: boolean;
   canRoll: boolean;
+  paused?: boolean;
   rolling: boolean;
   phase?: "ready" | "rolling" | "moving" | "landed";
   disabled?: boolean;
@@ -72,7 +74,7 @@ export function MobileTurnDialog({
             Пропустить
           </button> : null}
         </div>
-        {showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
+        {paused ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">Партия на паузе</p> : showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">
               <DiceFace value={diceValue} rolling={phase === "rolling"} direction={index % 2 === 0 ? "right" : "left"} />

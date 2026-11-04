@@ -6,6 +6,7 @@ import { BotLevelButtons, type BotLevelValue } from "./bot-level-buttons";
 import { MobileTurnDialog } from "./mobile-turn-dialog";
 import { boardStepDuration } from "./board-movement";
 import { useBoardMovement } from "./use-board-movement";
+import { useMobileGameHeader } from "./use-mobile-game-header";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
 import { OtherPlayersList } from "./other-players-list";
@@ -419,6 +420,7 @@ export function GameRoom({
   useEffect(() => { setTrackView(null); }, [me?.track, currentPlayer?.track]);
   const hasFastTrackPlayers = gamePlayers.some((player) => player.track === "FAST_TRACK");
   const viewportMode = snapshot.game.status === "WAITING" ? null : showFastTrack ? "classic" : gameRoomView;
+  const mobileHeaderHidden = useMobileGameHeader(viewportMode === "classic");
   const movement = useBoardMovement(snapshot, "RAT_RACE", me?.id, turnAnimationPhase);
   const boardSnapshot = movement.snapshot;
   useEffect(() => {
@@ -670,6 +672,7 @@ export function GameRoom({
       onResume: canResume ? () => void resumeGame() : null,
       hostDisplayView: canManage && !isSolo ? gameRoomView : null,
       viewportMode,
+      mobileHeaderHidden,
       trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && hasFastTrackPlayers ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
       onTrackChange: setTrackView,
       onCheckConnection: () => void refreshConnection()
@@ -696,6 +699,7 @@ export function GameRoom({
     showFastTrack,
     hasFastTrackPlayers,
     viewportMode,
+    mobileHeaderHidden,
     snapshot.game.rulesVersion,
     snapshot.chatMessages,
     remainingSeconds,
@@ -1378,12 +1382,13 @@ export function GameRoom({
       )}
     >
       <MobileTurnDialog
-        open={Boolean(me) && snapshot.game.status === "IN_PROGRESS"}
+        open={Boolean(me) && (snapshot.game.status === "IN_PROGRESS" || snapshot.game.status === "PAUSED")}
         currentPlayer={currentPlayer ?? null}
         isMine={currentPlayer?.id === me?.id}
         canRoll={canRoll && !pendingAction}
+        paused={snapshot.game.status === "PAUSED"}
         phase={turnAnimationPhase}
-        disabled={fastBusy}
+        disabled={fastBusy || snapshot.game.status === "PAUSED"}
         rolling={rollingDice}
         diceValues={diceFaces}
         diceCount={activeDiceCount}
@@ -1642,16 +1647,16 @@ export function GameRoom({
           </div>
           ) : null}
 
-      <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 lg:hidden">
+      <div className="mobile-game-region grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 lg:hidden">
         {snapshot.game.status !== "WAITING" ? (
-          <div className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-2">
-            <MobileBoard
-              snapshot={boardSnapshot}
-              movingPlayerId={movement.movingPlayerId}
-              selectedPlayer={boardSnapshot.players.find((player) => player.id === selectedPlayer?.id)}
-              containerRef={mobileBoardRef}
-            />
+          <div className="mobile-game-stack grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-2">
             <MobileGameTabs
+              board={<MobileBoard
+                snapshot={boardSnapshot}
+                movingPlayerId={movement.movingPlayerId}
+                selectedPlayer={boardSnapshot.players.find((player) => player.id === selectedPlayer?.id)}
+                containerRef={mobileBoardRef}
+              />}
               player={selectedPlayer}
               players={gamePlayers}
               currentPlayerId={snapshot.game.currentPlayerId}
@@ -2322,9 +2327,9 @@ function WaitingRoomOverview({
               const isPlayer = player.role === "PLAYER";
               const ready = !isPlayer || (Boolean(player.figurine) && (snapshot.game.rulesVersion !== 2 || isDreamCell(player.dreamCellIndex)));
               return (
-                <div key={player.id} className="flex min-w-0 items-center gap-3 rounded-xl bg-card p-3">
+                <div key={player.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-xl bg-card p-3">
                   <PlayerToken player={player} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
                     <div className="truncate text-sm font-extrabold">
                       {player.controller === "BOT"
                         ? `${gamePlayerName(player)} · ${player.botStrategy === "beginner_v1" ? "новичок" : player.botStrategy === "expert_v1" ? "эксперт" : "опытный бот"}`
@@ -2338,13 +2343,13 @@ function WaitingRoomOverview({
                   </div>
                   <span
                     className={[
-                      "shrink-0 rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide",
+                      "col-start-2 row-start-2 inline-flex max-w-full justify-self-start rounded-lg px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide",
                       ready ? "bg-[#eaf3e0] text-success" : "bg-[#fff0df] text-[#8a3d0a]"
                     ].join(" ")}
                   >
                     {ready ? "Готов" : !player.figurine ? "Без фигурки" : "Без мечты"}
                   </span>
-                  {canManage && !isSolo && player.userId !== snapshot.game.createdById && player.role !== "HOST" ? <button type="button" onClick={() => setRemoveTarget(player)} aria-label={`Удалить ${gamePlayerName(player)} из лобби`} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700"><X size={18} aria-hidden="true" /></button> : null}
+                  {canManage && !isSolo && player.userId !== snapshot.game.createdById && player.role !== "HOST" ? <button type="button" onClick={() => setRemoveTarget(player)} aria-label={`Удалить ${gamePlayerName(player)} из лобби`} className="col-start-3 row-start-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700"><X size={18} aria-hidden="true" /></button> : null}
                 </div>
               );
             })}
@@ -2879,7 +2884,7 @@ function MobileBoard({
 
   return (
     <div ref={containerRef} className="w-full min-w-0 max-w-full" data-moving-player={movingPlayerId ?? undefined}>
-      <div className="min-w-0 max-w-full overflow-hidden rounded-xl bg-card/60">
+      <div className="min-w-0 max-w-full overflow-hidden bg-card/60">
         <div
           ref={scrollRef}
           className="relative grid h-[88px] w-full min-w-0 max-w-full touch-pan-y snap-x snap-mandatory grid-flow-col auto-cols-auto overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -3118,8 +3123,7 @@ function PlayerIdentityMark({
   size?: "xs" | "sm" | "md" | "lg";
 }) {
   const name = gamePlayerName(player);
-  const figurine = player.figurine ?? player.user?.figurine;
-  const avatarUrl = player.user?.avatarUrl;
+  const figurine = player.figurine;
   const initials = name
     .split(/\s+/)
     .slice(0, 2)
@@ -3155,8 +3159,6 @@ function PlayerIdentityMark({
     >
       {figurine ? (
         <img src={figurineImagePath(figurine)} alt="" className="h-full w-full object-contain" />
-      ) : avatarUrl ? (
-        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
       ) : (
         initials
       )}
@@ -3273,6 +3275,7 @@ function PlayerStatusBadges({ state }: { state: FinancialState }) {
 type MobileGameTab = "turn" | "player" | "assets" | "expenses" | "liabilities";
 
 function MobileGameTabs({
+  board,
   player,
   players,
   currentPlayerId,
@@ -3284,6 +3287,7 @@ function MobileGameTabs({
   turnTabRequest,
   actions
 }: {
+  board: ReactNode;
   player: GamePlayer | undefined;
   players: GamePlayer[];
   currentPlayerId: string | null;
@@ -3320,7 +3324,9 @@ function MobileGameTabs({
   ];
 
   return (
-    <Card className="w-full min-w-0 max-w-full rounded-2xl border-0">
+    <section className="mobile-game-layout flex h-full min-h-0 w-full min-w-0 flex-col bg-white">
+      <div className="mobile-game-pinned shrink-0 bg-card">
+      {board}
       <div
         className="grid min-w-0 grid-cols-5 gap-1.5 bg-[#eef3e8] p-2"
         role="tablist"
@@ -3381,12 +3387,13 @@ function MobileGameTabs({
           );
         })}
       </div>
+      </div>
 
       <div
         id="mobile-game-tab-panel"
         role="tabpanel"
         aria-labelledby={`mobile-game-tab-${activeTab}`}
-        className="min-w-0 max-w-full overflow-x-hidden p-3 min-[420px]:p-4"
+        className="mobile-game-scroll-panel min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 min-[420px]:p-4"
       >
         <div className={activeTab === "turn" ? "block" : "hidden"} aria-hidden={activeTab !== "turn"}>
           {actions}
@@ -3426,7 +3433,7 @@ function MobileGameTabs({
                 Банк
               </Button>
             </div>
-            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2">
               <Metric label="Наличные" value={money(state.cashCents)} />
               <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
               <Metric label="Зарплата" value={money(state.salaryCents)} />
@@ -3474,7 +3481,7 @@ function MobileGameTabs({
           />
         ) : null}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -4373,7 +4380,7 @@ function ActionsPanel({
               ) : null}
             </div>
             {latestCard.isStock ? (
-              <div className="mt-3 rounded-md bg-surface p-3 text-sm">
+              <div className="mt-3 border-t border-line/70 pt-3 text-sm">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                     Расчёт стоимости
@@ -5118,7 +5125,7 @@ function CashChangeVisualization({ change }: { change: CashChange }) {
           <strong className={`tabular-nums ${positive ? "text-success" : "text-red-700"}`}>{expression.effect}</strong>
           <span className="sr-only">равно</span>
           <span className="text-neutral-500" aria-hidden="true">→</span>
-          <strong className="rounded-md bg-white px-2.5 py-1 font-semibold tabular-nums text-black">{expression.after}</strong>
+          <strong className="font-semibold tabular-nums text-ink">{expression.after}</strong>
         </>
       ) : (
         <strong className={positive ? "text-success" : "text-red-700"}>
@@ -5215,28 +5222,21 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
 
   return (
     <div
-      className={`w-full min-w-0 max-w-full overflow-hidden rounded-lg shadow-[0_8px_20px_rgba(27,57,118,.10)] [overflow-wrap:anywhere] ${appearance.container}`}
+      className={`w-full min-w-0 max-w-full rounded-lg p-3 [overflow-wrap:anywhere] ${appearance.container}`}
     >
-      <div className="p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
-            {cardTypes[cardType] ?? "Карточка"}
-          </span>
-        </div>
-        <div className="mt-2 text-base font-semibold text-neutral-900">{title}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
+          {cardTypes[cardType] ?? "Карточка"}
+        </span>
       </div>
+      <div className="mt-2 text-base font-semibold text-neutral-900">{title}</div>
       {bodyText ? (
-        <div className={`border-t px-3 py-2.5 ${appearance.section}`}>
-          <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Описание
-          </div>
-          <div className="mt-1 whitespace-pre-line text-sm leading-5 text-neutral-800">
-            <MoneyBoldText text={bodyText} />
-          </div>
+        <div className="mt-2 whitespace-pre-line text-sm leading-5 text-neutral-800">
+          <MoneyBoldText text={bodyText} />
         </div>
       ) : null}
       {effectDetails.length > 0 || financialDetails.length > 0 ? (
-        <div className={`grid gap-3 border-t px-3 py-2.5 sm:grid-cols-2 ${appearance.section}`}>
+        <div className={`mt-3 grid gap-3 border-t pt-3 sm:grid-cols-2 ${appearance.section}`}>
           {financialDetails.length > 0 ? (
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">

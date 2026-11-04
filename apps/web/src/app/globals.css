@@ -17,6 +17,7 @@
   --burnt: #c0560c;
   --sand: #dfcebb;
   --muted: #657597;
+  --game-header-height: calc(max(0.75rem, env(safe-area-inset-top)) + 4rem);
 }
 
 * {
@@ -358,6 +359,63 @@ body.game-room-viewport-locked {
   padding-right: max(1rem, env(safe-area-inset-right));
   padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+@media (max-width: 1023px) {
+  .app-shell--game-classic-active {
+    display: flex;
+    height: 100dvh;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-shell--game-classic-active > .app-shell-header {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+    transition: margin-top 240ms cubic-bezier(.2, .8, .2, 1);
+  }
+
+  .app-shell--game-classic-active.app-shell--game-header-hidden > .app-shell-header {
+    margin-top: calc(-1 * var(--game-header-height));
+  }
+
+  .app-shell--game-classic-active > .app-shell-main {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :is(.game-room--classic-active, .game-room--fast-track-active) {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .game-room--classic-active > .mobile-game-region,
+  .game-room--classic-active .mobile-game-stack {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .mobile-game-scroll-panel {
+    scrollbar-color: #c5b5a3 transparent;
+    padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell--game-classic-active > .app-shell-header { transition: none; }
 }
 
 .journey-board-stage:fullscreen {
