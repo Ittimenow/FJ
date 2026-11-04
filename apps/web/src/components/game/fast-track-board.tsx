@@ -2,7 +2,7 @@
 
 import { fastTrackCells, fastTrackOwner, fastTrackPrice, readFastTrackWorld, type FastTrackCell } from "@cashflow/shared";
 import { BriefcaseBusiness, Dices, UserRound } from "lucide-react";
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { money } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer, GameSnapshot } from "@/lib/types";
@@ -51,6 +51,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
   const [externalPanels, setExternalPanels] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [activeTab, setActiveTab] = useState<"turn" | "player" | "assets">("turn");
+  const turnPanelRef = useRef<HTMLDivElement>(null);
   const tabId = useId();
   const pending = snapshot.game.pendingAction;
   const decisionId = pending?.type === "fast_track_choice" && pending.gamePlayerId === player?.id ? pending.decisionId : null;
@@ -65,8 +66,10 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
     if (root.current) observer.observe(root.current);
     return () => { observer.disconnect(); media.removeEventListener("change", updateMobile); };
   }, []);
-  useEffect(() => { if (decisionId || phase === "rolling") setActiveTab("turn"); }, [decisionId, phase]);
-  useEffect(() => { if (turnTabRequest > 0) setActiveTab("turn"); }, [turnTabRequest]);
+  useLayoutEffect(() => { if (turnTabRequest > 0) setActiveTab("turn"); }, [turnTabRequest]);
+  useLayoutEffect(() => {
+    if (turnTabRequest > 0 && activeTab === "turn") turnPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [activeTab, turnTabRequest]);
   useEffect(() => {
     const container = viewport.current;
     const cell = container?.querySelector<HTMLElement>(`[data-fast-cell="${Math.max(0, position)}"]`);
@@ -110,7 +113,7 @@ export function FastTrackBoard({ snapshot, player, diceAction, actions, history,
             {tab.id === "turn" && decisionId ? <span className="fast-track-tab-attention" aria-label="Требуется действие" /> : null}
           </button>)}
         </div>
-        <div id={`${tabId}-turn-panel`} role="tabpanel" aria-labelledby={`${tabId}-turn`} hidden={activeTab !== "turn"} tabIndex={0} className="fast-track-tab-panel">{turn}</div>
+        <div ref={turnPanelRef} id={`${tabId}-turn-panel`} role="tabpanel" aria-labelledby={`${tabId}-turn`} hidden={activeTab !== "turn"} tabIndex={0} className="fast-track-tab-panel">{turn}</div>
         <div id={`${tabId}-player-panel`} role="tabpanel" aria-labelledby={`${tabId}-player`} hidden={activeTab !== "player"} tabIndex={0} className="fast-track-tab-panel">{overview}</div>
         <div id={`${tabId}-assets-panel`} role="tabpanel" aria-labelledby={`${tabId}-assets`} hidden={activeTab !== "assets"} tabIndex={0} className="fast-track-tab-panel">
           {focusPlayer ? <PlayerAssets snapshot={snapshot} player={focusPlayer} /> : <p className="empty-assets">На большом круге пока нет игроков.</p>}

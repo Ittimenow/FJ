@@ -12,6 +12,7 @@ export function MobileTurnDialog({
   currentPlayer,
   isMine,
   canRoll,
+  requiresDecision = false,
   paused = false,
   rolling,
   phase = "ready",
@@ -22,12 +23,14 @@ export function MobileTurnDialog({
   onRoll,
   onEnterFastTrack,
   onSkip,
+  onShowTurn,
   rollLabel
 }: {
   open: boolean;
   currentPlayer: GamePlayer | null;
   isMine: boolean;
   canRoll: boolean;
+  requiresDecision?: boolean;
   paused?: boolean;
   rolling: boolean;
   phase?: "ready" | "rolling" | "moving" | "landed";
@@ -38,6 +41,7 @@ export function MobileTurnDialog({
   onRoll: () => void;
   onEnterFastTrack?: (() => void) | undefined;
   onSkip?: (() => void) | undefined;
+  onShowTurn?: (() => void) | undefined;
   rollLabel?: string | undefined;
 }) {
   const [mobileViewport, setMobileViewport] = useState(false);
@@ -74,7 +78,7 @@ export function MobileTurnDialog({
             Пропустить
           </button> : null}
         </div>
-        {paused ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">Партия на паузе</p> : showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
+        {paused ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">Партия на паузе</p> : requiresDecision ? <Button type="button" variant="action" className="min-h-12 min-w-0 w-full px-2 text-xs text-white min-[360px]:text-sm" onClick={onShowTurn} disabled={disabled}>Требуется ваше решение</Button> : showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">
               <DiceFace value={diceValue} rolling={phase === "rolling"} direction={index % 2 === 0 ? "right" : "left"} />

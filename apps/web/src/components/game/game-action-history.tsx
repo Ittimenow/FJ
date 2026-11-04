@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { Eye, ListFilter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GameEvent, GamePlayer } from "@/lib/types";
 import { eventHeadline } from "./game-journal";
-import { importantActionEventIds, mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
+import { compactTurnMovement, importantActionEventIds, mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
 import { PlayerAvatar } from "./player-avatar";
 import "./game-action-history.css";
 
@@ -21,7 +22,7 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   fastTrackOnly?: boolean;
   gameStatus?: string;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
-  renderAction?: (event: GameEvent, allEvents: GameEvent[]) => ReactNode;
+  renderAction?: (event: GameEvent, allEvents: GameEvent[], pairedRoll?: GameEvent) => ReactNode;
   header?: ReactNode;
 }) {
   const [history, setHistory] = useState(events);
@@ -75,16 +76,15 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
     } finally { setLoading(false); }
   }
 
-  const actionBody = (event: GameEvent) => renderAction
-    ? renderAction(event, history)
-    : <p className="m-0 text-sm leading-5 text-ink">{eventHeadline(event)}</p>;
+  const actionBody = (event: GameEvent, pairedRoll?: GameEvent) => renderAction
+    ? renderAction(event, history, pairedRoll)
+    : <p className="m-0 text-sm leading-5 text-ink">{pairedRoll ? `${eventHeadline(pairedRoll)} · ` : ""}{eventHeadline(event)}</p>;
 
   return <section className="game-action-history min-w-0" aria-label={fastTrackOnly ? "История большого круга" : "История действий игроков"}>
     {header}
-    {viewerPlayerId ? <div className="game-history-filter mb-3 flex justify-end">
-      <button type="button" role="switch" aria-label="Важное" aria-checked={importantOnly} onClick={() => setImportantOnly((value) => !value)} className="game-history-switch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey">
-        <span className="game-history-switch-knob" aria-hidden="true" />
-        <span>{importantOnly ? "Важное" : "Все ходы"}</span>
+    {viewerPlayerId ? <div className="game-history-filter">
+      <button type="button" aria-label={importantOnly ? "Показать все ходы" : "Показать только важное"} aria-pressed={importantOnly} title={importantOnly ? "Важное" : "Все ходы"} onClick={() => setImportantOnly((value) => !value)} className={`game-history-switch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey ${importantOnly ? "game-history-switch--important" : ""}`}>
+        {importantOnly ? <ListFilter size={16} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
       </button>
     </div> : null}
     <ol className="game-turn-list m-0 list-none p-0" aria-live="polite" aria-busy={loading}>
@@ -92,12 +92,12 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
         <TurnPlayer player={turn.player} turnHeading />
         <ol className="game-turn-timeline m-0 list-none p-0">
           {turn.id === decisionTurnId ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение">{currentAction}</li> : null}
-          {turn.events.map((event) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
-            {actionBody(event)}
+          {compactTurnMovement(turn.events).map(({ event, roll }) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
+            {actionBody(event, roll)}
           </li>)}
-          {turn.otherActions.flatMap((group) => group.events.map((event, index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player?.id}>
+          {turn.otherActions.flatMap((group) => compactTurnMovement(group.events).map(({ event, roll }, index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player?.id}>
             {index === 0 && group.player ? <TurnPlayer player={group.player} /> : null}
-            {actionBody(event)}
+            {actionBody(event, roll)}
           </li>))}
         </ol>
       </li>)}

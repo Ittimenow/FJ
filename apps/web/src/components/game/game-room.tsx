@@ -9,6 +9,7 @@ import { useBoardMovement } from "./use-board-movement";
 import { useMobileGameHeader } from "./use-mobile-game-header";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
+import { recoveredActionEvents } from "./game-action-timeout";
 import { OtherPlayersList } from "./other-players-list";
 
 import {
@@ -140,6 +141,13 @@ type GameActionResult = {
 };
 
 type TurnAnimationPhase = "ready" | "rolling" | "moving" | "landed";
+const socketTimeoutMessage = "Сервер долго не отвечает. Проверьте соединение и повторите действие.";
+const socketRecoveryMessage = "Ответ задержался. Состояние партии обновлено — проверьте результат перед повтором.";
+const socketUnavailableMessage = "Игровой сервер пока недоступен. Переподключение выполняется автоматически.";
+
+function isConnectionError(message: string | null) {
+  return message === socketTimeoutMessage || message === socketRecoveryMessage || message === socketUnavailableMessage;
+}
 type DecisionSubmission =
   | "deal_buy"
   | "deal_decline"
@@ -246,6 +254,7 @@ export function GameRoom({
     socketRef.current = socket;
 
     socket.on("connect", () => {
+      setError((current) => current === socketUnavailableMessage ? null : current);
       setConnection((current) => ({
         ...current,
         phase: "connected",
@@ -281,6 +290,7 @@ export function GameRoom({
         return;
       }
       setSnapshot((current) => acceptGameSnapshot(current, value));
+      setError((current) => isConnectionError(current) ? null : current);
     });
     socket.on("game:deleted", () => leaveGamePage());
     socket.on(realtimeEvents.chatMessage, (message) => {
@@ -305,7 +315,7 @@ export function GameRoom({
       setError(
         phase === "session_expired"
           ? "Сессия истекла. Войдите в аккаунт заново."
-          : "Игровой сервер пока недоступен. Переподключение выполняется автоматически."
+          : socketUnavailableMessage
       );
     });
     const handleOffline = () => {
@@ -604,11 +614,6 @@ export function GameRoom({
   useEffect(() => {
     setDealAuctionBid("");
   }, [dealAuction?.cardId]);
-  useEffect(() => {
-    if (isDealAuctionBidder && !dealAuctionResponse) {
-      setTurnTabRequest((current) => current + 1);
-    }
-  }, [dealAuction?.cardId, isDealAuctionBidder]);
   const auctionPanel = dealAuction && dealAuctionCard && (isDealAuctionSeller || isDealAuctionBidder) ? (
     <DealAuctionDialog
       open
@@ -638,6 +643,9 @@ export function GameRoom({
   const stockSaleOffer = useMemo(
     () => stockSaleOfferForPlayer(pendingAction, me),
     [me, pendingAction]
+  );
+  const requiresOwnDecision = snapshot.game.status === "IN_PROGRESS" && Boolean(
+    ownPendingAction || stockSaleOffer || (isDealAuctionBidder && !dealAuctionResponse)
   );
   const currentStockSaleResetKey = stockSaleResetKey(stockSaleOffer);
   useEffect(() => {
@@ -919,13 +927,14 @@ export function GameRoom({
         reject(new Error("Соединение с игрой неактивно"));
         return;
       }
+      const previousSequence = snapshot.events.reduce((max, item) => Math.max(max, item.sequence), 0);
       socket.timeout(10_000).emit(
         event,
         {
           gameId: snapshot.game.id,
           ...payload
         },
-        (timeoutError: Error | null, result?: GameActionResult) => {
+        async (timeoutError: Error | null, result?: GameActionResult) => {
           if (timeoutError) {
             const message = `Команда ${event} не получила ответ за 10 секунд`;
             void reportConnectionIssue({
@@ -935,7 +944,30 @@ export function GameRoom({
               message,
               diagnostics: connection
             });
-            reject(new Error("Сервер долго не отвечает. Проверьте соединение и повторите действие."));
+            void refreshConnection(socket);
+            try {
+              const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+                signal: AbortSignal.timeout(5_000)
+              });
+              if (response.ok) {
+                const latest = await response.json() as GameSnapshot;
+                if (latest?.game?.id === snapshot.game.id) {
+                  setSnapshot((current) => acceptGameSnapshot(current, latest));
+                  const recovered = recoveredActionEvents(event, latest.events, previousSequence, me?.id ?? null);
+                  if (recovered) {
+                    resolve({ snapshot: latest, events: recovered });
+                    return;
+                  }
+                  reject(new Error(socketRecoveryMessage));
+                  return;
+                }
+              }
+            } catch {
+              // The HTTP check is best effort; the socket may still reconnect.
+            }
+            reject(new Error(socketTimeoutMessage));
             return;
           }
           resolve(result ?? {});
@@ -1047,7 +1079,6 @@ export function GameRoom({
     try {
       const result = await emitWithAck("turn:skip", {});
       applyActionResult(result);
-      setTurnTabRequest((current) => current + 1);
     } catch (event) {
       setError(gameErrorMessage(event, "Не удалось пропустить ход"));
     }
@@ -1386,6 +1417,7 @@ export function GameRoom({
         currentPlayer={currentPlayer ?? null}
         isMine={currentPlayer?.id === me?.id}
         canRoll={canRoll && !pendingAction}
+        requiresDecision={requiresOwnDecision}
         paused={snapshot.game.status === "PAUSED"}
         phase={turnAnimationPhase}
         disabled={fastBusy || snapshot.game.status === "PAUSED"}
@@ -1394,6 +1426,7 @@ export function GameRoom({
         diceCount={activeDiceCount}
         maxCompactViewportWidth={showFastTrack || gameRoomView === "classic" ? 1023 : 1279}
         onSkip={skipTurn}
+        onShowTurn={() => setTurnTabRequest((current) => current + 1)}
         onEnterFastTrack={canEnterFastTrack ? () => { void fastAction("fast-track/enter"); } : undefined}
         rollLabel={canEnterFastTrack ? "Бросить кубики" : undefined}
         onRoll={() => { void rollDice(); }}
@@ -3300,13 +3333,17 @@ function MobileGameTabs({
   actions: ReactNode;
 }) {
   const [activeTab, setActiveTab] = useState<MobileGameTab>("player");
+  const scrollPanelRef = useRef<HTMLDivElement>(null);
   const state = player?.financialState;
   const assetCount = player?.assets.length ?? 0;
   const liabilities = player ? repayableLiabilityRows(player) : [];
   const actionAttention = Boolean(actionAttentionKey);
 
   useLayoutEffect(() => {
-    if (turnTabRequest > 0) setActiveTab("turn");
+    if (turnTabRequest > 0) {
+      setActiveTab("turn");
+      scrollPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    }
   }, [turnTabRequest]);
 
   const tabs: Array<{
@@ -3390,10 +3427,11 @@ function MobileGameTabs({
       </div>
 
       <div
+        ref={scrollPanelRef}
         id="mobile-game-tab-panel"
         role="tabpanel"
         aria-labelledby={`mobile-game-tab-${activeTab}`}
-        className="mobile-game-scroll-panel min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 min-[420px]:p-4"
+        className={cn("mobile-game-scroll-panel min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 min-[420px]:p-4", activeTab === "turn" && "pt-0 min-[420px]:pt-0")}
       >
         <div className={activeTab === "turn" ? "block" : "hidden"} aria-hidden={activeTab !== "turn"}>
           {actions}
@@ -4714,12 +4752,12 @@ function GameTurnFeed({
       return data.events;
     }}
     header={showHeader ? <div className="mb-3 flex items-center justify-between gap-2"><h3 className="text-sm font-extrabold">История действий</h3></div> : null}
-    renderAction={(event, allEvents) => event.type === realtimeEvents.cardDraw ? <JournalCardDraw event={event} /> : event.type === "player:baby" ? <BabyJournalEvent
+    renderAction={(event, allEvents, pairedRoll) => event.type === realtimeEvents.cardDraw ? <JournalCardDraw event={event} /> : event.type === "player:baby" ? <BabyJournalEvent
       event={event} allEvents={allEvents} players={players}
       recipient={gamePlayerForEvent(event, players) ?? undefined}
       currentGamePlayerId={currentGamePlayerId} currentGamePlayer={viewingPlayer}
       gameStatus={gameStatus} onSendBabyGift={onSendBabyGift}
-    /> : <div className="text-sm"><GameEventPresentation event={event} /></div>}
+    /> : <div className="text-sm"><GameEventPresentation event={event} pairedRoll={pairedRoll} /></div>}
   />;
 }
 
@@ -4996,18 +5034,20 @@ const eventTitleIcons = {
 
 function GameEventPresentation({
   event,
+  pairedRoll,
   titleClassName = "font-medium"
 }: {
   event: GameEvent;
+  pairedRoll?: GameEvent | undefined;
   titleClassName?: string;
 }) {
   const cashChange = eventCashChange(event);
-  const details = compactEventDetails(event);
+  const details = pairedRoll ? [...compactEventDetails(pairedRoll), ...compactEventDetails(event)] : compactEventDetails(event);
 
   return (
     <div className="min-w-0 max-w-full text-sm">
       <div className={`text-neutral-800 ${titleClassName}`}>
-        <GameEventHeadline event={event} />
+        <GameEventHeadline event={event} pairedRoll={pairedRoll} />
       </div>
       {cashChange ? <CashChangeVisualization change={cashChange} /> : null}
       {details.length > 0 ? (
@@ -5023,27 +5063,28 @@ function GameEventPresentation({
   );
 }
 
-function GameEventHeadline({ event }: { event: GameEvent }) {
+function diceResultText(event: GameEvent) {
+  const diceValues = Array.isArray(event.payload.diceValues)
+    ? event.payload.diceValues
+        .map((value) => toNumber(value))
+        .filter((value) => Number.isFinite(value))
+    : [];
+  const total = toNumber(event.payload.dice);
+  return diceValues.length > 0
+    ? `${diceValues.join(" + ")} = ${Number.isFinite(total) ? total : diceValues.reduce((sum, value) => sum + value, 0)}`
+    : String(Number.isFinite(total) ? total : "—");
+}
+
+function GameEventHeadline({ event, pairedRoll }: { event: GameEvent; pairedRoll?: GameEvent | undefined }) {
   if (event.type === "fast_track:purchased" && event.payload.previousOwnerId) {
     return <span>Выкуплено: {String(event.payload.title ?? "возможность большого круга")}</span>;
   }
   if (event.type === realtimeEvents.playerRollDice) {
-    const diceValues = Array.isArray(event.payload.diceValues)
-      ? event.payload.diceValues
-          .map((value) => toNumber(value))
-          .filter((value) => Number.isFinite(value))
-      : [];
-    const total = toNumber(event.payload.dice);
-    const expression =
-      diceValues.length > 0
-        ? `${diceValues.join(" + ")} = ${Number.isFinite(total) ? total : diceValues.reduce((sum, value) => sum + value, 0)}`
-        : String(Number.isFinite(total) ? total : "—");
-
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
         <Dices size={16} className="shrink-0 text-journey" aria-hidden="true" />
         <span className="sr-only">Бросок кубика: </span>
-        <span>{expression}</span>
+        <span>{diceResultText(event)}</span>
       </span>
     );
   }
@@ -5057,8 +5098,7 @@ function GameEventHeadline({ event }: { event: GameEvent }) {
 
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <MoveRight size={16} className="shrink-0 text-journey" aria-hidden="true" />
-        <span className="sr-only">Перемещение по полю: </span>
+        {pairedRoll ? <><Dices size={16} className="shrink-0 text-journey" aria-hidden="true" /><span className="sr-only">Бросок кубика и перемещение по полю: </span><span>{diceResultText(pairedRoll)}</span><span aria-hidden="true">·</span></> : <><MoveRight size={16} className="shrink-0 text-journey" aria-hidden="true" /><span className="sr-only">Перемещение по полю: </span></>}
         <span>
           {compactBoardPosition(from)} → {compactBoardPosition(to)}
         </span>

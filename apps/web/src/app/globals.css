@@ -361,6 +361,12 @@ body.game-room-viewport-locked {
   padding-left: max(1rem, env(safe-area-inset-left));
 }
 
+.app-shell-main:has(> .game-results-page) {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+}
+
 @media (max-width: 1023px) {
   .app-shell--game-classic-active {
     display: flex;

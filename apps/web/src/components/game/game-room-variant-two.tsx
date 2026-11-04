@@ -72,6 +72,7 @@ export function GameRoomVariantTwo({
   const initialSelectedId = me?.id ?? currentPlayer?.id ?? players[0]?.id ?? null;
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(initialSelectedId);
   const [compactSection, setCompactSection] = useState<CompactSection>("finance");
+  const actionsPanelRef = useRef<HTMLElement>(null);
   const selectedPlayer =
     players.find((player) => player.id === selectedPlayerId) ?? me ?? players[0];
   const actionAttention = snapshot.game.pendingAction?.gamePlayerId === me?.id;
@@ -83,7 +84,13 @@ export function GameRoomVariantTwo({
   }, [initialSelectedId, players, selectedPlayerId]);
 
   useLayoutEffect(() => {
-    if (turnTabRequest > 0) setCompactSection("actions");
+    if (turnTabRequest <= 0) return;
+    setCompactSection("actions");
+    const frame = requestAnimationFrame(() => {
+      actionsPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
+      actionsPanelRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [turnTabRequest]);
 
   const compactTabs: Array<{
@@ -191,11 +198,12 @@ export function GameRoomVariantTwo({
         </div>
 
         <aside
+          ref={actionsPanelRef}
           id="journey-mobile-panel-actions"
           role="tabpanel"
           aria-labelledby="journey-mobile-tab-actions"
           className={[
-            "min-w-0 space-y-3 xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1",
+            "min-w-0 scroll-mt-24 space-y-3 xl:block xl:h-full xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1",
             compactSection === "actions" ? "block" : "hidden"
           ].join(" ")}
         >

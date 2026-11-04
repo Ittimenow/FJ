@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "refine-turn-decisions-history-and-results",
+          "category": "improvement",
+          "summary": "На телефоне решение открывается по кнопке без смены вкладки, история и результаты занимают меньше места, а после задержки ответа состояние партии сверяется с сервером."
+        },
+        {
           "id": "pin-mobile-game-controls-and-restore-figurines",
           "category": "improvement",
           "summary": "На телефоне поле и вкладки остаются сверху, меню скрывается и возвращается свайпом, ходы в истории легче различить, а в старых партиях снова видны фишки игроков."

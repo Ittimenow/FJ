@@ -187,7 +187,7 @@
 :where(.fast-track) .fast-track-tab-panel > .empty-assets { margin: 0; padding: 12px; }
 :where(.fast-track) .fast-track-tab-panel .player-overview,
 :where(.fast-track) .fast-track-tab-panel .turn-activity { overflow: visible; border-radius: 0; box-shadow: none; }
-:where(.fast-track) .fast-track-tab-panel .turn-activity { padding-top: 12px; }
+:where(.fast-track) .fast-track-tab-panel .turn-activity { padding-top: 0; }
 :where(.fast-track) .fast-track-tab-panel .fast-track-turn-options { padding-top: 0; }
 :where(.fast-track) .fast-track-tab-panel .player-goal { margin-top: 20px; }
 :where(.fast-track) .fast-track-tab-panel .player-goal .player-section-heading { margin: 0; }

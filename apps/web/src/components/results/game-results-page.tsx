@@ -29,30 +29,30 @@ export function GameResultsPage({ results, viewerId }: { results: GameResultsRes
   const gameHref = `/games/${results.game.id}?view=game`;
 
   return (
-    <main className="min-h-screen bg-canvas px-4 pb-20 pt-6 text-ink sm:px-6 sm:pt-10">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={gameHref as Route} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-journey shadow-panel focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
+    <main className="game-results-page min-h-screen bg-canvas px-3 pb-10 pt-3 text-ink sm:px-5 sm:pt-5">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Link href={gameHref as Route} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-sm font-bold text-journey shadow-panel focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25">
             <ArrowLeft size={17} aria-hidden="true" /> Вернуться к игре
           </Link>
-          <p className="text-sm font-semibold text-muted">{results.game.title}</p>
+          <p className="min-w-0 truncate text-xs font-semibold text-muted">{results.game.title}</p>
         </div>
 
         {canViewMine ? (
-          <div className="mt-7 inline-flex max-w-full flex-wrap gap-1 rounded-2xl bg-white p-1.5 shadow-panel" aria-label="Чьи результаты показать">
+          <div className="mt-3 inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-white p-1 shadow-panel" aria-label="Чьи результаты показать">
             <button type="button" aria-pressed={view === "game"} onClick={() => setView("game")}
-              className={`min-h-11 rounded-xl px-4 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${view === "game" ? "bg-journey text-white" : "text-journey hover:bg-canvas"}`}>
+              className={`min-h-10 rounded-lg px-3 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${view === "game" ? "bg-journey text-white" : "text-journey hover:bg-canvas"}`}>
               Итоги партии
             </button>
             <button type="button" aria-pressed={view === "mine"} onClick={() => setView("mine")}
-              className={`min-h-11 rounded-xl px-4 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${view === "mine" ? "bg-journey text-white" : "text-journey hover:bg-canvas"}`}>
+              className={`min-h-10 rounded-lg px-3 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 ${view === "mine" ? "bg-journey text-white" : "text-journey hover:bg-canvas"}`}>
               Посмотреть свои результаты
             </button>
           </div>
         ) : null}
 
         {view === "mine" && canViewMine && viewer && viewerResult ? (
-          <div className="mt-8 space-y-8">
+          <div className="mt-5 space-y-5">
             <PlayerHeading title="Ваши результаты" player={viewer} description="Ваш путь в завершённой партии" />
             <Turns result={viewerResult} />
             {viewer.track === "FAST_TRACK" ? (
@@ -71,11 +71,11 @@ export function GameResultsPage({ results, viewerId }: { results: GameResultsRes
             <Awards title="Ваши награды" awards={results.awards.filter((award) => award.playerId === viewer.id)} />
           </div>
         ) : (
-          <div className="mt-8 space-y-9">
+          <div className="mt-5 space-y-5">
             {winner && winnerResult ? (
               <>
                 <section className="overflow-hidden rounded-[26px] bg-ink text-white shadow-[0_24px_55px_rgba(23,36,63,.18)]" aria-labelledby="winner-heading">
-                  <div className="grid gap-7 p-6 sm:p-9 lg:grid-cols-[minmax(0,1fr)_minmax(220px,.42fr)] lg:items-center">
+                  <div className="grid gap-4 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(220px,.42fr)] lg:items-center">
                     <div>
                       <div className="flex items-center gap-4"><GamePlayerMark player={winner} size="lg" /><span className="text-sm font-bold text-white/75">Победитель партии</span></div>
                       <h1 id="winner-heading" className="mt-5 text-balance text-4xl font-extrabold tracking-[-0.035em] sm:text-5xl">{gamePlayerName(winner)}</h1>
@@ -174,7 +174,7 @@ function Assets({ title, items }: { title: string; items: AssetLine[] }) {
 }
 
 function Awards({ title, awards }: { title: string; awards: GameResultsResponse["awards"] }) {
-  return <section className="space-y-4" aria-label={title}><h2 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl"><Trophy size={24} className="text-[#947414]" aria-hidden="true" />{title}</h2>{awards.length ? <AwardCards awards={awards} /> : <p className="rounded-xl bg-white px-5 py-4 text-sm text-muted">В этой партии наград нет.</p>}</section>;
+  return <section className="space-y-2" aria-label={title}><h2 className="flex items-center gap-2 text-2xl font-extrabold sm:text-3xl"><Trophy size={24} className="text-[#947414]" aria-hidden="true" />{title}</h2>{awards.length ? <AwardCards awards={awards} /> : <p className="rounded-xl bg-white px-5 py-4 text-sm text-muted">В этой партии наград нет.</p>}</section>;
 }
 
 function smallAssets(assets: PlayerAsset[]): AssetLine[] {

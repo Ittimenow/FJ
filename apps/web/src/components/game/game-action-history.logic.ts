@@ -13,6 +13,23 @@ export function mergeActionEvents(current: GameEvent[], incoming: GameEvent[]) {
   return [...events.values()].sort((a, b) => b.sequence - a.sequence);
 }
 
+/** Keep the raw event log intact while displaying a roll and its move as one step. */
+export function compactTurnMovement(events: GameEvent[]) {
+  const entries: Array<{ event: GameEvent; roll?: GameEvent }> = [];
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index]!;
+    const next = events[index + 1];
+    if (event.type === "player:move" && next?.type === "player:roll_dice"
+      && event.gamePlayer?.id && event.gamePlayer.id === next.gamePlayer?.id) {
+      entries.push({ event, roll: next });
+      index += 1;
+    } else {
+      entries.push({ event });
+    }
+  }
+  return entries;
+}
+
 /** One card belongs to the turn owner; other participants stay inside that turn. */
 export function playerActionTurns(events: GameEvent[], players: GamePlayer[], onlyPlayerId?: string | null, fastTrackOnly = false, currentPlayerId?: string | null, additionalEventIds?: ReadonlySet<string>) {
   const visibleIds = new Set(playerActionEvents(events, players, onlyPlayerId).map((event) => event.id));
