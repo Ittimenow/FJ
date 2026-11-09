@@ -55,7 +55,7 @@ export function MobileTurnDialog({
   }, [maxCompactViewportWidth]);
 
   if (!open || !mobileViewport || !currentPlayer) return null;
-  const showDice = rolling || phase !== "ready";
+  const showDice = rolling || (!requiresDecision && phase !== "ready");
 
   return <>
     <span className="mobile-turn-bar-anchor" aria-hidden="true" />
@@ -78,13 +78,13 @@ export function MobileTurnDialog({
             Пропустить
           </button> : null}
         </div>
-        {paused ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">Партия на паузе</p> : requiresDecision ? <Button type="button" variant="action" className="min-h-12 min-w-0 w-full px-2 text-xs text-white min-[360px]:text-sm" onClick={onShowTurn} disabled={disabled}>Требуется ваше решение</Button> : showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
+        {paused ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">Партия на паузе</p> : showDice ? <div className="mobile-turn-dice flex min-h-12 justify-center gap-2" aria-live="polite" aria-label="Результат броска">
           {diceValues.map((diceValue, index) => (
             <div key={index} className="-m-5 scale-50">
               <DiceFace value={diceValue} rolling={phase === "rolling"} direction={index % 2 === 0 ? "right" : "left"} />
             </div>
           ))}
-        </div> : !isMine || !canRoll ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">{isMine ? "Выберите действие во вкладке «Ход»" : "Ожидайте своего хода"}</p> : <div className="grid min-w-0 gap-1.5">
+        </div> : requiresDecision ? <Button type="button" variant="action" className="min-h-12 min-w-0 w-full px-2 text-xs text-white min-[360px]:text-sm" onClick={onShowTurn} disabled={disabled}>Требуется ваше решение</Button> : !isMine || !canRoll ? <p className="min-w-0 text-right text-xs font-semibold leading-4 text-[#76532e]">{isMine ? "Выберите действие во вкладке «Ход»" : "Ожидайте своего хода"}</p> : <div className="grid min-w-0 gap-1.5">
           {onEnterFastTrack ? <Button type="button" variant="secondary" className="min-h-10 w-full px-2 text-xs min-[360px]:text-sm" onClick={onEnterFastTrack} disabled={disabled}>На большой круг</Button> : null}
           <Button
             type="button"

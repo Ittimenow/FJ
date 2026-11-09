@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "keep-mobile-dice-visible-during-roll",
+          "category": "fix",
+          "summary": "Во время броска на телефоне кубики остаются видимыми до завершения движения, после чего появляется нужное решение."
+        },
+        {
           "id": "improve-yandex-indexing-for-public-results",
           "category": "improvement",
           "summary": "Поисковые системы быстрее узнают о новых и обновлённых опубликованных историях игр, а карта сайта содержит их актуальные адреса."

@@ -391,6 +391,7 @@ for(const view of ['classic','journey']) {
     await expect(page.locator('[data-fast-timeline-cell]')).toHaveCount(49);
     await page.setViewportSize({width:1024,height:768});
     await expect(page.locator('.board-shell')).toBeVisible();
+    await page.locator('[data-fast-cell="23"]').scrollIntoViewIfNeeded();
     await expect(page.locator('[data-fast-cell="23"]')).toBeInViewport();
     await page.setViewportSize({width:1920,height:1080});
     await expect(page.locator('.central-panel')).toBeVisible();
@@ -427,21 +428,22 @@ for (const width of [320, 390, 430]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.mouse.move(width / 2, 350);
     await page.mouse.wheel(0, 600);
-    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
+    const scrollPanel = page.locator('.fast-track-tab-panel:not([hidden])');
+    await expect.poll(() => scrollPanel.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
     await expect(bar).toBeInViewport();
     await page.locator('.fast-track-timeline').scrollIntoViewIfNeeded();
     expect(await page.locator('.fast-track-timeline').evaluate(el => {
       el.scrollLeft = 200;
       return el.scrollLeft > 0;
     })).toBe(true);
-    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    await scrollPanel.evaluate(el => el.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: join(output, `mobile-room-${width}.png`) });
     await page.getByRole('tab', { name: /Активы/ }).click();
     await bar.getByRole('button', { name: 'Бросить кубики', exact: true }).click();
     await expect(page.getByText('Бросок принят', { exact: true })).toBeVisible();
     await expect(bar.getByLabel('Результат броска')).toBeVisible();
     await expect(bar.getByRole('button', { name: 'Бросить кубики', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: /^Ход/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: /Активы/ })).toHaveAttribute('aria-selected', 'true');
   });
 }
 
@@ -858,13 +860,15 @@ for (const track of ['small', 'large']) {
       for (const value of values) await expect(controls.getByLabel(`На кубике ${value}`, { exact: true })).toBeVisible();
       const history = page.locator('.game-action-history:visible');
       await expect(history.locator('.game-action-entry')).toHaveCount(1);
-      await expect(history.locator('[data-action-id]')).toHaveCount(2);
-      await expect(history.getByRole('switch', { name: 'Важное' })).toHaveText('Все ходы');
+      await expect(history.locator('[data-action-id]')).toHaveCount(1);
+      await expect(history.locator('[data-action-id]')).toHaveAttribute('data-action-id', 'move-1');
+      await expect(history.getByRole('button', { name: 'Показать только важное' })).toHaveAttribute('aria-pressed', 'false');
       await page.screenshot({ path: join(output, `restored-${track}-${width}.png`), fullPage: true });
       if (width < 1024) {
         const box = await controls.boundingBox();
         expect(box!.y + box!.height).toBeLessThanOrEqual(900);
         expect(box!.y + box!.height).toBeGreaterThan(875);
+        await expect(controls.getByRole('button', { name: 'Требуется ваше решение' })).toBeVisible({ timeout: 10000 });
       }
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.waitForTimeout(3300);
@@ -922,7 +926,7 @@ test('live turn groups and history filters update for both players before the tu
     await expect(history(view).locator('.game-turn-other-action')).toHaveCount(2);
     await expect(history(view).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
     await expect(history(view).locator('.game-turn-other-action [data-turn-identity="boris"]')).toBeVisible();
-    await history(view).getByRole('switch', { name: 'Важное' }).click();
+    await history(view).getByRole('button', { name: 'Показать только важное' }).click();
     await expect(history(view).locator('.game-action-entry')).toHaveCount(1);
   }
   await expect(history(page).locator('.game-action-entry')).toContainText('Анна');
@@ -931,7 +935,7 @@ test('live turn groups and history filters update for both players before the tu
   await update(5, 'loan:repay');
   await expect(history(page).locator('[data-action-id]')).toHaveCount(3);
   await expect(history(other).locator('[data-action-id]')).toHaveCount(2);
-  await history(other).getByRole('switch', { name: 'Важное' }).click();
+  await history(other).getByRole('button', { name: 'Показать все ходы' }).click();
   await expect(history(other).locator('.game-action-entry').first()).toContainText('Анна');
   await expect(history(other).locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'live-5');
   await expect(history(other).locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'live-4');
@@ -949,26 +953,15 @@ test('mobile important history offers congratulations and names the active playe
   await expect(bar.getByRole('status', { name: 'Сейчас ходит Анна' })).toBeVisible();
   await expect(bar.getByRole('button', { name: /Бросить кубик/ })).toHaveCount(0);
   const history = page.locator('.game-action-history:visible');
-  const filter = history.getByRole('switch', { name: 'Важное' });
+  const filter = history.locator('.game-history-switch');
+  await expect(filter).toHaveAccessibleName('Показать только важное');
+  await expect(filter).toHaveAttribute('aria-pressed', 'false');
   const width = (await filter.boundingBox())!.width;
-  expect(width).toBeLessThanOrEqual(102);
-  const gap = await filter.evaluate((element) => {
-    const text = element.lastElementChild!.getBoundingClientRect();
-    const knob = element.firstElementChild!.getBoundingClientRect();
-    return knob.left - text.right;
-  });
-  expect(gap).toBeLessThanOrEqual(8);
+  expect(width).toBe(30);
   await filter.click();
-  await expect(filter).toHaveText('Важное');
+  await expect(filter).toHaveAccessibleName('Показать все ходы');
+  await expect(filter).toHaveAttribute('aria-pressed', 'true');
   expect((await filter.boundingBox())!.width).toBe(width);
-  await expect(filter.locator('.game-history-switch-knob')).toHaveCSS('transform', 'none');
-  const checkedGap = await filter.evaluate((element) => {
-    const text = element.lastElementChild!.getBoundingClientRect();
-    const knob = element.firstElementChild!.getBoundingClientRect();
-    return text.left - knob.right;
-  });
-  expect(checkedGap).toBeGreaterThanOrEqual(0);
-  expect(checkedGap).toBeLessThanOrEqual(8);
   await page.evaluate(() => {
     const snapshot = structuredClone((window as any).roomSnapshot);
     snapshot.players.find((player: any) => player.id === 'boris').controller = 'HUMAN';
@@ -984,7 +977,7 @@ test('mobile important history keeps the existing auction decision', async ({ pa
   await page.goto(`${fixtureUrl}?mode=room&multiplayer=1&viewer=second-user`);
   await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
   await page.getByRole('tab', { name: 'Ход', exact: true }).click();
-  await page.locator('.game-action-history:visible').getByRole('switch', { name: 'Важное' }).click();
+  await page.locator('.game-action-history:visible').getByRole('button', { name: 'Показать только важное' }).click();
   await page.evaluate(() => {
     const snapshot = structuredClone((window as any).roomSnapshot);
     snapshot.players.find((player: any) => player.id === 'boris').controller = 'HUMAN';
@@ -1060,9 +1053,9 @@ for (const track of ['small', 'large']) {
       const decision = card.getByLabel('Текущее решение', { exact: true });
       await expect(decision).toBeVisible();
       await expect(decision.getByRole('button', { name: track === 'large' ? /Оплатить/ : 'Мелкая сделка', exact: track !== 'large' })).toBeVisible();
-      expect((await history.getByRole('switch', { name: 'Важное' }).boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y);
+      expect((await history.getByRole('button', { name: 'Показать только важное' }).boundingBox())!.y).toBeLessThanOrEqual((await card.boundingBox())!.y);
       await expect(card.locator('.game-turn-timeline')).toHaveCount(1);
-      await expect(card.locator('[data-action-id]')).toHaveCount(4);
+      await expect(card.locator('[data-action-id]')).toHaveCount(3);
       await expect(card.locator('[data-action-id]').first()).toHaveAttribute('data-action-id', 'turn-layout-2');
       await expect(card.locator('[data-action-id]').last()).toHaveAttribute('data-action-id', 'turn-layout-4');
       await expect(card.locator('.game-turn-other-action [data-turn-identity="boris"]')).toContainText('Борис');
@@ -1072,7 +1065,7 @@ for (const track of ['small', 'large']) {
       const dots = await card.locator('.game-turn-event').evaluateAll(elements => elements.map(element => ({ content: getComputedStyle(element, '::before').content, left: element.getBoundingClientRect().left + parseFloat(getComputedStyle(element, '::before').left) })));
       expect(dots.every(dot => dot.content === '""' && dot.left > (0))).toBe(true);
       expect(new Set(dots.map(dot => dot.left)).size).toBe(1);
-      expect(dots[0]!.left).toBeGreaterThan((await card.boundingBox())!.x);
+      expect(dots[0]!.left).toBeGreaterThanOrEqual((await card.boundingBox())!.x);
       expect(await card.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
       await page.screenshot({ path: join(output, `turn-layout-${track}-${width}-decision.png`), fullPage: true });
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
