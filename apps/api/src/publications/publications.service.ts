@@ -33,6 +33,7 @@ import {
 } from "./publications.dto";
 import { composeSeriesPost, type TelegramPostSource } from "./telegram-post.logic";
 import { resolvePublicationCardBaseUrl, sendTelegramPhoto } from "./telegram-photo";
+import { notifyIndexNow } from "./indexnow";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -77,6 +78,15 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
       take: Math.min(Math.max(limit, 1), 24)
     });
     return toSerializable(summaries.map((summary) => this.publicSummary(summary)));
+  }
+
+  async sitemapEntries() {
+    const summaries = await this.prisma.gameSummary.findMany({
+      where: { visibleOnSite: true, status: SummaryStatus.PUBLISHED, game: { isTest: false } },
+      select: { id: true, updatedAt: true },
+      orderBy: { sitePublishedAt: "desc" }
+    });
+    return toSerializable(summaries);
   }
 
   async publicDetail(id: string) {
@@ -251,6 +261,10 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
       where: { isActive: true },
       orderBy: { createdAt: "desc" }
     });
+    const previousSummary = await this.prisma.gameSummary.findUnique({
+      where: { gameId },
+      select: { id: true, visibleOnSite: true, status: true }
+    });
     const sourceSequence = game.events[game.events.length - 1]?.sequence ?? 0;
     const summary = await this.prisma.gameSummary.upsert({
       where: { gameId },
@@ -277,13 +291,30 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (summary.announcement?.mode === PublicationMode.AUTOMATIC) {
-      return this.publish(summary.id);
+      if (summary.telegramMessageId && previousSummary?.visibleOnSite && previousSummary.status === SummaryStatus.PUBLISHED) {
+        await notifyIndexNow(this.publicUrl, `/results/${summary.id}`, this.logger);
+      }
+      try {
+        return await this.publish(summary.id);
+      } catch (error) {
+        if (previousSummary?.visibleOnSite && previousSummary.status === SummaryStatus.PUBLISHED) {
+          await notifyIndexNow(this.publicUrl, `/results/${summary.id}`, this.logger);
+        }
+        throw error;
+      }
+    }
+    if (previousSummary?.visibleOnSite && previousSummary.status === SummaryStatus.PUBLISHED) {
+      await notifyIndexNow(this.publicUrl, `/results/${summary.id}`, this.logger);
     }
     return toSerializable(summary);
   }
 
   async updateSummary(id: string, dto: UpdateSummaryDto) {
-    return this.prisma.gameSummary.update({
+    const before = await this.prisma.gameSummary.findUnique({
+      where: { id },
+      include: { game: { select: { isTest: true } } }
+    });
+    const summary = await this.prisma.gameSummary.update({
       where: { id },
       data: {
         ...(dto.headline !== undefined && { headline: dto.headline.trim() }),
@@ -296,12 +327,23 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
         })
       }
     });
+    if (before && !before.game.isTest) {
+      const wasPublic = before.visibleOnSite && before.status === SummaryStatus.PUBLISHED;
+      const isPublic = summary.visibleOnSite && summary.status === SummaryStatus.PUBLISHED;
+      const contentChanged =
+        (dto.headline !== undefined && summary.headline !== before.headline) ||
+        (dto.body !== undefined && summary.body !== before.body);
+      if (wasPublic !== isPublic || (isPublic && contentChanged)) {
+        await notifyIndexNow(this.publicUrl, `/results/${id}`, this.logger);
+      }
+    }
+    return summary;
   }
 
   async publish(id: string) {
     const summary = await this.prisma.gameSummary.findUnique({
       where: { id },
-      include: { announcement: true }
+      include: { announcement: true, game: { select: { isTest: true } } }
     });
     if (!summary) throw new NotFoundException("Саммари не найдено");
     if (summary.telegramMessageId) return toSerializable(summary);
@@ -333,7 +375,7 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
           allow_sending_without_reply: false
         }
       });
-      return toSerializable(await this.prisma.gameSummary.update({
+      const published = await this.prisma.gameSummary.update({
         where: { id },
         data: {
           status: SummaryStatus.PUBLISHED,
@@ -344,7 +386,11 @@ export class PublicationsService implements OnModuleInit, OnModuleDestroy {
           publishedAt: new Date(),
           lastError: null
         }
-      }));
+      });
+      if (!summary.game.isTest) {
+        await notifyIndexNow(this.publicUrl, `/results/${id}`, this.logger);
+      }
+      return toSerializable(published);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Неизвестная ошибка Telegram";
       await this.prisma.gameSummary.update({

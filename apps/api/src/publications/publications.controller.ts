@@ -22,6 +22,11 @@ export class PublicResultsController {
     return this.publications.publicList(Number.isInteger(parsed) ? parsed : 6);
   }
 
+  @Get("sitemap")
+  sitemap() {
+    return this.publications.sitemapEntries();
+  }
+
   @Get(":id")
   detail(@Param("id") id: string) {
     return this.publications.publicDetail(id);

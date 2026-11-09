@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${result.headline} — Финансовое путешествие`,
     description: result.facts.awards?.[0]?.text ?? result.facts.highlights[0]?.text ?? "Итоги завершённой финансовой игры.",
+    alternates: { canonical: result.pageUrl },
     openGraph: { images: [`/results/${id}/opengraph-image`] },
     twitter: { card: "summary_large_image", images: [`/results/${id}/opengraph-image`] }
   };

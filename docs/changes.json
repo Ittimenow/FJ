@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "improve-yandex-indexing-for-public-results",
+          "category": "improvement",
+          "summary": "Поисковые системы быстрее узнают о новых и обновлённых опубликованных историях игр, а карта сайта содержит их актуальные адреса."
+        },
+        {
           "id": "refine-turn-decisions-history-and-results",
           "category": "improvement",
           "summary": "На телефоне решение открывается по кнопке без смены вкладки, история и результаты занимают меньше места, а после задержки ответа состояние партии сверяется с сервером."

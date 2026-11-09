@@ -7,7 +7,8 @@ import { publicResults } from "@/lib/results";
 
 export const metadata: Metadata = {
   title: "Итоги игр — Финансовое путешествие",
-  description: "Результаты завершённых партий, ключевые решения и финансовые повороты игроков."
+  description: "Результаты завершённых партий, ключевые решения и финансовые повороты игроков.",
+  alternates: { canonical: "/results" }
 };
 
 export default async function ResultsPage() {
