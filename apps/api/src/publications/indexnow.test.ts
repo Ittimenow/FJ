@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import { notifyIndexNow } from "./indexnow";
 
@@ -21,7 +22,7 @@ test("IndexNow receives the changed public result URL and its ownership key", as
   assert.equal(requests[0]?.searchParams.get("url"), "https://gamefj.ru/results/summary-id");
   const key = requests[0]?.searchParams.get("key") ?? "";
   assert.match(key, /^[a-zA-Z0-9-]{8,128}$/);
-  assert.equal(readFileSync(new URL(`../../../web/public/${key}.txt`, import.meta.url), "utf8").trim(), key);
+  assert.equal(readFileSync(join(__dirname, `../../../web/public/${key}.txt`), "utf8").trim(), key);
   assert.deepEqual(warnings, []);
 });
 
