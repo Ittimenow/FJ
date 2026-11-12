@@ -1,8 +1,10 @@
 import { TestGameOptionsDto } from "./fast-track.dto";
 import { Type } from "class-transformer";
-import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from "class-validator";
 
 export class CreateGameDto extends TestGameOptionsDto {
+  @ValidateIf((_, value) => value !== undefined) @IsIn(["101", "202"]) gameType?: "101" | "202";
+
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;

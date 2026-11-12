@@ -220,6 +220,8 @@ export interface GameListItem {
 }
 
 export interface GameSnapshot {
+  game202?: import("@cashflow/shared").Public202 | null;
+  cards202?: Array<{slug:string;title:string;bodyText:string}>;
   game: {
     id: string;
     code: string;
@@ -248,6 +250,8 @@ export interface GameSnapshot {
     remainingPeriodSeconds: number | null;
     pauseReason: "manual" | "period_complete" | "player_left" | null;
     pausedAt: string | null;
+    gameType?: "101" | "202";
+    gameTypeSelected?: boolean;
     rulesVersion?: number;
     isTest?: boolean;
     fastTrackWorld?: FastTrackWorld;

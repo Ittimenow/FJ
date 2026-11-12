@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ConflictException } from "@nestjs/common";
-import { CardType } from "@prisma/client";
+import { CardType, GameType } from "@prisma/client";
 import { AdminService } from "./admin.service";
 import { writeCardWorkbook, type WorkbookCard } from "./card-workbook";
 
@@ -11,7 +11,7 @@ const original: WorkbookCard = {
   title: "Дом", bodyText: "Купите дом", category: null, subcategory: null,
   isActive: true, meta: [], effects: [], conditions: []
 };
-const set = { id: setId, name: "Набор", isDefault: true };
+const set = { id: setId, name: "Набор", isDefault: true, gameType: GameType.CLASSIC_101 };
 
 test("предпросмотр показывает изменение и отсутствие карточки без записи", async () => {
   let writes = 0;
@@ -75,4 +75,22 @@ test("подтверждение применяет только выбранн�
   assert.deepEqual(writes, []);
   await service.applyWorkbookCard(preview.changes[0]!);
   assert.deepEqual(writes, ["meta", "effects", "conditions", "update:Новый дом"]);
+});
+
+test("предпросмотр импорта отклоняет карточку 202 внутри набора 101", async () => {
+  const service = new AdminService({
+    cardSet: { findMany: async () => [set] },
+    card: { findMany: async () => [] }
+  } as never);
+  const card202 = { ...original, id: null, meta: [{ metaKey: "game_type", metaValue: "202" }] };
+  await assert.rejects(() => service.previewCardWorkbook(writeCardWorkbook([set], [card202])), /режиму 101/);
+});
+
+test("прямое применение импорта и создание карточки отклоняют несовместимый режим", async () => {
+  const service = new AdminService({
+    cardSet: { findUnique: async () => ({ ...set, gameType: GameType.ADVANCED_202 }) },
+    $transaction: async () => { assert.fail("Несовместимая карточка не должна записываться"); }
+  } as never);
+  await assert.rejects(() => service.applyWorkbookCard({ action: "create", cardId: null, expectedSnapshot: null, after: { ...original, id: null } }), /режиму 202/);
+  await assert.rejects(() => service.createCard(original), /режиму 202/);
 });

@@ -44,6 +44,7 @@ import {
 
 export interface GameRoomHeaderState {
   gameId: string;
+  gameType?: "101" | "202";
   currentUserId: string;
   player?: GamePlayer | undefined;
   title: string;
@@ -89,6 +90,10 @@ export function useSetGameRoomHeader() {
   const context = useContext(GameRoomHeaderContext);
   if (!context) throw new Error("useSetGameRoomHeader must be used inside GameRoomHeaderProvider");
   return context.setState;
+}
+
+export function useGameRoomGameType() {
+  return useContext(GameRoomHeaderContext)?.state?.gameType ?? null;
 }
 
 export function GameRoomViewport({ initialMode, children }: {

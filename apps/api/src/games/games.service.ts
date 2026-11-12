@@ -1,3 +1,4 @@
+import { newGame202, command202, public202, finances202, rules202, turnContext202, type State202, type Public202, type Task202, type InitialPlayer202, type Command202 } from "@cashflow/shared";
 import { fastTrackCells, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackOwner, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
 import { TestGameOptionsDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import {
@@ -17,6 +18,7 @@ import {
   GameMode,
   GameRole,
   GameStatus,
+  GameType,
   PlayerController,
   Prisma,
   SystemRole
@@ -228,6 +230,33 @@ export function sealedDealAuctionResponses(
   );
 }
 
+/** Shared snapshots reveal only whether each player answered a sealed 202 auction. */
+export function sealedPublic202(state: State202 | Public202): Public202 {
+  const view = public202(state as State202);
+  const sealTask = (task: Task202) => {
+    if (task.kind === "auction" && task.bids) {
+      // Zero is a response marker here, not a published bid or a refusal.
+      task.bids = Object.fromEntries(Object.keys(task.bids).map(playerId => [playerId, 0]));
+    }
+    if (task.resume) sealTask(task.resume);
+  };
+  view.queue.forEach(sealTask);
+  return view;
+}
+
+function sealedSavedSnapshot202(snapshot: Prisma.JsonValue): Prisma.JsonValue {
+  if (!isPlainObject(snapshot)) return snapshot;
+  const view: Record<string, unknown> = { ...snapshot };
+  const sealState = (state: unknown) => isPlainObject(state) && Array.isArray(state.queue)
+    ? sealedPublic202(state as unknown as Public202) as unknown as Prisma.JsonValue
+    : state;
+  if ("game202" in view) view.game202 = sealState(view.game202);
+  if (isPlainObject(view.game) && "game202" in view.game) {
+    view.game = { ...view.game, game202: sealState(view.game.game202) };
+  }
+  return view as Prisma.JsonValue;
+}
+
 interface CardDeckState {
   drawPile: number[];
   discardPile: number[];
@@ -331,8 +360,8 @@ export class GamesService {
     if (dto.cardSetId && creator.role !== SystemRole.ADMIN) {
       throw new ForbiddenException("Выбирать набор карточек может только администратор");
     }
-    const cardSet = await this.requirePlayableCardSet(
-      creator.role === SystemRole.ADMIN ? dto.cardSetId : undefined
+    const cardSet = await this.cardSetForCreation(
+      creator.role === SystemRole.ADMIN ? dto.cardSetId : undefined, dto.gameType
     );
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const botCount = dto.botCount ?? 0;
@@ -346,6 +375,7 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Новая партия",
         mode: GameMode.MULTIPLAYER,
+        gameType: cardSet.gameType,
         rulesVersion: 2,
         isTest: Boolean(dto.testing),
         isPublic: Boolean(dto.isPublic),
@@ -355,6 +385,7 @@ export class GamesService {
         cardSetId: cardSet.id,
         settings: {
           ...testSettings,
+          gameTypeSelected: dto.gameType !== undefined,
           timeLimitMinutes: dto.testing ? null : dto.timeLimitMinutes ?? 90,
           periodCount: dto.periodCount ?? 1,
           cardDecks
@@ -448,7 +479,7 @@ export class GamesService {
     if (dto.botLevels && dto.botLevels.length !== botCount) {
       throw new BadRequestException("Укажите уровень сложности для каждого бота");
     }
-    const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
+    const cardSet = await this.cardSetForCreation(dto.cardSetId, dto.gameType);
     const cardDecks = await this.initialCardDecks(this.prisma, cardSet.id);
     const code = await this.generateGameCode();
     const occupiedFigurines = new Set<string>();
@@ -467,12 +498,14 @@ export class GamesService {
         code,
         title: dto.title?.trim() || "Одиночное путешествие",
         mode: GameMode.SOLO,
+        gameType: cardSet.gameType,
         rulesVersion: 2,
         isTest: Boolean(dto.testing),
         maxPlayers: botCount + 1,
         cardSetId: cardSet.id,
         settings: {
           ...testSettings,
+          gameTypeSelected: dto.gameType !== undefined,
           timeLimitMinutes: null,
           periodCount: 1,
           cardDecks
@@ -530,6 +563,56 @@ export class GamesService {
     return {};
   }
 
+  async act202(gameId: string, actorId: string, command: Command202, botExplanation?: string) {
+    const expired = await this.expireGameIfNeeded(gameId);
+    if (expired) return this.actionResult(gameId, expired);
+    const emitted: PendingEvent[] = [];
+    await this.prisma.$transaction(async tx => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: true } });
+      if (game.gameType !== "ADVANCED_202" || !game.game202State || game.status !== GameStatus.IN_PROGRESS) throw new BadRequestException("Партия 202 сейчас не идёт");
+      const actor = game.players.find(p => p.role === GameRole.PLAYER && p.status === GamePlayerStatus.JOINED && this.playerControlledBy(p, actorId));
+      if (!actor) throw new ForbiddenException("Действие доступно только участнику партии");
+      const before = game.game202State as unknown as State202;
+      if (command.revision !== before.revision) throw new ConflictException("Состояние изменилось. Обновите партию");
+      let state: State202;
+      try { state = command202(before, actor.id, command, max => randomInt(max)); }
+      catch (error) { throw new BadRequestException((error as Error).message); }
+      if (botExplanation && actor.controller === PlayerController.BOT) state.log.push({ revision: state.revision, playerId: actor.id, text: botExplanation, kind: "bot", ...turnContext202(before) });
+      for (const p of state.players) {
+        if (p.track === "FAST_TRACK" && before.players.find(previous => previous.id === p.id)?.track === "RAT_RACE") emitted.push({ type: "player:escaped_rat_race", gamePlayerId: p.id, payload: { gameType: "202", initialIncomeCents: p.initialFastIncome / 100 } });
+      }
+      await this.project202(tx, state);
+      await tx.game.update({ where: { id: gameId }, data: {
+        game202State: state as unknown as Prisma.InputJsonValue, currentTurnIndex: state.current, currentRound: state.round,
+        fastTrackWorld: state.world as unknown as Prisma.InputJsonValue,
+        ...(state.winner ? { status: GameStatus.ENDED, endedAt: new Date() } : {})
+      } });
+      for (const line of state.log.filter(line => line.revision === state.revision)) {
+        const { playerId, ...payload } = line;
+        emitted.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, gameType: "202" } });
+      }
+      if (state.winner) emitted.push({ type: realtimeEvents.gameEnded, gamePlayerId: state.winner, payload: { winnerGamePlayerId: state.winner, reason: "game202_full_goal" } });
+      emitted.push({ type: realtimeEvents.stateUpdate, payload: { reason: "game202_action", revision: state.revision } });
+      await this.appendEvents(tx, gameId, actorId, emitted);
+    }, { timeout: 20_000 });
+    return this.actionResult(gameId, emitted);
+  }
+
+  private async project202(tx: Tx, state: State202) {
+    // Compatibility projection for existing reports. Authoritative cents and all instruments remain in game202State.
+    const dollars = (value: number) => BigInt(Math.trunc(value / 100));
+    for (const p of state.players) {
+      const f = finances202(state, p);
+      await tx.gamePlayer.update({ where: { id: p.id }, data: { track: p.track, position: p.position, fastTrackPosition: p.fastPosition } });
+      await tx.playerFinancialState.update({ where: { gamePlayerId: p.id }, data: {
+        cashCents: dollars(p.cash), salaryCents: dollars(p.track === "FAST_TRACK" ? 0 : p.salary), passiveIncomeCents: dollars(f.passive), totalIncomeCents: dollars(f.income), totalExpensesCents: dollars(f.expenses), monthlyCashflowCents: dollars(f.cashflow), childrenCount: p.children,
+        fastTrackIncomeCents: dollars(p.fastIncome), fastTrackStartIncomeCents: dollars(p.initialFastIncome), fastTrackCharity: p.fastCharity,
+        ...(state.winner === p.id ? { wonAt: new Date() } : {})
+      } });
+    }
+  }
+
   private async lockGame(tx: Tx, gameId: string) {
     await tx.$queryRaw`SELECT id FROM games WHERE id = ${gameId}::uuid FOR UPDATE`;
   }
@@ -572,6 +655,7 @@ export class GamesService {
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: {
         players: { where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }, include: { financialState: true, liabilities: true }, orderBy: { seat: "asc" } }
       } });
+      if (game.gameType === "ADVANCED_202") throw new BadRequestException("Используйте действия игры 202");
       const player = game.players[game.currentTurnIndex % game.players.length];
       if (!player || !this.playerControlledBy(player, userId)) throw new ForbiddenException("Сейчас ход другого игрока");
       if (game.rulesVersion !== 2 || game.status !== GameStatus.IN_PROGRESS || this.pendingAction(game.settings)) throw new BadRequestException("Перейти можно только в начале своего хода");
@@ -648,6 +732,7 @@ export class GamesService {
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: {
         players: { where: { role: GameRole.PLAYER, status: GamePlayerStatus.JOINED }, include: { financialState: true }, orderBy: { seat: "asc" } }
       } });
+      if (game.gameType === "ADVANCED_202") throw new BadRequestException("Используйте действия игры 202");
       const index = game.currentTurnIndex % game.players.length;
       const player = game.players[index];
       if (!player || !this.playerControlledBy(player, userId)) throw new ForbiddenException("Сейчас ход другого игрока");
@@ -696,10 +781,12 @@ export class GamesService {
     return this.actionResult(gameId, events);
   }
 
-  async listPlayableCardSets() {
+  async listPlayableCardSets(gameType?: "101" | "202") {
     const [sets, counts] = await Promise.all([
       this.prisma.cardSet.findMany({
-        select: { id: true, name: true, isDefault: true },
+        where: gameType ? { gameType: gameType === "202" ? GameType.ADVANCED_202 : GameType.CLASSIC_101 } : {},
+        select: { id: true, name: true, isDefault: true, gameType: true,
+          cards: { where: { isActive: true }, select: { slug: true } } },
         orderBy: [{ isDefault: "desc" }, { name: "asc" }]
       }),
       this.prisma.card.groupBy({
@@ -710,12 +797,15 @@ export class GamesService {
     ]);
 
     return sets.flatMap((set) => {
+      const { cards, ...details } = set;
       const setCounts = counts
         .filter((row) => row.cardSetId === set.id)
         .map((row) => ({ cardType: row.cardType, count: row._count._all }));
       if (missingCardTypes(setCounts).length > 0) return [];
+      if (set.gameType === GameType.ADVANCED_202 && (cards.length !== 138 || cards.some(card => !rules202[card.slug]))) return [];
       return [{
-        ...set,
+        ...details,
+        gameType: set.gameType === GameType.ADVANCED_202 ? "202" as const : "101" as const,
         counts: Object.fromEntries(
           setCounts.map((row) => [row.cardType, row.count])
         )
@@ -782,7 +872,12 @@ export class GamesService {
       })
     ]);
 
-    return toSerializable({ mine, open });
+    // Listing rooms must never expose the authoritative 202 state or future decks.
+    const publicRoom = <T extends { game202State: Prisma.JsonValue }>(row: T) => {
+      const { game202State, ...view } = row;
+      return view;
+    };
+    return toSerializable({ mine: mine.map(publicRoom), open: open.map(publicRoom) });
   }
 
   async getGame(gameId: string, userId: string) {
@@ -1110,11 +1205,23 @@ export class GamesService {
 
   async updateLobby(gameId: string, actorUserId: string, dto: UpdateLobbyDto) {
     await this.ensureCanManageGame(gameId, actorUserId);
+    if (dto.gameType !== undefined && dto.gameType !== "101" && dto.gameType !== "202") throw new BadRequestException("Выберите режим игры: 101 или 202");
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: actorUserId }, select: { role: true, timeZone: true } });
     await this.prisma.$transaction(async (tx) => {
       await this.lockGame(tx, gameId);
       const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: true } });
-      if (game.mode !== GameMode.MULTIPLAYER || game.status !== GameStatus.WAITING) throw new BadRequestException("Настройки можно изменить только до начала командной игры");
+      if (game.status !== GameStatus.WAITING) throw new BadRequestException("Настройки можно изменить только до начала игры");
+      const settings = game.settings as Record<string, unknown>;
+      const isSolo = game.mode === GameMode.SOLO;
+      if (isSolo && [dto.title, dto.maxPlayers, dto.timeLimitMinutes, dto.periodCount, dto.isPublic, dto.scheduledLocal].some(value => value !== undefined)) {
+        throw new BadRequestException("В одиночной партии можно изменить только режим и набор карточек");
+      }
+      if (settings.gameTypeSelected === false && dto.gameType === undefined) {
+        throw new BadRequestException("Сначала выберите режим игры: 101 или 202");
+      }
+      const currentGameType = game.gameType === GameType.ADVANCED_202 ? "202" : "101";
+      const nextGameType = dto.gameType ?? currentGameType;
+      const modeChanged = currentGameType !== nextGameType;
       const occupied = game.players.filter((player) => player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED).length;
       const maxPlayers = dto.maxPlayers ?? game.maxPlayers ?? 6;
       if (maxPlayers < occupied) throw new BadRequestException("Лимит меньше числа игроков в лобби");
@@ -1128,19 +1235,24 @@ export class GamesService {
       if (!nextTitle) throw new BadRequestException("Укажите название игры");
       let cardSetId = game.cardSetId;
       let cardDecks: unknown = undefined;
-      if (dto.cardSetId && dto.cardSetId !== game.cardSetId) {
-        if (user.role !== SystemRole.ADMIN) throw new ForbiddenException("Выбирать набор карточек может только администратор");
-        const cardSet = await this.requirePlayableCardSet(dto.cardSetId);
-        cardSetId = cardSet.id;
-        cardDecks = await this.initialCardDecks(tx, cardSet.id);
+      if (dto.cardSetId && !isSolo && user.role !== SystemRole.ADMIN) {
+        throw new ForbiddenException("Выбирать набор карточек может только администратор");
       }
-      const settings = game.settings as Record<string, unknown>;
+      if (modeChanged || dto.cardSetId || settings.gameTypeSelected === false) {
+        const cardSet = await this.requirePlayableCardSet(dto.cardSetId ?? (modeChanged || settings.gameTypeSelected === false ? undefined : game.cardSetId), nextGameType);
+        cardSetId = cardSet.id;
+        if (modeChanged || cardSetId !== game.cardSetId || settings.gameTypeSelected === false) cardDecks = await this.initialCardDecks(tx, cardSet.id);
+      }
       await tx.game.update({ where: { id: gameId }, data: {
         title: nextTitle, maxPlayers, isPublic, scheduledAt,
-        scheduleTimeZone: isPublic ? user.timeZone : null,
+        scheduleTimeZone: isPublic ? (dto.scheduledLocal !== undefined ? user.timeZone : game.scheduleTimeZone) : null,
         scheduleRevision: game.scheduleRevision + (game.scheduledAt?.getTime() !== scheduledAt?.getTime() ? 1 : 0),
         cardSetId,
-        settings: { ...settings, timeLimitMinutes: dto.timeLimitMinutes ?? settings.timeLimitMinutes ?? 90,
+        gameType: nextGameType === "202" ? GameType.ADVANCED_202 : GameType.CLASSIC_101,
+        ...(modeChanged ? { game202State: Prisma.DbNull, rulesVersion: 2 } : {}),
+        settings: { ...settings,
+          gameTypeSelected: true,
+          timeLimitMinutes: isSolo || game.isTest ? null : dto.timeLimitMinutes !== undefined ? dto.timeLimitMinutes : settings.timeLimitMinutes === undefined ? 90 : settings.timeLimitMinutes,
           periodCount: dto.periodCount ?? settings.periodCount ?? 1,
           ...(cardDecks ? { cardDecks } : {}) } as Prisma.InputJsonValue
       } });
@@ -1151,7 +1263,7 @@ export class GamesService {
         const participants = await tx.gamePlayer.findMany({ where: { gameId, userId: { not: null }, status: GamePlayerStatus.JOINED }, select: { userId: true } });
         await tx.userNotification.createMany({ data: participants.filter((player) => player.userId !== actorUserId).map((player) => ({ userId: player.userId!, gameId, kind: "OPEN_GAME_RESCHEDULED", dedupeKey: `rescheduled:${gameId}:${game.scheduleRevision + 1}` })), skipDuplicates: true });
       }
-      await this.appendEvents(tx, gameId, actorUserId, [{ type: "game:lobby_updated", payload: { maxPlayers, isPublic } }, { type: realtimeEvents.stateUpdate, payload: { reason: "lobby_updated" } }]);
+      await this.appendEvents(tx, gameId, actorUserId, [{ type: "game:lobby_updated", payload: { maxPlayers, isPublic, gameType: nextGameType, cardSetId } }, { type: realtimeEvents.stateUpdate, payload: { reason: "lobby_updated" } }]);
     });
     return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
   }
@@ -1203,7 +1315,8 @@ export class GamesService {
     const emittedEvents: PendingEvent[] = [];
 
     await this.prisma.$transaction(async (tx) => {
-      let game = await tx.game.findUniqueOrThrow({
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({
         where: { id: gameId },
         include: {
           players: {
@@ -1212,21 +1325,11 @@ export class GamesService {
           }
         }
       });
-      if (game.rulesVersion === 2) {
-        await this.lockGame(tx, gameId);
-        game = await tx.game.findUniqueOrThrow({
-          where: { id: gameId },
-          include: {
-            players: {
-              where: { role: GameRole.PLAYER, status: "JOINED" },
-              orderBy: { seat: "asc" }
-            }
-          }
-        });
-      }
-
       if (game.status !== GameStatus.WAITING) {
         throw new BadRequestException("Игра уже началась");
+      }
+      if ((game.settings as Record<string, unknown>).gameTypeSelected === false) {
+        throw new BadRequestException("Сначала выберите режим игры: 101 или 202");
       }
       if (game.isPublic && game.scheduledAt && game.scheduledAt > new Date()) {
         throw new BadRequestException("Открытую игру можно начать после назначенного времени.");
@@ -1292,6 +1395,23 @@ export class GamesService {
         }
       }
 
+      let state202: State202 | undefined;
+      if (game.gameType === "ADVANCED_202") {
+        await this.requirePlayableCardSet(game.cardSetId, "202");
+        const inputs: InitialPlayer202[] = [];
+        for (const participant of turnOrder) {
+          const row = await tx.gamePlayer.findUniqueOrThrow({ where: { id: participant.id }, include: { financialState: true, profession: true, liabilities: true } });
+          const f = row.financialState!;
+          inputs.push({ id: row.id, dream: row.dreamCellIndex!, salary: Number(f.salaryCents), passive: Number(f.basePassiveIncomeCents), expenses: Number(f.baseExpensesCents), savings: Number(row.profession?.savingsCents ?? 0), childCost: Number(f.perChildCostCents), loans: row.liabilities.map(l => ({ name: l.name, balance: Number(l.balanceCents), payment: Number(l.paymentCents), bank: l.type === "bank_loan" })) });
+        }
+        state202 = newGame202(inputs, max => randomInt(max));
+        if (game.isTest) {
+          const options = game.settings as Record<string, number>;
+          for (const p of state202.players) { p.track = "FAST_TRACK"; p.cash = (options.testCashCents ?? 500_000) * 100; p.fastIncome = p.initialFastIncome = (options.testIncomeCents ?? 100_000) * 100; }
+        }
+        await this.project202(tx, state202);
+      }
+
       const startedAt = new Date();
       await tx.game.update({
         where: { id: gameId },
@@ -1301,6 +1421,7 @@ export class GamesService {
           endedAt: null,
           currentTurnIndex: 0,
           currentRound: 1,
+          ...(state202 ? { game202State: state202 as unknown as Prisma.InputJsonValue } : {}),
           settings: startGameTimeline(game.settings, startedAt)
         }
       });
@@ -1315,6 +1436,12 @@ export class GamesService {
           periodCount: timeline.timeLimitMinutes === null ? null : timeline.periodCount
         }
       });
+      if (state202) {
+        for (const line of state202.log) {
+          const { playerId, ...payload } = line;
+          emittedEvents.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, ...(game.isTest && payload.turnKey ? { track: "FAST_TRACK" } : {}), gameType: "202" } });
+        }
+      }
       if (timeline.timeLimitMinutes !== null) {
         emittedEvents.push({
           type: realtimeEvents.gamePeriodStarted,
@@ -1496,7 +1623,7 @@ export class GamesService {
         role: GameRole.PLAYER,
         status: GamePlayerStatus.JOINED
       },
-      include: { game: { select: { status: true, rulesVersion: true } } }
+      include: { game: { select: { status: true, rulesVersion: true, gameType: true } } }
     });
     if (!membership) throw new ForbiddenException("Вы не участвуете в этой игре");
     if (membership.game.status !== GameStatus.WAITING) {
@@ -1639,6 +1766,7 @@ export class GamesService {
           }
         });
       }
+      if (game.gameType === "ADVANCED_202") throw new BadRequestException("Используйте действия игры 202");
       if (game.status !== GameStatus.IN_PROGRESS) {
         throw new BadRequestException("Игра сейчас не идёт");
       }
@@ -1898,6 +2026,7 @@ export class GamesService {
           }
         }
       });
+      if (game.gameType === "ADVANCED_202") throw new BadRequestException("Используйте действия игры 202");
       if (game.status !== GameStatus.IN_PROGRESS) {
         throw new BadRequestException("Игра сейчас не идёт");
       }
@@ -3837,7 +3966,10 @@ export class GamesService {
         gamePlayer: { select: { id: true, seat: true, role: true } }
       }
     });
-    return toSerializable({ events });
+    return toSerializable({ events: events.map(event => ({
+      ...event,
+      stateSnapshot: sealedSavedSnapshot202(event.stateSnapshot)
+    })) });
   }
 
   async professions() {
@@ -6330,15 +6462,16 @@ export class GamesService {
           },
       include: {
         financialState: true,
-        game: { select: { status: true, rulesVersion: true } }
+        game: { select: { status: true, rulesVersion: true, gameType: true } }
       }
     });
     if (!player) throw new ForbiddenException("Вы не участвуете в этой игре");
+    if (player.game.gameType === "ADVANCED_202") throw new BadRequestException("Используйте действия игры 202");
     if (player.game.rulesVersion === 2) {
       await this.lockGame(tx, gameId);
       player = await tx.gamePlayer.findUniqueOrThrow({
         where: { id: player.id },
-        include: { financialState: true, game: { select: { status: true, rulesVersion: true } } }
+        include: { financialState: true, game: { select: { status: true, rulesVersion: true, gameType: true } } }
       });
       if (player.status !== GamePlayerStatus.JOINED) throw new ForbiddenException("Вы не участвуете в этой игре");
     }
@@ -6416,17 +6549,33 @@ export class GamesService {
     return user;
   }
 
-  private async requirePlayableCardSet(cardSetId?: string) {
-    const cardSet = cardSetId
+  private async cardSetForCreation(cardSetId?: string, gameType?: "101" | "202") {
+    if (gameType !== undefined && gameType !== "101" && gameType !== "202") throw new BadRequestException("Выберите режим игры: 101 или 202");
+    if (gameType || cardSetId) return this.requirePlayableCardSet(cardSetId, gameType);
+    // A draft has not selected its rules yet. It must not depend on a particular
+    // mode having a complete default set before the user can open preparation.
+    const available = await this.listPlayableCardSets();
+    const initial = available.find(set => set.gameType === "101") ?? available[0];
+    if (!initial) throw new NotFoundException("Нет готовых наборов карточек для создания игры");
+    return this.requirePlayableCardSet(initial.id, initial.gameType);
+  }
+
+  private async requirePlayableCardSet(cardSetId?: string, gameType: "101" | "202" = "101") {
+    const requiredGameType = gameType === "202" ? GameType.ADVANCED_202 : GameType.CLASSIC_101;
+    const selectedId = cardSetId ?? (await this.listPlayableCardSets(gameType))[0]?.id;
+    const cardSet = selectedId
       ? await this.prisma.cardSet.findUnique({
-          where: { id: cardSetId },
-          select: { id: true, name: true }
+          where: { id: selectedId },
+          select: { id: true, name: true, gameType: true }
         })
-      : await this.prisma.cardSet.findFirst({
-          where: { name: { equals: "Оригинал", mode: "insensitive" } },
-          select: { id: true, name: true }
-        });
-    if (!cardSet) throw new NotFoundException(cardSetId ? "Набор карточек не найден" : "Набор «Оригинал» недоступен");
+      : null;
+    if (!cardSet) throw new NotFoundException(cardSetId ? "Набор карточек не найден" : `Нет доступного набора для режима ${gameType}`);
+
+    if (cardSet.gameType !== requiredGameType) throw new BadRequestException(`Набор карточек не подходит для режима ${gameType}`);
+    if (gameType === "202") {
+      const cards = await this.prisma.card.findMany({ where: { cardSetId: cardSet.id, isActive: true }, select: { slug: true } });
+      if (cards.length !== 138 || cards.some(card => !rules202[card.slug])) throw new BadRequestException("Для игры 202 импортируйте все 138 карточек актуального набора");
+    }
 
     const counts = await this.prisma.card.groupBy({
       by: ["cardType"],
@@ -6485,7 +6634,7 @@ export class GamesService {
 
     const stateSnapshot = await this.compactSnapshot(tx, gameId);
 
-    if (stateSnapshot.game.rulesVersion === 2 && stateSnapshot.game.status === GameStatus.IN_PROGRESS) {
+    if (stateSnapshot.game.gameType !== "202" && stateSnapshot.game.rulesVersion === 2 && stateSnapshot.game.status === GameStatus.IN_PROGRESS) {
       const readyPlayers = stateSnapshot.players.filter((player) => {
         const state = player.financialState;
         return player.role === GameRole.PLAYER && player.status === GamePlayerStatus.JOINED && player.track === BoardTrack.RAT_RACE
@@ -6567,10 +6716,12 @@ export class GamesService {
         status: game.status,
         currentTurnIndex: game.currentTurnIndex,
         currentRound: game.currentRound,
+        gameType: game.gameType === "ADVANCED_202" ? "202" : "101",
         rulesVersion: game.rulesVersion,
         isTest: game.isTest,
         fastTrackWorld: game.fastTrackWorld,
-        settings: game.settings
+        settings: game.gameType === "ADVANCED_202" ? {} : game.settings,
+        game202: game.game202State ? sealedPublic202(game.game202State as unknown as State202) : null
       },
       players: game.players.map((player) => ({
         id: player.id,
@@ -6722,11 +6873,15 @@ export class GamesService {
         remainingPeriodSeconds: timeline.remainingPeriodSeconds,
         pauseReason: timeline.pauseReason,
         pausedAt: timeline.pausedAt,
+        gameType: game.gameType === "ADVANCED_202" ? "202" : "101",
+        gameTypeSelected: (game.settings as Record<string, unknown>).gameTypeSelected !== false,
         rulesVersion: game.rulesVersion,
         isTest: game.isTest,
         fastTrackWorld: readFastTrackWorld(game.fastTrackWorld),
-        pendingAction: this.publicPendingAction(this.pendingAction(game.settings))
+        pendingAction: game.gameType === "ADVANCED_202" ? null : this.publicPendingAction(this.pendingAction(game.settings))
       },
+      game202: game.game202State ? sealedPublic202(game.game202State as unknown as State202) : null,
+      cards202: game.gameType === "ADVANCED_202" ? await this.prisma.card.findMany({ where: { cardSetId: game.cardSetId }, select: { slug: true, title: true, bodyText: true } }) : undefined,
       board: ratRaceBoard,
       fastTrackBoard: fastTrackCells,
       players: game.players.map((player) => ({
@@ -6734,10 +6889,10 @@ export class GamesService {
         figurine: player.figurine && isFigurineId(player.figurine) ? player.figurine : selectedFigurines.get(player.id) ?? null,
         assets: player.assets.map((asset) => ({ ...asset, name: realEstateAssetName(asset) }))
       })),
-      events: [...game.events].reverse(),
+      events: [...game.events].reverse().map(event => ({ ...event, stateSnapshot: sealedSavedSnapshot202(event.stateSnapshot) })),
       chatMessages: [
         ...game.chatMessages,
-        ...gameChatNotices(game, noticeEvents.reverse(), game.players, game.rulesVersion === 2 && game.status === GameStatus.IN_PROGRESS
+        ...gameChatNotices(game, noticeEvents.reverse(), game.players, game.gameType !== "ADVANCED_202" && game.rulesVersion === 2 && game.status === GameStatus.IN_PROGRESS
           ? activePlayers.filter((player) => {
             const state = player.financialState;
             return player.track === BoardTrack.RAT_RACE && state?.bankruptcyStatus !== BankruptcyStatus.LIQUIDATING

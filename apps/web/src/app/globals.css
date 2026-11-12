@@ -177,7 +177,7 @@ body.game-room-viewport-locked {
 
 @media (max-width: 1279px) {
   .app-shell-header-content:has(.game-header-controls) .brand-logo-text { display: none !important; }
-  .app-shell-main:has(.mobile-turn-bar-anchor) { padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom))); }
+  .app-shell-main:has(.mobile-turn-bar-anchor) { padding-bottom: max(8rem, calc(var(--game-turn-bar-height, 7rem) + 1rem + env(safe-area-inset-bottom))); }
 }
 
 .desktop-game-board-grid {
@@ -414,9 +414,9 @@ body.game-room-viewport-locked {
     gap: 0;
   }
 
-  .mobile-game-scroll-panel {
+  :is(.game-room--classic-active, .game-room--fast-track-active) .mobile-game-scroll-panel {
     scrollbar-color: #c5b5a3 transparent;
-    padding-bottom: max(8rem, calc(7rem + env(safe-area-inset-bottom)));
+    padding-bottom: max(8rem, calc(var(--game-turn-bar-height, 7rem) + 1rem + env(safe-area-inset-bottom)));
   }
 }
 

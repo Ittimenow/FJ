@@ -18,6 +18,13 @@ VALUES (
 )
 ON CONFLICT ("id") DO NOTHING;
 
+-- Once sets are separated by rules, the later migration owns their defaults.
+DO $$
+BEGIN
+IF NOT EXISTS (
+  SELECT 1 FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'card_sets' AND column_name = 'game_type'
+) THEN
 UPDATE "card_sets"
 SET "is_default" = true
 WHERE "id" = '00000000-0000-0000-0000-000000000001'
@@ -39,6 +46,9 @@ WHERE "id" IN (
 CREATE UNIQUE INDEX IF NOT EXISTS "card_sets_single_default_idx"
   ON "card_sets"("is_default")
   WHERE "is_default" = true;
+END IF;
+END
+$$;
 
 ALTER TABLE "card_sets" ALTER COLUMN "updated_at" DROP DEFAULT;
 

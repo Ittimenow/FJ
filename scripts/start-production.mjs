@@ -210,6 +210,8 @@ async function setupDatabaseIfNeeded() {
   ]);
 
   await run(npmCommand, ["run", "prisma:prepare-full-game", "--workspace=@cashflow/database"]);
+  await run(npmCommand, ["run", "prisma:prepare-game-202", "--workspace=@cashflow/database"]);
+  await run(npmCommand, ["run", "prisma:prepare-card-set-game-types", "--workspace=@cashflow/database"]);
   await run(npmCommand, ["run", "prisma:prepare-open-game-notifications", "--workspace=@cashflow/database"]);
   await run(npmCommand, ["run", "prisma:prepare-bot-names", "--workspace=@cashflow/database"]);
 

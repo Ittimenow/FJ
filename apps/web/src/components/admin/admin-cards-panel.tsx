@@ -58,6 +58,7 @@ interface ApiCard {
 interface ApiCardSet {
   id: string;
   name: string;
+  gameType: "101" | "202";
   isDefault: boolean;
   totalCards: number;
   activeCards: number;
@@ -130,6 +131,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
   const [createFormOpen, setCreateFormOpen] = useState(false);
   const [createSetFormOpen, setCreateSetFormOpen] = useState(false);
   const [newSetName, setNewSetName] = useState("");
+  const [newSetGameType, setNewSetGameType] = useState<"101" | "202">("101");
   const [renameFormOpen, setRenameFormOpen] = useState(false);
   const [renameName, setRenameName] = useState("");
   const [cardSets, setCardSets] = useState<ApiCardSet[]>([]);
@@ -258,7 +260,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name: newSetName })
+        body: JSON.stringify({ name: newSetName, gameType: newSetGameType })
       });
       if (!response.ok) throw new Error(await apiErrorMessage(response));
       const created = (await response.json()) as Pick<ApiCardSet, "id">;
@@ -331,7 +333,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
       setCardSets((current) =>
         current.map((set) => ({
           ...set,
-          isDefault: set.id === updated.id
+          isDefault: set.gameType === selectedSet.gameType ? set.id === updated.id : set.isDefault
         }))
       );
     } catch (defaultFailure) {
@@ -417,7 +419,13 @@ export function AdminCardsPanel({ token }: { token: string }) {
         </div>
 
         {createSetFormOpen ? (
-          <form className="mt-5 grid gap-3 border-t border-line/70 pt-5 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={createCardSet}>
+          <form className="mt-5 grid gap-3 border-t border-line/70 pt-5 sm:grid-cols-[160px_minmax(0,1fr)_auto]" onSubmit={createCardSet}>
+            <label className="grid gap-2 text-sm font-extrabold text-ink">Режим игры
+              <select value={newSetGameType} onChange={(event) => setNewSetGameType(event.target.value as "101" | "202")} disabled={setSaving} className="h-12 min-w-0 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none focus:border-action focus:ring-4 focus:ring-action/20">
+                <option value="101">101</option>
+                <option value="202">202</option>
+              </select>
+            </label>
             <label className="grid gap-2 text-sm font-extrabold text-ink">
               Название нового набора
               <input
@@ -451,10 +459,12 @@ export function AdminCardsPanel({ token }: { token: string }) {
               }}
               disabled={setsLoading || cardSets.length === 0}
             >
-              {cardSets.map((set) => (
-                <option key={set.id} value={set.id}>
-                  {set.name}{set.isDefault ? " — основной" : ""}
-                </option>
+              {(["101", "202"] as const).map((gameType) => (
+                <optgroup key={gameType} label={`Режим ${gameType}`}>
+                  {cardSets.filter((set) => set.gameType === gameType).map((set) => (
+                    <option key={set.id} value={set.id}>{set.name}{set.isDefault ? " — основной" : ""}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
@@ -464,10 +474,11 @@ export function AdminCardsPanel({ token }: { token: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <p className="break-words font-extrabold text-ink">{selectedSet.name}</p>
+                  <span className="text-sm font-bold text-muted">Режим {selectedSet.gameType}</span>
                   {selectedSet.isDefault ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8effe] px-2.5 py-1 text-xs font-extrabold text-journey">
                       <Star size={13} fill="currentColor" aria-hidden="true" />
-                      Основной набор
+                      Основной для {selectedSet.gameType}
                     </span>
                   ) : (
                     <Button
@@ -690,6 +701,7 @@ export function AdminCardsPanel({ token }: { token: string }) {
                 key={`${selectedCardSetId}:${filter}`}
                 token={token}
                 cardSetId={selectedCardSetId}
+                gameType={selectedSet?.gameType ?? "101"}
                 cardType={filter}
                 onCardCreated={(createdCard) => {
                   if (createdCard.cardType !== filter) {
@@ -747,15 +759,17 @@ export function AdminCardsPanel({ token }: { token: string }) {
 function CreateCardForm({
   token,
   cardSetId,
+  gameType,
   cardType,
   onCardCreated
 }: {
   token: string;
   cardSetId: string;
+  gameType: "101" | "202";
   cardType: AdminCardType;
   onCardCreated: (card: ApiCard) => void;
 }) {
-  const [form, setForm] = useState(() => emptyCardForm(cardType));
+  const [form, setForm] = useState(() => emptyCardForm(cardType, gameType));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -792,7 +806,7 @@ function CreateCardForm({
 
       const createdCard = (await response.json()) as ApiCard;
       onCardCreated(createdCard);
-      setForm(emptyCardForm(cardType));
+      setForm(emptyCardForm(cardType, gameType));
     } catch (createError) {
       setError(
         createError instanceof Error
@@ -1223,7 +1237,7 @@ function cardTypeLabel(value: AdminCardType) {
   return cardTypes.find((type) => type.value === value)?.label ?? value;
 }
 
-function emptyCardForm(cardType: AdminCardType) {
+function emptyCardForm(cardType: AdminCardType, gameType: "101" | "202" = "101") {
   return {
     cardType,
     slug: "",
@@ -1232,7 +1246,7 @@ function emptyCardForm(cardType: AdminCardType) {
     category: "",
     subcategory: "",
     isActive: true,
-    metaText: "",
+    metaText: gameType === "202" ? "game_type = 202" : "",
     effectsText: "",
     conditionsText: ""
   };

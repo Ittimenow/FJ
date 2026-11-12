@@ -46,6 +46,11 @@ enum GameMode {
   SOLO
 }
 
+enum GameType {
+  CLASSIC_101
+  ADVANCED_202
+}
+
 enum PlayerController {
   HUMAN
   BOT
@@ -196,6 +201,8 @@ model PasswordResetToken {
 }
 
 model Game {
+  gameType         GameType   @default(CLASSIC_101) @map("game_type")
+  game202State     Json?      @map("game_202_state")
   rulesVersion     Int        @default(1) @map("rules_version")
   isTest           Boolean    @default(false) @map("is_test")
   isPublic         Boolean    @default(false) @map("is_public")
@@ -480,6 +487,7 @@ model ProfessionLine {
 model CardSet {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique
+  gameType  GameType @default(CLASSIC_101) @map("game_type")
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -487,6 +495,7 @@ model CardSet {
   cards Card[]
   games Game[]
 
+  @@index([gameType])
   @@map("card_sets")
 }
 

@@ -1,3 +1,4 @@
+.game-action-entry + .game-action-entry { margin-top: 8px; border-top: 2px solid #dfcebb; padding-top: 16px; }
 .game-turn-timeline { padding-left: 12px; }
 .game-turn-event { position: relative; }
 .game-turn-event + .game-turn-event { margin-top: 12px; }

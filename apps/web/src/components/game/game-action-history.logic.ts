@@ -1,6 +1,6 @@
 import type { GameEvent, GamePlayer } from "../../lib/types";
 import { isBabyGiftWindowOpen } from "@cashflow/shared";
-import { gamePlayerForEvent, gameTurns, playerIdForTurn } from "./game-journal";
+import { game202TurnContext, gamePlayerForEvent, gameTurns, playerIdForTurn } from "./game-journal";
 
 const preparationEvents = new Set([
   "player:joined", "player:added", "player:removed", "player:role_changed",
@@ -43,7 +43,7 @@ export function playerActionTurns(events: GameEvent[], players: GamePlayer[], on
   });
   return gameTurns(resolved).flatMap((turn) => {
     const started = turn.events.some((event) => ["player:roll_dice", "turn:skipped", "bankruptcy:turn_skipped"].includes(event.type));
-    const ownerId = !started && !turn.complete && currentPlayerId ? currentPlayerId : playerIdForTurn(turn);
+    const ownerId = turn.ownerGamePlayerId ?? (!started && !turn.complete && currentPlayerId ? currentPlayerId : playerIdForTurn(turn));
     const player = players.find((item) => item.id === ownerId);
     if (!player) return [];
     const currentFastTrackPreparation = !started && !turn.complete && player.id === currentPlayerId && player.track === "FAST_TRACK";
@@ -53,16 +53,22 @@ export function playerActionTurns(events: GameEvent[], players: GamePlayer[], on
     for (const event of visible) {
       const author = gamePlayerForEvent(event, players);
       if (!author || author.id === ownerId) continue;
-      const previous = otherActions[otherActions.length - 1];
+      const previous = turn.turnKey
+        ? otherActions.find(group => group.player.id === author.id)
+        : otherActions[otherActions.length - 1];
       if (previous?.player.id === author.id) previous.events.push(event);
       else otherActions.push({ player: author, events: [event] });
     }
     return [{
       id: turn.id,
+      ...(turn.turnKey ? { turnKey: turn.turnKey } : {}),
+      ...(turn.turnKey ? { timeline: visible } : {}),
       player,
       complete: turn.complete,
       sequence: turn.events[0]?.sequence ?? 0,
-      events: visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId).reverse(),
+      events: turn.turnKey
+        ? visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId)
+        : visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId).reverse(),
       otherActions
     }];
   }).sort((a, b) => b.sequence - a.sequence);
@@ -109,6 +115,7 @@ export function playerActionEvents(events: GameEvent[], players: GamePlayer[], o
   }
   return mergeActionEvents([], events).filter((event) => {
     if (event.type === "state:update" || event.type === "player:fast_track_ready" || event.type.startsWith("game:") || preparationEvents.has(event.type)) return false;
+    if (event.type === "game202:action" && (!game202TurnContext(event) || ["turn_started", "turn_ended"].includes(String(event.payload.kind)))) return false;
     const player = gamePlayerForEvent(event, players);
     if (!player || (onlyPlayerId && player.id !== onlyPlayerId)) return false;
     if (!fastTrackOnly) return true;

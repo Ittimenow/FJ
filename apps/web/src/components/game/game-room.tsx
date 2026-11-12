@@ -1,16 +1,26 @@
 "use client";
 
+import { CompactAssets, isStockAsset } from "./asset-portfolio";
+import { Game202Panel } from "./game-202-panel";
+import { GameModeSettings } from "./game-mode-settings";
+import { RatRaceBoard, RatRaceMobileBoard as MobileBoard, RatRaceTabs, PlayerToken, cellTypes } from "./rat-race-layout";
+
 import { fastTrackCells, isDreamCell } from "@cashflow/shared";
 import { DreamPicker, FastTrackPanel } from "./fast-track-panel";
 import { BotLevelButtons, type BotLevelValue } from "./bot-level-buttons";
+import { BankDialog } from "./bank-dialog";
 import { MobileTurnDialog } from "./mobile-turn-dialog";
 import { boardStepDuration } from "./board-movement";
 import { useBoardMovement } from "./use-board-movement";
 import { useMobileGameHeader } from "./use-mobile-game-header";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
+import { JournalCard, MoneyBoldText } from "./journal-card";
+import { ChoicePanel, DecisionPanel, FundingProgress, MarketSalePanel, PurchasePanel, StockSalePanel } from "./game-decision-panels";
+import { TurnMovement } from "./turn-movement";
 import { recoveredActionEvents } from "./game-action-timeout";
-import { OtherPlayersList } from "./other-players-list";
+import { FinancialPlayerReport, FinancialExpenses, CreditList, Metric, PlayerIdentityMark, ProgressBar } from "./financial-report";
+import { expenseItems, liabilityLabels, repayableLiabilityRows } from "./financial-report-model";
 
 import {
   availableBankLoanCents,
@@ -19,7 +29,6 @@ import {
   canEscapeRatRace,
   dealDownPaymentAmount,
   isDealAuctionOpportunity,
-  figurineImagePath,
   isBabyGiftWindowOpen,
   outstandingBankLoanBalanceCents,
   realtimeEvents,
@@ -27,10 +36,8 @@ import {
 } from "@cashflow/shared";
 import {
   ArrowRightToLine,
-  Baby,
   Banknote,
   Bot,
-  BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -50,9 +57,7 @@ import {
   Minus,
   MoveRight,
   Plus,
-  ReceiptText,
   ShieldCheck,
-  UserRound,
   UserX,
   UsersRound,
   X
@@ -60,12 +65,9 @@ import {
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import {
-  CSSProperties,
   FormEvent,
   ReactNode,
-  RefObject,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -85,7 +87,6 @@ import {
   GameRoomVariantTwo,
   type GameRoomView
 } from "@/components/game/game-room-variant-two";
-import { childExpenseCalculation } from "@/components/game/child-expense";
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import { LobbySettings } from "@/components/game/lobby-settings";
 import {
@@ -97,13 +98,7 @@ import {
 } from "@/components/game/game-event-result";
 import { gameEndPresentation } from "@/components/game/game-end-result";
 import {
-  canAffordPurchaseCents,
-  changeStockCostCents,
-  changeStockQuantity,
-  maxStockQuantityForCashCents,
-  normalizeStockQuantity,
-  stockPurchaseCostCents,
-  stockQuantityForCostCents
+  normalizeStockQuantity
 } from "@/components/game/stock-purchase-calculation";
 import { gamePlayerForEvent } from "@/components/game/game-journal";
 import {
@@ -236,6 +231,8 @@ export function GameRoom({
   );
   const [figurineSaving, setFigurineSaving] = useState(false);
   const [lobbyBusy, setLobbyBusy] = useState(false);
+  const [modeSetupPending, setModeSetupPending] = useState(initialSnapshot.game.gameTypeSelected === false);
+  const [settingsPending, setSettingsPending] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -424,12 +421,17 @@ export function GameRoom({
   }, [currentUserId, initialSnapshot.players, router, snapshot.players]);
   const ownFigurine = me?.figurine;
   const hasPlayerMembership = Boolean(me);
-  const choosingDream = snapshot.game.status === "WAITING" && snapshot.game.rulesVersion === 2 && Boolean(me) && (!isDreamCell(me?.dreamCellIndex) || dreamPickerOpen);
-  const choosingFigurine = snapshot.game.status === "WAITING" && Boolean(me) && !choosingDream && !me?.figurine;
+  const setupReady = snapshot.game.gameTypeSelected !== false && !modeSetupPending;
+  const choosingDream = setupReady && snapshot.game.status === "WAITING" && snapshot.game.rulesVersion === 2 && Boolean(me) && (!isDreamCell(me?.dreamCellIndex) || dreamPickerOpen);
+  const choosingFigurine = setupReady && snapshot.game.status === "WAITING" && Boolean(me) && !choosingDream && !me?.figurine;
   const showFastTrack = snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && (trackView ?? me?.track ?? currentPlayer?.track) === "FAST_TRACK";
   useEffect(() => { setTrackView(null); }, [me?.track, currentPlayer?.track]);
   const hasFastTrackPlayers = gamePlayers.some((player) => player.track === "FAST_TRACK");
-  const viewportMode = snapshot.game.status === "WAITING" ? null : showFastTrack ? "classic" : gameRoomView;
+  const viewportMode = snapshot.game.status === "WAITING" || (snapshot.game.gameType === "202" && showFastTrack)
+    ? null
+    : showFastTrack || snapshot.game.gameType === "202"
+      ? "classic"
+      : gameRoomView;
   const mobileHeaderHidden = useMobileGameHeader(viewportMode === "classic");
   const movement = useBoardMovement(snapshot, "RAT_RACE", me?.id, turnAnimationPhase);
   const boardSnapshot = movement.snapshot;
@@ -441,7 +443,7 @@ export function GameRoom({
     const { body } = document;
 
     const syncViewportLock = () => {
-      const shouldLock = snapshot.game.status !== "WAITING" && desktopViewport.matches;
+      const shouldLock = viewportMode !== null && snapshot.game.status !== "WAITING" && desktopViewport.matches;
 
       documentElement.classList.toggle("game-room-viewport-locked", shouldLock);
       body.classList.toggle("game-room-viewport-locked", shouldLock);
@@ -469,6 +471,7 @@ export function GameRoom({
   const playersWithoutFigurines = gamePlayers.filter((player) => player.status === "JOINED" && !player.figurine);
   const humanGamePlayers = gamePlayers.filter((player) => player.controller === "HUMAN");
   const startDisabledReason =
+    settingsPending ? "Дождитесь сохранения настроек игры." :
     gamePlayers.length < 2
       ? "Для старта нужны минимум два игрока."
       : gamePlayers.length > Math.min(snapshot.game.maxPlayers ?? 12, 12)
@@ -498,7 +501,7 @@ export function GameRoom({
   const canPause = canManage && snapshot.game.status === "IN_PROGRESS";
   const canResume = canManage && snapshot.game.status === "PAUSED";
   const canStart =
-    snapshot.game.status === "WAITING" &&
+    snapshot.game.status === "WAITING" && setupReady && !settingsPending && !lobbyBusy &&
     canManage && (!snapshot.game.isTest || isAdmin);
   const canChangeHostParticipation =
     !isSolo &&
@@ -678,8 +681,9 @@ export function GameRoom({
       onSendChat: (body) => emit("chat:send", { body }),
       onPause: canPause ? () => void pauseGame() : null,
       onResume: canResume ? () => void resumeGame() : null,
-      hostDisplayView: canManage && !isSolo ? gameRoomView : null,
+      hostDisplayView: canManage && !isSolo && snapshot.game.gameType !== "202" ? gameRoomView : null,
       viewportMode,
+      gameType: snapshot.game.gameType ?? "101",
       mobileHeaderHidden,
       trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && hasFastTrackPlayers ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
       onTrackChange: setTrackView,
@@ -709,6 +713,7 @@ export function GameRoom({
     viewportMode,
     mobileHeaderHidden,
     snapshot.game.rulesVersion,
+    snapshot.game.gameType,
     snapshot.chatMessages,
     remainingSeconds,
     timelineLoading
@@ -727,7 +732,7 @@ export function GameRoom({
   }, [currentStockSaleResetKey]);
 
   useEffect(() => {
-    if (snapshot.game.status === "ENDED" && !stayOnEndedGame) {
+    if (snapshot.game.status === "ENDED" && !stayOnEndedGame && snapshot.game.gameType !== "202") {
       router.replace(`/games/${snapshot.game.id}/results` as Route);
     }
   }, [router, snapshot.game.id, snapshot.game.status, stayOnEndedGame]);
@@ -741,7 +746,7 @@ export function GameRoom({
 
   async function startGame() {
     setError(null);
-    if (lobbyBusy) return;
+    if (lobbyBusy || !setupReady || settingsPending) return;
     setLobbyBusy(true);
     try {
     if (socketRef.current?.connected) {
@@ -1399,6 +1404,32 @@ export function GameRoom({
   );
 
 
+  const playerPreparation = <>
+      {choosingDream && me ? <DreamPicker embedded gameType={snapshot.game.gameType ?? "101"} player={me} saving={fastBusy} onChoose={(cellIndex) => { void fastAction("dream", { cellIndex }).then((saved) => { if (saved) setDreamPickerOpen(false); }); }} /> : null}
+      {choosingFigurine ? (
+        <section className="text-ink" aria-labelledby="choose-figurine-title">
+          <h2 id="choose-figurine-title" className="text-xl font-extrabold">Выберите фишку</h2>
+          <p className="mt-2 text-sm leading-6">Она будет представлять вас на обоих игровых кругах. У каждого игрока своя фишка.</p>
+          {me && isDreamCell(me.dreamCellIndex) ? (
+            <div className="mt-4 flex items-center gap-3 rounded-xl bg-card p-2 sm:p-3">
+              <span className="relative aspect-[3/2] w-24 shrink-0 overflow-hidden rounded-lg">
+                <img src={`/dreams/${me.dreamCellIndex}.webp`} alt="" width={96} height={64} className="absolute inset-0 h-full w-full object-cover" />
+              </span>
+              <div className="min-w-0"><p className="text-xs text-muted">Ваша мечта</p><p className="font-extrabold">{fastTrackCells[me.dreamCellIndex]!.label}</p>
+                <button type="button" className="mt-1 min-h-9 text-sm font-bold text-journey underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey" onClick={() => setDreamPickerOpen(true)}>Изменить мечту</button>
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4 max-h-[min(65vh,600px)] overflow-y-auto pr-1"><FigurinePicker value={figurineChoice} taken={takenFigurines} onChange={(figurine) => { setFigurineChoice(figurine); void chooseFigurine(figurine); }} disabled={figurineSaving} /></div>
+          {figurineSaving ? <p className="mt-3 text-sm" role="status">Сохраняем фишку…</p> : null}
+        </section>
+      ) : null}
+  </>;
+
+  if (snapshot.game.gameType === "202" && snapshot.game202 && snapshot.game.status !== "WAITING") {
+    return <Game202Panel snapshot={snapshot} token={token} currentUserId={currentUserId} showFastTrack={showFastTrack} onTrackChange={setTrackView} onSnapshot={next => setSnapshot(current => acceptGameSnapshot(current, next))} />;
+  }
+
   return (
     <div
       className={cn(
@@ -1412,6 +1443,21 @@ export function GameRoom({
           : null
       )}
     >
+      {snapshot.game.status === "WAITING" ? <GameModeSettings snapshot={snapshot} token={token} canManage={canManage} isAdmin={isAdmin} disabled={lobbyBusy || settingsPending} onSaved={value => setSnapshot(current => acceptGameSnapshot(current, value))} onPendingChange={setModeSetupPending} /> : null}
+      {snapshot.game.status !== "WAITING" || setupReady ? <>
+      {snapshot.game.status === "WAITING" ? canManage && !isSolo ? (
+        <LobbySettings key={snapshot.game.id} snapshot={snapshot} token={token} timeZone={timeZone} disabled={lobbyBusy} onSaved={value => setSnapshot(current => acceptGameSnapshot(current, value))} onPendingChange={setSettingsPending} />
+      ) : (
+        <section id="lobby-settings" className="rounded-2xl bg-white p-4 shadow-panel sm:p-5" aria-labelledby="lobby-settings-title">
+          <h2 id="lobby-settings-title" className="text-xl font-extrabold">2. Настройки игры</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">{isSolo ? "Закрытая партия с ботами без ограничения времени. Состав соперников выбран при создании игры." : "Настройками партии управляет ведущий."}</p>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+            <div><dt className="text-muted">Название</dt><dd className="mt-1 break-words font-bold">{snapshot.game.title}</dd></div>
+            <div><dt className="text-muted">Мест для игроков</dt><dd className="mt-1 font-bold">{snapshot.game.maxPlayers ?? 6}</dd></div>
+            <div><dt className="text-muted">Длительность</dt><dd className="mt-1 font-bold">{snapshot.game.timeLimitMinutes ? `${snapshot.game.timeLimitMinutes} мин` : "Без ограничения"}</dd></div>
+          </dl>
+        </section>
+      ) : null}
       <MobileTurnDialog
         open={Boolean(me) && (snapshot.game.status === "IN_PROGRESS" || snapshot.game.status === "PAUSED")}
         currentPlayer={currentPlayer ?? null}
@@ -1477,35 +1523,6 @@ export function GameRoom({
           <Button variant="action" disabled={fastBusy || rollingDice} onClick={() => { setTrackView("RAT_RACE"); void rollDice(); }}>Бросить кубики</Button>
         </div>
       ) : null}
-      {snapshot.game.status === "WAITING" && me ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-ink shadow-panel" aria-label="Этапы подготовки партии">
-          <span className={choosingDream ? "text-journey" : "text-success"}>1. Мечта</span>
-          <span className="text-muted" aria-hidden="true">→</span>
-          <span className={choosingFigurine ? "text-journey" : me.figurine ? "text-success" : "text-muted"}>2. Фишка</span>
-          <span className="text-muted" aria-hidden="true">→</span>
-          <span className="text-muted">3. Игровое поле</span>
-        </div>
-      ) : null}
-      {choosingDream && me ? <DreamPicker player={me} saving={fastBusy} onChoose={(cellIndex) => { void fastAction("dream", { cellIndex }).then((saved) => { if (saved) setDreamPickerOpen(false); }); }} /> : null}
-      {choosingFigurine ? (
-        <section className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="choose-figurine-title">
-          <h2 id="choose-figurine-title" className="text-xl font-extrabold">Выберите фишку</h2>
-          <p className="mt-2 text-sm leading-6">Она будет представлять вас на обоих игровых кругах. У каждого игрока своя фишка.</p>
-          {me && isDreamCell(me.dreamCellIndex) ? (
-            <div className="mt-4 flex items-center gap-3 rounded-xl bg-card p-2 sm:p-3">
-              <span className="relative aspect-[3/2] w-24 shrink-0 overflow-hidden rounded-lg">
-                <img src={`/dreams/${me.dreamCellIndex}.webp`} alt="" width={96} height={64} className="absolute inset-0 h-full w-full object-cover" />
-              </span>
-              <div className="min-w-0"><p className="text-xs text-muted">Ваша мечта</p><p className="font-extrabold">{fastTrackCells[me.dreamCellIndex]!.label}</p>
-                <button type="button" className="mt-1 min-h-9 text-sm font-bold text-journey underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-journey" onClick={() => setDreamPickerOpen(true)}>Изменить мечту</button>
-              </div>
-            </div>
-          ) : null}
-          <div className="mt-4 max-h-[min(65vh,600px)] overflow-y-auto pr-1"><FigurinePicker value={figurineChoice} taken={takenFigurines} onChange={(figurine) => { setFigurineChoice(figurine); void chooseFigurine(figurine); }} disabled={figurineSaving} /></div>
-          {figurineSaving ? <p className="mt-3 text-sm" role="status">Сохраняем фишку…</p> : null}
-        </section>
-      ) : null}
-
       {snapshot.game.status === "WAITING" ? (
         <WaitingRoomOverview
           snapshot={snapshot}
@@ -1517,9 +1534,8 @@ export function GameRoom({
           startBusy={lobbyBusy}
           code={snapshot.game.code}
           token={token}
-          timeZone={timeZone}
-          isAdmin={isAdmin}
-          onSettingsSaved={(value) => setSnapshot((current) => acceptGameSnapshot(current, value))}
+          preparation={choosingDream || choosingFigurine ? playerPreparation : null}
+          settingsPending={settingsPending}
           onAddBot={(level) => void lobbyAction("bots", "POST", { level })}
           onRemovePlayer={(playerId) => void lobbyAction(`players/${playerId}`, "DELETE")}
           onAddUser={addUserToGame}
@@ -1750,6 +1766,7 @@ export function GameRoom({
 
         </>
       )}
+      </> : null}
     </div>
   );
 }
@@ -1873,143 +1890,6 @@ function gameEndReasonText(reason: string | null) {
   return gameEndPresentation({ reason }).description;
 }
 
-function StockSalePanel({
-  offer,
-  quantity,
-  onQuantityChange,
-  onDecrease,
-  onIncrease,
-  decisionSubmission,
-  onSell,
-  onDecline
-}: {
-  offer: NonNullable<ReturnType<typeof stockSaleOfferForPlayer>>;
-  quantity: StockSaleQuantity;
-  onQuantityChange: (value: StockSaleQuantity) => void;
-  onDecrease: () => void;
-  onIncrease: () => void;
-  decisionSubmission: Extract<DecisionSubmission, "stock_sell" | "stock_decline"> | null;
-  onSell: () => void;
-  onDecline: () => void;
-}) {
-  const numericQuantity = quantity === "" ? 0 : quantity;
-  const saleTotalCents = offer.salePriceCents * numericQuantity;
-  const submitting = decisionSubmission !== null;
-  const quantityControlClassName =
-    "h-11 min-w-0 rounded-xl bg-white px-0 text-ink shadow-[0_6px_16px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]";
-
-  return (
-    <section className="rounded-2xl bg-card p-3 shadow-[0_16px_36px_rgba(27,57,118,.10)] min-[420px]:p-4">
-      <div>
-        <h3 className="text-base font-extrabold text-ink">Продажа акций</h3>
-        <p className="mt-2 text-sm leading-6 text-muted">{localizeGameText(offer.title)}</p>
-        <p className="mt-1 text-sm font-bold text-ink">
-          Доступно акций: {offer.quantity}
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <label htmlFor="stock-sale-quantity" className="text-sm font-extrabold text-ink">
-          Количество на продажу
-        </label>
-        <div className="mt-2 grid grid-cols-[repeat(2,minmax(0,.7fr))_minmax(4rem,1.5fr)_repeat(3,minmax(0,.7fr))] items-center gap-1">
-          <Button
-            variant="ghost"
-            className={quantityControlClassName}
-            onClick={() => onQuantityChange(numericQuantity - 20)}
-            disabled={submitting || numericQuantity <= 1}
-            aria-label="Уменьшить количество на 20"
-            title="Уменьшить на 20"
-          >
-            <ChevronsLeft size={17} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            className={quantityControlClassName}
-            onClick={onDecrease}
-            disabled={submitting || numericQuantity <= 1}
-            aria-label="Уменьшить количество на 1"
-            title="Уменьшить на 1"
-          >
-            <ChevronLeft size={17} aria-hidden="true" />
-          </Button>
-          <Input
-            id="stock-sale-quantity"
-            type="number"
-            min={1}
-            max={offer.quantity}
-            step={1}
-            inputMode="numeric"
-            value={quantity}
-            onChange={(event) =>
-              onQuantityChange(event.target.value === "" ? "" : Number(event.target.value))
-            }
-            disabled={submitting}
-            className="h-11 px-1 text-center font-extrabold tabular-nums"
-          />
-          <Button
-            variant="ghost"
-            className={quantityControlClassName}
-            onClick={onIncrease}
-            disabled={submitting || numericQuantity >= offer.quantity}
-            aria-label="Увеличить количество на 1"
-            title="Увеличить на 1"
-          >
-            <ChevronRight size={17} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            className={quantityControlClassName}
-            onClick={() => onQuantityChange(numericQuantity + 20)}
-            disabled={submitting || numericQuantity >= offer.quantity}
-            aria-label="Увеличить количество на 20"
-            title="Увеличить на 20"
-          >
-            <ChevronsRight size={17} aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            className={quantityControlClassName}
-            onClick={() => onQuantityChange(offer.quantity)}
-            disabled={submitting || numericQuantity >= offer.quantity}
-            aria-label="Выбрать максимальное количество акций"
-            title="Выбрать максимум"
-          >
-            <ArrowRightToLine size={17} aria-hidden="true" />
-          </Button>
-        </div>
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-1 text-sm">
-          <span className="font-medium text-muted">Сумма продажи</span>
-          <strong className="text-base font-extrabold text-ink">
-            {quantity === ""
-              ? "Укажите количество"
-              : `${quantity} x ${money(offer.salePriceCents)} = ${money(saleTotalCents)}`}
-          </strong>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button
-          variant="action"
-          onClick={onSell}
-          disabled={submitting || quantity === ""}
-          aria-busy={decisionSubmission === "stock_sell"}
-        >
-          {decisionSubmission === "stock_sell" ? "Продаём…" : "Продать"}
-        </Button>
-        <Button
-          variant="ghost"
-          className="bg-white text-ink shadow-[0_7px_18px_rgba(27,57,118,.09)] hover:bg-[#fffdf9]"
-          onClick={onDecline}
-          disabled={submitting}
-          aria-busy={decisionSubmission === "stock_decline"}
-        >
-          {decisionSubmission === "stock_decline" ? "Отказываемся…" : "Не продавать"}
-        </Button>
-      </div>
-    </section>
-  );
-}
 
 function diceValuesFromActionResult(result: GameActionResult) {
   const diceEvent = result.events?.find((event) => event.type === realtimeEvents.playerRollDice);
@@ -2258,9 +2138,8 @@ function WaitingRoomOverview({
   startBusy,
   code,
   token,
-  timeZone,
-  isAdmin,
-  onSettingsSaved,
+  preparation,
+  settingsPending,
   onAddBot,
   onRemovePlayer,
   onAddUser,
@@ -2281,9 +2160,8 @@ function WaitingRoomOverview({
   startBusy: boolean;
   code: string;
   token: string;
-  timeZone: string | null;
-  isAdmin: boolean;
-  onSettingsSaved: (snapshot: GameSnapshot) => void;
+  preparation: ReactNode;
+  settingsPending: boolean;
   onAddBot: (level: BotLevelValue) => void;
   onRemovePlayer: (playerId: string) => void;
   onAddUser: (body: { userId: string; role: string }) => void;
@@ -2304,7 +2182,7 @@ function WaitingRoomOverview({
   const figurinesReady = gamePlayers.length > 0 && readyPlayers.length === gamePlayers.length;
   const dreamsReady = snapshot.game.rulesVersion !== 2 || gamePlayers.every((player) => isDreamCell(player.dreamCellIndex));
   const completedChecks =
-    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(dreamsReady);
+    Number(enoughPlayers) + Number(hasHumanPlayer) + Number(figurinesReady) + Number(dreamsReady) + Number(!settingsPending);
   const [now, setNow] = useState(() => Date.now());
   const [removeTarget, setRemoveTarget] = useState<GamePlayer | null>(null);
   useEffect(() => {
@@ -2322,13 +2200,14 @@ function WaitingRoomOverview({
   const [newBotLevel, setNewBotLevel] = useState<BotLevelValue>("balanced_v1");
 
   return (
-    <section className="grid gap-4 rounded-2xl bg-white p-4 shadow-panel sm:p-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
+    <>
+    <section id="lobby-team" className="rounded-2xl bg-white p-4 shadow-panel sm:p-5" aria-labelledby="lobby-team-title">
       <div className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">
-              {isSolo ? "Ваши виртуальные соперники готовы" : "Соберите команду"}
-            </h1>
+            <h2 id="lobby-team-title" className="text-xl font-extrabold">
+              3. Соберите команду
+            </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
               {isSolo
                 ? snapshot.game.rulesVersion === 2
@@ -2414,9 +2293,6 @@ function WaitingRoomOverview({
           </div>
         ) : null}
         {canManage && !isSolo ? (
-          <LobbySettings snapshot={snapshot} token={token} timeZone={timeZone} isAdmin={isAdmin} onSaved={onSettingsSaved} />
-        ) : null}
-        {canManage && !isSolo ? (
           <HostPanel
             code={code}
             gameId={snapshot.game.id}
@@ -2429,15 +2305,17 @@ function WaitingRoomOverview({
             onChangeParticipation={onChangeParticipation}
           />
         ) : null}
+        {preparation ? <div className="mt-5 border-t border-line/70 pt-5">{preparation}</div> : null}
       </div>
+    </section>
 
-      <aside className="rounded-xl bg-card p-4 text-ink sm:p-5">
-        <h2 className="text-lg font-extrabold">Готовность к старту</h2>
+      <section id="lobby-readiness" className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="lobby-readiness-title">
+        <h2 id="lobby-readiness-title" className="text-xl font-extrabold">4. Готовность к старту</h2>
         {snapshot.game.scheduledAt ? <div className="mt-3 rounded-xl bg-white p-3 text-sm">
           <p className="font-bold">Начало: {new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short" }).format(new Date(snapshot.game.scheduledAt))}</p>
           <p className="mt-1" role="timer">{beforeStart ? `До начала игры осталось ${formatLobbyCountdown(secondsUntilStart)}` : "Время начала наступило"}</p>
         </div> : null}
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <LobbyCheck
             complete={enoughPlayers}
             label={enoughPlayers ? "Игроков достаточно" : "Нужно минимум два игрока"}
@@ -2451,6 +2329,7 @@ function WaitingRoomOverview({
             label={figurinesReady ? "Фигурки выбраны" : `Фигурки: ${readyPlayers.length}/${gamePlayers.length}`}
           />
           {snapshot.game.rulesVersion === 2 ? <LobbyCheck complete={dreamsReady} label={dreamsReady ? "Мечты выбраны" : "Каждый игрок должен выбрать мечту"} /> : null}
+          {canManage ? <LobbyCheck complete={!settingsPending} label={settingsPending ? "Настройки ещё не сохранены" : "Настройки сохранены"} /> : null}
           <LobbyCheck
             complete={canManage}
             label={canManage ? "Вы можете запустить партию" : "Старт запустит ведущий"}
@@ -2459,7 +2338,7 @@ function WaitingRoomOverview({
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#dce4ef]">
           <div
             className="h-full rounded-full bg-action transition-[width] duration-300"
-            style={{ width: `${Math.round((completedChecks / 4) * 100)}%` }}
+            style={{ width: `${Math.round((completedChecks / 5) * 100)}%` }}
           />
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
@@ -2469,7 +2348,7 @@ function WaitingRoomOverview({
         </p>
         {canManage ? (
           <Button
-            className="mt-4 w-full"
+            className="mt-4 w-full sm:w-auto sm:min-w-56"
             variant="action"
             onClick={onStartGame}
             disabled={!canStart || Boolean(startDisabledReason) || beforeStart || startBusy}
@@ -2477,7 +2356,7 @@ function WaitingRoomOverview({
             {startBusy ? "Запускаем…" : "Начать партию"}
           </Button>
         ) : null}
-      </aside>
+      </section>
       {removeTarget ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div role="alertdialog" aria-modal="true" aria-labelledby="remove-player-title" aria-describedby="remove-player-description" onKeyDown={(event) => { if (event.key === "Escape") setRemoveTarget(null); if (event.key === "Tab") { event.preventDefault(); const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button")); const index = buttons.indexOf(document.activeElement as HTMLButtonElement); buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length]?.focus(); } }} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
           <h2 id="remove-player-title" className="text-xl font-extrabold">Удалить участника?</h2>
@@ -2485,7 +2364,7 @@ function WaitingRoomOverview({
           <div className="mt-5 flex justify-end gap-2"><Button id="cancel-lobby-removal" type="button" variant="secondary" onClick={() => setRemoveTarget(null)}>Отмена</Button><Button type="button" variant="danger" disabled={startBusy} onClick={() => { onRemovePlayer(removeTarget.id); setRemoveTarget(null); }}>Удалить</Button></div>
         </div>
       </div> : null}
-    </section>
+    </>
   );
 }
 
@@ -2531,46 +2410,25 @@ export function DesktopGameBoard({
   children: ReactNode;
 }) {
   return (
-    <section className="desktop-game-board-shell w-full rounded-2xl bg-card p-3 shadow-panel" aria-label="Поле малого круга" data-moving-player={movingPlayerId ?? undefined}>
-      <div className="desktop-game-board-grid grid justify-center gap-2 overflow-x-auto">
-        {snapshot.board.map((cell) => {
-          const players = cellPlayers(snapshot, cell.index);
-          return (
-            <BoardCellTile
-              key={cell.index}
-              cell={cell}
-              players={players}
-              movingPlayerId={movingPlayerId}
-              style={ringCellStyle(cell.index)}
-              compact
-            />
-          );
-        })}
-
-        <div
-          className="grid min-h-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] gap-3 rounded-xl bg-surface p-3"
-          style={{ gridColumn: "2 / 8", gridRow: "2 / 6" }}
-        >
-          <DesktopFinancialPanel
-            player={selectedPlayer}
-            players={players}
-            currentPlayerId={snapshot.game.currentPlayerId}
-            canManageLiabilities={canManageLiabilities}
-            onCloseLiability={onCloseLiability}
-            canOpenBank={canOpenBank}
-            onOpenBank={onOpenBank}
-            outsidePlayers={outsidePlayers}
-          />
-          <div className="min-h-0 overflow-y-auto rounded-xl bg-white px-3 pb-3 pt-0 shadow-panel">
-            {children}
-          </div>
+    <RatRaceBoard snapshot={snapshot} movingPlayerId={movingPlayerId}>
+      <div className="grid h-full min-h-0 grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] gap-3">
+        <DesktopFinancialPanel
+          player={selectedPlayer}
+          players={players}
+          currentPlayerId={snapshot.game.currentPlayerId}
+          canManageLiabilities={canManageLiabilities}
+          onCloseLiability={onCloseLiability}
+          canOpenBank={canOpenBank}
+          onOpenBank={onOpenBank}
+          outsidePlayers={outsidePlayers}
+        />
+        <div className="min-h-0 overflow-y-auto rounded-xl bg-white px-3 pb-3 pt-0 shadow-panel">
+          {children}
         </div>
       </div>
-    </section>
+    </RatRaceBoard>
   );
 }
-
-type DesktopFinancialTab = "player" | "assets" | "expenses" | "liabilities";
 
 function DesktopFinancialPanel({
   player,
@@ -2591,7 +2449,6 @@ function DesktopFinancialPanel({
   onOpenBank: () => void;
   outsidePlayers: GamePlayer[];
 }) {
-  const [activeTab, setActiveTab] = useState<DesktopFinancialTab>("player");
   const state = player?.financialState;
 
   if (!player || !state) {
@@ -2604,155 +2461,16 @@ function DesktopFinancialPanel({
   }
 
   const liabilities = repayableLiabilityRows(player);
-  const tabs: Array<{
-    id: DesktopFinancialTab;
-    label: string;
-    icon: ReactNode;
-    count?: number;
-  }> = [
-    { id: "player", label: "Игрок", icon: <UserRound size={15} /> },
-    { id: "assets", label: "Активы", icon: <BriefcaseBusiness size={15} />, count: player.assets.length },
-    { id: "expenses", label: "Расходы", icon: <ReceiptText size={15} /> },
-    { id: "liabilities", label: "Долги", icon: <Landmark size={15} />, count: liabilities.length }
-  ];
-
   return (
-    <div className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-xl bg-white shadow-panel">
-      <div
-        className="grid grid-cols-4 gap-1.5 bg-[#eef3e8] p-2"
-        role="tablist"
-        aria-label="Информация об игроке"
-      >
-        {tabs.map((tab, index) => {
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              id={`desktop-game-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls="desktop-game-tab-panel"
-              tabIndex={active ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(event) => {
-                let nextIndex = index;
-                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-                if (event.key === "ArrowLeft") {
-                  nextIndex = (index - 1 + tabs.length) % tabs.length;
-                }
-                if (event.key === "Home") nextIndex = 0;
-                if (event.key === "End") nextIndex = tabs.length - 1;
-                if (nextIndex === index) return;
-
-                event.preventDefault();
-                const nextTab = tabs[nextIndex];
-                if (!nextTab) return;
-                setActiveTab(nextTab.id);
-                document.getElementById(`desktop-game-tab-${nextTab.id}`)?.focus();
-              }}
-              className={[
-                "relative flex h-14 min-w-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866]",
-                active
-                  ? "bg-[#dfe9d4] text-[#3f5b35]"
-                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35] active:bg-white/70 active:text-[#3f5b35]"
-              ].join(" ")}
-            >
-              <span aria-hidden="true">{tab.icon}</span>
-              <span className="w-full truncate text-center">{tab.label}</span>
-              {tab.count !== undefined ? (
-                <span
-                  className={[
-                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[8px] leading-4",
-                    active ? "bg-[#718866] text-white" : "bg-white text-[#61715b]"
-                  ].join(" ")}
-                >
-                  {tab.count}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        id="desktop-game-tab-panel"
-        role="tabpanel"
-        aria-labelledby={`desktop-game-tab-${activeTab}`}
-        className="min-h-0 overflow-y-auto p-3"
-      >
-        {activeTab === "player" ? (
-          <div>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <PlayerIdentityMark player={player} />
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <h2 className="truncate text-lg font-semibold">
-                      {gamePlayerName(player)}
-                    </h2>
-                    <ChildrenMarks count={state.childrenCount} />
-                  </div>
-                  <div className="mt-1 truncate text-sm text-neutral-500">
-                    {player.profession?.name}
-                  </div>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                className="h-9 shrink-0 gap-2 px-3 text-xs"
-                onClick={onOpenBank}
-                disabled={!canOpenBank}
-              >
-                <Landmark size={15} aria-hidden="true" />
-                Банк
-              </Button>
-            </div>
-            <div className="mt-4 grid grid-cols-5 gap-2">
-              <Metric label="Наличные" value={money(state.cashCents)} />
-              <Metric label="Зарплата" value={money(state.salaryCents)} />
-              <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
-              <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
-              <Metric label="Расходы" value={money(state.totalExpensesCents)} />
-            </div>
-            <FinancialFreedomProgress
-              className="mt-3"
-              passiveIncomeCents={state.passiveIncomeCents}
-              totalExpensesCents={state.totalExpensesCents}
-              bankLoanBalanceCents={outstandingBankLoanBalanceCents(player.liabilities)}
-            />
-            <CashflowEquation className="mt-3" state={state} />
-            {outsidePlayers.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                <span>Вне поля</span>
-                {outsidePlayers.map((outsidePlayer) => (
-                  <PlayerToken key={outsidePlayer.id} player={outsidePlayer} />
-                ))}
-              </div>
-            ) : null}
-            <OtherPlayersList
-              className="mt-4 border-t border-line/70 pt-4"
-              players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}
-              currentPlayerId={currentPlayerId}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === "assets" ? <CompactAssets assets={player.assets} /> : null}
-
-        {activeTab === "expenses" ? (
-          <div className="space-y-4">
-            <ExpenseComposition player={player} />
-            <SectionList
-              title={money(state.totalExpensesCents)}
-              titleAlign="right"
-              rows={expenseRows(player)}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === "liabilities" ? (
+    <RatRaceTabs
+      idPrefix="desktop-game"
+      variant="desktop"
+      assetCount={player.assets.length}
+      liabilityCount={liabilities.length}
+      player={<FinancialPlayerReport player={player} players={players} currentPlayerId={currentPlayerId} canOpenBank={canOpenBank} onOpenBank={onOpenBank} outsidePlayers={outsidePlayers} variant="desktop"/>}
+      assets={<CompactAssets assets={player.assets} />}
+      expenses={<FinancialExpenses items={expenseItems(player)} total={state.totalExpensesCents}/>}
+      liabilities={
           <CreditList
             liabilities={liabilities}
             currentCashCents={state.cashCents}
@@ -2760,443 +2478,8 @@ function DesktopFinancialPanel({
             canManageLiabilities={canManageLiabilities}
             onCloseLiability={onCloseLiability}
           />
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function CompactAssets({ assets }: { assets: GamePlayer["assets"] }) {
-  if (assets.length === 0) {
-    return (
-      <p className="text-sm text-neutral-600">
-        Активов пока нет, но амбиции уже на балансе!
-      </p>
-    );
-  }
-
-  const maxAbsCashflowCents = Math.max(
-    1,
-    ...assets.map((asset) => Math.abs(asset.cashflowCents))
-  );
-
-  return (
-    <div className="space-y-2">
-      <PortfolioSummary assets={assets} />
-      {assets.map((asset) => (
-        <AssetCard
-          key={asset.id}
-          asset={asset}
-          maxAbsCashflowCents={maxAbsCashflowCents}
-        />
-      ))}
-    </div>
-  );
-}
-
-const portfolioSegmentClasses: Record<string, string> = {
-  stocks: "bg-[#7b9cc6]",
-  real_estate: "bg-[#73a865]",
-  business: "bg-[#9d82b8]",
-  other: "bg-[#b99c5d]"
-};
-
-const portfolioCategoryLabels: Record<string, string> = {
-  stocks: "Акции",
-  real_estate: "Недвижимость",
-  business: "Бизнес",
-  other: "Другие активы"
-};
-
-function PortfolioSummary({ assets }: { assets: GamePlayer["assets"] }) {
-  const totalCostCents = assets.reduce((sum, asset) => sum + asset.costBasisCents, 0);
-  const totalMarketCents = assets.reduce((sum, asset) => sum + asset.marketValueCents, 0);
-  const totalCashflowCents = assets.reduce((sum, asset) => sum + asset.cashflowCents, 0);
-  const resultCents = totalMarketCents - totalCostCents;
-  const grouped = Array.from(
-    assets.reduce((items, asset) => {
-      const category = assetPortfolioCategory(asset);
-      items.set(
-        category,
-        (items.get(category) ?? 0) +
-          Math.max(0, asset.marketValueCents || asset.costBasisCents)
-      );
-      return items;
-    }, new Map<string, number>())
-  ).filter(([, value]) => value > 0);
-  const compositionTotal = grouped.reduce((sum, [, value]) => sum + value, 0);
-
-  return (
-    <div className="rounded-md bg-surface p-3">
-      <div className="text-sm font-semibold">Портфель</div>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Metric className="bg-white" label="Вложено" value={money(totalCostCents)} />
-        <Metric className="bg-white" label="Текущая стоимость" value={money(totalMarketCents)} />
-        <Metric
-          className="bg-white"
-          label={resultCents >= 0 ? "Прибыль" : "Убыток"}
-          value={money(Math.abs(resultCents))}
-        />
-        <Metric
-          className="bg-white"
-          label="Денежный поток активов"
-          value={`${money(totalCashflowCents)}/мес`}
-        />
-      </div>
-      {compositionTotal > 0 ? (
-        <>
-          <div
-            className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
-            role="img"
-            aria-label="Распределение стоимости портфеля по типам активов"
-          >
-            {grouped.map(([category, value]) => (
-              <div
-                key={category}
-                className={portfolioSegmentClasses[category] ?? "bg-neutral-400"}
-                style={{ width: `${(value / compositionTotal) * 100}%` }}
-                title={`${portfolioCategoryLabels[category] ?? "Другие активы"}: ${money(value)}`}
-              />
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-            {grouped.map(([category, value]) => (
-              <div key={category} className="inline-flex items-center gap-1.5 text-xs">
-                <span
-                  className={`h-2.5 w-2.5 rounded-sm ${portfolioSegmentClasses[category] ?? "bg-neutral-400"}`}
-                  aria-hidden="true"
-                />
-                <span className="text-neutral-600">
-                  {portfolioCategoryLabels[category] ?? "Другие активы"}
-                </span>
-                <strong>{Math.round((value / compositionTotal) * 100)}%</strong>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function assetPortfolioCategory(asset: GamePlayer["assets"][number]) {
-  if (isStockAsset(asset)) return "stocks";
-  const type = asset.type.toLowerCase();
-  if (type.includes("realestate") || type.includes("real_estate")) {
-    return "real_estate";
-  }
-  if (type.includes("network") || type.includes("business")) return "business";
-  return "other";
-}
-
-function MobileBoard({
-  snapshot,
-  selectedPlayer,
-  movingPlayerId,
-  containerRef
-}: {
-  snapshot: GameSnapshot;
-  selectedPlayer: GamePlayer | undefined;
-  containerRef: RefObject<HTMLDivElement | null>;
-  movingPlayerId: string | null;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const followedPlayer = snapshot.players.find((player) => player.id === movingPlayerId) ?? selectedPlayer;
-  const targetCellIndex = followedPlayer?.track === "RAT_RACE" && followedPlayer.position >= 0 ? followedPlayer.position : 0;
-  useEffect(() => {
-    const container = scrollRef.current;
-    const target = container?.querySelector<HTMLElement>(
-      `[data-board-cell="${targetCellIndex}"]`
-    );
-    if (!container || !target) return;
-    container.scrollTo({
-      left: target.offsetLeft - container.clientWidth / 2 + target.clientWidth / 2,
-      behavior: "instant"
-    });
-  }, [snapshot.game.id, targetCellIndex]);
-
-  return (
-    <div ref={containerRef} className="w-full min-w-0 max-w-full" data-moving-player={movingPlayerId ?? undefined}>
-      <div className="min-w-0 max-w-full overflow-hidden bg-card/60">
-        <div
-          ref={scrollRef}
-          className="relative grid h-[88px] w-full min-w-0 max-w-full touch-pan-y snap-x snap-mandatory grid-flow-col auto-cols-auto overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth px-[calc(50%_-_23px)] pb-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          aria-label="Малый круг"
-        >
-          {snapshot.board.map((cell) => {
-            const players = cellPlayers(snapshot, cell.index);
-            const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
-            return (
-              <div
-                key={cell.index}
-                data-board-cell={cell.index}
-                style={{ width: Math.max(46, players.length * 40 + 8) }}
-                className="relative min-w-0 snap-center text-center"
-                aria-label={`Клетка ${cell.index + 1}: ${localizeGameText(cell.label)}`}
-              >
-                <div
-                  className={[
-                    "text-[10px] font-semibold",
-                    cell.index === targetCellIndex ? "text-success" : "text-neutral-500"
-                  ].join(" ")}
-                >
-                  {cell.index + 1}
-                </div>
-                <div className="relative mt-1 h-3">
-                  <span className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-line" />
-                  <span
-                    className={[
-                      "absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-sm",
-                      appearance.timelineMarker,
-                      cell.index === targetCellIndex
-                        ? "scale-125 ring-2 ring-success ring-offset-1"
-                        : ""
-                    ].join(" ")}
-                  />
-                </div>
-                <div className="mt-1 h-9">
-                  <PlayerTokenStack
-                    players={players}
-                    small
-                    mobileBoard
-                    movingPlayerId={movingPlayerId}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BoardCellTile({
-  cell,
-  players,
-  style,
-  compact = false,
-  mobile = false,
-  active = false,
-  movingPlayerId = null
-}: {
-  cell: GameSnapshot["board"][number];
-  players: GamePlayer[];
-  style?: CSSProperties;
-  compact?: boolean;
-  mobile?: boolean;
-  active?: boolean;
-  movingPlayerId?: string | null;
-}) {
-  const appearance = boardCellAppearances[cell.type] ?? defaultBoardCellAppearance;
-
-  return (
-    <div
-      className={[
-        "relative overflow-hidden rounded-md border",
-        appearance.tile,
-        compact
-          ? "h-full min-h-0 w-full min-w-0 p-3"
-          : mobile
-            ? "h-24 w-full p-2"
-            : "min-h-24 aspect-square p-3",
-        active ? "ring-2 ring-success ring-offset-2 ring-offset-white" : ""
-      ].join(" ")}
-      style={style}
-      data-board-cell={cell.index}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute inset-x-0 top-0 h-1.5 ${appearance.marker}`}
-      />
-      <div
-        className="flex items-center justify-start gap-2 pt-1"
-      >
-        <span
-          className={[
-            "shrink-0",
-            compact || mobile
-              ? "text-lg font-bold text-neutral-700"
-              : "text-xs font-semibold text-neutral-600"
-          ].join(" ")}
-        >
-          {cell.index + 1}
-        </span>
-        <Badge
-          className={[
-            "min-w-0 justify-start bg-transparent text-left font-semibold text-ink",
-            compact ? "max-w-[7rem] px-2 text-[11px]" : "",
-            mobile
-              ? "max-w-full flex-1 px-1 py-1 text-[10px] [overflow-wrap:anywhere]"
-              : ""
-          ].join(" ")}
-        >
-          {cell.type === "charity" ? (
-            <span className="inline-block leading-tight">
-              Благотвори-
-              <br />
-              тельность
-            </span>
-          ) : (
-            <span className="inline-block leading-tight">
-              {cellTypes[cell.type] ??
-                (cell.label ? localizeGameText(cell.label) : "Игровая клетка")}
-            </span>
-          )}
-        </Badge>
-      </div>
-      <div className="absolute bottom-2 left-2 right-2 h-12">
-        <PlayerTokenStack players={players} desktopBoard={compact} movingPlayerId={movingPlayerId} />
-      </div>
-    </div>
-  );
-}
-
-function PlayerTokenStack({
-  players,
-  small = false,
-  desktopBoard = false,
-  mobileBoard = false,
-  movingPlayerId = null
-}: {
-  players: GamePlayer[];
-  small?: boolean;
-  desktopBoard?: boolean;
-  mobileBoard?: boolean;
-  movingPlayerId?: string | null;
-}) {
-  const overlapClass = desktopBoard ? "-ml-7" : mobileBoard ? "ml-1" : "-ml-3";
-
-  return (
-    <div
-      className={cn(
-        "flex h-full min-w-0 items-end isolate",
-        desktopBoard ? "justify-start" : "justify-center"
-      )}
-    >
-      {players.map((player, index) => (
-        <span
-          key={player.id}
-          className={cn("relative shrink-0", index > 0 && overlapClass)}
-          style={{ zIndex: index + 1 }}
-        >
-          <PlayerToken
-            player={player}
-            small={small}
-            desktopBoard={desktopBoard}
-            mobileBoard={mobileBoard}
-            moving={player.id === movingPlayerId}
-          />
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function PlayerToken({
-  player,
-  small = false,
-  moving = false,
-  desktopBoard = false,
-  mobileBoard = false
-}: {
-  player: GamePlayer;
-  small?: boolean;
-  moving?: boolean;
-  desktopBoard?: boolean;
-  mobileBoard?: boolean;
-}) {
-  const title = gamePlayerName(player);
-  if (player.figurine) {
-    return (
-      <span
-        className={[
-          "inline-flex shrink-0",
-          desktopBoard
-            ? "h-12 w-12"
-            : mobileBoard
-              ? "h-9 w-9"
-              : small
-                ? "h-7 w-7"
-                : "h-10 w-10",
-          moving ? "timeline-moving-token" : ""
-        ].join(" ")}
-        title={title}
-        data-player-id={player.id}
-      >
-        <img
-          src={figurineImagePath(player.figurine)}
-          alt=""
-          className="h-full w-full object-contain"
-        />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={[
-        "rounded text-center font-semibold text-white",
-        small ? "h-4 min-w-4 px-0.5 text-[9px] leading-4" : "h-5 min-w-5 px-1 text-xs",
-        moving ? "timeline-moving-token" : ""
-      ].join(" ")}
-      style={{ backgroundColor: player.color ?? "#171717" }}
-      title={title}
-    >
-      {player.seat}
-    </span>
-  );
-}
-
-function PlayerIdentityMark({
-  player,
-  size = "md"
-}: {
-  player: GamePlayer;
-  size?: "xs" | "sm" | "md" | "lg";
-}) {
-  const name = gamePlayerName(player);
-  const figurine = player.figurine;
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-  const sizeClass = figurine
-    ? size === "lg"
-      ? "h-24 w-24"
-      : size === "xs"
-        ? "h-8 w-8"
-        : size === "sm"
-          ? "h-10 w-10"
-          : "h-12 w-12"
-    : size === "lg"
-      ? "h-20 w-20 text-xl"
-      : size === "xs"
-        ? "h-8 w-8 text-[10px]"
-        : size === "sm"
-          ? "h-9 w-9 text-xs"
-          : "h-11 w-11 text-sm";
-
-  return (
-    <span
-      className={[
-        "grid shrink-0 place-items-center",
-        figurine
-          ? ""
-          : "overflow-hidden rounded-full bg-journey font-extrabold text-white shadow-[0_5px_14px_rgba(27,57,118,.18)]",
-        sizeClass
-      ].join(" ")}
-      title={name}
-    >
-      {figurine ? (
-        <img src={figurineImagePath(figurine)} alt="" className="h-full w-full object-contain" />
-      ) : (
-        initials
-      )}
-      <span className="sr-only">Игрок {name}</span>
-    </span>
+      }
+    />
   );
 }
 
@@ -3260,24 +2543,6 @@ function FigurineDialog({
   );
 }
 
-function cellPlayers(snapshot: GameSnapshot, cellIndex: number) {
-  return snapshot.players.filter(
-    (player) =>
-      player.role === "PLAYER" &&
-      player.track === "RAT_RACE" &&
-      player.position === cellIndex
-  );
-}
-
-function ringCellStyle(index: number): CSSProperties {
-  const number = index + 1;
-  if (number <= 8) return { gridColumn: number, gridRow: 1 };
-  if (number <= 12) return { gridColumn: 8, gridRow: number - 7 };
-  if (number <= 20) return { gridColumn: 21 - number, gridRow: 6 };
-  if (number <= 24) return { gridColumn: 1, gridRow: 26 - number };
-  return {};
-}
-
 function PlayerStatusBadges({ state }: { state: FinancialState }) {
   const statuses = compactDetails([
     state.wonAt ? "🏆 Победитель" : null,
@@ -3305,8 +2570,6 @@ function PlayerStatusBadges({ state }: { state: FinancialState }) {
   );
 }
 
-type MobileGameTab = "turn" | "player" | "assets" | "expenses" | "liabilities";
-
 function MobileGameTabs({
   board,
   player,
@@ -3332,184 +2595,23 @@ function MobileGameTabs({
   turnTabRequest: number;
   actions: ReactNode;
 }) {
-  const [activeTab, setActiveTab] = useState<MobileGameTab>("player");
-  const scrollPanelRef = useRef<HTMLDivElement>(null);
   const state = player?.financialState;
-  const assetCount = player?.assets.length ?? 0;
   const liabilities = player ? repayableLiabilityRows(player) : [];
-  const actionAttention = Boolean(actionAttentionKey);
-
-  useLayoutEffect(() => {
-    if (turnTabRequest > 0) {
-      setActiveTab("turn");
-      scrollPanelRef.current?.scrollTo({ top: 0, behavior: "instant" });
-    }
-  }, [turnTabRequest]);
-
-  const tabs: Array<{
-    id: MobileGameTab;
-    label: string;
-    icon: ReactNode;
-    count?: number;
-    attention?: boolean;
-  }> = [
-    { id: "turn", label: "Ход", icon: <Dices size={17} />, attention: actionAttention },
-    { id: "player", label: "Игрок", icon: <UserRound size={17} /> },
-    { id: "assets", label: "Активы", icon: <BriefcaseBusiness size={17} />, count: assetCount },
-    { id: "expenses", label: "Расходы", icon: <ReceiptText size={17} /> },
-    { id: "liabilities", label: "Долги", icon: <Landmark size={17} />, count: liabilities.length }
-  ];
+  const emptyReport = <p className="py-2 text-sm text-neutral-600">Финансовый отчёт появится после старта партии.</p>;
 
   return (
-    <section className="mobile-game-layout flex h-full min-h-0 w-full min-w-0 flex-col bg-white">
-      <div className="mobile-game-pinned shrink-0 bg-card">
-      {board}
-      <div
-        className="grid min-w-0 grid-cols-5 gap-1.5 bg-[#eef3e8] p-2"
-        role="tablist"
-        aria-label="Информация об игроке"
-      >
-        {tabs.map((tab, index) => {
-          const active = tab.id === activeTab;
-          return (
-            <button
-              key={tab.id}
-              id={`mobile-game-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls="mobile-game-tab-panel"
-              tabIndex={active ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(event) => {
-                let nextIndex = index;
-                if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-                if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
-                if (event.key === "Home") nextIndex = 0;
-                if (event.key === "End") nextIndex = tabs.length - 1;
-                if (nextIndex === index) return;
-
-                event.preventDefault();
-                const nextTab = tabs[nextIndex];
-                if (!nextTab) return;
-                setActiveTab(nextTab.id);
-                document.getElementById(`mobile-game-tab-${nextTab.id}`)?.focus();
-              }}
-              className={[
-                "relative flex h-14 min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 overflow-hidden rounded-lg px-0.5 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#718866] min-[360px]:text-[10px]",
-                active
-                  ? "bg-[#dfe9d4] text-[#3f5b35]"
-                  : "bg-transparent text-[#61715b] hover:bg-white/70 hover:text-[#3f5b35] active:bg-white/70 active:text-[#3f5b35]"
-              ].join(" ")}
-            >
-              <span aria-hidden="true">{tab.icon}</span>
-              <span className="w-full truncate text-center">{tab.label}</span>
-              {tab.count !== undefined ? (
-                <span
-                  className={[
-                    "absolute right-1 top-1 inline-flex min-w-4 justify-center rounded-full px-1 text-[8px] leading-4",
-                    active ? "bg-[#718866] text-white" : "bg-white text-[#61715b]"
-                  ].join(" ")}
-                >
-                  {tab.count}
-                </span>
-              ) : null}
-              {tab.attention ? (
-                <span
-                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#9d82b8] ring-2 ring-white"
-                  aria-label="Требуется действие"
-                />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-      </div>
-
-      <div
-        ref={scrollPanelRef}
-        id="mobile-game-tab-panel"
-        role="tabpanel"
-        aria-labelledby={`mobile-game-tab-${activeTab}`}
-        className={cn("mobile-game-scroll-panel min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 min-[420px]:p-4", activeTab === "turn" && "pt-0 min-[420px]:pt-0")}
-      >
-        <div className={activeTab === "turn" ? "block" : "hidden"} aria-hidden={activeTab !== "turn"}>
-          {actions}
-        </div>
-
-        {activeTab !== "turn" && (!player || !state) ? (
-          <p className="py-2 text-sm text-neutral-600">
-            Финансовый отчёт появится после старта партии.
-          </p>
-        ) : null}
-
-        {activeTab === "player" && player && state ? (
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <PlayerIdentityMark player={player} size="sm" />
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <div className="truncate text-sm font-semibold">
-                      {gamePlayerName(player)}
-                    </div>
-                    <ChildrenMarks count={state.childrenCount} size="sm" />
-                  </div>
-                  <div className="mt-0.5 truncate text-xs text-neutral-500">
-                    {player.profession?.name}
-                  </div>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                className="h-9 shrink-0 gap-2 px-3 text-xs"
-                onClick={onOpenBank}
-                disabled={!canOpenBank}
-              >
-                <Landmark size={15} aria-hidden="true" />
-                Банк
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Metric label="Наличные" value={money(state.cashCents)} />
-              <Metric label="Денежный поток" value={money(state.monthlyCashflowCents)} />
-              <Metric label="Зарплата" value={money(state.salaryCents)} />
-              <Metric label="Пассивный доход" value={money(state.passiveIncomeCents)} />
-              <div className="min-[360px]:col-span-2">
-                <Metric label="Расходы" value={money(state.totalExpensesCents)} />
-              </div>
-            </div>
-            <FinancialFreedomProgress
-              passiveIncomeCents={state.passiveIncomeCents}
-              totalExpensesCents={state.totalExpensesCents}
-              bankLoanBalanceCents={outstandingBankLoanBalanceCents(player.liabilities)}
-            />
-            <CashflowEquation state={state} />
-            <OtherPlayersList
-              className="border-t border-line/70 pt-3"
-              players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}
-              currentPlayerId={currentPlayerId}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === "assets" && player && state ? (
-          <CompactAssets assets={player.assets} />
-        ) : null}
-
-        {activeTab === "expenses" && player && state ? (
-          <div className="space-y-4">
-            <ExpenseComposition player={player} />
-            <SectionList
-              title={money(state.totalExpensesCents)}
-              titleAlign="right"
-              rows={expenseRows(player)}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === "liabilities" && player && state ? (
+    <RatRaceTabs
+      idPrefix="mobile-game"
+      board={board}
+      turn={actions}
+      turnTabRequest={turnTabRequest}
+      actionAttention={Boolean(actionAttentionKey)}
+      assetCount={player?.assets.length ?? 0}
+      liabilityCount={liabilities.length}
+      player={player && state ? <FinancialPlayerReport player={player} players={players} currentPlayerId={currentPlayerId} canOpenBank={canOpenBank} onOpenBank={onOpenBank} variant="mobile"/> : emptyReport}
+      assets={player && state ? <CompactAssets assets={player.assets} /> : emptyReport}
+      expenses={player && state ? <FinancialExpenses items={expenseItems(player)} total={state.totalExpensesCents}/> : emptyReport}
+      liabilities={player && state ? (
           <CreditList
             liabilities={liabilities}
             currentCashCents={state.cashCents}
@@ -3517,589 +2619,34 @@ function MobileGameTabs({
             canManageLiabilities={canManageLiabilities}
             onCloseLiability={onCloseLiability}
           />
-        ) : null}
-      </div>
-    </section>
+      ) : emptyReport}
+    />
   );
 }
 
-function AssetCard({
-  asset,
-  maxAbsCashflowCents
-}: {
-  asset: GamePlayer["assets"][number];
-  maxAbsCashflowCents: number;
-}) {
-  const stock = isStockAsset(asset);
 
-  return (
-    <div className="rounded-md bg-surface p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-medium">{localizeGameText(asset.name)}</div>
-          {asset.symbol ? (
-            <div className="mt-1 text-xs text-neutral-500">{asset.symbol}</div>
-          ) : null}
-        </div>
-        <Badge className="shrink-0 bg-white text-ink">{assetTypeLabel(asset)}</Badge>
-      </div>
-      <div className="mt-3 grid gap-2 text-sm">
-        {stock ? (
-          <>
-            <AssetInfoRow label="Количество" value={`${asset.quantity} шт.`} />
-            <AssetInfoRow label="Стоимость за единицу" value={money(assetUnitCostCents(asset))} />
-          </>
-        ) : asset.quantity > 1 ? (
-          <AssetInfoRow label="Количество" value={String(asset.quantity)} />
-        ) : null}
-        <AssetInfoRow label="Стоимость" value={money(asset.costBasisCents)} />
-        <AssetInfoRow label="Денежный поток" value={`${money(asset.cashflowCents)}/мес`} />
-      </div>
-      <AssetCashflowBar
-        cashflowCents={asset.cashflowCents}
-        maxAbsCashflowCents={maxAbsCashflowCents}
-      />
-    </div>
-  );
-}
 
-function AssetCashflowBar({
-  cashflowCents,
-  maxAbsCashflowCents
-}: {
-  cashflowCents: number;
-  maxAbsCashflowCents: number;
-}) {
-  if (cashflowCents === 0) {
-    return (
-      <div className="mt-3 inline-flex rounded-full bg-neutral-200 px-2 py-1 text-xs text-neutral-600">
-        Без ежемесячного денежного потока
-      </div>
-    );
-  }
 
-  const positive = cashflowCents > 0;
-  return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className={positive ? "text-success" : "text-red-700"}>
-          {positive ? "Вклад в денежный поток" : "Снижение денежного потока"}
-        </span>
-        <strong>{money(cashflowCents)}/мес</strong>
-      </div>
-      <ProgressBar
-        className="mt-1.5"
-        value={Math.abs(cashflowCents)}
-        max={Math.max(1, maxAbsCashflowCents)}
-        label={`${positive ? "Вклад" : "Снижение"} денежного потока ${money(Math.abs(cashflowCents))} в месяц`}
-        tone={positive ? "success" : "danger"}
-      />
-    </div>
-  );
-}
 
-function AssetInfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-neutral-600">{label}</span>
-      <span className="shrink-0 font-semibold">{value}</span>
-    </div>
-  );
-}
 
-function isStockAsset(asset: GamePlayer["assets"][number]) {
-  const type = asset.type.toLowerCase();
-  const name = asset.name.toLowerCase();
-  return Boolean(asset.symbol) || type.includes("stock") || type.includes("share") || /акци/.test(name);
-}
 
-function assetTypeLabel(asset: GamePlayer["assets"][number]) {
-  if (isStockAsset(asset)) return "Акции";
 
-  const type = asset.type.toLowerCase();
-  if (type.includes("realestate") || type.includes("real_estate")) return "Недвижимость";
-  if (type.includes("network")) return "Бизнес";
-  return "Актив";
-}
 
-function assetUnitCostCents(asset: GamePlayer["assets"][number]) {
-  return asset.quantity > 0 ? Math.round(asset.costBasisCents / asset.quantity) : 0;
-}
 
-function LoanPanel({
-  loanAmount,
-  availableLoanAmountCents,
-  currentCashCents,
-  currentMonthlyCashflowCents,
-  onLoanDecrease,
-  onLoanIncrease,
-  onLoanAmountChange,
-  onTakeLoan,
-  canTakeLoan,
-  loanSubmitting
-}: {
-  loanAmount: number;
-  availableLoanAmountCents: number;
-  currentCashCents: number;
-  currentMonthlyCashflowCents: number;
-  onLoanDecrease: () => void;
-  onLoanIncrease: () => void;
-  onLoanAmountChange: (value: number) => void;
-  onTakeLoan: () => void;
-  canTakeLoan: boolean;
-  loanSubmitting: boolean;
-}) {
-  const loanAvailable =
-    canTakeLoan && availableLoanAmountCents >= bankLoanIncrementCents;
 
-  return (
-    <div className="rounded-xl bg-surface p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <div className="text-sm font-medium">Взять кредит</div>
-        <div className="text-xs text-muted" aria-live="polite">
-          Доступно: <strong className="text-ink">{money(availableLoanAmountCents)}</strong>
-        </div>
-      </div>
-      <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2">
-        <Button
-          variant="secondary"
-          className="px-3"
-          onClick={onLoanDecrease}
-          disabled={!loanAvailable || loanSubmitting || loanAmount <= bankLoanIncrementCents}
-          aria-label={`Уменьшить сумму кредита на ${money(bankLoanIncrementCents)}`}
-        >
-          <ChevronLeft size={18} aria-hidden="true" />
-        </Button>
-        <Input
-          type="number"
-          min={bankLoanIncrementCents}
-          max={availableLoanAmountCents || undefined}
-          step={bankLoanIncrementCents}
-          value={loanAmount}
-          onChange={(event) => onLoanAmountChange(Number(event.target.value))}
-          disabled={!loanAvailable || loanSubmitting}
-          aria-label="Сумма кредита"
-          className="text-center font-semibold"
-        />
-        <Button
-          variant="secondary"
-          className="px-3"
-          onClick={onLoanIncrease}
-          disabled={
-            !loanAvailable ||
-            loanSubmitting ||
-            loanAmount >= availableLoanAmountCents
-          }
-          aria-label={`Увеличить сумму кредита на ${money(bankLoanIncrementCents)}`}
-        >
-          <ChevronRight size={18} aria-hidden="true" />
-        </Button>
-      </div>
-      {loanAvailable ? (
-        <LoanPreview
-          loanAmountCents={loanAmount}
-          currentCashCents={currentCashCents}
-          currentMonthlyCashflowCents={currentMonthlyCashflowCents}
-        />
-      ) : (
-        <div role="status" className="mt-3 rounded-xl bg-white p-3 text-sm leading-5 text-muted">
-          Лимит исчерпан. Увеличьте месячный денежный поток или погасите долг,
-          чтобы снова получить доступ к кредиту.
-        </div>
-      )}
-      <Button
-        className="mt-3 w-full"
-        variant="secondary"
-        onClick={onTakeLoan}
-        disabled={!loanAvailable || loanSubmitting}
-      >
-        {loanSubmitting ? "Оформляем кредит…" : "Взять кредит"}
-      </Button>
-      <p className="mt-2 text-xs text-neutral-500">
-        Лимит рассчитан так, чтобы новый платёж не сделал месячный денежный
-        поток отрицательным. Сумма кратна <strong>{money(bankLoanIncrementCents)}</strong>.
-      </p>
-    </div>
-  );
-}
 
-function BankDialog({
-  open,
-  loanAmount,
-  availableLoanAmountCents,
-  currentCashCents,
-  currentMonthlyCashflowCents,
-  onLoanDecrease,
-  onLoanIncrease,
-  onLoanAmountChange,
-  onTakeLoan,
-  canTakeLoan,
-  loanSubmitting,
-  onClose
-}: {
-  open: boolean;
-  loanAmount: number;
-  availableLoanAmountCents: number;
-  currentCashCents: number;
-  currentMonthlyCashflowCents: number;
-  onLoanDecrease: () => void;
-  onLoanIncrease: () => void;
-  onLoanAmountChange: (value: number) => void;
-  onTakeLoan: () => Promise<void>;
-  canTakeLoan: boolean;
-  loanSubmitting: boolean;
-  onClose: () => void;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
 
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
 
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
 
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, [open]);
 
-  if (!open) return null;
 
-  return (
-    <div
-      className="bank-dialog-overlay fixed inset-0 z-[80] bg-[#07152d]/60 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bank-dialog-title"
-        aria-describedby="bank-dialog-description"
-        className="bank-dialog-panel flex w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-[0_34px_90px_rgba(5,18,45,.35)]"
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const focusable = Array.from(
-            panelRef.current?.querySelectorAll<HTMLElement>(
-              'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-            ) ?? []
-          );
-          if (focusable.length === 0) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last?.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first?.focus();
-          }
-        }}
-      >
-        <div className="flex shrink-0 items-start justify-between gap-4 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
-          <div>
-            <h2 id="bank-dialog-title" className="text-xl font-extrabold tracking-[-0.025em] text-ink">
-              Банк
-            </h2>
-            <p id="bank-dialog-description" className="mt-1 text-sm leading-5 text-muted">
-              Выберите сумму кредита и проверьте, как изменится финансовый отчёт.
-            </p>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            aria-label="Закрыть банк"
-            onClick={onClose}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-muted shadow-[0_5px_14px_rgba(27,57,118,.10)] transition hover:-translate-y-0.5 hover:text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25"
-          >
-            <X size={19} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="bank-dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5 sm:pb-5">
-          <LoanPanel
-            loanAmount={loanAmount}
-            availableLoanAmountCents={availableLoanAmountCents}
-            currentCashCents={currentCashCents}
-            currentMonthlyCashflowCents={currentMonthlyCashflowCents}
-            onLoanDecrease={onLoanDecrease}
-            onLoanIncrease={onLoanIncrease}
-            onLoanAmountChange={onLoanAmountChange}
-            onTakeLoan={() => void onTakeLoan()}
-            canTakeLoan={canTakeLoan}
-            loanSubmitting={loanSubmitting}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function LoanPreview({
-  loanAmountCents,
-  currentCashCents,
-  currentMonthlyCashflowCents
-}: {
-  loanAmountCents: number;
-  currentCashCents: number;
-  currentMonthlyCashflowCents: number;
-}) {
-  const paymentCents = bankLoanPaymentCents(loanAmountCents);
-  const cashAfterCents = currentCashCents + loanAmountCents;
-  const cashflowAfterCents = currentMonthlyCashflowCents - paymentCents;
 
-  return (
-    <div className="mt-3 rounded-md border border-line bg-white p-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        После получения
-      </div>
-      <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
-        <div>
-          <div className="text-xs text-neutral-500">Наличные</div>
-          <div className="mt-0.5 font-semibold">{money(cashAfterCents)}</div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-500">Новый платёж</div>
-          <div className="mt-0.5 font-semibold text-red-700">
-            −{money(paymentCents)}/мес
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-500">Денежный поток после</div>
-          <div
-            className={`mt-0.5 font-semibold ${
-              cashflowAfterCents >= 0 ? "text-success" : "text-red-700"
-            }`}
-          >
-            {money(cashflowAfterCents)}/мес
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function CreditList({
-  liabilities,
-  currentCashCents,
-  monthlyIncomeCents,
-  canManageLiabilities,
-  onCloseLiability
-}: {
-  liabilities: PlayerLiability[];
-  currentCashCents: number;
-  monthlyIncomeCents: number;
-  canManageLiabilities: boolean;
-  onCloseLiability: (liability: PlayerLiability) => void;
-}) {
-  return (
-    <div>
-      <div className="text-sm font-medium">Кредиты</div>
-      {liabilities.length === 0 ? (
-        <p className="mt-2 text-sm text-neutral-600">Нет кредитов для закрытия.</p>
-      ) : (
-        <>
-          <DebtComposition
-            liabilities={liabilities}
-            currentCashCents={currentCashCents}
-            monthlyIncomeCents={monthlyIncomeCents}
-          />
-          <div className="mt-3 space-y-2">
-            {liabilities.map((liability) => {
-              const hasEnoughCash = currentCashCents >= liability.balanceCents;
-              const canClose = canManageLiabilities && hasEnoughCash;
-              return (
-                <div
-                  key={liability.id}
-                  className="grid gap-2 rounded-md bg-surface p-3 sm:grid-cols-[1fr_auto] sm:items-center"
-                >
-                  <div>
-                    <div className="text-sm font-medium">
-                      {liabilityLabels[liability.type] ?? localizeGameText(liability.name)}
-                    </div>
-                    <div className="mt-1 text-xs text-neutral-500">
-                      Остаток: {money(liability.balanceCents)}
-                      {liability.paymentCents > 0
-                        ? ` · платеж: ${money(liability.paymentCents)}/мес`
-                        : ""}
-                    </div>
-                    {!canManageLiabilities ? (
-                      <div className="mt-1 text-xs text-neutral-500">
-                        Погашение доступно владельцу финансового отчёта.
-                      </div>
-                    ) : !hasEnoughCash ? (
-                      <div className="mt-1 text-xs text-red-700">
-                        Недостаточно наличных для закрытия.
-                      </div>
-                    ) : (
-                      <div className="mt-1 text-xs font-medium text-success">
-                        Кредит можно закрыть полностью.
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    variant="secondary"
-                    className="h-8 px-3 text-xs"
-                    onClick={() => onCloseLiability(liability)}
-                    disabled={!canClose}
-                  >
-                    Закрыть кредит
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
-function expenseRows(player: GamePlayer) {
-  return expenseItems(player).map((item) => ({
-    id: item.id,
-    label: item.label,
-    value: money(item.amountCents),
-    calculation: item.calculation ?? null
-  }));
-}
 
-function expenseItems(player: GamePlayer): Array<{
-  id: string;
-  label: string;
-  amountCents: number;
-  calculation?: string | null;
-}> {
-  const profession = player.profession;
-  const state = player.financialState;
 
-  return [
-    {
-      id: "taxes",
-      label: "Налоги",
-      amountCents: profession?.taxesCents ?? 0
-    },
-    {
-      id: "home_mortgage",
-      label: "Оплата закладной на дом",
-      amountCents:
-        liabilityPayment(player, "home_mortgage") ??
-        profession?.mortgagePaymentCents ??
-        0
-    },
-    {
-      id: "school_debt",
-      label: "Оплата кредита на образование",
-      amountCents:
-        liabilityPayment(player, "school_debt") ??
-        profession?.schoolLoanPaymentCents ??
-        0
-    },
-    {
-      id: "car_debt",
-      label: "Оплата кредита на автомобиль",
-      amountCents:
-        liabilityPayment(player, "car_debt") ??
-        profession?.carLoanPaymentCents ??
-        0
-    },
-    {
-      id: "credit_cards",
-      label: "Выплаты по кредитной карточке",
-      amountCents:
-        liabilityPayment(player, "credit_cards") ??
-        profession?.creditCardPaymentCents ??
-        0
-    },
-    {
-      id: "retail_debt",
-      label: "Розничные расходы",
-      amountCents:
-        liabilityPayment(player, "retail_debt") ??
-        profession?.retailPaymentCents ??
-        0
-    },
-    {
-      id: "other_expenses",
-      label: "Другие расходы",
-      amountCents: profession?.otherExpensesCents ?? 0
-    },
-    {
-      id: "children",
-      label: "Расходы на детей",
-      amountCents:
-        (state
-          ? state.perChildCostCents * state.childrenCount
-          : profession?.childrenExpenseCents) ?? 0,
-      calculation: state
-        ? childExpenseCalculation(state.childrenCount, state.perChildCostCents)
-        : null
-    },
-    {
-      id: "bank_loan",
-      label: "Оплата кредита банка",
-      amountCents: sumLiabilityPayments(player, "bank_loan")
-    }
-  ];
-}
-
-function liabilityPayment(player: GamePlayer, type: string) {
-  const liabilities = player.liabilities.filter((liability) => liability.type === type);
-  if (liabilities.length > 0) {
-    return liabilities.reduce((sum, liability) => sum + liability.paymentCents, 0);
-  }
-  return player.financialState ? 0 : null;
-}
-
-function sumLiabilityPayments(player: GamePlayer, type: string) {
-  return player.liabilities
-    .filter((liability) => liability.type === type)
-    .reduce((sum, liability) => sum + liability.paymentCents, 0);
-}
-
-const liabilityLabels: Record<string, string> = {
-  home_mortgage: "Закладная на дом",
-  school_debt: "Кредит на образование",
-  car_debt: "Кредит на автомобиль",
-  credit_cards: "Кредитная карточка",
-  retail_debt: "Розничный долг",
-  bank_loan: "Оплата кредита банка"
-};
-
-function repayableLiabilityRows(player: GamePlayer) {
-  return [...player.liabilities]
-    .filter((liability) => liability.balanceCents > 0)
-    .sort((left, right) => {
-      const leftOrder = liabilitySortOrder(left.type);
-      const rightOrder = liabilitySortOrder(right.type);
-      return leftOrder === rightOrder ? left.name.localeCompare(right.name) : leftOrder - rightOrder;
-    });
-}
-
-function liabilitySortOrder(type: string) {
-  const order: Record<string, number> = {
-    home_mortgage: 10,
-    school_debt: 20,
-    car_debt: 30,
-    credit_cards: 40,
-    retail_debt: 50,
-    bank_loan: 60
-  };
-  return order[type] ?? 100;
-}
 
 function ActionsPanel({
   canChooseDeal,
@@ -4176,162 +2723,14 @@ function ActionsPanel({
   renderHistory: (action: ReactNode) => ReactNode;
   embedded?: boolean;
 }) {
-  const [stockCostDraft, setStockCostDraft] = useState("");
-  const [stockCostEditing, setStockCostEditing] = useState(false);
-
-  useEffect(() => {
-    setStockCostDraft("");
-    setStockCostEditing(false);
-  }, [latestCard?.cardId]);
-
-  const maxStockQuantity =
-    latestCard?.isStock
-      ? maxStockQuantityForCashCents(latestCard.priceCents, currentCashCents)
-      : 0;
-  const validDealQuantity = typeof dealQuantity === "number" && dealQuantity >= 1;
-  const totalStockCostCents =
-    latestCard?.isStock
-      ? stockPurchaseCostCents(latestCard.priceCents, dealQuantity)
-      : 0;
-  const purchaseCostCents = latestCard
-    ? latestCard.isStock
-      ? totalStockCostCents
-      : latestCard.downPaymentCents
-    : 0;
-  const canAffordLatestDeal = latestCard
-    ? canAffordPurchaseCents(currentCashCents, purchaseCostCents)
-    : false;
-  const canPayCharity =
-    charityChoice ? currentCashCents >= charityChoice.donationCents : false;
-  const canCloseMarketSale =
-    marketSaleOffer ? currentCashCents + marketSaleOffer.proceedsCents >= 0 : false;
-  const canResolveLatestDeal = waitingStockSellerNames.length === 0;
-  const dealDecisionSubmitting =
-    decisionSubmission === "deal_buy" ||
-    decisionSubmission === "deal_decline" ||
-    decisionSubmission === "deal_auction_start";
-  const stockDecisionSubmission =
-    decisionSubmission === "stock_sell" || decisionSubmission === "stock_decline"
-      ? decisionSubmission
-      : null;
-  const marketDecisionSubmission =
-    decisionSubmission === "market_sell" || decisionSubmission === "market_decline"
-      ? decisionSubmission
-      : null;
-
-  const content = (
-    <>
-      {auctionPanel}
-      {canChooseDeal ? (
-        <div className="rounded-md bg-[#f5faf2] p-3">
-          <div className="text-sm font-medium">Возможность</div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="secondary" onClick={onDrawSmallDeal}>
-              Мелкая сделка
-            </Button>
-            <Button variant="secondary" onClick={onDrawBigDeal}>
-              Крупная сделка
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {stockSaleOffer ? (
-        <StockSalePanel
-          offer={stockSaleOffer}
-          quantity={stockSaleQuantity}
-          onQuantityChange={onStockSaleQuantityChange}
-          onDecrease={onStockSaleDecrease}
-          onIncrease={onStockSaleIncrease}
-          decisionSubmission={stockDecisionSubmission}
-          onSell={onSellStock}
-          onDecline={onDeclineStockSale}
-        />
-      ) : null}
-
-      {marketSaleOffer ? (
-        <div className="rounded-md bg-[#f5f6fc] p-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="text-sm font-medium">Предложение рынка</div>
-            {marketSaleOffer.totalOffers > 1 ? (
-              <span className="text-xs font-medium text-neutral-600">
-                {marketSaleOffer.offerNumber} из {marketSaleOffer.totalOffers}
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-2 text-sm leading-6 text-neutral-700">
-            {localizeGameText(marketSaleOffer.title)}
-          </p>
-          <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-            <div>Актив: {localizeGameText(marketSaleOffer.assetName)}</div>
-            {marketSaleOffer.salePriceCents > 0 ? (
-              <div>
-                Цена продажи: <strong>{money(marketSaleOffer.salePriceCents)}</strong>
-              </div>
-            ) : (
-              <div>
-                Немедленная выплата: <strong>нет</strong>
-              </div>
-            )}
-            {marketSaleOffer.mortgageCents > 0 ? (
-              <div>
-                Закладная: <strong>{money(marketSaleOffer.mortgageCents)}</strong>
-              </div>
-            ) : null}
-            <div>
-              {marketSaleOffer.proceedsCents >= 0 ? "К получению" : "К доплате"}:{" "}
-              <strong>{money(Math.abs(marketSaleOffer.proceedsCents))}</strong>
-            </div>
-            {marketSaleOffer.netCashflowChangeCents !== 0 ? (
-              <div>
-                {marketSaleOffer.netCashflowChangeCents < 0
-                  ? "Денежный поток уменьшится на"
-                  : "Денежный поток увеличится на"}{" "}
-                <strong>{money(Math.abs(marketSaleOffer.netCashflowChangeCents))}</strong>/мес
-              </div>
-            ) : null}
-          </div>
-          {marketSaleOffer.proceedsCents < 0 ? (
-            <FundingProgress
-              className="mt-3"
-              availableCents={currentCashCents}
-              requiredCents={Math.abs(marketSaleOffer.proceedsCents)}
-              label="Доплата для закрытия продажи"
-            />
-          ) : null}
-          {!canCloseMarketSale ? (
-            <p className="mt-2 text-xs text-red-700">
-              Недостаточно наличных, чтобы закрыть продажу.
-            </p>
-          ) : null}
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button
-              onClick={onSellMarketAsset}
-              disabled={!canAnswerMarketSale || !canCloseMarketSale || Boolean(marketDecisionSubmission)}
-              aria-busy={marketDecisionSubmission === "market_sell"}
-            >
-              {marketDecisionSubmission === "market_sell" ? "Продаём…" : "Продать"}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onDeclineMarketSale}
-              disabled={!canAnswerMarketSale || Boolean(marketDecisionSubmission)}
-              aria-busy={marketDecisionSubmission === "market_decline"}
-            >
-              {marketDecisionSubmission === "market_decline" ? "Отказываемся…" : "Отказаться"}
-            </Button>
-          </div>
-          {marketSaleOffer.totalOffers > 1 ? (
-            <p className="mt-2 text-xs leading-5 text-neutral-600">
-              После вашего решения игра перейдёт к следующему подходящему активу.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
+  const canPayCharity=charityChoice?currentCashCents>=charityChoice.donationCents:false;
+  const content=<>
+    {auctionPanel}
+    {canChooseDeal?<ChoicePanel choices={[{label:"Мелкая сделка",variant:"secondary",onClick:onDrawSmallDeal},{label:"Крупная сделка",variant:"secondary",onClick:onDrawBigDeal}]}/>:null}
+    {stockSaleOffer?<StockSalePanel offer={stockSaleOffer} quantity={stockSaleQuantity} onQuantityChange={onStockSaleQuantityChange} onDecrease={onStockSaleDecrease} onIncrease={onStockSaleIncrease} decisionSubmission={decisionSubmission==="stock_sell"||decisionSubmission==="stock_decline"?decisionSubmission:null} onSell={onSellStock} onDecline={onDeclineStockSale}/>:null}
+    {marketSaleOffer?<MarketSalePanel offer={marketSaleOffer} available={currentCashCents} canAnswer={canAnswerMarketSale} onSell={onSellMarketAsset} onDecline={onDeclineMarketSale} submitting={decisionSubmission==="market_sell"?"sell":decisionSubmission==="market_decline"?"decline":null}/>:null}
       {charityChoice ? (
-        <div className="rounded-md bg-[#fff5ed] p-3">
-          <div className="text-sm font-medium">Благотворительность</div>
+        <DecisionPanel tone="charity" title="Благотворительность">
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             Заплатите 10% от своих общих доходов и кидайте 2 кубика 3 своих хода.
           </p>
@@ -4354,12 +2753,11 @@ function ActionsPanel({
               Нет
             </Button>
           </div>
-        </div>
+        </DecisionPanel>
       ) : null}
 
       {doodadPaymentChoice ? (
-        <div className="rounded-md bg-[#fff4f7] p-3">
-          <div className="text-sm font-medium">Выбор оплаты</div>
+        <DecisionPanel tone="expense" title="Выбор оплаты">
           <p className="mt-2 text-sm leading-6 text-neutral-700">
             {localizeGameText(doodadPaymentChoice.title)}
           </p>
@@ -4385,335 +2783,21 @@ function ActionsPanel({
               Кредитная карта
             </Button>
           </div>
-        </div>
+        </DecisionPanel>
       ) : null}
 
-      {latestCard ? (
-        <div className="w-full min-w-0 max-w-full rounded-md bg-[#f5faf2] p-3">
-          <div className="text-sm font-medium">Текущая сделка</div>
-            <p className="mt-1 break-words text-sm text-neutral-700">
-              {localizeGameText(latestCard.title)}
-            </p>
-            {latestCard.bodyText ? (
-              <p className="mt-2 break-words text-sm leading-6 text-neutral-700">
-                {localizeGameText(latestCard.bodyText)}
-              </p>
-            ) : null}
-            <div className="mt-3 space-y-1.5 text-sm text-neutral-700">
-              {latestCard.priceCents > 0 ? (
-                <div>
-                  Цена: <strong>{money(latestCard.priceCents)}</strong>
-                </div>
-              ) : null}
-              {!latestCard.isStock || latestCard.downPaymentCents > 0 ? (
-                <div>
-                  Первоначальный взнос:{" "}
-                  <strong>{money(latestCard.downPaymentCents)}</strong>
-                </div>
-              ) : null}
-              {latestCard.cashflowCents !== 0 ? (
-                <div>
-                  Денежный поток: <strong>{money(latestCard.cashflowCents)}</strong>/мес
-                </div>
-              ) : null}
-            </div>
-            {latestCard.isStock ? (
-              <div className="mt-3 border-t border-line/70 pt-3 text-sm">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    Расчёт стоимости
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    Цена акции: <strong className="text-neutral-700">{money(latestCard.priceCents)}</strong>
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <label
-                      htmlFor="stock-purchase-quantity"
-                      className="mb-1 block text-xs font-semibold text-neutral-600"
-                    >
-                      Кол-во
-                    </label>
-                    <div className="grid grid-cols-[repeat(2,minmax(0,.75fr))_minmax(4.5rem,1.8fr)_repeat(3,minmax(0,.75fr))] items-center gap-1">
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, -100))}
-                        disabled={!validDealQuantity}
-                        aria-label="Уменьшить количество на 100"
-                        title="Уменьшить на 100"
-                      >
-                        <ChevronsLeft size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, -10))}
-                        disabled={!validDealQuantity}
-                        aria-label="Уменьшить количество на 10"
-                        title="Уменьшить на 10"
-                      >
-                        <ChevronLeft size={16} aria-hidden="true" />
-                      </Button>
-                      <Input
-                        id="stock-purchase-quantity"
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        value={dealQuantity}
-                        placeholder="Кол-во"
-                        aria-label="Количество акций"
-                        onChange={(event) =>
-                          setDealQuantity(event.target.value === "" ? "" : Number(event.target.value))
-                        }
-                        className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
-                      />
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, 10))}
-                        aria-label="Увеличить количество на 10"
-                        title="Увеличить на 10"
-                      >
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() => setDealQuantity(changeStockQuantity(dealQuantity, 100))}
-                        aria-label="Увеличить количество на 100"
-                        title="Увеличить на 100"
-                      >
-                        <ChevronsRight size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-1 text-[10px] font-bold uppercase"
-                        onClick={() => setDealQuantity(maxStockQuantity)}
-                        disabled={
-                          dealQuantity === maxStockQuantity ||
-                          (maxStockQuantity === 0 && dealQuantity === "")
-                        }
-                        aria-label="Выбрать максимальное количество акций на текущие наличные"
-                        title="Максимум на текущие наличные"
-                      >
-                        max
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="stock-purchase-cost"
-                      className="mb-1 block text-xs font-semibold text-neutral-600"
-                    >
-                      Стоимость
-                    </label>
-                    <div className="grid grid-cols-[repeat(2,minmax(0,.75fr))_minmax(4.5rem,1.8fr)_repeat(3,minmax(0,.75fr))] items-center gap-1">
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() =>
-                          setDealQuantity(
-                            changeStockCostCents(dealQuantity, latestCard.priceCents, -1000)
-                          )
-                        }
-                        disabled={!validDealQuantity}
-                        aria-label="Уменьшить стоимость на 1000 долларов"
-                        title="Уменьшить на $1000"
-                      >
-                        <ChevronsLeft size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() =>
-                          setDealQuantity(
-                            changeStockCostCents(dealQuantity, latestCard.priceCents, -500)
-                          )
-                        }
-                        disabled={!validDealQuantity}
-                        aria-label="Уменьшить стоимость на 500 долларов"
-                        title="Уменьшить на $500"
-                      >
-                        <ChevronLeft size={16} aria-hidden="true" />
-                      </Button>
-                      <Input
-                        id="stock-purchase-cost"
-                        type="number"
-                        min={latestCard.priceCents}
-                        step={1}
-                        inputMode="decimal"
-                        value={
-                          stockCostEditing
-                            ? stockCostDraft
-                            : validDealQuantity
-                              ? totalStockCostCents
-                              : ""
-                        }
-                        placeholder="Стоимость"
-                        aria-label="Стоимость покупки акций в долларах"
-                        onFocus={() => {
-                          setStockCostEditing(true);
-                          setStockCostDraft(validDealQuantity ? String(totalStockCostCents) : "");
-                        }}
-                        onChange={(event) => {
-                          setStockCostDraft(event.target.value);
-                          setDealQuantity(
-                            event.target.value === ""
-                              ? ""
-                              : stockQuantityForCostCents(
-                                  latestCard.priceCents,
-                                  Math.round(Number(event.target.value))
-                                )
-                          );
-                        }}
-                        onBlur={() => {
-                          setStockCostEditing(false);
-                          setStockCostDraft(validDealQuantity ? String(totalStockCostCents) : "");
-                        }}
-                        className="h-10 px-1 text-center text-xs font-semibold tabular-nums placeholder:text-[11px]"
-                      />
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() =>
-                          setDealQuantity(
-                            changeStockCostCents(dealQuantity, latestCard.priceCents, 500)
-                          )
-                        }
-                        aria-label="Увеличить стоимость на 500 долларов"
-                        title="Увеличить на $500"
-                      >
-                        <ChevronRight size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-0"
-                        onClick={() =>
-                          setDealQuantity(
-                            changeStockCostCents(dealQuantity, latestCard.priceCents, 1000)
-                          )
-                        }
-                        aria-label="Увеличить стоимость на 1000 долларов"
-                        title="Увеличить на $1000"
-                      >
-                        <ChevronsRight size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-10 min-w-0 px-1 text-[10px] font-bold uppercase"
-                        onClick={() => setDealQuantity(maxStockQuantity)}
-                        disabled={
-                          dealQuantity === maxStockQuantity ||
-                          (maxStockQuantity === 0 && dealQuantity === "")
-                        }
-                        aria-label="Выбрать максимальную стоимость покупки на текущие наличные"
-                        title="Максимум на текущие наличные"
-                      >
-                        max
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="mt-2 text-xs text-neutral-500">
-                  На текущие наличные хватает: {maxStockQuantity}. Для большей покупки сначала возьмите кредит.
-                </p>
-              </div>
-            ) : null}
-            {purchaseCostCents > 0 && (!latestCard.isStock || validDealQuantity) ? (
-              <FundingProgress
-                className="mt-3"
-                availableCents={currentCashCents}
-                requiredCents={purchaseCostCents}
-                label="Сумма к оплате"
-              />
-            ) : null}
-            {!canResolveLatestDeal ? (
-              <p className="mt-3 break-words text-xs text-amber-700">
-                Ожидаем решение по продаже от игроков: {waitingStockSellerNames.join(", ")}.
-              </p>
-            ) : null}
-            <div
-              className={[
-                "mt-3 grid w-full min-w-0 gap-2",
-                embedded
-                  ? "grid-cols-1"
-                  : latestCard.isAuctionEligible
-                    ? "sm:grid-cols-2"
-                    : "sm:grid-cols-3"
-              ].join(" ")}
-            >
-              <Button
-                className="w-full min-w-0"
-                onClick={onBuyLatest}
-                disabled={
-                  !canResolveLatestDeal ||
-                  !canAffordLatestDeal ||
-                  dealDecisionSubmitting ||
-                  (Boolean(latestCard?.isStock) && !validDealQuantity)
-                }
-                aria-busy={decisionSubmission === "deal_buy"}
-              >
-                {decisionSubmission === "deal_buy" ? "Покупаем…" : "Купить"}
-              </Button>
-              {latestCard.isAuctionEligible ? (
-                <Button
-                  className="w-full min-w-0"
-                  variant="action"
-                  onClick={onStartAuction}
-                  disabled={!canResolveLatestDeal || dealDecisionSubmitting}
-                  aria-busy={decisionSubmission === "deal_auction_start"}
-                >
-                  {decisionSubmission === "deal_auction_start"
-                    ? "Открываем аукцион…"
-                    : "Предложить игрокам"}
-                </Button>
-              ) : null}
-              <Button
-                className="w-full min-w-0"
-                variant="secondary"
-                onClick={onOpenBank}
-                disabled={!canTakeLoan || dealDecisionSubmitting}
-              >
-                Взять кредит
-              </Button>
-              <Button
-                className="w-full min-w-0"
-                variant="secondary"
-                onClick={onDeclineLatest}
-                disabled={!canResolveLatestDeal || dealDecisionSubmitting}
-                aria-busy={decisionSubmission === "deal_decline"}
-              >
-                {decisionSubmission === "deal_decline" ? "Отказываемся…" : "Отказаться"}
-              </Button>
-            </div>
-        </div>
-      ) : null}
-
-    </>
-  );
-
-
-  if (embedded) {
-    return (
-      <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">
-        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard || auctionPanel ? content : null)}
-      </section>
-    );
-  }
-
-  return (
-    <Card>
-      <CardContent className="space-y-4">
-        {renderHistory(canChooseDeal || stockSaleOffer || marketSaleOffer || charityChoice || doodadPaymentChoice || latestCard || auctionPanel ? content : null)}
-      </CardContent>
-    </Card>
-  );
+    {latestCard?<PurchasePanel
+      card={{id:String(latestCard.cardId),title:latestCard.title,bodyText:latestCard.bodyText,isStock:latestCard.isStock,price:latestCard.priceCents,downPayment:latestCard.downPaymentCents,cashflow:latestCard.cashflowCents}}
+      available={currentCashCents} quantity={dealQuantity} onQuantityChange={setDealQuantity}
+      onBuy={onBuyLatest} onDecline={onDeclineLatest} onOpenBank={onOpenBank} canTakeLoan={canTakeLoan}
+      {...(latestCard.isAuctionEligible?{onOffer:onStartAuction}:{})}
+      submitting={decisionSubmission==="deal_buy"?"buy":decisionSubmission==="deal_decline"?"decline":decisionSubmission==="deal_auction_start"?"offer":null}
+      waitingNames={waitingStockSellerNames} embedded={embedded}
+    />:null}
+  </>;
+  const hasAction=canChooseDeal||stockSaleOffer||marketSaleOffer||charityChoice||doodadPaymentChoice||latestCard||auctionPanel;
+  if(embedded)return <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">{renderHistory(hasAction?content:null)}</section>;
+  return <Card><CardContent className="space-y-4">{renderHistory(hasAction?content:null)}</CardContent></Card>;
 }
 
 function GameTurnFeed({
@@ -5080,35 +3164,16 @@ function GameEventHeadline({ event, pairedRoll }: { event: GameEvent; pairedRoll
     return <span>Выкуплено: {String(event.payload.title ?? "возможность большого круга")}</span>;
   }
   if (event.type === realtimeEvents.playerRollDice) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        <Dices size={16} className="shrink-0 text-journey" aria-hidden="true" />
-        <span className="sr-only">Бросок кубика: </span>
-        <span>{diceResultText(event)}</span>
-      </span>
-    );
+    const diceValues=Array.isArray(event.payload.diceValues)?event.payload.diceValues.map(toNumber):[];
+    return <TurnMovement diceValues={diceValues} total={toNumber(event.payload.dice)}/>;
   }
 
   if (event.type === realtimeEvents.playerMove) {
-    const from = toNumber(event.payload.from);
-    const to = toNumber(event.payload.to);
-    const cell = isRecord(event.payload.cell) ? event.payload.cell : null;
-    const cellType = String(cell?.type ?? "");
-    const cellLabel = String(cell?.label ?? cellTypes[cellType] ?? "");
-
-    return (
-      <span className="inline-flex flex-wrap items-center gap-2">
-        {pairedRoll ? <><Dices size={16} className="shrink-0 text-journey" aria-hidden="true" /><span className="sr-only">Бросок кубика и перемещение по полю: </span><span>{diceResultText(pairedRoll)}</span><span aria-hidden="true">·</span></> : <><MoveRight size={16} className="shrink-0 text-journey" aria-hidden="true" /><span className="sr-only">Перемещение по полю: </span></>}
-        <span>
-          {compactBoardPosition(from)} → {compactBoardPosition(to)}
-        </span>
-        {cellLabel ? (
-          <span className="text-xs font-medium text-neutral-600">
-            {cellTypes[cellType] ?? localizeGameText(cellLabel || "Игровая клетка")}
-          </span>
-        ) : null}
-      </span>
-    );
+    const cell=isRecord(event.payload.cell)?event.payload.cell:null;
+    const cellType=String(cell?.type??"");
+    const cellLabel=String(cell?.label??cellTypes[cellType]??"");
+    const diceValues=pairedRoll&&Array.isArray(pairedRoll.payload.diceValues)?pairedRoll.payload.diceValues.map(toNumber):[];
+    return <TurnMovement diceValues={diceValues} {...(pairedRoll?{total:toNumber(pairedRoll.payload.dice)}:{})} from={toNumber(event.payload.from)} to={toNumber(event.payload.to)} cellLabel={cellLabel?cellTypes[cellType]??localizeGameText(cellLabel):""}/>;
   }
 
   const EventIcon = eventTitleIcons[event.type as keyof typeof eventTitleIcons];
@@ -5181,76 +3246,9 @@ function compactBoardPosition(value: number) {
   return value < 0 ? "Старт" : String(value + 1);
 }
 
-function MoneyBoldText({ text }: { text: string }) {
-  const localizedText = localizeGameText(text);
-  const currencyPattern = /(-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$)/gu;
-  const currencyPartPattern = /^-?[\d\s\u00a0\u202f]+(?:[.,]\d+)?\s*\$$/u;
-  const parts = localizedText.split(currencyPattern);
-
-  return (
-    <>
-      {parts.map((part, index) =>
-        currencyPartPattern.test(part) ? (
-          <strong key={index} className="font-semibold text-neutral-900">
-            {part}
-          </strong>
-        ) : (
-          <span key={index}>{part}</span>
-        )
-      )}
-    </>
-  );
-}
-
-type JournalCardAppearance = {
-  container: string;
-  badge: string;
-  section: string;
-};
-
-const defaultJournalCardAppearance: JournalCardAppearance = {
-  container: "border-neutral-300 bg-white",
-  badge: "bg-neutral-200 text-neutral-700",
-  section: "border-neutral-200"
-};
-
-const journalCardAppearances: Record<string, JournalCardAppearance> = {
-  SMALL_DEAL: {
-    container: "border-[#a8c99a] bg-[#f5faf2]",
-    badge: "bg-[#d1e3ca] text-[#35512d]",
-    section: "border-[#d1e3ca]"
-  },
-  BIG_DEAL: {
-    container: "border-[#91add3] bg-[#f3f7fc]",
-    badge: "bg-[#d2e0f2] text-[#294d78]",
-    section: "border-[#d2e0f2]"
-  },
-  MARKET: {
-    container: "border-[#a7add6] bg-[#f5f6fc]",
-    badge: "bg-[#d4d7ec] text-[#3f467d]",
-    section: "border-[#d4d7ec]"
-  },
-  DOODAD: {
-    container: "border-[#dfa1b3] bg-[#fff4f7]",
-    badge: "bg-[#eecbd5] text-[#7a3449]",
-    section: "border-[#eecbd5]"
-  },
-  FAST_TRACK: {
-    container: "border-[#d8b65a] bg-[#fff9e8]",
-    badge: "bg-[#f3e4ad] text-[#705719]",
-    section: "border-[#f3e4ad]"
-  },
-  DREAM: {
-    container: "border-[#b596c8] bg-[#faf5fc]",
-    badge: "bg-[#e1d2ea] text-[#604271]",
-    section: "border-[#e1d2ea]"
-  }
-};
-
 function JournalCardDraw({ event }: { event: GameEvent }) {
   const payload = event.payload ?? {};
   const cardType = String(payload.cardType ?? "");
-  const appearance = journalCardAppearances[cardType] ?? defaultJournalCardAppearance;
   const title = toText(payload.title) ?? "Карточка";
   const bodyText = toText(payload.bodyText);
   const effectDetails = compactDetails(cardEffectDetails(payload.effects));
@@ -5260,55 +3258,14 @@ function JournalCardDraw({ event }: { event: GameEvent }) {
     metaMoneyDetail("Денежный поток", payload.meta, "cashflow_monthly", "/мес")
   ]);
 
-  return (
-    <div
-      className={`w-full min-w-0 max-w-full rounded-lg p-3 [overflow-wrap:anywhere] ${appearance.container}`}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${appearance.badge}`}>
-          {cardTypes[cardType] ?? "Карточка"}
-        </span>
-      </div>
-      <div className="mt-2 text-base font-semibold text-neutral-900">{title}</div>
-      {bodyText ? (
-        <div className="mt-2 whitespace-pre-line text-sm leading-5 text-neutral-800">
-          <MoneyBoldText text={bodyText} />
-        </div>
-      ) : null}
-      {effectDetails.length > 0 || financialDetails.length > 0 ? (
-        <div className={`mt-3 grid gap-3 border-t pt-3 sm:grid-cols-2 ${appearance.section}`}>
-          {financialDetails.length > 0 ? (
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                Условия
-              </div>
-              <div className="mt-1 space-y-1 text-sm text-neutral-800">
-                {financialDetails.map((detail, index) => (
-                  <div key={`${index}-${detail}`}>
-                    <MoneyBoldText text={detail} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {effectDetails.length > 0 ? (
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                Эффект
-              </div>
-              <div className="mt-1 space-y-1 text-sm text-neutral-800">
-                {effectDetails.map((detail, index) => (
-                  <div key={`${index}-${detail}`}>
-                    <MoneyBoldText text={detail} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
+  return <JournalCard
+    cardType={cardType}
+    typeLabel={cardTypes[cardType] ?? "Карточка"}
+    title={title}
+    bodyText={bodyText}
+    financialDetails={financialDetails}
+    effectDetails={effectDetails}
+  />;
 }
 
 const eventTitles: Record<string, string> = {
@@ -5400,68 +3357,6 @@ const gameRoles: Record<string, string> = {
   PLAYER: "Игрок",
   BANKER: "Банкир",
   OBSERVER: "Наблюдатель"
-};
-
-const cellTypes: Record<string, string> = {
-  paycheck: "Расчетный чек",
-  deal: "Возможность",
-  small_deal: "Малая сделка",
-  big_deal: "Крупная сделка",
-  market: "Рынок",
-  doodad: "Всякая всячина",
-  charity: "Благотворительность",
-  baby: "Ребенок",
-  downsized: "Увольнение"
-};
-
-type BoardCellAppearance = {
-  tile: string;
-  marker: string;
-  timelineMarker: string;
-};
-
-const defaultBoardCellAppearance: BoardCellAppearance = {
-  tile: "border-line bg-white",
-  marker: "bg-neutral-400",
-  timelineMarker: "bg-neutral-300"
-};
-
-const boardCellAppearances: Record<string, BoardCellAppearance> = {
-  deal: {
-    tile: "border-line bg-[#f5faf2]",
-    marker: "bg-[#a8c99a]",
-    timelineMarker: "bg-[#d1e3ca]"
-  },
-  market: {
-    tile: "border-line bg-[#f5f6fc]",
-    marker: "bg-[#a7add6]",
-    timelineMarker: "bg-[#d4d7ec]"
-  },
-  paycheck: {
-    tile: "border-line bg-[#fff9e8]",
-    marker: "bg-[#e5c568]",
-    timelineMarker: "bg-[#f3e4ad]"
-  },
-  doodad: {
-    tile: "border-line bg-[#fff4f7]",
-    marker: "bg-[#dfa1b3]",
-    timelineMarker: "bg-[#eecbd5]"
-  },
-  baby: {
-    tile: "border-line bg-[#faf5fc]",
-    marker: "bg-[#c5a6d8]",
-    timelineMarker: "bg-[#e1d2ea]"
-  },
-  charity: {
-    tile: "border-line bg-[#fff5ed]",
-    marker: "bg-[#e6a06c]",
-    timelineMarker: "bg-[#f1d1b8]"
-  },
-  downsized: {
-    tile: "border-line bg-[#f7f2f8]",
-    marker: "bg-[#9875a8]",
-    timelineMarker: "bg-[#d6c5de]"
-  }
 };
 
 function eventTitle(type: string) {
@@ -6028,22 +3923,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function Metric({
-  label,
-  value,
-  className
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn("grid min-w-0 rounded-md bg-surface p-3", className)}>
-      <div className="min-h-8 text-xs leading-4 text-neutral-500">{label}</div>
-      <div className="mt-1 break-words text-sm font-semibold leading-5">{value}</div>
-    </div>
-  );
-}
+
 
 function ResultFinancialComparison({
   state,
@@ -6090,251 +3970,16 @@ function ResultFinancialComparison({
   );
 }
 
-function CashflowEquation({
-  state,
-  className = ""
-}: {
-  state: FinancialState;
-  className?: string;
-}) {
-  const scale = Math.max(1, state.totalIncomeCents, state.totalExpensesCents);
-  const positive = state.monthlyCashflowCents >= 0;
 
-  return (
-    <div className={`rounded-md bg-surface p-3 ${className}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-        Как формируется денежный поток
-      </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-center">
-        <div className="min-w-0">
-          <div className="text-xs text-neutral-500">Доходы</div>
-          <div className="mt-0.5 break-words text-sm font-semibold text-success">
-            {money(state.totalIncomeCents)}
-          </div>
-        </div>
-        <span className="text-neutral-400" aria-hidden="true">−</span>
-        <div className="min-w-0">
-          <div className="text-xs text-neutral-500">Расходы</div>
-          <div className="mt-0.5 break-words text-sm font-semibold text-red-700">
-            {money(state.totalExpensesCents)}
-          </div>
-        </div>
-        <span className="text-neutral-400" aria-hidden="true">=</span>
-        <div className="min-w-0">
-          <div className="text-xs text-neutral-500">Денежный поток</div>
-          <div
-            className={`mt-0.5 break-words text-sm font-semibold ${
-              positive ? "text-success" : "text-red-700"
-            }`}
-          >
-            {money(state.monthlyCashflowCents)}
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 space-y-1.5">
-        <ProgressBar
-          value={state.totalIncomeCents}
-          max={scale}
-          label={`Общие доходы ${money(state.totalIncomeCents)}`}
-          tone="success"
-        />
-        <ProgressBar
-          value={state.totalExpensesCents}
-          max={scale}
-          label={`Общие расходы ${money(state.totalExpensesCents)}`}
-          tone="danger"
-        />
-      </div>
-    </div>
-  );
-}
 
-type ProgressTone = "neutral" | "success" | "warning" | "danger";
 
-const progressToneClasses: Record<ProgressTone, string> = {
-  neutral: "bg-[#8da7c4]",
-  success: "bg-[#73a865]",
-  warning: "bg-[#d5ad45]",
-  danger: "bg-[#cf6679]"
-};
 
-function ProgressBar({
-  value,
-  max,
-  label,
-  tone = "neutral",
-  className = ""
-}: {
-  value: number;
-  max: number;
-  label: string;
-  tone?: ProgressTone;
-  className?: string;
-}) {
-  const safeMax = Math.max(1, max);
-  const percentage = Math.min(100, Math.max(0, (value / safeMax) * 100));
 
-  return (
-    <div
-      className={`h-2 overflow-hidden rounded-full bg-neutral-200 ${className}`}
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={safeMax}
-      aria-valuenow={Math.min(safeMax, Math.max(0, value))}
-      aria-valuetext={label}
-    >
-      <div
-        className={`h-full rounded-full transition-[width] ${progressToneClasses[tone]}`}
-        style={{ width: `${percentage}%` }}
-      />
-    </div>
-  );
-}
 
-function FinancialFreedomProgress({
-  passiveIncomeCents,
-  totalExpensesCents,
-  bankLoanBalanceCents,
-  className = ""
-}: {
-  passiveIncomeCents: number;
-  totalExpensesCents: number;
-  bankLoanBalanceCents: number;
-  className?: string;
-}) {
-  const incomeTargetCents = Math.max(1, totalExpensesCents + 1);
-  const incomeReached = passiveIncomeCents > totalExpensesCents;
-  const reached = canEscapeRatRace(
-    passiveIncomeCents,
-    totalExpensesCents,
-    bankLoanBalanceCents > 0
-  );
-  const percentage = incomeReached
-    ? 100
-    : Math.round(
-        Math.min(100, Math.max(0, (passiveIncomeCents / incomeTargetCents) * 100))
-      );
-  const missingCents = Math.max(0, incomeTargetCents - passiveIncomeCents);
-  const label = reached
-    ? "Условия выхода с малого круга выполнены"
-    : !incomeReached
-      ? `Пассивному доходу не хватает ${money(missingCents)} в месяц`
-      : `Осталось погасить банковские кредиты на ${money(bankLoanBalanceCents)}`;
 
-  return (
-    <div className={`rounded-md bg-surface px-3 py-2.5 ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="font-medium text-neutral-700">Финансовая свобода</span>
-        <span className={reached ? "font-semibold text-success" : "font-semibold text-neutral-700"}>
-          {reached
-            ? "Готово"
-            : incomeReached && bankLoanBalanceCents > 0
-              ? "Остался кредит"
-              : `${percentage}%`}
-        </span>
-      </div>
-      <ProgressBar
-        className="mt-2"
-        value={incomeReached ? incomeTargetCents : passiveIncomeCents}
-        max={incomeTargetCents}
-        label={label}
-        tone={reached ? "success" : "neutral"}
-      />
-      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-600">
-        <span>
-          Пассивный доход: <strong>{money(passiveIncomeCents)}</strong>/мес
-        </span>
-        <span>
-          Расходы: <strong>{money(totalExpensesCents)}</strong>/мес
-        </span>
-      </div>
-      <ul className="mt-2 space-y-1 text-xs" aria-label="Условия выхода с малого круга">
-        <li className="flex items-start gap-1.5">
-          {incomeReached ? (
-            <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={14} aria-hidden="true" />
-          ) : (
-            <Circle className="mt-0.5 shrink-0 text-neutral-500" size={14} aria-hidden="true" />
-          )}
-          <span className={incomeReached ? "text-success" : "text-neutral-600"}>
-            {incomeReached
-              ? "Пассивный доход выше расходов"
-              : `Увеличьте пассивный доход ещё на ${money(missingCents)}/мес`}
-          </span>
-        </li>
-        <li className="flex items-start gap-1.5">
-          {bankLoanBalanceCents <= 0 ? (
-            <CheckCircle2 className="mt-0.5 shrink-0 text-success" size={14} aria-hidden="true" />
-          ) : (
-            <Circle className="mt-0.5 shrink-0 text-neutral-500" size={14} aria-hidden="true" />
-          )}
-          <span className={bankLoanBalanceCents <= 0 ? "text-success" : "text-neutral-600"}>
-            {bankLoanBalanceCents <= 0
-              ? "Банковские кредиты погашены"
-              : `Погасите банковские кредиты на ${money(bankLoanBalanceCents)}`}
-          </span>
-        </li>
-      </ul>
-    </div>
-  );
-}
 
-function FundingProgress({
-  availableCents,
-  requiredCents,
-  label,
-  className = ""
-}: {
-  availableCents: number;
-  requiredCents: number;
-  label: string;
-  className?: string;
-}) {
-  if (requiredCents <= 0) return null;
-  const available = Math.max(0, availableCents);
-  const enough = available >= requiredCents;
-  const missingCents = Math.max(0, requiredCents - available);
-  const progressLabel = enough
-    ? `${label}: наличных достаточно`
-    : `${label}: не хватает ${money(missingCents)}`;
 
-  return (
-    <div
-      className={`w-full min-w-0 max-w-full rounded-md border border-line bg-white p-3 ${className}`}
-    >
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="min-w-0 break-words font-medium text-neutral-700">{label}</span>
-        <span
-          className={`min-w-0 break-words ${
-            enough ? "font-semibold text-success" : "font-semibold text-amber-700"
-          }`}
-        >
-          {enough ? "Денег хватает" : "Нужен кредит"}
-        </span>
-      </div>
-      <ProgressBar
-        className="mt-2"
-        value={available}
-        max={requiredCents}
-        label={progressLabel}
-        tone={enough ? "success" : "warning"}
-      />
-      <div className="mt-2 flex min-w-0 flex-wrap justify-between gap-2 text-xs text-neutral-600">
-        <span className="min-w-0 break-words">
-          Наличные: <strong>{money(available)}</strong>
-        </span>
-        <span className="min-w-0 break-words">
-          Нужно: <strong>{money(requiredCents)}</strong>
-        </span>
-      </div>
-      {!enough ? (
-        <div className="mt-1 text-xs text-amber-700">
-          Не хватает: <strong>{money(missingCents)}</strong>
-        </div>
-      ) : null}
-    </div>
-  );
-}
+
 
 function BankruptcyRecoveryProgress({
   deficitCents,
@@ -6373,247 +4018,17 @@ function BankruptcyRecoveryProgress({
   );
 }
 
-const expenseSegmentClasses: Record<string, string> = {
-  taxes: "bg-[#7b9cc6]",
-  home_mortgage: "bg-[#9d82b8]",
-  school_debt: "bg-[#66a7a0]",
-  car_debt: "bg-[#d59a62]",
-  credit_cards: "bg-[#c87383]",
-  retail_debt: "bg-[#b99c5d]",
-  other_expenses: "bg-[#8b9a73]",
-  children: "bg-[#c98aaf]",
-  bank_loan: "bg-[#77818f]"
-};
 
-function ExpenseComposition({ player }: { player: GamePlayer }) {
-  const items = expenseItems(player).filter((item) => item.amountCents > 0);
-  const total = items.reduce((sum, item) => sum + item.amountCents, 0);
-  if (total <= 0) return null;
 
-  return (
-    <div className="rounded-md bg-surface p-3">
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium">Структура расходов</span>
-        <strong>{money(total)}/мес</strong>
-      </div>
-      <div
-        className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
-        role="img"
-        aria-label={`Структура ежемесячных расходов на сумму ${money(total)}`}
-      >
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className={expenseSegmentClasses[item.id] ?? "bg-neutral-400"}
-            style={{ width: `${(item.amountCents / total) * 100}%` }}
-            title={`${item.label}: ${money(item.amountCents)}`}
-          />
-        ))}
-      </div>
-      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-        {items.map((item) => {
-          const percentage = Math.round((item.amountCents / total) * 100);
-          return (
-            <div key={item.id} className="flex min-w-0 items-center gap-2 text-xs">
-              <span
-                className={`h-2.5 w-2.5 shrink-0 rounded-sm ${expenseSegmentClasses[item.id] ?? "bg-neutral-400"}`}
-                aria-hidden="true"
-              />
-              <span className="min-w-0 flex-1 truncate text-neutral-600">{item.label}</span>
-              <span className="shrink-0 font-semibold">{percentage}%</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
-const debtSegmentClasses: Record<string, string> = {
-  home_mortgage: "bg-[#9d82b8]",
-  school_debt: "bg-[#66a7a0]",
-  car_debt: "bg-[#d59a62]",
-  credit_cards: "bg-[#c87383]",
-  retail_debt: "bg-[#b99c5d]",
-  bank_loan: "bg-[#7b9cc6]"
-};
 
-function DebtComposition({
-  liabilities,
-  currentCashCents,
-  monthlyIncomeCents
-}: {
-  liabilities: PlayerLiability[];
-  currentCashCents: number;
-  monthlyIncomeCents: number;
-}) {
-  const grouped = Array.from(
-    liabilities.reduce((items, liability) => {
-      const current = items.get(liability.type) ?? {
-        type: liability.type,
-        label: liabilityLabels[liability.type] ?? localizeGameText(liability.name),
-        balanceCents: 0,
-        paymentCents: 0
-      };
-      current.balanceCents += liability.balanceCents;
-      current.paymentCents += liability.paymentCents;
-      items.set(liability.type, current);
-      return items;
-    }, new Map<string, { type: string; label: string; balanceCents: number; paymentCents: number }>())
-      .values()
-  ).filter((item) => item.balanceCents > 0);
-  const totalBalanceCents = grouped.reduce((sum, item) => sum + item.balanceCents, 0);
-  const totalPaymentCents = grouped.reduce((sum, item) => sum + item.paymentCents, 0);
-  if (totalBalanceCents <= 0) return null;
-  const burdenRatio =
-    monthlyIncomeCents > 0
-      ? totalPaymentCents / monthlyIncomeCents
-      : totalPaymentCents > 0
-        ? 1
-        : 0;
-  const burdenPercent = Math.round(burdenRatio * 100);
-  const burdenTone: ProgressTone =
-    burdenRatio >= 0.5 ? "danger" : burdenRatio >= 0.3 ? "warning" : "neutral";
 
-  return (
-    <div className="mt-3 rounded-md bg-surface p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
-        <span className="font-medium">Структура долгов</span>
-        <div className="text-right">
-          <div className="font-semibold">{money(totalBalanceCents)}</div>
-          <div className="text-xs text-neutral-500">
-            {money(totalPaymentCents)}/мес
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div>
-          <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
-            <span>Платежи от дохода</span>
-            <strong className={burdenRatio >= 0.5 ? "text-red-700" : "text-neutral-800"}>
-              {burdenPercent}%
-            </strong>
-          </div>
-          <ProgressBar
-            className="mt-1.5"
-            value={totalPaymentCents}
-            max={Math.max(1, monthlyIncomeCents)}
-            label={`Долговые платежи занимают ${burdenPercent}% ежемесячного дохода`}
-            tone={burdenTone}
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
-            <span>Покрытие наличными</span>
-            <strong>
-              {Math.round(
-                Math.min(1, Math.max(0, currentCashCents / totalBalanceCents)) * 100
-              )}
-              %
-            </strong>
-          </div>
-          <ProgressBar
-            className="mt-1.5"
-            value={Math.max(0, currentCashCents)}
-            max={totalBalanceCents}
-            label={`Наличными покрывается ${money(Math.min(currentCashCents, totalBalanceCents))} из долга ${money(totalBalanceCents)}`}
-            tone={currentCashCents >= totalBalanceCents ? "success" : "neutral"}
-          />
-        </div>
-      </div>
-      <div
-        className="mt-3 flex h-3 overflow-hidden rounded-full bg-neutral-200"
-        role="img"
-        aria-label={`Общая задолженность ${money(totalBalanceCents)}, ежемесячный платёж ${money(totalPaymentCents)}`}
-      >
-        {grouped.map((item) => (
-          <div
-            key={item.type}
-            className={debtSegmentClasses[item.type] ?? "bg-neutral-400"}
-            style={{ width: `${(item.balanceCents / totalBalanceCents) * 100}%` }}
-            title={`${item.label}: ${money(item.balanceCents)}`}
-          />
-        ))}
-      </div>
-      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-        {grouped.map((item) => (
-          <div key={item.type} className="flex min-w-0 items-center gap-2 text-xs">
-            <span
-              className={`h-2.5 w-2.5 shrink-0 rounded-sm ${debtSegmentClasses[item.type] ?? "bg-neutral-400"}`}
-              aria-hidden="true"
-            />
-            <span className="min-w-0 flex-1 truncate text-neutral-600">{item.label}</span>
-            <span className="shrink-0 font-semibold">
-              {Math.round((item.balanceCents / totalBalanceCents) * 100)}%
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-function SectionList({
-  title,
-  titleAlign = "left",
-  rows
-}: {
-  title: string;
-  titleAlign?: "left" | "right";
-  rows: Array<{ id: string; label: string; value: string; calculation?: string | null }>;
-}) {
-  return (
-    <div>
-      <div
-        className={[
-          "mb-2 text-sm font-medium",
-          titleAlign === "right" ? "text-right" : "text-left"
-        ].join(" ")}
-      >
-        {title}
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-neutral-600">Пусто</p>
-      ) : (
-        <div className="space-y-2">
-          {rows.map((row) => (
-            <div key={row.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
-              <span className="min-w-0 break-words">{row.label}</span>
-              <span className="flex shrink-0 flex-wrap items-baseline justify-end gap-x-1.5 tabular-nums">
-                {row.calculation ? (
-                  <span className="text-xs text-neutral-500">{row.calculation}</span>
-                ) : null}
-                <span className="font-medium">{row.value}</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
-function ChildrenMarks({ count, size = "md" }: { count: number; size?: "sm" | "md" }) {
-  if (count <= 0) return null;
 
-  return (
-    <span
-      className="flex shrink-0 items-center gap-0.5 text-[#718866]"
-      role="img"
-      aria-label={`Детей: ${count}`}
-      title={`Детей: ${count}`}
-    >
-      {Array.from({ length: count }, (_, index) => (
-        <Baby
-          key={index}
-          size={size === "sm" ? 14 : 16}
-          strokeWidth={2.25}
-          aria-hidden="true"
-        />
-      ))}
-    </span>
-  );
-}
+
+
+
 
 function latestDealCard(
   events: GameEvent[],

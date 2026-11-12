@@ -37,7 +37,7 @@ export function CreateGameForm({ token, compact = false }: {
   }
 
   return <div className="grid gap-3">
-    {!compact ? <p className="text-sm text-muted">Состав, время и остальные настройки задаются в лобби.</p> : null}
+    {!compact ? <p className="text-sm text-muted">Выберите режим и набор карточек на странице подготовки игры.</p> : null}
     <Button type="button" variant="action" className="w-full" disabled={loading} onClick={() => void createGame()}>
       {loading ? "Создаём лобби…" : compact ? "Создать игру" : "Создать командную игру"}
     </Button>

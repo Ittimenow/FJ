@@ -23,6 +23,8 @@ export const importConditionTypes = [
 ] as const;
 
 export const importMetaKeys = [
+  "game_type",
+  "game202_rule",
   "symbol",
   "today_price",
   "price",
@@ -42,6 +44,7 @@ export const importMetaKeys = [
 export type ImportCardType = (typeof importCardTypes)[number];
 export type ImportEffectType = (typeof importEffectTypes)[number];
 export type ImportConditionType = (typeof importConditionTypes)[number];
+export type ImportGameType = "101" | "202";
 
 export interface ImportCardMeta {
   metaKey: string;
@@ -103,6 +106,34 @@ export function cardImportScope(cardSetId: string, slugs: string[]) {
     cardSetId,
     slug: { in: slugs }
   };
+}
+
+export function resolveCardImportGameType(
+  cards: ImportCard[],
+  requestedGameType?: string,
+  targetGameType?: ImportGameType
+): ImportGameType {
+  if (requestedGameType !== undefined && requestedGameType !== "101" && requestedGameType !== "202") {
+    throw new Error("Режим импорта должен быть 101 или 202: --game-type 101|202");
+  }
+  const modes = new Set<ImportGameType>();
+  for (const card of cards) {
+    const declared = card.meta.find((row) => row.metaKey === "game_type")?.metaValue;
+    if (declared !== undefined && declared !== "101" && declared !== "202") {
+      throw new Error(`Карточка «${card.slug}» содержит недопустимый режим игры`);
+    }
+    modes.add(declared ?? "101");
+  }
+  if (modes.size > 1) throw new Error("Нельзя импортировать карточки 101 и 202 в один набор");
+  const detected = modes.values().next().value as ImportGameType | undefined;
+  const gameType = requestedGameType ?? detected ?? "101";
+  if (detected && gameType !== detected) {
+    throw new Error(`Карточки режима ${detected} не соответствуют выбранному режиму ${gameType}`);
+  }
+  if (targetGameType && gameType !== targetGameType) {
+    throw new Error(`Набор относится к режиму ${targetGameType}; карточки режима ${gameType} нельзя импортировать в него`);
+  }
+  return gameType;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -199,6 +230,21 @@ export function validateCardBatch(input: unknown): CardValidationResult {
       if (metaValues.has(metaKey)) addError(index, displaySlug, `Повторяющийся metaKey: ${metaKey}`);
       metaValues.set(metaKey, metaValue);
       normalizedMeta.push({ metaKey, metaValue });
+    }
+
+    const declaredGameType = metaValues.get("game_type");
+    if (declaredGameType !== undefined && declaredGameType !== "101" && declaredGameType !== "202") {
+      addError(index, displaySlug, "meta.game_type должен быть 101 или 202");
+    }
+    const rule202 = metaValues.get("game202_rule");
+    if (declaredGameType === "202" && !rule202) addError(index, displaySlug, "Карточка 202 требует meta.game202_rule");
+    if (rule202) {
+      if (declaredGameType !== "202") addError(index, displaySlug, "meta.game202_rule допустим только для карточки режима 202");
+      try {
+        if (!isRecord(JSON.parse(rule202))) addError(index, displaySlug, "meta.game202_rule должен содержать JSON-объект");
+      } catch {
+        addError(index, displaySlug, "meta.game202_rule должен содержать корректный JSON-объект");
+      }
     }
 
     const normalizedEffects: ImportCardEffect[] = [];

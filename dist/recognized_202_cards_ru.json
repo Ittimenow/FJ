@@ -1,0 +1,4051 @@
+[
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_01",
+    "title": "Опцион на покупку MYT4U",
+    "bodyText": "Заплатите сейчас по $4 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции MYT4U по $10, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $10, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"MYT4U\",\"premium\":4,\"strike\":10,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_02",
+    "title": "Опцион на покупку MYT4U",
+    "bodyText": "Заплатите сейчас по $2 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции MYT4U по $15, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $15, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"MYT4U\",\"premium\":2,\"strike\":15,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_03",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: OK4U\nЦена сегодня: $5\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":5,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_04",
+    "title": "Дом 2 спальни/1 ванная",
+    "bodyText": "Дом 2 спальни/1 ванная рядом с офисным комплексом. Рекордный уровень безработицы привел к падению цен. И все же вы сумеете найти жильца, если снизите квартплату.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n4% ROI, можно продать за $75 000–$85 000.\n\nЦена: $52 000\nИпотека: $46 000\nПервый взнос: $6 000\nДенежный поток: +$20",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "52000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "6000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "46000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":52000,\"mortgage\":46000,\"down\":6000,\"income\":20,\"units\":1,\"acres\":0,\"house\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_05",
+    "title": "Опцион на покупку OK4U",
+    "bodyText": "Заплатите сейчас по $4 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции OK4U по $10, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $10, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"OK4U\",\"premium\":4,\"strike\":10,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_06",
+    "title": "Дом 2 спальни/1 ванная",
+    "bodyText": "Дом 2 спальни/1 ванная рядом с промышленной зоной. Большинство рабочих уволили в связи с сильным экономическим спадом. Продавцу срочно нужны деньги.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n3% ROI, можно продать за $75 000–$85 000.\n\nЦена: $52 000\nИпотека: $48 000\nПервый взнос: $4 000\nДенежный поток: +$10",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "52000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "4000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "48000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":52000,\"mortgage\":48000,\"down\":4000,\"income\":10,\"units\":1,\"acres\":0,\"house\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_07",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: MYT4U\nЦена сегодня: $40\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":40,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_08",
+    "title": "Продажа фермы после банкротства",
+    "bodyText": "Победителю аукциона по продаже фермы не хватает денег, и он предлагает вам 40 акров земли за $30 000 наличными. В настоящее время земля свободна.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n0% ROI, в будущем можно продать за ???\n\nЦена: $30 000\nИпотека: $0\nПервый взнос: $30 000\nДенежный поток: $0",
+    "category": "land",
+    "subcategory": "land_40_acres",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":30000,\"mortgage\":0,\"down\":30000,\"income\":0,\"units\":0,\"acres\":40,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_09",
+    "title": "20 акров необработанной земли",
+    "bodyText": "20 акров замечательной земли с лесом и рекой вдали от цивилизации. Ни дорог, ни удобств, ни шума.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n-12% ROI, в будущем можно продать за ???\n\nЦена: $30 000\nИпотека: $15 000\nПервый взнос: $15 000\nДенежный поток: -$150",
+    "category": "land",
+    "subcategory": "land_20_acres",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-150"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":30000,\"mortgage\":15000,\"down\":15000,\"income\":-150,\"units\":0,\"acres\":20,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_10",
+    "title": "Опцион на продажу OK4U",
+    "bodyText": "Заплатите сейчас по $4 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы продать акции OK4U по $40, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете продать акции по $40, а потом купить их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"OK4U\",\"premium\":4,\"strike\":40,\"side\":\"put\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_11",
+    "title": "Опцион на покупку OK4U",
+    "bodyText": "Заплатите сейчас по $1 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции OK4U по $20, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $20, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"OK4U\",\"premium\":1,\"strike\":20,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_12",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: MYT4U\nЦена сегодня: $5\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":5,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_13",
+    "title": "Опцион на покупку OK4U",
+    "bodyText": "Заплатите сейчас по $2 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции OK4U по $15, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $15, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"OK4U\",\"premium\":2,\"strike\":15,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_14",
+    "title": "Опцион на покупку MYT4U",
+    "bodyText": "Заплатите сейчас по $1 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы купить акции MYT4U по $20, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете купить акции по $20, а потом продать их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"MYT4U\",\"premium\":1,\"strike\":20,\"side\":\"call\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_15",
+    "title": "Опцион на продажу MYT4U",
+    "bodyText": "Заплатите сейчас по $4 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы продать акции MYT4U по $40, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете продать акции по $40, а потом купить их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"MYT4U\",\"premium\":4,\"strike\":40,\"side\":\"put\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_16",
+    "title": "Опцион на продажу OK4U",
+    "bodyText": "Заплатите сейчас по $2 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы продать акции OK4U по $35, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете продать акции по $35, а потом купить их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"OK4U\",\"premium\":2,\"strike\":35,\"side\":\"put\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_17",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: MYT4U\nЦена сегодня: $50\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":50,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_18",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя.\n\n(Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_19",
+    "title": "Дом 2 спальни/1 ванная",
+    "bodyText": "Дом 2 спальни/1 ванная около крупной фабрики. Аренда низкая, но жильцы постоянно меняются. К тому же вы узнали, что цены давно не были такими низкими.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n4% ROI, можно продать за $75 000–$85 000.\n\nЦена: $49 000\nИпотека: $46 000\nПервый взнос: $3 000\nДенежный поток: +$10",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "49000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "3000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "46000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":49000,\"mortgage\":46000,\"down\":3000,\"income\":10,\"units\":1,\"acres\":0,\"house\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_20",
+    "title": "Продажа земли после банкротства",
+    "bodyText": "Обанкротившийся перекупщик продает 20 акров. Земля свободна и находится вдали от дорог.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n0% ROI, в будущем можно продать за ???\n\nЦена: $20 000\nИпотека: $0\nПервый взнос: $20 000\nДенежный поток: $0",
+    "category": "land",
+    "subcategory": "land_20_acres",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":20000,\"mortgage\":0,\"down\":20000,\"income\":0,\"units\":0,\"acres\":20,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_21",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: OK4U\nЦена сегодня: $50\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "50"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":50,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_22",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: OK4U\nЦена сегодня: $40\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":40,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_23",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: OK4U\nЦена сегодня: $10\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":10,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_24",
+    "title": "Дом 2 спальни/1 ванная",
+    "bodyText": "Дом 2 спальни/1 ванная рядом с университетом. Цикличный рынок с нехваткой жильцов, но у вас на примете уже есть съемщик.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n4% ROI, можно продать за $75 000–$85 000.\n\nЦена: $46 000\nИпотека: $40 000\nПервый взнос: $6 000\nДенежный поток: +$20",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "46000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "6000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "20"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":46000,\"mortgage\":40000,\"down\":6000,\"income\":20,\"units\":1,\"acres\":0,\"house\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_25",
+    "title": "Бессонные ночи",
+    "bodyText": "Рецессия набирает темпы, прибыли OK4U падают, курс акций скатился до $5. Вы говорите друзьям: «Это ужасно. Грядут массовые увольнения». Но сами ничего не предпринимаете.\n\nИгрок справа от вас видит в этом возможность заработать. Только он и держатели опционов (кроме вас) могут купить акции OK4U по $5. Продавать могут все.\n\nДержатели коротких позиций обязаны покупать.",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":5,\"buy\":\"neighbor\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_26",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: MYT4U\nЦена сегодня: $40\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":40,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_27",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя.\n\n(Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_28",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: OK4U\nЦена сегодня: $40\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40\n\n(Вам имеет смысл открыть короткую позицию.)",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "OK4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":40,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_29",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Только вы и держатели опционов пут и колл можете открывать короткие позиции или покупать эти акции.\n\nПродавать могут все.\n\nДержатели коротких позиций обязаны покупать.\n\nНазвание: MYT4U\nЦена сегодня: $10\n\nДивидендов нет (0% ROI)\n\nПредыдущий разброс цен: $10–$40",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_min",
+        "metaValue": "10"
+      },
+      {
+        "metaKey": "price_max",
+        "metaValue": "40"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":10,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_30",
+    "title": "Распродажа земли",
+    "bodyText": "40 акров неиспользуемой земли в сельской местности. Нет ни мощеных дорог, ни воды, ни электричества.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n-12% ROI, в будущем можно продать за ???\n\nЦена: $40 000\nИпотека: $20 000\nПервый взнос: $20 000\nДенежный поток: -$200",
+    "category": "land",
+    "subcategory": "land_40_acres",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-200"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":40000,\"mortgage\":20000,\"down\":20000,\"income\":-200,\"units\":0,\"acres\":40,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_31",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя.\n\n(Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_32",
+    "title": "Дом на 2 семьи в наследство",
+    "bodyText": "Двоюродная бабушка сделала вам сюрприз. Заплатите ВСЕГО $3000 гонорара юристу, чтобы вступить в права наследования. (Внесите данные в игровую карточку.)\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n40% ROI, можно продать за $60 000–$80 000.\n\nЦена: $60 000\nИпотека: $51 000\nПервый взнос: $9 000\nДенежный поток: +$300",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "9000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "51000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "300"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":60000,\"mortgage\":51000,\"down\":9000,\"income\":300,\"units\":2,\"acres\":0,\"house\":false,\"fee\":3000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_33",
+    "title": "Продажа после лишения права собственности",
+    "bodyText": "Банк продает дом на 2 семьи, полученный по просроченному ипотечному кредиту. Переоформите кредит на себя, заплатите $1500 за юридическое сопровождение сделки — и дом будет вашим.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n120% ROI, можно продать за $60 000–$80 000.\n\nЦена: $36 000\nИпотека: $34 500\nПервый взнос: $1 500\nДенежный поток: +$150",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "36000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "1500"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "34500"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "150"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":36000,\"mortgage\":34500,\"down\":1500,\"income\":150,\"units\":2,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_34",
+    "title": "Мучительные сомнения",
+    "bodyText": "В связи с ростом безработицы объем продаж компании MYT4U стремительно сокращается, курс ее акций упал до $5. Вы говорите соседям о тревожных перспективах компании, но не предпринимаете никаких действий.\n\nИгрок справа от вас видит в этом возможность заработать. Только он и держатели опционов (кроме вас) могут купить акции MYT4U по $5. Продавать могут все.\n\nДержатели коротких позиций обязаны покупать.",
+    "category": "stock",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "symbol",
+        "metaValue": "MYT4U"
+      },
+      {
+        "metaKey": "today_price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "price",
+        "metaValue": "5"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":5,\"buy\":\"neighbor\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_35",
+    "title": "Опцион на продажу MYT4U",
+    "bodyText": "Заплатите сейчас по $2 за акцию (их число должно быть кратно 100, но всего не более 5000 штук), чтобы продать акции MYT4U по $35, когда кто-нибудь возьмет карточку с предложением этих ценных бумаг.\n\nВ течение одного тура вы можете продать акции по $35, а потом купить их по цене, указанной в другой карточке.\n\nСрок действия опциона — три тура, если он не будет использован раньше.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"option\",\"symbol\":\"MYT4U\",\"premium\":2,\"strike\":35,\"side\":\"put\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "SMALL_DEAL",
+    "slug": "set_202_capital_36",
+    "title": "Дом 2 спальни/1 ванная",
+    "bodyText": "Дом 2 спальни/1 ванная рядом с железнодорожным депо. Низкая квартплата, много пустующего жилья. Продавец на грани банкротства. Собирается уезжать.\n\nИспользуйте карточку сами или продайте возможность другому игроку.\n\n-6% ROI, можно продать за $75 000–$85 000.\n\nЦена: $52 000\nИпотека: $50 000\nПервый взнос: $2 000\nДенежный поток: -$10",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "52000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "2000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "-10"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":52000,\"mortgage\":50000,\"down\":2000,\"income\":-10,\"units\":1,\"acres\":0,\"house\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_1",
+    "title": "Опцион на недвижимость",
+    "bodyText": "За $1000, уплаченных сейчас, вы сможете взять себе любую сделку с недвижимостью, которую вытянет другой игрок, на указанных в карточке условиях. Эта сумма в $1000 НЕ БУДЕТ являться частью первого взноса.\n\nДействие опциона заканчивается в тот момент, когда вы вытягиваете следующую карточку сделки с недвижимостью. Если этот опцион не будет использован или продан, тогда право на сделку вернется игроку, который вытянул карточку.\n\nЭтот опцион можно продать другому игроку прямо сейчас или когда будет вытянута следующая карточка сделки с недвижимостью. До тех пор карточка опциона должна находиться у вас.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"right\",\"cost\":1000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_2",
+    "title": "Продается дом на 8 семей",
+    "bodyText": "Прекрасный район для сдачи жилья. Мало свободных помещений.\n\nКупите дом сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $240 000–$320 000.\n\nЦена: $200 000\nИпотека: $160 000\nПервый взнос: $40 000\nДенежный поток: +$1 600",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "160000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1600"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":200000,\"mortgage\":160000,\"down\":40000,\"income\":1600,\"units\":8,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_3",
+    "title": "Сетевой маркетинг. Карточка № 2",
+    "bodyText": "Увеличивая объемы продаж, вы достигли статуса лидера. Увеличьте доход от бизнеса на $1000 в месяц, если являетесь дистрибьютором Direct 2 You (D2Y).\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть несколько карточек D2Y № 2.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":2,\"income\":1000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_4",
+    "title": "Опцион на недвижимость",
+    "bodyText": "За $2000, уплаченных сейчас, вы сможете взять себе любую сделку с недвижимостью, которую вытянет другой игрок, на указанных в карточке условиях. Эта сумма в $2000 НЕ БУДЕТ являться частью первого взноса.\n\nДействие опциона заканчивается в тот момент, когда вы вытягиваете следующую карточку сделки с недвижимостью. Если этот опцион не будет использован или продан, тогда право на сделку вернется игроку, который вытянул карточку.\n\nЭтот опцион можно продать другому игроку прямо сейчас или когда будет вытянута следующая карточка сделки с недвижимостью. До тех пор карточка опциона должна находиться у вас.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"right\",\"cost\":2000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_5",
+    "title": "Вашу компьютерную программу покупают",
+    "bodyText": "Лидер компьютерной индустрии хочет приобрести вашу компьютерную программу и предлагает пожизненный авторский гонорар в размере $500 в месяц.\n\nПодтверждение авторства и исключительных прав обойдется вам в $14 000.\n\nЕсли заплатите, добавьте авторский гонорар $500 в месяц к своему пассивному доходу в отчете о доходах.",
+    "category": "royalty",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "14000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "14000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":14000,\"income\":500,\"repeat\":false,\"royalty\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_6",
+    "title": "Запишите хит!",
+    "bodyText": "Знаменитый исполнитель хочет купить вашу песню и предлагает пожизненный авторский гонорар в размере $200 в месяц.\n\nПрофессиональная аранжировка и членство в союзе композиторов будут стоить вам $8000.\n\nЕсли заплатите, добавьте авторский гонорар $200 в месяц к своему пассивному доходу в отчете о доходах.",
+    "category": "royalty",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":8000,\"income\":200,\"repeat\":false,\"royalty\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_7",
+    "title": "Опцион на недвижимость",
+    "bodyText": "За $1500, уплаченных сейчас, вы сможете взять себе любую сделку с недвижимостью, которую вытянет другой игрок, на указанных в карточке условиях. Эта сумма в $1500 НЕ БУДЕТ являться частью первого взноса.\n\nДействие опциона заканчивается в тот момент, когда вы вытягиваете следующую карточку сделки с недвижимостью. Если этот опцион не будет использован или продан, тогда право на сделку вернется игроку, который вытянул карточку.\n\nЭтот опцион можно продать другому игроку прямо сейчас или когда будет вытянута следующая карточка сделки с недвижимостью. До тех пор карточка опциона должна находиться у вас.",
+    "category": "option",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"right\",\"cost\":1500}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_8",
+    "title": "Продается дом на 8 семей",
+    "bodyText": "Дом в очень хорошем состоянии. Минимальные расходы на ремонт.\n\nКупите его сами или продайте возможность другому игроку.\n\n50% ROI, можно продать за $240 000–$320 000.\n\nЦена: $230 000\nИпотека: $200 000\nПервый взнос: $30 000\nДенежный поток: +$1 250",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "230000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1250"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":230000,\"mortgage\":200000,\"down\":30000,\"income\":1250,\"units\":8,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_1_9",
+    "title": "Сетевой маркетинг. Карточка № 2",
+    "bodyText": "Ваши продажи стремительно возрастают. Увеличьте доход от бизнеса на $500 в месяц, если являетесь дистрибьютором Direct 2 You (D2Y).\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть несколько карточек D2Y № 2.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":2,\"income\":500}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_1",
+    "title": "Сетевой маркетинг. Карточка № 2",
+    "bodyText": "Ваши продажи стремительно возрастают. Увеличьте доход от бизнеса на $500 в месяц, если являетесь дистрибьютором Direct 2 You (D2Y).\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть несколько карточек D2Y № 2.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":2,\"income\":500}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_2",
+    "title": "Сетевой маркетинг. Карточка № 2",
+    "bodyText": "Вы начали учить других и стали супервайзером. Увеличьте доход от бизнеса на $1500 в месяц, если являетесь дистрибьютором Direct 2 You (D2Y).\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть несколько карточек D2Y № 2.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":2,\"income\":1500}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_3",
+    "title": "Сетевой маркетинг. Карточка № 3",
+    "bodyText": "В компании Direct 2 You (D2Y) вы добились успеха!\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1 и минимум одной карточки D2Y № 2.\n\nВас повысили до директора, и вы будете получать $5000 дополнительного ежемесячного дохода от бизнеса.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть только одна карточка D2Y № 3.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":3,\"income\":5000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_4",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя. (Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_5",
+    "title": "Перестрахование",
+    "bodyText": "Трастовый фонд перестрахования в налоговом рае предлагает квартиры квалифицированным инвесторам. Безупречная репутация руководства, высокие прибыли, ограниченная ответственность.\n\nВам (одному) предлагают приобрести любое количество квартир по $50 000. 21% ROI принесет вам по $880 денежного потока за каждую квартиру.\n\nЦена: по $50 000 каждая\nДолг: $0\nПервый взнос: $50 000\nДенежный поток: +$880",
+    "category": "investment",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "880"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":50000,\"income\":880,\"repeat\":true,\"royalty\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_6",
+    "title": "ООО с профессиональными строителями",
+    "bodyText": "Общество с ограниченной ответственностью выполняет капитальный ремонт жилых комплексов. Бригады профессионалов с безупречной репутацией.\n\nВам (одному) предлагают купить любое количество квартир по $50 000. 24% годовой доходности наличными принесут вам по $1000 денежного потока за каждую квартиру плюс будущее приращение капитала в размере ???\n\nЦена: по $50 000 каждая\nИпотека: $0\nПервый взнос: $50 000\nДенежный поток: +$1 000",
+    "category": "investment",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":50000,\"income\":1000,\"repeat\":true,\"royalty\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_7",
+    "title": "Продается дом на 2 семьи",
+    "bodyText": "Легко добираться, недалеко автострада, автобусная остановка и железнодорожная станция.\n\nКупите дом сами или продайте возможность другому игроку.\n\n40% ROI, можно продать за $60 000–$80 000.\n\nЦена: $60 000\nИпотека: $48 000\nПервый взнос: $12 000\nДенежный поток: +$400",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "60000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "12000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "48000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "400"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":60000,\"mortgage\":48000,\"down\":12000,\"income\":400,\"units\":2,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_8",
+    "title": "Продается дом на 8 семей",
+    "bodyText": "Собственность повышенного спроса, только что выставлена на продажу.\n\nКупите дом сами или продайте возможность другому игроку.\n\n56% ROI, можно продать за $240 000–$320 000.\n\nЦена: $200 000\nИпотека: $168 000\nПервый взнос: $32 000\nДенежный поток: +$1 500",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "32000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "168000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":200000,\"mortgage\":168000,\"down\":32000,\"income\":1500,\"units\":8,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_2_9",
+    "title": "Продается дом на 2 семьи",
+    "bodyText": "Хорошая прибавка к вашему инвестиционному портфелю.\n\nКупите дом сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $60 000–$80 000.\n\nЦена: $45 000\nИпотека: $37 000\nПервый взнос: $8 000\nДенежный поток: +$320",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "45000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "37000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "320"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":45000,\"mortgage\":37000,\"down\":8000,\"income\":320,\"units\":2,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_1",
+    "title": "Вашу игрушку покупают",
+    "bodyText": "Крупная компания хочет приобрести созданную вами игрушку и предлагает пожизненный авторский гонорар в размере $400 в месяц.\n\nЗаплатите $12 000 за патент, чтобы защитить свои права, или ничего не получите.\n\nЕсли заплатите, добавьте авторский гонорар $400 в месяц к своему пассивному доходу в отчете о доходах.",
+    "category": "royalty",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "12000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "12000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "400"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":12000,\"income\":400,\"repeat\":false,\"royalty\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_2",
+    "title": "Продается дом на 4 семьи",
+    "bodyText": "Оригинальная архитектура. Идеально для молодых специалистов.\n\nКупите дом сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $120 000–$160 000.\n\nЦена: $100 000\nИпотека: $80 000\nПервый взнос: $20 000\nДенежный поток: +$800",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "20000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "800"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":100000,\"mortgage\":80000,\"down\":20000,\"income\":800,\"units\":4,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_3",
+    "title": "Продается многоквартирный дом",
+    "bodyText": "30 квартир. Исключительно добросовестный управляющий поможет снизить эксплуатационные расходы.\n\nКупите дом сами или продайте возможность другому игроку.\n\n54% ROI, можно продать за $900 000–$1 200 000.\n\nЦена: $800 000\nИпотека: $700 000\nПервый взнос: $100 000\nДенежный поток: +$4 500",
+    "category": "realestate",
+    "subcategory": "30plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "800000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "100000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "700000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "4500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":800000,\"mortgage\":700000,\"down\":100000,\"income\":4500,\"units\":30,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_4",
+    "title": "Продается дом на 12 семей",
+    "bodyText": "Старое здание. Новая сантехника и электрика.\n\nКупите его сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $360 000–$540 000.\n\nЦена: $350 000\nИпотека: $300 000\nПервый взнос: $50 000\nДенежный поток: +$2 000",
+    "category": "realestate",
+    "subcategory": "12plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "350000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "300000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":350000,\"mortgage\":300000,\"down\":50000,\"income\":2000,\"units\":12,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_5",
+    "title": "Продается дом на 2 семьи",
+    "bodyText": "Прекрасный дом в центре города.\n\nКупите его сами или продайте возможность другому игроку.\n\n34% ROI, можно продать за $60 000–$80 000.\n\nЦена: $65 000\nИпотека: $55 000\nПервый взнос: $10 000\nДенежный поток: +$280",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "65000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "10000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "55000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "280"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":65000,\"mortgage\":55000,\"down\":10000,\"income\":280,\"units\":2,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_6",
+    "title": "Сетевой маркетинг. Карточка № 2",
+    "bodyText": "Показывая другим, как увеличивать продажи, вы доросли до менеджера. Вы будете получать $2000 дополнительного ежемесячного дохода от бизнеса, если являетесь дистрибьютором Direct 2 You (D2Y).\n\nПолучать указанный доход можно только в случае наличия карточки D2Y № 1.\n\nЭтот доход от бизнеса нельзя продать или передать.\n\nВы можете оставить эту карточку у себя.\n\n(У игрока может быть несколько карточек D2Y № 2.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":2,\"income\":2000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_7",
+    "title": "Продается дом на 4 семьи",
+    "bodyText": "Надежная постройка. Новая крыша. Отличный район.\n\nКупите дом сами или продайте возможность другому игроку.\n\n56% ROI, можно продать за $120 000–$160 000.\n\nЦена: $80 000\nИпотека: $64 000\nПервый взнос: $16 000\nДенежный поток: +$750",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "16000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "64000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "750"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":80000,\"mortgage\":64000,\"down\":16000,\"income\":750,\"units\":4,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_8",
+    "title": "Вашу книгу покупают",
+    "bodyText": "Крупное издательство хочет приобрести вашу книгу и предлагает пожизненный минимальный авторский гонорар в размере $250 в месяц.\n\nЮридические услуги стоят $8000.\n\nЕсли заплатите, добавьте авторский гонорар $250 в месяц к своему пассивному доходу в отчете о доходах.",
+    "category": "royalty",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "250"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":8000,\"income\":250,\"repeat\":false,\"royalty\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_3_9",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя. (Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_1",
+    "title": "Сетевой маркетинг. Карточка № 1",
+    "bodyText": "Вы можете стать дистрибьютором Direct 2 You (D2Y), компании сетевого маркетинга. Качественные товары, низкий первоначальный доход, перспективы роста для способных учеников и лидеров. Никаких обещаний и масса возможностей.\n\nЦена: $200\nДенежный поток: $0\n\nЕсли станете дистрибьютором компании, оставьте эту карточку у себя. (Каждому игроку разрешается иметь только одну карточку D2Y № 1.)",
+    "category": "network_marketing",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":1,\"income\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_2",
+    "title": "Продается дом на 4 семьи",
+    "bodyText": "Безопасный район. Система сигнализации и общественная служба охраны.\n\nКупите дом сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $120 000–$160 000.\n\nЦена: $125 000\nИпотека: $110 000\nПервый взнос: $15 000\nДенежный поток: +$600",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "125000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "110000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "600"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":125000,\"mortgage\":110000,\"down\":15000,\"income\":600,\"units\":4,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_3",
+    "title": "Продается дом на 2 семьи",
+    "bodyText": "Реконструированный район. Высокий спрос на жилье.\n\nКупите дом сами или продайте возможность другому игроку.\n\n36% ROI, можно продать за $60 000–$80 000.\n\nЦена: $50 000\nИпотека: $42 000\nПервый взнос: $8 000\nДенежный поток: +$240",
+    "category": "realestate",
+    "subcategory": "duplex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "42000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "240"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":50000,\"mortgage\":42000,\"down\":8000,\"income\":240,\"units\":2,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_4",
+    "title": "Продается дом на 4 семьи",
+    "bodyText": "Новый перспективный район рядом с городом.\n\nКупите дом сами или продайте возможность другому игроку.\n\n56% ROI, можно продать за $120 000–$160 000.\n\nЦена: $140 000\nИпотека: $108 000\nПервый взнос: $32 000\nДенежный поток: +$1 500",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "140000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "32000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "108000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":140000,\"mortgage\":108000,\"down\":32000,\"income\":1500,\"units\":4,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_5",
+    "title": "Продается дом на 8 семей",
+    "bodyText": "Район пенсионеров. Жильцы съезжают очень редко.\n\nКупите дом сами или продайте возможность другому игроку.\n\n51% ROI, можно продать за $240 000–$320 000.\n\nЦена: $210 000\nИпотека: $170 000\nПервый взнос: $40 000\nДенежный поток: +$1 700",
+    "category": "realestate",
+    "subcategory": "8plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "210000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "170000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "1700"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":210000,\"mortgage\":170000,\"down\":40000,\"income\":1700,\"units\":8,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_6",
+    "title": "Продается дом на 4 семьи",
+    "bodyText": "Отличное жилье для университетских преподавателей. Рядом с кампусом.\n\nКупите дом сами или продайте возможность другому игроку.\n\n40% ROI, можно продать за $120 000–$160 000.\n\nЦена: $90 000\nИпотека: $75 000\nПервый взнос: $15 000\nДенежный поток: +$500",
+    "category": "realestate",
+    "subcategory": "4plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "90000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "15000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "75000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":90000,\"mortgage\":75000,\"down\":15000,\"income\":500,\"units\":4,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_7",
+    "title": "Продается многоквартирный дом",
+    "bodyText": "24 квартиры. Дому всего 8 лет, требуется благоустройство территории.\n\nКупите его сами или продайте возможность другому игроку.\n\n46% ROI, можно продать за $720 000–$960 000.\n\nЦена: $650 000\nИпотека: $585 000\nПервый взнос: $65 000\nДенежный поток: +$2 500",
+    "category": "realestate",
+    "subcategory": "24plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "650000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "65000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "585000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "2500"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":650000,\"mortgage\":585000,\"down\":65000,\"income\":2500,\"units\":24,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_8",
+    "title": "Долгосрочные облигации",
+    "bodyText": "Взаимный фонд долгосрочных облигаций предлагает квартиры квалифицированным инвесторам. Опытные управляющие и высокая доходность гарантируются.\n\nВам (одному) предлагают купить любое количество квартир по $25 000. 18% ROI принесут вам по $380 денежного потока за каждую квартиру.\n\nЦена: по $25 000 каждая\nДолг: $0\nПервый взнос: $25 000\nДенежный поток: +$380",
+    "category": "investment",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "25000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "25000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "0"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "380"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"investment\",\"cost\":25000,\"income\":380,\"repeat\":true,\"royalty\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "BIG_DEAL",
+    "slug": "set_202_cashflow_4_9",
+    "title": "Продается многоквартирный дом",
+    "bodyText": "50 квартир. Рабочий район. Стабильный денежный поток.\n\nКупите дом сами или продайте возможность другому игроку.\n\n48% ROI, можно продать за $1 500 000–$2 000 000.\n\nЦена: $1 000 000\nИпотека: $800 000\nПервый взнос: $200 000\nДенежный поток: +$8 000",
+    "category": "realestate",
+    "subcategory": "50plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "1000000"
+      },
+      {
+        "metaKey": "down_payment",
+        "metaValue": "200000"
+      },
+      {
+        "metaKey": "mortgage",
+        "metaValue": "800000"
+      },
+      {
+        "metaKey": "cashflow_monthly",
+        "metaValue": "8000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"property\",\"cost\":1000000,\"mortgage\":800000,\"down\":200000,\"income\":8000,\"units\":50,\"acres\":0,\"house\":false}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_01",
+    "title": "Реконструкция дома",
+    "bodyText": "Дом на 4 семьи в рабочем районе. Получен по [неразборчиво] ипотеке. Требуется ремонт на сумму $12 000. Банк профинансирует все работы под [неразборчиво] процент.\nЕсли вас пугает риск, эту замечательную сделку может получить ваш сосед справа.\nЦена: $90 000.\nИпотека: $90 000.\nПервый взнос: $0.\nДенежный поток: +$200.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"market_property\",\"property\":{\"kind\":\"property\",\"cost\":90000,\"mortgage\":90000,\"down\":0,\"income\":200,\"units\":4,\"acres\":0,\"house\":false},\"repair\":12000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_02",
+    "title": "Обмен недвижимости",
+    "bodyText": "Дом на 2 семьи подорожал, и вы можете обменять его на дом, рассчитанный на 4 семьи.\n48% ROI, наличность не требуется. Внесите в игровую карточку все цифры, но ничего не платите.\n(Предварительно сотрите оттуда все данные о доме на 2 семьи.)\nЦена: $100 000.\nИпотека: $80 000.\nПервый взнос: $20 000.\nДенежный поток: +$800.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"exchange\",\"units\":2,\"property\":{\"kind\":\"property\",\"cost\":100000,\"mortgage\":80000,\"down\":20000,\"income\":800,\"units\":4,\"acres\":0,\"house\":false}}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_03",
+    "title": "Надвигается рецессия!",
+    "bodyText": "Национальный банк борется с инфляцией, деловая активность на спаде. Это больно бьет по всем арендодателям, поскольку приходится снижать плату, чтобы удержать жильцов.\nВсе уменьшают месячный денежный поток от сдачи жилья внаем на $50 за каждую квартиру.\n(Например, месячный денежный поток от дома на 2 семьи уменьшается на $100.)\nЕсли денежный поток от какого-то вида собственности станет отрицательным, вы можете вернуть ее Банку за [неразборчивая доля] первого взноса.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"rent\",\"amount\":-50}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_04",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Выпуск нового лекарственного средства [неразборчиво] акциям компании существенно подняться и произошло дробление 2 к 1.\nВсе держатели удваивают количество своих акций OK4U. Цена за акцию уменьшается вдвое. Количество акций в опционах и коротких позициях удваивается, а цена реализации уменьшается наполовину.\nДивидендов по-прежнему нет. После дробления только вы и держатели опционов можете покупать, продавать или открывать короткие позиции по новой цене — $40 за акцию.\nНазвание: OK4U.\nЦена сегодня: $40.\nДержатели коротких позиций обязаны покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":40,\"split\":true,\"buy\":\"owner\",\"sell\":\"eligible\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_05",
+    "title": "Предложение о покупке многоквартирных домов",
+    "bodyText": "Инвестиционный траст недвижимости предлагает по $30 000 за каждую квартиру в многоквартирных домах (не менее 24 квартир).\nПродавать за такую цену имеет право каждый игрок.\nЕсли вы продадите, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"large\",\"price\":30000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_06",
+    "title": "Ваш ребенок женится",
+    "bodyText": "Один из ваших детей окончил школу и женится. Теперь вам не нужно поддерживать его материально.\nВы даете молодым $5000, чтобы помочь начать семейную жизнь, а затем уменьшаете количество детей в игровой карточке и пропорционально сокращаете статью «Расходы на детей».\nЕсли у вас нет детей, то вы не выполняете никаких действий.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"wedding\",\"cost\":5000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_07",
+    "title": "Благотворительный аукцион",
+    "bodyText": "Вскоре состоится ежегодная встреча бизнес-элиты вашего города, на которой будет проведен благотворительный аукцион.\nПервый приз: победитель сможет бросать на выбор 1, 2 или 3 кости в каждый свой ход, пока будет находиться на дорожке для крысиных бегов.\nПродайте эту карточку (и приз) на аукционе тому, кто предложит самую высокую цену. (Вы тоже можете сделать заявку.)\nАукционер получает 10% от продажи.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"auction\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_08",
+    "title": "Остановка торгов по акциям OK4U",
+    "bodyText": "Курс акций OK4U упал до $5 и запустил механизм вашего стоп-приказа.\nВы (один) обязаны продать все акции OK4U по $5 за акцию. Держатели коротких позиций обязаны покупать.\nДержатели опционов пут и колл могут получать прибыль или покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":5,\"buy\":\"none\",\"forced\":true,\"sell\":\"eligible\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_09",
+    "title": "Строится новый аэропорт",
+    "bodyText": "Новому аэропорту требуется ваша земля. Вы должны продать ее по себестоимости, то есть получить только сумму первого взноса.\nСотрите название своей собственности с самым высоким денежным потоком, ее стоимость, сумму ипотечного кредита и получите свой первый взнос.\nПрименяется к любой сдаваемой вами недвижимости или земле.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"airport\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_10",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Успешно проведена программа снижения себестоимости. Компания объявляет дробление акций 2 к 1.\nВсе держатели удваивают количество своих акций MYT4U. Цена за акцию уменьшается вдвое. Количество акций в опционах и коротких позициях удваивается, а цена реализации уменьшается наполовину.\nДивидендов по-прежнему нет. После дробления все игроки могут покупать, продавать или открывать короткие позиции по новой цене — $30 за акцию.\nНазвание: MYT4U дробление 2 к 1.\nЦена: $30.\nДержатели коротких позиций обязаны покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":30,\"split\":true,\"buy\":\"all\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_11",
+    "title": "Неожиданное предложение",
+    "bodyText": "Сосед-инвестор предлагает купить у вас недвижимость, которая приносит самый высокий денежный поток, за 150% стоимости.\nЕсли вы согласны, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.\nЕсли у вас нет недвижимости, приносящей денежный поток, предложение передается первому игроку справа от вас, у которого она есть.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"highest\",\"price\":1.5}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_12",
+    "title": "Предложение о покупке дома",
+    "bodyText": "Покупатель предлагает $85 000 за дом.\n2 спальни/1 ванная. Финансирует все сам.\nПродавать за такую цену имеет право каждый игрок.\nЕсли вы продадите, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "85000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"house\",\"price\":85000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_13",
+    "title": "Компания OK4U Drug Co. разорена!",
+    "bodyText": "OK4U объявила себя банкротом из-за судебных исков по поводу якобы вредных продуктов.\nВсе акции обесцениваются.\nВсе держатели акций и опционов колл стирают свои акции OK4U. Все держатели опционов пут и коротких позиций получают прибыль от новой цены $0, прежде чем акции навсегда будут сняты с торгов.\nНазвание: OK4U. Цена сегодня: $0.\nТорговля не разрешена.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":0,\"bankrupt\":true,\"buy\":\"none\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_14",
+    "title": "Компания OK4U Drug Co. — банкрот!",
+    "bodyText": "Курс акций упал до $0. Все держатели акций и опционов колл стирают свои акции OK4U. Все держатели опционов пут и коротких позиций получают прибыль от новой цены $0, прежде чем акции навсегда будут сняты с торгов.\nКомпания реорганизована.\nНовое руководство покупает бизнес и все активы, а затем проводит первичное размещение по $4 за акцию. Только вы можете покупать или открывать короткую позицию.\nНазвание: OK4U. Цена сегодня: $4.\nДивидендов нет (0% ROI).\nРазброс цен устанавливается заново.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":4,\"bankrupt\":true,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_15",
+    "title": "Предложение о покупке земли",
+    "bodyText": "Застройщик предлагает $125 000 за 10 акров свободной земли.\nПродавать может каждый, у кого есть достаточно земли.\nВы можете продать часть большого участка, разделив землю и стоимость. (См. «Дробление недвижимости» в «Правилах игры».)\nЕсли вы продадите, нужно будет погасить долг по ипотеке и соответственно уменьшить показатель суммы денежного потока.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"land\",\"price\":125000,\"acres\":10}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_16",
+    "title": "Панический сброс акций MYT4U",
+    "bodyText": "Сегодня компания MYT4U признала, что ее прибыли не будут соответствовать прогнозам аналитиков и показателям прошлого года. Панический сброс акций довел цену до $5 и запустил механизм вашего стоп-приказа.\nВы (один) обязаны продать все акции MYT4U по $5 за акцию. Держатели коротких позиций обязаны покупать. Держатели опционов пут и колл могут получать прибыль или покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":5,\"buy\":\"none\",\"forced\":true,\"sell\":\"eligible\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_17",
+    "title": "Ваш ребенок женится",
+    "bodyText": "Один из ваших детей окончил школу и женился. Теперь вам не нужно поддерживать его материально.\nВы даете молодым $2000, чтобы помочь начать семейную жизнь, а затем уменьшаете количество детей в игровой карточке и пропорционально сокращаете статью «Расходы на детей».\nЕсли у вас нет детей, то вы не выполняете никаких действий.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"wedding\",\"cost\":2000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_18",
+    "title": "Стихийное бедствие!",
+    "bodyText": "Землетрясение покрыло объект вашей недвижимости 3-метровым слоем грязи и камней. Касается любой недвижимости с самым большим денежным потоком.\nДенежный поток от этой недвижимости упал до $0. (Внесите соответствующие изменения в игровую карточку.)\nВы не можете продать эту недвижимость сразу, как только появится карточка с предложением о покупке такой недвижимости. Необходимо время на восстановление. (Оставьте эту карточку у себя до следующего круга.)\nПолис страхования всех видов рисков (если он у вас есть) возмещает вам сумму первого взноса и позволяет сохранить недвижимость.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"disaster\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_19",
+    "title": "Обмен недвижимости",
+    "bodyText": "Дом 2 спальни/1 ванная подорожал, и вы можете обменять его на дом, рассчитанный на 4 семьи.\n42% ROI, наличность не требуется. Внесите в игровую карточку все цифры, но ничего не платите.\n(Предварительно сотрите оттуда все данные о доме на 1 семью.)\nЦена: $110 000.\nИпотека: $90 000.\nПервый взнос: $20 000.\nДенежный поток: +$700.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"exchange\",\"units\":1,\"property\":{\"kind\":\"property\",\"cost\":110000,\"mortgage\":90000,\"down\":20000,\"income\":700,\"units\":4,\"acres\":0,\"house\":false}}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_20",
+    "title": "Предложение о покупке земли",
+    "bodyText": "В вашем районе планируется построить небольшой универмаг на 10 акрах земли. Застройщик предлагает $150 000.\nПродавать может каждый, у кого есть достаточно земли.\nВы можете продать часть большого участка, разделив землю и стоимость. (См. «Дробление недвижимости» в «Правилах игры».)\nЕсли вы продадите, нужно будет погасить долг по ипотеке и соответственно уменьшить показатель суммы денежного потока.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"land\",\"price\":150000,\"acres\":10}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_21",
+    "title": "Банкротство акций MYT4U Electronics Co.",
+    "bodyText": "Все держатели акций и опционов колл стирают свои акции MYT4U. Все держатели опционов пут и коротких позиций получают прибыль от новой цены $0, прежде чем акции навсегда будут сняты с торгов.\nКомпания реорганизована.\nТребования погасить долги при [неразборчиво; возможно «ограничении»] кредита вынудили банки забрать компанию и провести первичное размещение акций по цене $4. Только вы можете покупать или открывать короткую позицию.\nНазвание: MYT4U. Цена сегодня: $4.\nДивидендов нет (0% ROI).\nРазброс цен устанавливается заново.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":4,\"bankrupt\":true,\"buy\":\"owner\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_22",
+    "title": "Страхование всех видов рисков",
+    "bodyText": "Крупная страховая биржа предлагает полис полного страхования на $5 000 000. Покрываются все убытки (кроме тех, что вызваны действиями самого владельца). Купить можете только вы.\nЦена: $200 в месяц (если куплено, добавьте их к расходам по страхованию).\nВам будут возмещены все убытки, вплоть до полной стоимости собственности, ПЛЮС любые сопутствующие расходы, если таковые будут иметь место.\nЭту карточку нельзя продавать или выставлять на аукцион.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"insurance\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_23",
+    "title": "Обмен недвижимости",
+    "bodyText": "Дом на 4 семьи подорожал, и вы можете обменять его на дом, рассчитанный на 8 семей.\n51% ROI, наличность не требуется. Внесите в игровую карточку все цифры, но ничего не платите.\n(Предварительно сотрите оттуда все данные о доме на 4 семьи.)\nЦена: $190 000.\nИпотека: $150 000.\nПервый взнос: $40 000.\nДенежный поток: +$1 700.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"exchange\",\"units\":4,\"property\":{\"kind\":\"property\",\"cost\":190000,\"mortgage\":150000,\"down\":40000,\"income\":1700,\"units\":8,\"acres\":0,\"house\":false}}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_24",
+    "title": "Предложение о покупке дома",
+    "bodyText": "Покупатель предлагает $80 000 за дом 2 спальни/1 ванная. Финансирует все сам.\nПродавать за такую цену имеет право каждый игрок.\nЕсли вы продадите, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "80000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"house\",\"price\":80000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_25",
+    "title": "Предложение о покупке домов",
+    "bodyText": "Покупатель предлагает по $35 000 за каждую квартиру в домах на 2, 4 и 8 семей.\n\nПродавать за такую цену имеет право каждый игрок.\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "2plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "35000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"plex\",\"price\":35000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_26",
+    "title": "Предложение о покупке домов",
+    "bodyText": "Покупатель предлагает по $30 000 за каждую квартиру в домах на 2, 4 и 8 семей.\n\nПродавать за такую цену имеет право каждый игрок.\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "2plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "30000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"plex\",\"price\":30000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_27",
+    "title": "Страхование всех видов рисков",
+    "bodyText": "Крупная страховая биржа предлагает полис полного страхования на $5 000 000. Покрываются все убытки (кроме тех, что вызваны действиями самого владельца). Купить можете только вы.\n\nЦена: $200 в месяц (если купите, добавьте их к расходам по страхованию).\n\nВам будут возмещены все убытки, вплоть до полной стоимости собственности, ПЛЮС любые сопутствующие расходы, если таковые будут иметь место.\n\nЭту карточку нельзя продавать или выставлять на аукцион.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"insurance\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_28",
+    "title": "Предложение о покупке земли",
+    "bodyText": "Перекупщик предлагает $40 000 за 5 акров свободной земли.\n\nПродавать может каждый, у кого есть достаточно земли.\n\nВы можете продать часть большого участка, разделив землю и стоимость. (См. «Дробление недвижимости» в «Правилах игры».)\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и соответственно уменьшить показатель суммы денежного потока.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"land\",\"price\":40000,\"acres\":5}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_29",
+    "title": "Сделка с «завышенной» ценой",
+    "bodyText": "Полностью выкупленный дом на 4 семьи в прекрасном состоянии. Цена кажется слишком высокой, но владелец предоставляет 100% финансирование под очень низкий процент.\n\nПока вы будете спрашивать всех, не слишком ли это рискованно, эту великолепную сделку может заполучить ваш сосед справа.\n\nЦена: $190 000\nИпотека: $190 000\nПервый взнос: $0\nДенежный поток: +$300",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"market_property\",\"property\":{\"kind\":\"property\",\"cost\":190000,\"mortgage\":190000,\"down\":0,\"income\":300,\"units\":4,\"acres\":0,\"house\":false},\"repair\":0}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_30",
+    "title": "Обнаружено загрязнение",
+    "bodyText": "Один из объектов недвижимости, находящихся в собственности игрока справа от вас, загрязнен токсичными отходами. Если этот игрок не владеет недвижимостью, тогда карточка будет передаваться по кругу, пока не найдется владелец недвижимости (вы будете последним в цепочке).\n\nИгрок, которого это коснется, должен заплатить $50 000 за очистные работы, иначе потеряет недвижимость с самым большим денежным потоком. Эту собственность и ее денежный поток нужно стереть с игровой карточки.\n\nПолис страхования от всех рисков (если он у вас есть) покрывает все убытки и возмещает $50 000.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"contamination\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_31",
+    "title": "Обвал акций MYT4U Electronics Co.",
+    "bodyText": "На фоне резкого падения сбыта и рекордной безработицы люди стремятся вкладывать деньги в облигации.\n\nВсе акции обесцениваются.\n\nВсе держатели акций и опционов колл стирают свои акции MYT4U. Все держатели опционов пут и коротких позиций получают прибыль от новой цены $0, прежде чем акции навсегда будут сняты с торгов.\n\nНазвание: MYT4U\nЦена сегодня: $0\n\nТорговля не разрешена.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":0,\"bankrupt\":true,\"buy\":\"none\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_32",
+    "title": "Предложение о покупке дома",
+    "bodyText": "Покупатель предлагает $75 000 за дом 2 спальни/1 ванная. Финансирует все сам.\n\nПродавать за такую цену имеет право каждый игрок.\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "house2u",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "75000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"house\",\"price\":75000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_33",
+    "title": "Акции OK4U Drug Co.",
+    "bodyText": "Успех новых лекарств позволяет компании провести дробление акций 2 к 1.\n\nВсе держатели удваивают количество своих акций OK4U. Цена за акцию уменьшается вдвое. Количество акций в опционах и коротких позициях удваивается, а цена реализации уменьшается наполовину.\n\nДивидендов нет. После дробления только вы и держатели опционов можете покупать, продавать или открывать короткие позиции по новой цене — $30 за акцию.\n\nНазвание: OK4U дробление 2 к 1\nЦена: $30\n\nДержатели коротких позиций обязаны покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\"],\"price\":30,\"split\":true,\"buy\":\"owner\",\"sell\":\"eligible\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_34",
+    "title": "Предложение о покупке домов",
+    "bodyText": "Покупатель предлагает по $40 000 за каждую квартиру в домах на 2, 4 и 8 семей.\n\nПродавать за такую цену имеет право каждый игрок.\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": "realestate",
+    "subcategory": "2plex",
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "price",
+        "metaValue": "40000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"plex\",\"price\":40000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_35",
+    "title": "Акции MYT4U Electronics Co.",
+    "bodyText": "Компания получила эксклюзивные права на новый продукт, когда провела дробление акций 2 к 1. Новая цена — $40.\n\nВсе держатели удваивают количество своих акций MYT4U. Цена за акцию уменьшается вдвое. Количество акций в опционах и коротких позициях удваивается, а цена реализации уменьшается наполовину.\n\nДивидендов нет. После дробления только вы и держатели опционов можете покупать, продавать или открывать короткие позиции по новой цене — $40 за акцию.\n\nНазвание: MYT4U\nЦена сегодня: $40\n\nДержатели коротких позиций обязаны покупать.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"MYT4U\"],\"price\":40,\"split\":true,\"buy\":\"owner\",\"sell\":\"eligible\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_36",
+    "title": "Предложение о покупке многоквартирных домов",
+    "bodyText": "Покупатель предлагает по $40 000 за каждую квартиру в многоквартирных домах.\n\nПродавать за такую цену имеет право каждый игрок.\n\nЕсли вы продаете, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"apartment\",\"price\":40000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_37",
+    "title": "Найдите наставника",
+    "bodyText": "После долгих раздумий вы решили, что вам необходим ментор.\nВам повезло! В городе появился опытный профессионал, вы нашли общий язык, и теперь у вас есть наставник.\nТри следующих хода вы сможете отказываться от вытянутой карточки, если она вам не нравится, и брать другую. (Если у кого-то из игроков есть опцион на вашу сделку с недвижимостью, возьмите другую карточку.)",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"mentor\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_38",
+    "title": "Сетевой маркетинг. Карточка № 3",
+    "bodyText": "Если вы хорошо потрудились в компании Direct 2 You (D2Y) и у вас есть карточка D2Y № 1 и минимум одна карточка D2Y № 2, примите наши поздравления!\nВас повышают до директора. Вы будете получать дополнительный денежный поток в размере $7000 в месяц.\nЭтот доход от бизнеса нельзя продать или передать.\nВы можете оставить эту карточку у себя.\n(У игрока может быть только одна карточка D2Y № 3.)",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"d2y\",\"level\":3,\"income\":7000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_39",
+    "title": "Обмен недвижимости",
+    "bodyText": "Дом на 8 семей подорожал, и вы можете обменять его на дом, рассчитанный на 16 семей.\n60% ROI, наличность не требуется. Внесите в игровую карточку все цифры, но ничего не платите.\n(Предварительно сотрите оттуда все данные о доме на 8 семей.)\nЦена: $450 000.\nИпотека: $380 000.\nПервый взнос: $70 000.\nДенежный поток: +$3500.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"exchange\",\"units\":8,\"property\":{\"kind\":\"property\",\"cost\":450000,\"mortgage\":380000,\"down\":70000,\"income\":3500,\"units\":16,\"acres\":0,\"house\":false}}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_40",
+    "title": "Повышаются корпоративные налоги",
+    "bodyText": "Правительство повысило ставку налогообложения корпораций на 20%, обещая, что это временная мера.\nНо рынок понял это как «навсегда», и котировки обвалились. Никто (включая вас) не покупает акции OK4U и MYT4U. В результате они упали до $10.\nПродавать может каждый игрок. Держатели коротких позиций обязаны покупать. Держатели опционов на покупку и на продажу могут снять прибыль.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"quote\",\"symbols\":[\"OK4U\",\"MYT4U\"],\"price\":10,\"buy\":\"none\",\"sell\":\"all\"}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_41",
+    "title": "Предложение о покупке многоквартирных домов",
+    "bodyText": "Покупатель предлагает по $35 000 за каждую квартиру в многоквартирных домах.\nПродавать за такую цену имеет право каждый игрок.\nЕсли вы продадите, нужно будет погасить долг по ипотеке и уменьшить денежный поток на сумму, которую получаете от этой собственности сейчас.",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"sale\",\"filter\":\"apartment\",\"price\":35000}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "MARKET",
+    "slug": "set_202_market_42",
+    "title": "Международная торговля на подъеме",
+    "bodyText": "Бизнес в городе оживляется благодаря развитию торговли с другими странами. Безработица на рекордно низком уровне, что вызывает нехватку жилья.\nЦены на аренду жилья выросли на $30 в месяц.\nКаждый игрок увеличивает свой месячный денежный поток за каждую сдаваемую квартиру на $30.\n(Например, месячный денежный поток от дома на 2 семьи увеличивается на $60.)",
+    "category": null,
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"rent\",\"amount\":30}"
+      }
+    ],
+    "effects": [],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_01",
+    "title": "Не можете спать спокойно",
+    "bodyText": "Тревожит куча неоплаченных счетов. Посмотрите передачу о том, как за один день заработать миллион долларов.\n\nКупите продукты. Заплатите $100.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":100,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_02",
+    "title": "Купите детям собаку",
+    "bodyText": "Разумеется, породистую.\n\nЗаплатите $500 сейчас И внесите в статью «Прочие расходы» $100 в месяц.\n\n(Если детей нет, платить не нужно.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":500,\"monthly\":100,\"children\":true}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -500,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_03",
+    "title": "Отдыхать лучше всего на природе",
+    "bodyText": "Купите дачный домик на берегу озера. Здесь будете отдыхать вы и ваша семья. Не предназначено для сдачи внаем.\n\nЗаплатите первый взнос $25 000 И внесите $500 ежемесячных выплат по ипотечному кредиту на дом в колонку «Расходы».\n\nЦена: $75 000.\nИпотека: $50 000.\nПервый взнос: $25 000.\nДенежный поток: $0.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":25000,\"monthly\":0,\"loan\":[50000,500]}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -25000,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "liability.create",
+        "amountCents": 50000,
+        "payload": {
+          "mandatory": true,
+          "type": "mortgage",
+          "name": "Отдыхать лучше всего на природе",
+          "paymentCents": 500
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_04",
+    "title": "Наймите репетитора",
+    "bodyText": "Ваш ребенок хорошо учится. Хочет поступать в университет.\n\nВнесите в статью «Прочие расходы» $200 в месяц.\n\n(Если детей нет, платить не нужно.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":200,\"children\":true}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_05",
+    "title": "Подпишитесь на газету для инвесторов",
+    "bodyText": "Внесите в статью «Прочие расходы» $20 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":20}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -20,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_06",
+    "title": "Лучше чем ТВ",
+    "bodyText": "Купите новейшую компьютерную программу, чтобы детям было чем заняться.\n\nЗаплатите по $50 за ребенка.\n\n(Если детей нет, платить не нужно.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "per_child",
+        "metaValue": "true"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":50,\"monthly\":0,\"children\":true,\"perChild\":true}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -50,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_07",
+    "title": "Купите телевизор высокой четкости",
+    "bodyText": "Ваш телевизор устарел. Купите телевизор HDTV самой последней модели.\n\nЗаплатите $1500.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":1500,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -1500,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_08",
+    "title": "Пора приобщаться к высоким технологиям",
+    "bodyText": "Возьмите в аренду компьютер, создайте персональный веб-сайт и наймите веб-дизайнера.\n\nВнесите в статью «Прочие расходы» $150 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":150}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -150,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_09",
+    "title": "Вы прошли кредитную проверку",
+    "bodyText": "Вы отвечаете всем требованиям! Возьмите в аренду европейский спортивный автомобиль.\n\nВнесите в статью «Прочие расходы» $1000 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":1000}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -1000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_10",
+    "title": "Ребенок поступил в университет",
+    "bodyText": "Даже с учетом стипендии учеба в престижном университете требует, чтобы вы сразу заплатили $50 000\n\nИЛИ\n\nувеличили статью «Расходы на детей» на $1000 в месяц И внесли кредит на образование ($50 000) в колонку «Пассивы».\n\n(Если детей нет, никаких расходов тоже нет.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "payment_choice",
+        "metaValue": "cash_or_credit"
+      },
+      {
+        "metaKey": "cash_price",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "credit_balance",
+        "metaValue": "50000"
+      },
+      {
+        "metaKey": "credit_payment",
+        "metaValue": "1000"
+      },
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":0,\"children\":true,\"university\":true}"
+      }
+    ],
+    "effects": [],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_11",
+    "title": "Замучили стрессы",
+    "bodyText": "Займитесь медитацией.\n\nВнесите в статью «Прочие расходы» $30 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":30}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -30,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_12",
+    "title": "Станьте членом престижного загородного клуба",
+    "bodyText": "Заплатите $20 000 сразу И внесите в статью «Прочие расходы» $400 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":20000,\"monthly\":400}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -20000,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -400,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_13",
+    "title": "Развлечения на заднем дворе",
+    "bodyText": "Постройте во дворе бассейн и джакузи.\n\nЦена: $32 000.\nПервый взнос $12 000 и по $260 в месяц выплат по ипотеке за $20 000 кредита под недвижимость.\n\nВнесите ипотечный кредит на недвижимость в колонку «Пассивы» И добавьте в статью «Прочие расходы» $140 в месяц за электроэнергию и обслуживание.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":12000,\"monthly\":140,\"loan\":[20000,260]}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -12000,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -140,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "liability.create",
+        "amountCents": 20000,
+        "payload": {
+          "mandatory": true,
+          "type": "mortgage",
+          "name": "Развлечения на заднем дворе",
+          "paymentCents": 260
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_14",
+    "title": "Через 3 месяца встреча выпускников",
+    "bodyText": "Запишитесь в фитнес-клуб, чтобы поразить старых друзей своей прекрасной формой.\n\nВнесите в статью «Прочие расходы» $80 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":80}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -80,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_15",
+    "title": "Консультация эксперта по защите активов",
+    "bodyText": "Заплатите $3000, если ваш пассивный доход составляет более $500 в месяц.\n\n(Если он меньше, то не платите.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":3000,\"monthly\":0,\"threshold\":500}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -3000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_16",
+    "title": "Купите мобильный телефон",
+    "bodyText": "Это непременный атрибут бизнесмена.\n\nВнесите в статью «Прочие расходы» $100 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":100}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -100,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_17",
+    "title": "Сходите в кафетерий",
+    "bodyText": "Побалуйте себя капучино и десертом.\n\nЗаплатите $10.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":10,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -10,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_18",
+    "title": "Рабочий кабинет в доме",
+    "bodyText": "Ремонт будет стоить вам $750 в месяц.\n\nВнесите в статью «Прочие расходы» $750 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":750}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -750,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_19",
+    "title": "Необходимо повысить уровень игры в гольф",
+    "bodyText": "Возьмите уроки игры в гольф.\n\nЗаплатите $500 инструктору.\n\n(P.S. Никаких гарантий, что вы станете мастером.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":500,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -500,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_20",
+    "title": "Невозможно отказать",
+    "bodyText": "Коллега просит вас купить печенье для спортивной команды ее ребенка.\n\nЗаплатите $20.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":20,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -20,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_21",
+    "title": "Старшему ребенку нужна собственная машина",
+    "bodyText": "Купите безопасный и надежный подержанный автомобиль.\n\nЗаплатите первый взнос $3000 И внесите $250 в месяц на выплату кредита в колонку «Расходы», а $5000 кредита на машину — в колонку «Пассивы».\n\nПЛЮС\n\nдобавьте в статью «Прочие расходы» $150 в месяц за страховку, топливо и техобслуживание.\n\n(Если детей нет, платить не нужно.)",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":3000,\"monthly\":150,\"children\":true,\"loan\":[5000,250]}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -3000,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -150,
+        "payload": {
+          "mandatory": true
+        }
+      },
+      {
+        "effectType": "liability.create",
+        "amountCents": 5000,
+        "payload": {
+          "mandatory": true,
+          "type": "car_loan",
+          "name": "Старшему ребенку нужна собственная машина",
+          "paymentCents": 250
+        }
+      }
+    ],
+    "conditions": [
+      {
+        "condType": "has_children",
+        "payload": {}
+      }
+    ]
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_22",
+    "title": "Налоговая проверка",
+    "bodyText": "Заплатите $15 000 за аудит.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":15000,\"monthly\":0}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cash.adjust",
+        "amountCents": -15000,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_23",
+    "title": "Наймите домработницу",
+    "bodyText": "У вас нет времени на ведение домашнего хозяйства.\n\nВнесите в статью «Прочие расходы» $200 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":200}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -200,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  },
+  {
+    "cardType": "DOODAD",
+    "slug": "set_202_doodad_24",
+    "title": "Пора обзавестись достойным автомобилем",
+    "bodyText": "Возьмите в аренду новейшую модель кроссовера.\n\nВнесите в статью «Прочие расходы» $500 в месяц.",
+    "category": "expense",
+    "subcategory": null,
+    "isActive": true,
+    "meta": [
+      {
+        "metaKey": "game_type",
+        "metaValue": "202"
+      },
+      {
+        "metaKey": "game202_rule",
+        "metaValue": "{\"kind\":\"expense\",\"cash\":0,\"monthly\":500}"
+      }
+    ],
+    "effects": [
+      {
+        "effectType": "cashflow.adjust",
+        "amountCents": -500,
+        "payload": {
+          "mandatory": true
+        }
+      }
+    ],
+    "conditions": []
+  }
+]

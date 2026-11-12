@@ -10,7 +10,7 @@ import { compactTurnMovement, importantActionEventIds, mergeActionEvents, player
 import { PlayerAvatar } from "./player-avatar";
 import "./game-action-history.css";
 
-export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, fastTrackOnly = false, gameStatus, loadEarlier, renderAction, header }: {
+export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, currentActionEventId, currentActionPlayerId, prepareEvents, chronologicalActions = false, fastTrackOnly = false, gameStatus, loadEarlier, hasEarlierEvents, renderAction, header }: {
   gameId: string;
   events: GameEvent[];
   players: GamePlayer[];
@@ -19,22 +19,28 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   currentTurnPlayerId?: string | null;
   currentTurnKey?: string;
   currentAction?: ReactNode;
+  /** The current decision already shows this opening, inside this feed or in an adjacent panel. */
+  currentActionEventId?: string;
+  currentActionPlayerId?: string | null;
+  prepareEvents?: (events: GameEvent[]) => GameEvent[];
+  chronologicalActions?: boolean;
   fastTrackOnly?: boolean;
   gameStatus?: string;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
+  hasEarlierEvents?: boolean;
   renderAction?: (event: GameEvent, allEvents: GameEvent[], pairedRoll?: GameEvent) => ReactNode;
   header?: ReactNode;
 }) {
   const [history, setHistory] = useState(events);
   const [visibleCount, setVisibleCount] = useState(10);
-  const [archiveLoaded, setArchiveLoaded] = useState(events.length < 80);
+  const [archiveLoaded, setArchiveLoaded] = useState(hasEarlierEvents === undefined ? events.length < 80 : !hasEarlierEvents);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importantOnly, setImportantOnly] = useState(false);
   useEffect(() => {
     setHistory(events);
     setVisibleCount(10);
-    setArchiveLoaded(events.length < 80);
+    setArchiveLoaded(hasEarlierEvents === undefined ? events.length < 80 : !hasEarlierEvents);
     setError(null);
   }, [gameId]);
   useEffect(() => { setHistory((current) => mergeActionEvents(current, events)); }, [events]);
@@ -42,12 +48,16 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   const importantIds = importantOnly && viewerPlayerId
     ? importantActionEventIds(history, players, viewerPlayerId, gameStatus)
     : undefined;
-  const turns = playerActionTurns(history, players, onlyPlayerId ?? (importantOnly ? viewerPlayerId : null), fastTrackOnly, currentTurnPlayerId, importantIds);
+  const withoutCurrentCard = currentActionEventId
+    ? history.filter(event => event.id !== currentActionEventId)
+    : history;
+  const visibleHistory = prepareEvents ? prepareEvents(withoutCurrentCard) : withoutCurrentCard;
+  const turns = playerActionTurns(visibleHistory, players, onlyPlayerId ?? (importantOnly ? viewerPlayerId : null), fastTrackOnly, currentTurnPlayerId, importantIds);
   const currentPlayer = players.find((player) => player.id === currentTurnPlayerId);
   let decisionTurnId: string | null = null;
   if (currentAction && currentPlayer) {
     const latest = turns[0];
-    if (latest && !latest.complete && latest.player.id === currentPlayer.id) {
+    if (latest && !latest.complete && latest.player.id === currentPlayer.id && (!latest.turnKey || latest.turnKey === currentTurnKey)) {
       decisionTurnId = latest.id;
     } else {
       decisionTurnId = `current-${gameId}-${currentTurnKey ?? currentPlayer.id}`;
@@ -88,19 +98,40 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
       </button>
     </div> : null}
     <ol className="game-turn-list m-0 list-none p-0" aria-live="polite" aria-busy={loading}>
-      {actions.slice(0, visibleCount).map((turn) => <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 border-t-2 border-line pt-4 pb-5 [overflow-wrap:anywhere] first:border-t-0 first:pt-0">
-        <TurnPlayer player={turn.player} turnHeading />
-        <ol className="game-turn-timeline m-0 list-none p-0">
-          {turn.id === decisionTurnId ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение">{currentAction}</li> : null}
-          {compactTurnMovement(turn.events).map(({ event, roll }) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
-            {actionBody(event, roll)}
-          </li>)}
-          {turn.otherActions.flatMap((group) => compactTurnMovement(group.events).map(({ event, roll }, index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player?.id}>
-            {index === 0 && group.player ? <TurnPlayer player={group.player} /> : null}
-            {actionBody(event, roll)}
-          </li>))}
-        </ol>
-      </li>)}
+      {actions.slice(0, visibleCount).map((turn) => {
+        const chronological = chronologicalActions || Boolean(turn.timeline);
+        const hasDecision = turn.id === decisionTurnId;
+        const decisionActor = players.find(player => player.id === currentActionPlayerId) ?? turn.player;
+        const ownerDecision = hasDecision && (!chronological || decisionActor.id === turn.player.id);
+        const otherActions = [...turn.otherActions];
+        if (chronological && hasDecision && decisionActor.id !== turn.player.id && !otherActions.some(group => group.player.id === decisionActor.id)) {
+          otherActions.push({player:decisionActor,events:[]});
+        }
+        return <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 border-t-2 border-line pt-4 pb-5 [overflow-wrap:anywhere] first:border-t-0 first:pt-0">
+          <TurnPlayer player={turn.player} turnHeading />
+          <ol className="game-turn-timeline m-0 list-none p-0">
+            {ownerDecision && !chronological ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение">{currentAction}</li> : null}
+            {compactTurnMovement(turn.events).map(({event,roll}) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
+              {actionBody(event,roll)}
+            </li>)}
+            {ownerDecision && chronological ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение" data-action-player-id={turn.player.id}>{currentAction}</li> : null}
+            {otherActions.flatMap((group, groupIndex) => {
+              const entries = compactTurnMovement(group.events);
+              const decisionHere = chronological && hasDecision && group.player.id === decisionActor.id;
+              return [
+                ...entries.map(({event,roll},index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player.id}>
+                  {index === 0 ? <TurnPlayer player={group.player}/> : null}
+                  {actionBody(event,roll)}
+                </li>),
+                ...(decisionHere ? [<li key={`decision-${group.player.id}-${groupIndex}`} className="game-turn-event game-turn-other-action game-turn-decision" aria-label="Текущее решение" data-action-player-id={group.player.id}>
+                  {!entries.length ? <TurnPlayer player={group.player}/> : null}
+                  {currentAction}
+                </li>] : [])
+              ];
+            })}
+          </ol>
+        </li>;
+      })}
     </ol>
     {!actions.length ? <p className="py-3 text-sm text-muted">Действий пока нет.</p> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}. Попробуйте ещё раз.</p> : null}

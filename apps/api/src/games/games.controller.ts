@@ -1,3 +1,4 @@
+import { Game202CommandDto } from "./dto/game-202.dto";
 import { ChooseDreamDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CardType } from "@prisma/client";
@@ -19,7 +20,7 @@ import {
 import { ChatDto } from "./dto/chat.dto";
 import { ChooseFigurineDto } from "./dto/choose-figurine.dto";
 import { CreateGameDto } from "./dto/create-game.dto";
-import { UpdateLobbyDto } from "./dto/update-lobby.dto";
+import { PlayableCardSetsQueryDto, UpdateLobbyDto } from "./dto/update-lobby.dto";
 import { CreateSoloGameDto } from "./dto/create-solo-game.dto";
 import { UpdateGameScheduleDto } from "./dto/update-game-schedule.dto";
 import { DrawCardDto } from "./dto/draw-card.dto";
@@ -71,8 +72,15 @@ export class GamesController {
   }
 
   @Get("card-sets")
-  listPlayableCardSets() {
-    return this.games.listPlayableCardSets();
+  listPlayableCardSets(@Query() query: PlayableCardSetsQueryDto) {
+    return this.games.listPlayableCardSets(query.gameType);
+  }
+
+  @Post(":id/202/command")
+  async command202(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: Game202CommandDto) {
+    const result = await this.games.act202(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
   }
 
   @Post("join")

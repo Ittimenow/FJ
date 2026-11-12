@@ -5,7 +5,8 @@ import {
   Injectable,
   NotFoundException
 } from "@nestjs/common";
-import { AccountStatus, CardType, Prisma, SystemRole } from "@prisma/client";
+import { AccountStatus, CardType, GameType, Prisma, SystemRole } from "@prisma/client";
+import { rules202 } from "@cashflow/shared";
 import * as bcrypt from "bcryptjs";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
@@ -25,6 +26,11 @@ const requiredCardTypeLabels: Partial<Record<CardType, string>> = {
   DOODAD: "всякая всячина",
   MARKET: "рынок"
 };
+
+function publicCardSet<T extends { gameType: GameType }>(set: T) {
+  const { gameType, ...fields } = set;
+  return { ...fields, gameType: gameType === GameType.ADVANCED_202 ? "202" as const : "101" as const };
+}
 
 @Injectable()
 export class AdminService {
@@ -85,6 +91,7 @@ export class AdminService {
       sets.map((set) => ({
         id: set.id,
         name: set.name,
+        gameType: set.gameType === GameType.ADVANCED_202 ? "202" : "101",
         isDefault: set.isDefault,
         createdAt: set.createdAt,
         updatedAt: set.updatedAt,
@@ -107,16 +114,17 @@ export class AdminService {
 
     try {
       return toSerializable(
-        await this.prisma.cardSet.create({
-          data: { name },
+        publicCardSet(await this.prisma.cardSet.create({
+          data: { name, gameType: dto.gameType === "202" ? GameType.ADVANCED_202 : GameType.CLASSIC_101 },
           select: {
             id: true,
             name: true,
+            gameType: true,
             isDefault: true,
             createdAt: true,
             updatedAt: true
           }
-        })
+        }))
       );
     } catch (error) {
       this.handleCardSetWriteError(error);
@@ -128,17 +136,18 @@ export class AdminService {
 
     try {
       return toSerializable(
-        await this.prisma.cardSet.update({
+        publicCardSet(await this.prisma.cardSet.update({
           where: { id: cardSetId },
           data: { name },
           select: {
             id: true,
             name: true,
+            gameType: true,
             isDefault: true,
             createdAt: true,
             updatedAt: true
           }
-        })
+        }))
       );
     } catch (error) {
       this.handleCardSetWriteError(error);
@@ -151,6 +160,7 @@ export class AdminService {
       select: {
         id: true,
         name: true,
+        gameType: true,
         isDefault: true,
         createdAt: true,
         updatedAt: true
@@ -176,13 +186,19 @@ export class AdminService {
           .join(", ")}`
       );
     }
-    if (cardSet.isDefault) return toSerializable(cardSet);
+    if (cardSet.gameType === GameType.ADVANCED_202) {
+      const cards = await this.prisma.card.findMany({ where: { cardSetId, isActive: true }, select: { slug: true } });
+      if (cards.length !== 138 || cards.some((card) => !rules202[card.slug])) {
+        throw new BadRequestException("Для основного набора 202 нужны все 138 поддерживаемых карточек");
+      }
+    }
+    if (cardSet.isDefault) return toSerializable(publicCardSet(cardSet));
 
     return toSerializable(
-      await this.prisma.$transaction(
+      publicCardSet(await this.prisma.$transaction(
         async (tx) => {
           await tx.cardSet.updateMany({
-            where: { isDefault: true, id: { not: cardSetId } },
+            where: { isDefault: true, gameType: cardSet.gameType, id: { not: cardSetId } },
             data: { isDefault: false }
           });
           return tx.cardSet.update({
@@ -191,6 +207,7 @@ export class AdminService {
             select: {
               id: true,
               name: true,
+              gameType: true,
               isDefault: true,
               createdAt: true,
               updatedAt: true
@@ -198,7 +215,7 @@ export class AdminService {
           });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-      )
+      ))
     );
   }
 
@@ -271,13 +288,14 @@ export class AdminService {
   async previewCardWorkbook(buffer: Buffer) {
     const workbook = readCardWorkbook(buffer);
     const [sets, existing] = await Promise.all([
-      this.prisma.cardSet.findMany({ select: { id: true, name: true } }),
+      this.prisma.cardSet.findMany({ select: { id: true, name: true, gameType: true } }),
       this.prisma.card.findMany({
         where: { cardSetId: { in: workbook.sets.map((set) => set.id) } },
         include: this.cardInclude
       })
     ]);
     const setIds = new Set(sets.map((set) => set.id));
+    const setTypes = new Map(sets.map((set) => [set.id, set.gameType]));
     for (const set of workbook.sets) {
       if (!setIds.has(set.id)) throw new BadRequestException(`Набор «${set.name}» не найден в базе`);
     }
@@ -295,6 +313,7 @@ export class AdminService {
     }> = [];
     for (const incoming of workbook.cards) {
       await this.validateWorkbookCard(incoming);
+      this.validateCardGameType(incoming, setTypes.get(incoming.cardSetId) ?? GameType.CLASSIC_101);
       const byIdentity = incoming.id === null ? undefined : byId.get(incoming.id);
       if (incoming.id !== null && !byIdentity) {
         throw new BadRequestException(`Карточка #${incoming.id} не найдена в указанном наборе`);
@@ -332,7 +351,7 @@ export class AdminService {
       throw new BadRequestException("Идентификатор или исходная версия карточки отсутствуют");
     }
     const dto = input.after ? await this.validateWorkbookCard(input.after) : null;
-    if (dto) await this.requireCardSet(dto.cardSetId);
+    if (dto) this.validateCardGameType(dto, (await this.requireCardSet(dto.cardSetId)).gameType);
     try {
       return toSerializable(await this.prisma.$transaction(async (tx) => {
         const currentRow = input.cardId === null ? null : await tx.card.findUnique({ where: { id: input.cardId }, include: this.cardInclude });
@@ -371,7 +390,7 @@ export class AdminService {
 
   async createCard(dto: AdminCardDto) {
     this.validateCardRelations(dto);
-    await this.requireCardSet(dto.cardSetId);
+    this.validateCardGameType(dto, (await this.requireCardSet(dto.cardSetId)).gameType);
 
     try {
       const card = await this.prisma.$transaction(async (tx) =>
@@ -400,12 +419,16 @@ export class AdminService {
       throw new BadRequestException("Invalid card id");
     }
     this.validateCardRelations(dto);
-    await this.requireCardSet(dto.cardSetId);
+    const targetSet = await this.requireCardSet(dto.cardSetId);
+    this.validateCardGameType(dto, targetSet.gameType);
 
     try {
       const card = await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.card.findUnique({ where: { id: cardId } });
+        const existing = await tx.card.findUnique({ where: { id: cardId }, include: { cardSet: { select: { gameType: true } } } });
         if (!existing) throw new NotFoundException("Card not found");
+        if (existing.cardSet.gameType !== targetSet.gameType) {
+          throw new BadRequestException("Карточку нельзя перенести в набор другого режима игры");
+        }
 
         await tx.cardMeta.deleteMany({ where: { cardId } });
         await tx.cardEffect.deleteMany({ where: { cardId } });
@@ -693,7 +716,7 @@ export class AdminService {
       return cardSetId;
     }
     const defaultSet = await this.prisma.cardSet.findFirst({
-      where: { isDefault: true },
+      where: { isDefault: true, gameType: GameType.CLASSIC_101 },
       select: { id: true }
     });
     if (!defaultSet) throw new NotFoundException("Основной набор карточек не найден");
@@ -703,10 +726,19 @@ export class AdminService {
   private async requireCardSet(cardSetId: string) {
     const cardSet = await this.prisma.cardSet.findUnique({
       where: { id: cardSetId },
-      select: { id: true }
+      select: { id: true, gameType: true }
     });
     if (!cardSet) throw new NotFoundException("Набор карточек не найден");
     return cardSet;
+  }
+
+  private validateCardGameType(card: { meta?: Array<{ metaKey: string; metaValue: string }> }, gameType: GameType) {
+    const marker = card.meta?.find((item) => item.metaKey.trim() === "game_type")?.metaValue.trim();
+    const hasRule202 = card.meta?.some((item) => item.metaKey.trim() === "game202_rule");
+    const expected = gameType === GameType.ADVANCED_202 ? "202" : "101";
+    if ((marker !== undefined && marker !== expected) || (expected === "202" && marker !== "202") || (expected === "101" && hasRule202)) {
+      throw new BadRequestException(`Карточка не соответствует режиму ${expected} выбранного набора`);
+    }
   }
 
   private cardSetName(value: string) {

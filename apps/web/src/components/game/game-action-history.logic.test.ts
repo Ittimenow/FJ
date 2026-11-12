@@ -9,6 +9,58 @@ const { purchasedFastTrackCells, fastTrackCellEffect } = require('./fast-track-p
 const { fastTrackCells } = require('@cashflow/shared') as typeof import('@cashflow/shared');
 const players=[{id:'anna',userId:'u1'},{id:'boris',userId:'u2'}] as GamePlayer[];
 const event=(sequence:number,type:string,id='anna',payload={}):GameEvent=>({id:`e${sequence}`,sequence,type,payload,createdAt:'2026-09-20T10:00:00Z',gamePlayer:{id,seat:1,role:'PLAYER'}});
+
+test('202 turns retain the owner while grouping every other participant and simultaneous skips', () => {
+  const row = (sequence:number, id:string, key:string, owner:string, kind:string) => event(sequence,'game202:action',id,{turnKey:key,turnOwnerGamePlayerId:owner,kind,revision:7,track:'RAT_RACE'});
+  const events = [
+    row(1,'anna','anna:1','anna','turn_started'), row(2,'boris','anna:1','anna','command'),
+    row(3,'anna','anna:1','anna','command'), row(4,'anna','anna:1','anna','turn_ended'),
+    row(5,'boris','boris:1','boris','turn_started'), row(6,'boris','boris:1','boris','turn_skipped'), row(7,'boris','boris:1','boris','turn_ended'),
+    row(8,'anna','anna:2','anna','turn_started')
+  ];
+  const turns=playerActionTurns(events,players,null,false,'anna');
+  assert.deepEqual(turns.map(turn=>[turn.player.id,turn.turnKey,turn.complete]),[['anna','anna:2',false],['boris','boris:1',true],['anna','anna:1',true]]);
+  assert.deepEqual(turns[2]?.events.map(item=>item.sequence),[3]);
+  assert.deepEqual(turns[2]?.otherActions.flatMap(group=>group.events.map(item=>item.sequence)),[2]);
+  assert.deepEqual(turns[2]?.timeline?.map(item=>item.sequence),[2,3]);
+  assert.deepEqual(turns[1]?.events.map(item=>item.sequence),[6]);
+});
+
+test('202 replay pages merge by explicit turn identity even when the turn start is not loaded', () => {
+  const row=(sequence:number,id:string)=>event(sequence,'game202:action',id,{turnKey:'anna:4',turnOwnerGamePlayerId:'anna',kind:'command',revision:sequence});
+  const recent=[row(91,'boris'),row(92,'anna')];
+  const earlier=[event(81,'game202:action','anna',{turnKey:'anna:4',turnOwnerGamePlayerId:'anna',kind:'turn_started'}),row(82,'anna')];
+  const before=playerActionTurns(recent,players,null,false,'boris');
+  const after=playerActionTurns(mergeActionEvents(recent,earlier),players,null,false,'boris');
+  assert.equal(before[0]?.id,after[0]?.id);
+  assert.equal(after[0]?.player.id,'anna');
+  assert.deepEqual(after[0]?.events.map(item=>item.sequence),[82,92]);
+  assert.deepEqual(after[0]?.otherActions[0]?.events.map(item=>item.sequence),[91]);
+});
+
+test('202 owner actions are oldest first and each other participant gets one ordered group below', () => {
+  const people=[...players,{id:'vera',userId:'u3'}] as GamePlayer[];
+  const row=(sequence:number,id:string)=>event(sequence,'game202:action',id,{turnKey:'anna:4',turnOwnerGamePlayerId:'anna',kind:'command',revision:sequence});
+  const input=[row(7,'anna'),row(6,'boris'),row(5,'vera'),row(4,'anna'),row(3,'boris'),row(2,'anna'),row(1,'anna')];
+  const turn=playerActionTurns(input,people)[0]!;
+  assert.deepEqual(turn.events.map(item=>item.sequence),[1,2,4,7]);
+  assert.deepEqual(turn.otherActions.map(group=>[group.player.id,group.events.map(item=>item.sequence)]),[['boris',[3,6]],['vera',[5]]]);
+  assert.deepEqual(input.map(item=>item.sequence),[7,6,5,4,3,2,1]);
+});
+
+test('202 old text and preparation never masquerade as reconstructed turns', () => {
+  const events=[
+    event(1,'game202:action','anna',{text:'Кубики: 6',revision:1}),
+    event(2,'game202:action','boris',{text:'Пропущен ход',revision:1}),
+    event(3,'game202:action','anna',{text:'Получен стартовый портфель',kind:'setup'}),
+    event(4,'game202:action','boris',{turnKey:'anna:2',turnOwnerGamePlayerId:'anna',kind:'command'}),
+    event(5,'player:escaped_rat_race','anna',{gameType:'202'})
+  ];
+  const turns=playerActionTurns(events,players,null,false,'boris');
+  assert.equal(turns.length,1);
+  assert.equal(turns[0]?.player.id,'anna');
+  assert.deepEqual(playerActionEvents(events,players).map(item=>item.sequence),[5,4]);
+});
 test('a roll and the resulting move occupy one history entry without losing other events',()=>{
   const events=[event(5,'deal:buy'),event(4,'player:move'),event(3,'player:roll_dice'),event(2,'loan:take')];
   const compact=compactTurnMovement(events);

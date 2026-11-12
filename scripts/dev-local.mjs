@@ -321,6 +321,20 @@ try {
     { env: localEnv }
   );
 
+  log("Preparing game 202 schema.");
+  await run(
+    npmCommand,
+    ["run", "prisma:prepare-game-202", "--workspace=@cashflow/database"],
+    { env: localEnv }
+  );
+
+  log("Preparing card set game types.");
+  await run(
+    npmCommand,
+    ["run", "prisma:prepare-card-set-game-types", "--workspace=@cashflow/database"],
+    { env: localEnv }
+  );
+
   log("Syncing database schema.");
   await run(npmCommand, ["run", "db:push"], { env: localEnv });
 

@@ -29,7 +29,9 @@
     "prisma:prepare-full-game": "prisma db execute --file prisma/deploy/20260919_add_full_game.sql --schema prisma/schema.prisma",
     "prisma:prepare-open-game-notifications": "prisma db execute --file prisma/deploy/20261016_add_open_game_notifications.sql --schema prisma/schema.prisma",
     "prisma:prepare-bot-names": "prisma db execute --file prisma/deploy/20261022_add_bot_names.sql --schema prisma/schema.prisma",
-    "prisma:seed-bot-names": "tsx prisma/seed-bot-names.ts"
+    "prisma:seed-bot-names": "tsx prisma/seed-bot-names.ts",
+    "prisma:prepare-game-202": "prisma db execute --file prisma/deploy/20261111_add_game_202.sql --schema prisma/schema.prisma",
+    "prisma:prepare-card-set-game-types": "prisma db execute --file prisma/deploy/20261111_add_card_set_game_type.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@photostructure/tz-lookup": "11.7.0",

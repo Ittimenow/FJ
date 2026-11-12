@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Gavel, Hourglass, X } from "lucide-react";
-import React, { useId } from "react";
+import React, { useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { money } from "@/lib/format";
@@ -65,7 +65,6 @@ export function DealAuctionDialog({
   onSelect: (buyerGamePlayerId: string) => void;
   onCancel: () => void;
 }) {
-  const titleId = useId();
   const bidId = useId();
   if (!open || !card) return null;
 
@@ -74,24 +73,8 @@ export function DealAuctionDialog({
   const offeredRows = rows.filter((row) => row.status === "offered");
 
   return (
-    <section aria-labelledby={titleId} className="min-w-0 rounded-xl bg-card p-3 sm:p-4">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 shrink-0 text-journey">
-            <Gavel size={21} aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-xl font-extrabold tracking-[-0.025em] text-ink">
-              {role === "seller" ? "Аукцион возможности" : "Вам предлагают возможность"}
-            </h2>
-            <p className="mt-1 text-sm leading-5 text-[#536789]">
-              {role === "seller"
-                ? "Дождитесь решений игроков, затем выберите подходящее предложение."
-                : "Назовите цену за право купить актив или откажитесь. Ответ изменить нельзя."}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-4">
+    <OfferPanel title={role === "seller" ? "Аукцион возможности" : "Вам предлагают возможность"}
+      description={role === "seller" ? "Дождитесь решений игроков, затем выберите подходящее предложение." : "Назовите цену за право купить актив или откажитесь. Ответ изменить нельзя."}>
           <section className="border-t border-line pt-4">
             <h3 className="break-words text-base font-extrabold text-ink">{card.title}</h3>
             {card.bodyText ? (
@@ -172,33 +155,14 @@ export function DealAuctionDialog({
               </div>
               <div className="mt-3 space-y-2">
                 {rows.map((row) => (
-                  <div key={row.id} className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-[0_7px_18px_rgba(27,57,118,.07)]">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-extrabold text-ink">{row.name}</div>
-                      <div className="mt-0.5 text-xs font-semibold text-muted">
-                        {row.status === "waiting"
-                          ? "Ещё не ответил"
-                          : !resolved
-                            ? "Ответ получен"
-                            : row.status === "declined"
-                              ? "Отказался"
-                              : `Предложил ${money(row.amountCents ?? 0)}`}
-                      </div>
-                    </div>
-                    {row.status === "waiting" ? (
+                  <OfferResponse key={row.id} title={row.name}
+                    description={row.status === "waiting" ? "Ещё не ответил" : !resolved ? "Ответ получен" : row.status === "declined" ? "Отказался" : `Предложил ${money(row.amountCents ?? 0)}`}
+                    actions={row.status === "waiting" ? (
                       <Hourglass className="shrink-0 text-muted" size={18} aria-hidden="true" />
                     ) : resolved && row.status === "offered" ? (
-                      <Button
-                        onClick={() => onSelect(row.id)}
-                        disabled={submitting}
-                        className="h-10 shrink-0"
-                      >
-                        Выбрать
-                      </Button>
-                    ) : (
-                      <Check className="shrink-0 text-[#6f8e2f]" size={19} aria-hidden="true" />
-                    )}
-                  </div>
+                      <Button onClick={() => onSelect(row.id)} disabled={submitting} className="h-10 shrink-0">Выбрать</Button>
+                    ) : <Check className="shrink-0 text-[#6f8e2f]" size={19} aria-hidden="true" />}
+                  />
                 ))}
               </div>
               {resolved ? (
@@ -223,7 +187,25 @@ export function DealAuctionDialog({
               )}
             </div>
           )}
-        </div>
-    </section>
+    </OfferPanel>
   );
+}
+
+/** Shared offer surface, with the existing 101 auction heading and spacing. */
+export function OfferPanel({title,description,children}:{title:string;description?:ReactNode;children?:ReactNode}) {
+  const titleId=useId();
+  return <section aria-labelledby={titleId} className="min-w-0 rounded-xl bg-card p-3 sm:p-4">
+    <div className="flex min-w-0 items-start gap-2.5">
+      <span className="mt-0.5 shrink-0 text-journey"><Gavel size={21} aria-hidden="true"/></span>
+      <div className="min-w-0"><h2 id={titleId} className="text-xl font-extrabold tracking-[-0.025em] text-ink">{title}</h2>{description?<p className="mt-1 text-sm leading-5 text-[#536789]">{description}</p>:null}</div>
+    </div>
+    <div className="mt-4 space-y-4">{children}</div>
+  </section>;
+}
+
+export function OfferResponse({title,description,actions,children}:{title:ReactNode;description?:ReactNode;actions?:ReactNode;children?:ReactNode}) {
+  return <div className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 shadow-[0_7px_18px_rgba(27,57,118,.07)]">
+    <div className="min-w-0"><div className="truncate text-sm font-extrabold text-ink">{title}</div>{description?<div className="mt-0.5 text-xs font-semibold text-muted">{description}</div>:null}{children}</div>
+    {actions}
+  </div>;
 }

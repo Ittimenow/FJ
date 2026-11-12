@@ -10,10 +10,10 @@ import { money } from "@/lib/format";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer, GameSnapshot } from "@/lib/types";
 
-export function DreamPicker({ player, saving, onChoose }: { player: GamePlayer; saving: boolean; onChoose: (index: number) => void }) {
-  return <section className="rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5" aria-labelledby="dream-picker-title">
+export function DreamPicker({ player, saving, onChoose, gameType = "101", embedded = false }: { embedded?: boolean; gameType?: "101" | "202"; player: GamePlayer; saving: boolean; onChoose: (index: number) => void }) {
+  return <section className={embedded ? "text-ink" : "rounded-2xl bg-white p-4 text-ink shadow-panel sm:p-5"} aria-labelledby="dream-picker-title">
     <h2 id="dream-picker-title" className="flex items-center gap-2 text-xl font-extrabold"><Target size={22} aria-hidden="true" /> Выберите мечту</h2>
-    <p className="mt-2 text-sm leading-6">Покупка выбранной мечты принесёт победу. До начала партии выбор можно изменить.</p>
+    <p className="mt-2 text-sm leading-6">{gameType === "202" ? "Для победы увеличьте доход на 50 000 и исполните свою мечту либо две другие. " : "Покупка выбранной мечты принесёт победу. "}До начала партии выбор можно изменить.</p>
     <div className="dream-picker-cards mt-4 grid auto-rows-max max-h-[min(70vh,760px)] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3" role="group" aria-label="Карточки мечт" aria-busy={saving}>
       {fastTrackDreams.map((cell) => {
         const selected = player.dreamCellIndex === cell.index;

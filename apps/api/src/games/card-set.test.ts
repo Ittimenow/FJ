@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CardType } from "@prisma/client";
+import { CardType, GameType } from "@prisma/client";
 import { GamesService } from "./games.service";
 import { missingCardTypes, requiredCardTypes } from "./card-set";
 
@@ -24,16 +24,18 @@ test("inactive or absent card types keep a card set from being playable", () => 
   assert.deepEqual(missing, [CardType.BIG_DEAL]);
 });
 
-test("новая партия без выбора набора использует «Оригинал»", async () => {
+test("новая партия выбирает основной набор своего режима независимо от названия", async () => {
   const service = new GamesService({
     cardSet: {
-      findFirst: async (query: { where: { name: { equals: string } } }) => {
-        assert.equal(query.where.name.equals, "Оригинал");
-        return { id: "original-id", name: "Оригинал" };
-      }
+      findMany: async (query: { where: { gameType: GameType }; orderBy: unknown[] }) => {
+        assert.equal(query.where.gameType, GameType.CLASSIC_101);
+        assert.deepEqual(query.orderBy[0], { isDefault: "desc" });
+        return [{ id: "original-id", name: "Переименованный набор", gameType: GameType.CLASSIC_101, cards: [] }];
+      },
+      findUnique: async () => ({ id: "original-id", name: "Переименованный набор", gameType: GameType.CLASSIC_101 })
     },
     card: {
-      groupBy: async () => requiredCardTypes.map((cardType) => ({ cardType, _count: { _all: 1 } }))
+      groupBy: async () => requiredCardTypes.map((cardType) => ({ cardSetId: "original-id", cardType, _count: { _all: 1 } }))
     }
   } as never);
 

@@ -579,12 +579,13 @@ async function seedCards(
   db: PrismaClient | Prisma.TransactionClient = prisma
 ) {
   const replaceAll = options.replaceAll ?? true;
-  const hasDefaultCardSet = await db.cardSet.count({ where: { isDefault: true } });
+  const hasDefaultCardSet = await db.cardSet.count({ where: { isDefault: true, gameType: "CLASSIC_101" } });
   const defaultCardSet = await db.cardSet.upsert({
     where: { id: defaultCardSetId },
     create: {
       id: defaultCardSetId,
       name: "Основной",
+      gameType: "CLASSIC_101",
       isDefault: hasDefaultCardSet === 0
     },
     update: {}

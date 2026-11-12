@@ -1,17 +1,18 @@
 "use client";
 
-import { canEscapeRatRace, fastTrackCells, outstandingBankLoanBalanceCents } from "@cashflow/shared";
+import { fastTrackCells, outstandingBankLoanBalanceCents } from "@cashflow/shared";
 import { Orbit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { money } from "@/lib/format";
+import { classicFinancialPresentation, freedomProgress, type FinancialPresentation } from "./financial-presentation";
 import { gamePlayerName } from "@/lib/game-player";
 import type { GamePlayer } from "@/lib/types";
 import { GamePlayerMark } from "./game-player-mark";
 
-export function OtherPlayersList({ players, currentPlayerId, className = "" }: {
+export function OtherPlayersList({ players, currentPlayerId, className = "", presentation = classicFinancialPresentation }: {
   players: GamePlayer[];
   currentPlayerId: string | null;
   className?: string;
+  presentation?: FinancialPresentation;
 }) {
   const others = players.filter((player) => player.role === "PLAYER");
   return <section className={className} aria-label="Остальные игроки">
@@ -37,11 +38,11 @@ export function OtherPlayersList({ players, currentPlayerId, className = "" }: {
               {player.seat ? <span>Место {player.seat}</span> : null}
               <span>{fastTrack ? "Большой круг" : "Малый круг"}</span>
               {state ? <>
-                <span>Наличные {money(state.cashCents)}</span>
-                <span>{fastTrack ? `Денежный поток ${money(state.fastTrackIncomeCents ?? 0)}` : `Поток ${money(state.monthlyCashflowCents)}/мес`}</span>
+                <span>Наличные {presentation.money(state.cashCents)}</span>
+                <span>{fastTrack ? `Денежный поток ${presentation.money(state.fastTrackIncomeCents ?? 0)}` : `Поток ${presentation.money(state.monthlyCashflowCents)}/мес`}</span>
               </> : null}
             </div>
-            {state ? fastTrack ? <FastTrackResult player={player} /> : <PlayerFreedomMini player={player} /> : null}
+            {state ? fastTrack ? <FastTrackResult player={player} presentation={presentation} /> : <PlayerFreedomMini player={player} presentation={presentation} /> : null}
           </li>;
         })}
       </ul>
@@ -49,32 +50,30 @@ export function OtherPlayersList({ players, currentPlayerId, className = "" }: {
   </section>;
 }
 
-export function FastTrackResult({ player, showDream = true }: { player: GamePlayer; showDream?: boolean }) {
+export function FastTrackResult({ player, showDream = true, presentation = classicFinancialPresentation }: { player: GamePlayer; showDream?: boolean; presentation?: FinancialPresentation }) {
   const state = player.financialState!;
   const increase = (state.fastTrackIncomeCents ?? 0) - (state.fastTrackStartIncomeCents ?? 0);
-  const percentage = Math.round(Math.min(100, Math.max(0, increase / 50_000 * 100)));
+  const percentage = Math.round(Math.min(100, Math.max(0, increase / presentation.fastIncomeTarget * 100)));
   const dream = fastTrackCells[player.dreamCellIndex ?? -1];
   return <div className="mt-3">
     <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
-      <span>Доход к победе</span><strong className={increase >= 50_000 ? "text-success" : "text-neutral-700"}>{percentage}%</strong>
+      <span>Доход к победе</span><strong className={increase >= presentation.fastIncomeTarget ? "text-success" : "text-neutral-700"}>{percentage}%</strong>
     </div>
-    <PlayerProgress value={increase} max={50_000} label={`Прирост дохода ${money(increase)} из ${money(50_000)}`} complete={increase >= 50_000} />
-    <p className="mt-1.5 text-xs text-neutral-600">Прирост {increase >= 0 ? "+" : "−"}{money(Math.abs(increase))}</p>
+    <PlayerProgress value={increase} max={presentation.fastIncomeTarget} label={`Прирост дохода ${presentation.money(increase)} из ${presentation.money(presentation.fastIncomeTarget)}`} complete={increase >= presentation.fastIncomeTarget} />
+    <p className="mt-1.5 text-xs text-neutral-600">Прирост {increase >= 0 ? "+" : "−"}{presentation.money(Math.abs(increase))}</p>
     {showDream ? <p className="mt-1 break-words text-xs text-neutral-600">Мечта: <strong>{dream?.label ?? "Не выбрана"}</strong></p> : null}
   </div>;
 }
 
-function PlayerFreedomMini({ player }: { player: GamePlayer }) {
+function PlayerFreedomMini({ player, presentation }: { player: GamePlayer; presentation: FinancialPresentation }) {
   const { passiveIncomeCents, totalExpensesCents } = player.financialState!;
   const bankLoanBalanceCents = outstandingBankLoanBalanceCents(player.liabilities);
-  const target = Math.max(1, totalExpensesCents + 1);
-  const incomeReached = passiveIncomeCents > totalExpensesCents;
-  const reached = canEscapeRatRace(passiveIncomeCents, totalExpensesCents, bankLoanBalanceCents > 0);
+  const {target, incomeReached, reached} = freedomProgress(presentation, passiveIncomeCents, totalExpensesCents, bankLoanBalanceCents, player.financialState!.cashCents);
   const percentage = incomeReached ? 100 : Math.round(Math.min(100, Math.max(0, passiveIncomeCents / target * 100)));
   const label = reached
     ? "Условия выхода с малого круга выполнены"
     : bankLoanBalanceCents > 0 && incomeReached
-      ? `Пассивный доход выше расходов, осталось погасить банковские кредиты на ${money(bankLoanBalanceCents)}`
+      ? `${presentation.incomeReachedLabel}, осталось погасить банковские кредиты на ${presentation.money(bankLoanBalanceCents)}`
       : `Прогресс игрока к выходу с малого круга ${percentage}%`;
   return <div className="mt-3">
     <div className="flex items-center justify-between gap-2 text-xs text-neutral-600">
@@ -82,7 +81,8 @@ function PlayerFreedomMini({ player }: { player: GamePlayer }) {
       <strong className={reached ? "text-success" : "text-neutral-700"}>{reached ? "Готово" : incomeReached && bankLoanBalanceCents > 0 ? "Остался кредит" : `${percentage}%`}</strong>
     </div>
     <PlayerProgress value={incomeReached ? target : passiveIncomeCents} max={target} label={label} complete={reached} />
-    {bankLoanBalanceCents > 0 ? <div className="mt-1.5 text-xs text-neutral-600">Кредиты к погашению: <strong>{money(bankLoanBalanceCents)}</strong></div> : null}
+    {presentation.gameType === "202" && player.financialState!.cashCents < 0 ? <p className="mt-1.5 text-xs text-neutral-600">Покройте обязательные расходы: <strong>{presentation.money(-player.financialState!.cashCents)}</strong></p> : null}
+    {bankLoanBalanceCents > 0 ? <div className="mt-1.5 text-xs text-neutral-600">Кредиты к погашению: <strong>{presentation.money(bankLoanBalanceCents)}</strong></div> : null}
   </div>;
 }
 

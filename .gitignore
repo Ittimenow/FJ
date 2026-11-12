@@ -21,3 +21,6 @@ packages/database/prisma/migrations/dev.db
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Isolated local UI verification
+.next-dev-202-check

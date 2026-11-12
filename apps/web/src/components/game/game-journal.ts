@@ -4,7 +4,18 @@ export type PlayerTurn = {
   id: string;
   events: GameEvent[];
   complete: boolean;
+  ownerGamePlayerId?: string;
+  turnKey?: string;
 };
+
+/** Only explicit persisted metadata establishes a 202 turn; a revision is an action, not a turn. */
+export function game202TurnContext(event: GameEvent) {
+  const { turnKey, turnOwnerGamePlayerId } = event.payload;
+  return event.type === "game202:action" && typeof turnKey === "string" && turnKey.length > 0
+    && typeof turnOwnerGamePlayerId === "string" && turnOwnerGamePlayerId.length > 0
+    ? { turnKey, ownerGamePlayerId: turnOwnerGamePlayerId }
+    : null;
+}
 
 export type TurnEventPlayerGroup = {
   key: string;
@@ -38,6 +49,7 @@ const nonGameplayPlayerEventTypes = new Set([
 
 export function gameTurns(events: GameEvent[]): PlayerTurn[] {
   const turns: PlayerTurn[] = [];
+  const turns202 = new Map<string, PlayerTurn>();
   let activeTurn: GameEvent[] | null = null;
 
   const finish = (complete = false) => {
@@ -51,6 +63,22 @@ export function gameTurns(events: GameEvent[]): PlayerTurn[] {
   };
 
   for (const event of [...events].sort((left, right) => left.sequence - right.sequence)) {
+    if (event.type === "game202:action") {
+      const context = game202TurnContext(event);
+      // Old 202 events have no reliable boundaries and are shown as a separate archive.
+      if (!context) continue;
+      let turn = turns202.get(context.turnKey);
+      if (!turn) {
+        turn = { id: `turn-202-${context.turnKey}`, events: [], complete: false, ...context };
+        turns202.set(context.turnKey, turn);
+      }
+      turn.events.push(event);
+      if (event.payload.kind === "turn_ended") turn.complete = true;
+      continue;
+    }
+    // 202 compatibility projections (for example entering the fast track) are
+    // already represented by their canonical log and must not start a 101 turn.
+    if (event.payload.gameType === "202") continue;
     if (turnStartEventTypes.has(event.type)) {
       const activeHasStart = activeTurn?.some((item) => turnStartEventTypes.has(item.type));
       if (activeTurn && !activeHasStart) {
@@ -80,11 +108,12 @@ export function gameTurns(events: GameEvent[]): PlayerTurn[] {
   }
 
   finish(false);
-  return turns;
+  return [...turns, ...turns202.values()].sort((left, right) => (left.events[0]?.sequence ?? 0) - (right.events[0]?.sequence ?? 0));
 }
 
 export function playerIdForTurn(turn: PlayerTurn) {
   return (
+    turn.ownerGamePlayerId ??
     turn.events.find((event) => turnStartEventTypes.has(event.type))?.gamePlayer?.id ??
     turn.events.find((event) => event.gamePlayer?.id)?.gamePlayer?.id ??
     null
@@ -169,6 +198,7 @@ export function turnHeadline(turn: PlayerTurn) {
 export function eventHeadline(event: GameEvent) {
   const payload = event.payload;
   switch (event.type) {
+    case "game202:action": return typeof payload.text === "string" ? payload.text : "Действие игрока";
     case "player:dream_chosen": return `Выбрана мечта «${payload.title ?? ""}»`;
     case "fast_track:cashflow": return `Денежный поток: +${formatWholeMoney(payload.amountCents)}`;
     case "fast_track:expense": return `${payload.title}: −${formatWholeMoney(payload.amountCents)}`;

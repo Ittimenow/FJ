@@ -29,7 +29,7 @@ test("full game against isolated PostgreSQL", { skip: !url }, async (t) => {
   const gameIds: string[] = [];
   let snapshot: any;
   const solo = async (testing = true) => {
-    const result: any = await service.createSoloGame(admin!.id, { botCount: 1, cardSetId: cardSet.id, ...(testing ? { testing: true, testCashCents: 500_000, testIncomeCents: 100_000 } : {}) });
+    const result: any = await service.createSoloGame(admin!.id, { gameType: "101", botCount: 1, cardSetId: cardSet.id, ...(testing ? { testing: true, testCashCents: 500_000, testIncomeCents: 100_000 } : {}) });
     gameIds.push(result.game.id);
     return result;
   };

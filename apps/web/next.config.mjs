@@ -4,7 +4,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 /** @type {import('next').NextConfig} */
 export default function nextConfig(phase) {
   const config = {
-    distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
+    distDir: process.env.FJ_NEXT_DIST_DIR ?? (phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next"),
     transpilePackages: ["@cashflow/shared"],
     typedRoutes: true,
     async headers() {

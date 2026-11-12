@@ -1,10 +1,11 @@
-import { CardType, Prisma, PrismaClient } from "@prisma/client";
+import { CardType, GameType, Prisma, PrismaClient } from "@prisma/client";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   cardImportScope,
   classifyCardChanges,
   normalizeTargetCardSetName,
+  resolveCardImportGameType,
   type ImportCard,
   validateCardBatch
 } from "../src/card-import";
@@ -78,7 +79,7 @@ function cardData(card: ImportCard) {
 
 async function main() {
   if (process.argv.includes("--help")) {
-    console.log("Usage: npm run db:import-cards -- --set NAME [--file PATH] [--dry-run|--apply] [--allow-production]");
+    console.log("Usage: npm run db:import-cards -- --set NAME [--game-type 101|202] [--file PATH] [--dry-run|--apply] [--allow-production]");
     return;
   }
 
@@ -89,6 +90,10 @@ async function main() {
     throw new Error("Запись в production заблокирована. Требуется отдельное явное разрешение и флаг --allow-production");
   }
   const targetSetName = normalizeTargetCardSetName(argument("--set"));
+  const requestedGameType = argument("--game-type");
+  if (process.argv.includes("--game-type") && requestedGameType === undefined) {
+    throw new Error("Укажите режим импорта: --game-type 101|202");
+  }
 
   const file = resolve(argument("--file") ?? resolve(repoRoot, "dist/recognized_original_cards_ru.json"));
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
@@ -99,10 +104,14 @@ async function main() {
     return;
   }
 
+  const gameType = resolveCardImportGameType(validation.cards, requestedGameType);
   const targetSet = await prisma.cardSet.findUnique({
     where: { name: targetSetName },
-    select: { id: true, name: true }
+    select: { id: true, name: true, gameType: true }
   });
+  if (targetSet) {
+    resolveCardImportGameType(validation.cards, gameType, targetSet.gameType === GameType.ADVANCED_202 ? "202" : "101");
+  }
   const existingRows = targetSet
     ? await prisma.card.findMany({
         where: cardImportScope(
@@ -122,7 +131,7 @@ async function main() {
     const existingBySlug = new Map(existingRows.map((card) => [card.slug, card]));
     await prisma.$transaction(async (tx) => {
       const writeSet = targetSet ?? await tx.cardSet.create({
-        data: { name: targetSetName },
+        data: { name: targetSetName, gameType: gameType === "202" ? GameType.ADVANCED_202 : GameType.CLASSIC_101 },
         select: { id: true }
       });
       for (const card of [...plan.created, ...plan.updated]) {
@@ -154,6 +163,7 @@ async function main() {
     mode: dryRun ? "dry-run" : "apply",
     file,
     targetSet: targetSetName,
+    gameType,
     targetSetExists: Boolean(targetSet),
     targetSetWillBeCreated: !targetSet,
     created: plan.created.length,

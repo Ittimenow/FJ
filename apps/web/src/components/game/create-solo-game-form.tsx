@@ -2,58 +2,22 @@
 
 import { Bot, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BotLevelButtons, type BotLevelValue } from "./bot-level-buttons";
 import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
 
-type GameCardSet = {
-  id: string;
-  name: string;
-  isDefault: boolean;
-};
-
 export function CreateSoloGameForm({ token }: { token: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cardSets, setCardSets] = useState<GameCardSet[]>([]);
-  const [cardSetId, setCardSetId] = useState("");
-  const [cardSetsLoading, setCardSetsLoading] = useState(true);
-  const [cardSetsError, setCardSetsError] = useState<string | null>(null);
   const [botLevels, setBotLevels] = useState<BotLevelValue[]>(["balanced_v1"]);
   const [newBotLevel, setNewBotLevel] = useState<BotLevelValue>("balanced_v1");
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch(`${publicApiBaseUrl()}/api/games/card-sets`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error();
-        const sets = (await response.json()) as GameCardSet[];
-        if (cancelled) return;
-        setCardSets(sets);
-        const original = sets.find((set) => set.name.trim().toLocaleLowerCase("ru") === "оригинал");
-        setCardSetId(original?.id ?? "");
-        if (!original) setCardSetsError("Набор «Оригинал» недоступен. Выберите другой набор.");
-      } catch {
-        if (!cancelled) {
-          setCardSetsError("Не удалось загрузить наборы. Обновите страницу и попробуйте снова.");
-        }
-      } finally {
-        if (!cancelled) setCardSetsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -65,8 +29,7 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         },
         body: JSON.stringify({
           botCount: botLevels.length,
-          botLevels,
-          ...(cardSetId ? { cardSetId } : {})
+          botLevels
         })
       });
       if (!response.ok) {
@@ -92,37 +55,9 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         <div>
           <h2 className="text-xl font-extrabold text-ink">Играть с ботами</h2>
           <p className="mt-1 text-sm leading-6 text-muted">
-            Начните сразу: соперники сами выполняют ходы и объясняют финансовые решения.
+            Подберите соперников. Режим игры и набор карточек выберите на странице подготовки.
           </p>
         </div>
-      </div>
-
-      <div>
-        <label htmlFor="solo-card-set" className="mb-2 block text-sm font-extrabold text-ink">
-          Набор карточек
-        </label>
-        <select
-          id="solo-card-set"
-          value={cardSetId}
-          onChange={(event) => { setCardSetId(event.target.value); setCardSetsError(null); }}
-          disabled={cardSetsLoading || cardSets.length === 0}
-          className="h-[50px] w-full rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-action focus:ring-4 focus:ring-action/20"
-        >
-          {cardSetsLoading ? <option value="">Загружаем наборы…</option> : null}
-          {!cardSetsLoading && cardSets.length === 0 ? (
-            <option value="">Нет доступных наборов</option>
-          ) : null}
-          {cardSets.map((set) => (
-            <option key={set.id} value={set.id}>
-              {set.name}{set.isDefault ? " — основной" : ""}
-            </option>
-          ))}
-        </select>
-        {cardSetsError ? (
-          <p className="mt-2 text-xs font-medium leading-5 text-red-700" role="alert">
-            {cardSetsError}
-          </p>
-        ) : null}
       </div>
 
       <section aria-labelledby="solo-opponents-title" className="grid gap-3">
@@ -181,10 +116,10 @@ export function CreateSoloGameForm({ token }: { token: string }) {
         type="submit"
         variant="action"
         className="w-full"
-        disabled={loading || cardSetsLoading || !cardSetId}
-        aria-busy={loading || cardSetsLoading}
+        disabled={loading}
+        aria-busy={loading}
       >
-        {loading ? "Готовим соперников..." : "Начать одиночную игру"}
+        {loading ? "Готовим соперников..." : "Создать игру с ботами"}
       </Button>
     </form>
   );
