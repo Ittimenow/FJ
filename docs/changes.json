@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "include-ready-202-card-set-in-production",
+          "category": "fix",
+          "summary": "Полный набор из 138 карточек 202 доступен при создании партии и включён в поставку обновлений."
+        },
+        {
           "id": "protect-202-sealed-auction-bids",
           "category": "fix",
           "summary": "Во время закрытого аукциона 202 участники видят только факт ответа игроков, без сумм чужих ставок."

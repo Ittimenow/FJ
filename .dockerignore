@@ -19,6 +19,7 @@ backups
 distr
 dist/*
 !dist/recognized_original_cards_ru.json
+!dist/recognized_202_cards_ru.json
 !dist/seed_cards.sql
 !dist/seed_professions.sql
 npm-debug.log*
