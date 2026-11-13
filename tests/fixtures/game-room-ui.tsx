@@ -10,11 +10,43 @@ export function GameRoomFixture({ snapshot }: { snapshot: GameSnapshot }) {
   const [initialSnapshot] = useState(() => {
     const params = new URLSearchParams(location.search);
     const view = params.get('view') === 'journey' ? 'journey' : 'classic';
+    const game: GameSnapshot['game'] = {
+      id: snapshot.game.id,
+      title: 'Проверка игровой комнаты',
+      code: 'DEMO',
+      mode: 'SOLO',
+      createdById: 'admin',
+      status: params.get('status') === 'WAITING' ? 'WAITING' : 'IN_PROGRESS',
+      gameType: '101',
+      gameTypeSelected: true,
+      cardSet: { id: 'fixture-101', name: 'Тестовый 101' },
+      maxPlayers: 6,
+      isPublic: false,
+      scheduledAt: null,
+      scheduleTimeZone: null,
+      startedAt: null,
+      endedAt: null,
+      timeLimitMinutes: null,
+      currentPeriod: 1,
+      periodCount: 3,
+      periodDeadlineAt: null,
+      deadlineAt: null,
+      remainingPeriodSeconds: null,
+      pauseReason: null,
+      pausedAt: null,
+      currentPlayerId: snapshot.game.currentPlayerId,
+      currentRound: snapshot.game.currentRound,
+      currentTurnIndex: snapshot.game.currentTurnIndex,
+      rulesVersion: snapshot.game.rulesVersion,
+      isTest: snapshot.game.isTest,
+      fastTrackWorld: snapshot.game.fastTrackWorld,
+      pendingAction: null,
+    };
     return {
       ...snapshot,
       chatMessages: [],
       events: [],
-      game: { ...snapshot.game, title: 'Проверка игровой комнаты', code: 'DEMO', mode: 'SOLO', createdById: 'admin', currentPeriod: 1, periodCount: 3, status: params.get('status') === 'WAITING' ? 'WAITING' : 'IN_PROGRESS', pendingAction: null },
+      game,
       players: snapshot.players.map((player, index) => ({ ...player, track: params.has('allFast') || (index === 1 && params.has('fast')) ? 'FAST_TRACK' : 'RAT_RACE', position: index === 1 ? 22 : 0, userId: index === 1 && params.has("multiplayer") ? "second-user" : player.userId, user: player.user ? { ...player.user, gameRoomView: view } : index === 1 && params.has("multiplayer") ? { id: "second-user", displayName: "Борис", gameRoomView: view } : null }))
     } as GameSnapshot;
   });

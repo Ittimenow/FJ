@@ -4,6 +4,11 @@
       "version": "unreleased",
       "changes": [
         {
+          "id": "restore-game-room-browser-checks",
+          "category": "technical",
+          "summary": "Восстановлены автоматические проверки подготовки и запуска партии с выбранным режимом и набором карточек."
+        },
+        {
           "id": "include-ready-202-card-set-in-production",
           "category": "fix",
           "summary": "Полный набор из 138 карточек 202 доступен при создании партии и включён в поставку обновлений."

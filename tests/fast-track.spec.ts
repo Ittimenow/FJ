@@ -36,6 +36,16 @@ async function serveFixture(page: Page) {
       await route.fulfill({ status: 404, body: 'Not found' });
     }
   });
+  await page.route('**/api/games/card-sets?*', async (route) => {
+    const mode = new URL(route.request().url()).searchParams.get('gameType');
+    await route.fulfill({ json: mode === '101' ? [{
+      id: 'fixture-101',
+      name: 'Тестовый 101',
+      gameType: '101',
+      isDefault: true,
+      counts: { SMALL_DEAL: 54, BIG_DEAL: 41, MARKET: 42, DOODAD: 42 },
+    }] : [] });
+  });
 }
 test.beforeEach(async ({ page }) => { await serveFixture(page); });
 
@@ -681,7 +691,14 @@ for (const width of [1440, 390]) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`${fixtureUrl}?mode=room&status=WAITING`);
     await expect(page.locator('html')).toHaveAttribute('data-room-ready', 'true');
+    const setup = page.getByRole('region', { name: '1. Режим и набор карточек', exact: true });
+    await expect(setup.getByRole('radio', { name: /101 — базовая игра/ })).toBeChecked();
+    await expect(setup.getByRole('combobox', { name: 'Набор карточек для 101' })).toHaveValue('fixture-101');
+    await expect(setup.getByRole('option', { name: 'Тестовый 101 — основной', exact: true })).toHaveCount(1);
+    await expect(setup.getByRole('status')).toHaveText('Режим 101 и набор «Тестовый 101» сохранены. Можно продолжить подготовку.');
+    await expect(setup.getByRole('alert')).toHaveCount(0);
     await expect(page.getByRole('group', { name: 'Показать круг' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Начать партию', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Начать партию', exact: true }).click();
     await expect(page.locator('.app-shell--game-classic-active')).toHaveCount(1);
     await expect(page.getByRole('group', { name: 'Показать круг' })).toHaveCount(0);
