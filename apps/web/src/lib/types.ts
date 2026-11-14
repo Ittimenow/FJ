@@ -220,6 +220,7 @@ export interface GameListItem {
 }
 
 export interface GameSnapshot {
+  sandbox?: import("@cashflow/shared").SandboxView;
   game202?: import("@cashflow/shared").Public202 | null;
   cards202?: Array<{slug:string;title:string;bodyText:string}>;
   game: {

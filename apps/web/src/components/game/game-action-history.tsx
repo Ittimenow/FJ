@@ -8,9 +8,10 @@ import type { GameEvent, GamePlayer } from "@/lib/types";
 import { eventHeadline } from "./game-journal";
 import { compactTurnMovement, importantActionEventIds, mergeActionEvents, playerActionTurns } from "./game-action-history.logic";
 import { PlayerAvatar } from "./player-avatar";
+import { GameActionIcon } from "./game-action-icon";
 import "./game-action-history.css";
 
-export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, currentActionEventId, currentActionPlayerId, prepareEvents, chronologicalActions = false, fastTrackOnly = false, gameStatus, loadEarlier, hasEarlierEvents, renderAction, header }: {
+export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewerPlayerId, currentTurnPlayerId, currentTurnKey, currentAction, currentActionEventId, currentActionPlayerId, prepareEvents, fastTrackOnly = false, gameStatus, loadEarlier, hasEarlierEvents, renderAction, header }: {
   gameId: string;
   events: GameEvent[];
   players: GamePlayer[];
@@ -23,7 +24,6 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
   currentActionEventId?: string;
   currentActionPlayerId?: string | null;
   prepareEvents?: (events: GameEvent[]) => GameEvent[];
-  chronologicalActions?: boolean;
   fastTrackOnly?: boolean;
   gameStatus?: string;
   loadEarlier?: (() => Promise<GameEvent[]>) | undefined;
@@ -99,34 +99,35 @@ export function GameActionHistory({ gameId, events, players, onlyPlayerId, viewe
     </div> : null}
     <ol className="game-turn-list m-0 list-none p-0" aria-live="polite" aria-busy={loading}>
       {actions.slice(0, visibleCount).map((turn) => {
-        const chronological = chronologicalActions || Boolean(turn.timeline);
         const hasDecision = turn.id === decisionTurnId;
         const decisionActor = players.find(player => player.id === currentActionPlayerId) ?? turn.player;
-        const ownerDecision = hasDecision && (!chronological || decisionActor.id === turn.player.id);
+        const ownerDecision = hasDecision && decisionActor.id === turn.player.id;
         const otherActions = [...turn.otherActions];
-        if (chronological && hasDecision && decisionActor.id !== turn.player.id && !otherActions.some(group => group.player.id === decisionActor.id)) {
+        if (hasDecision && decisionActor.id !== turn.player.id && !otherActions.some(group => group.player.id === decisionActor.id)) {
           otherActions.push({player:decisionActor,events:[]});
         }
         return <li key={turn.id} data-turn-player-id={turn.player.id} className="game-action-entry min-w-0 border-t-2 border-line pt-4 pb-5 [overflow-wrap:anywhere] first:border-t-0 first:pt-0">
           <TurnPlayer player={turn.player} turnHeading />
           <ol className="game-turn-timeline m-0 list-none p-0">
-            {ownerDecision && !chronological ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение">{currentAction}</li> : null}
+            {ownerDecision ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение" data-action-player-id={turn.player.id}><GameActionIcon event={history.find(event=>event.id===currentActionEventId)}/>{currentAction}</li> : null}
             {compactTurnMovement(turn.events).map(({event,roll}) => <li key={event.id} className="game-turn-event" data-action-id={event.id} data-action-player-id={turn.player.id}>
+              <GameActionIcon event={event}/>
               {actionBody(event,roll)}
             </li>)}
-            {ownerDecision && chronological ? <li className="game-turn-event game-turn-decision" aria-label="Текущее решение" data-action-player-id={turn.player.id}>{currentAction}</li> : null}
             {otherActions.flatMap((group, groupIndex) => {
               const entries = compactTurnMovement(group.events);
-              const decisionHere = chronological && hasDecision && group.player.id === decisionActor.id;
+              const decisionHere = hasDecision && group.player.id === decisionActor.id;
               return [
-                ...entries.map(({event,roll},index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player.id}>
-                  {index === 0 ? <TurnPlayer player={group.player}/> : null}
-                  {actionBody(event,roll)}
-                </li>),
                 ...(decisionHere ? [<li key={`decision-${group.player.id}-${groupIndex}`} className="game-turn-event game-turn-other-action game-turn-decision" aria-label="Текущее решение" data-action-player-id={group.player.id}>
-                  {!entries.length ? <TurnPlayer player={group.player}/> : null}
+                  <TurnPlayer player={group.player}/>
+                  <GameActionIcon event={history.find(event=>event.id===currentActionEventId)}/>
                   {currentAction}
-                </li>] : [])
+                </li>] : []),
+                ...entries.map(({event,roll},index) => <li key={event.id} className="game-turn-event game-turn-other-action" data-action-id={event.id} data-action-player-id={group.player.id}>
+                  {index === 0 && !decisionHere ? <TurnPlayer player={group.player}/> : null}
+                  <GameActionIcon event={event}/>
+                  {actionBody(event,roll)}
+                </li>)
               ];
             })}
           </ol>

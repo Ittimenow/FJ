@@ -2,10 +2,39 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameEvent, GamePlayer } from "../../lib/types";
 import type { Log202 } from "@cashflow/shared";
-import { compact202History, currentCardOpening202, isCardOpening202, legacy202HistoryEvents, recordedMovement202 } from "./game-202-history.logic";
+import { compact202History, prepare202History, currentCardOpening202, isCardOpening202, legacy202HistoryEvents, recordedMovement202 } from "./game-202-history.logic";
 
 const players = [{ id: "a", seat: 1, role: "PLAYER" }] as GamePlayer[];
 const row = (id:string, sequence:number, revision:number, text:string):GameEvent => ({ id, sequence, type:"game202:action", payload:{revision,text}, createdAt:"2026-11-01T12:00:00Z", gamePlayer:{id:"a",seat:1,role:"PLAYER"} });
+
+test("202 commands show their own results once and preserve each card occurrence",()=>{
+  const base = {...row("open",1,1,"Открыта карточка"),payload:{revision:1,slug:"house",kind:"effect",effectType:"card_opened",turnKey:"a:1",turnOwnerGamePlayerId:"a"}};
+  const make=(id:string,sequence:number,revision:number,payload:Record<string,unknown>):GameEvent=>({...base,id,sequence,payload:{...base.payload,effectType:undefined,revision,...payload}});
+  const result=make("result",2,2,{effectType:"financial_result",cashChangeCents:-300000,cashflowChangeCents:30000});
+  const command=make("buy",3,2,{kind:"command",commandType:"decide",choice:"buy",text:"Куплена недвижимость"});
+  const explanation=make("bot",4,2,{kind:"bot",text:"Доход покупки покрывает обслуживание кредита"});
+  const other={...result,id:"other",sequence:5,gamePlayer:{id:"b",seat:2,role:"PLAYER" as const}};
+  const repeated=make("repeat",6,3,{effectType:"card_opened"});
+  const events=[base,result,command,explanation,other,repeated];
+  const prepared=prepare202History(events);
+  assert.deepEqual(prepared.map(event=>event.id),["open","buy","other","repeat"]);
+  assert.equal(prepared[1]!.payload.cashChangeCents,-300000);
+  assert.equal(prepared[1]!.payload.cashflowChangeCents,30000);
+  assert.equal(prepared[1]!.payload.explanation,explanation.payload.text);
+  assert.equal(command.payload.cashChangeCents,undefined,"archive input remains intact");
+});
+
+test("202 hides bot boilerplate and turn-start text including legacy archives",()=>{
+  const events=[row("start",1,1,"Начало хода"),row("empty",2,1,"Решение по открытой карточке"),row("payday",3,1,"День зарплаты")];
+  assert.deepEqual(prepare202History(events).map(event=>event.id),["payday"]);
+});
+
+test("202 never attributes later automatic market effects to an earlier decision",()=>{
+  const command={...row("command",2,7,"Отказ от возможности"),payload:{revision:7,kind:"command",slug:"capital",turnKey:"a:1"}};
+  const market={...row("market",3,7,"Финансовый результат"),payload:{revision:7,effectType:"financial_result",slug:"market",turnKey:"a:1",cashChangeCents:-50000}};
+  const otherTurn={...market,id:"other-turn",sequence:1,payload:{...market.payload,slug:"capital",turnKey:"a:0"}};
+  assert.deepEqual(prepare202History([command,market,otherTurn]).map(event=>event.id),["command","market","other-turn"]);
+});
 
 test("202 roll presentation combines dice and a recorded route while preserving unrelated effects", () => {
   const dice={...row("dice",1,1,"Кубики: 2"),payload:{revision:1,effectType:"dice",diceValues:[2],dice:2,from:-1,to:1,cell:{index:1,type:"doodad",label:"Всякая всячина"}}};
@@ -89,4 +118,22 @@ test("legacy opened cards get a full face, but decisions referring to the same c
   assert.equal(isCardOpening202(opened),true);
   assert.equal(isCardOpening202({...opened,payload:{...opened.payload,text:"Отказ от возможности"}}),false);
   assert.equal(isCardOpening202({...opened,payload:{text:"Открыта карточка"}}),false);
+});
+
+
+test("202 keeps exact balances when attaching results and never bridges an unrecorded gap",()=>{
+  const event=(id:string,sequence:number,payload:Record<string,unknown>):GameEvent=>({...row(id,sequence,1,"Результат"),payload:{revision:1,turnKey:"a:1",...payload}});
+  const first=event("first",1,{effectType:"financial_result",beforeCashCents:40000,afterCashCents:100000,cashChangeCents:60000});
+  const second=event("second",2,{effectType:"financial_result",beforeCashCents:100000,afterCashCents:209000,cashChangeCents:109000});
+  const command=event("command",3,{kind:"command",commandType:"accept"});
+  const merged=prepare202History([first,second,command])[0]!;
+  assert.equal(merged.payload.beforeCashCents,40000);
+  assert.equal(merged.payload.afterCashCents,209000);
+  assert.equal(merged.payload.cashChangeCents,169000);
+  const gap={...second,payload:{...second.payload,beforeCashCents:120000,afterCashCents:229000}};
+  const incomplete=prepare202History([first,gap,command])[0]!;
+  assert.equal(incomplete.payload.beforeCashCents,undefined);
+  assert.equal(incomplete.payload.afterCashCents,undefined);
+  const legacy={...first,payload:{...first.payload,beforeCashCents:undefined,afterCashCents:undefined}};
+  assert.equal(prepare202History([legacy,command])[0]!.payload.beforeCashCents,undefined);
 });

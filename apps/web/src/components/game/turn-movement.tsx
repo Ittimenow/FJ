@@ -20,12 +20,12 @@ export function TurnMovement({ diceValues, total, from, to, cellLabel }: TurnMov
 
   return <span className="inline-flex flex-wrap items-center gap-2" data-turn-movement>
     {hasDice ? <>
-      <Dices size={16} className="shrink-0 text-journey" aria-hidden="true"/>
+      <Dices size={16} className="shrink-0 text-journey" data-inline-action-icon aria-hidden="true"/>
       <span className="sr-only">{hasRoute ? "Бросок кубика и перемещение по полю: " : "Бросок кубика: "}</span>
       <span>{result}</span>
       {hasRoute ? <span aria-hidden="true">·</span> : null}
     </> : <>
-      <MoveRight size={16} className="shrink-0 text-journey" aria-hidden="true"/>
+      <MoveRight size={16} className="shrink-0 text-journey" data-inline-action-icon aria-hidden="true"/>
       <span className="sr-only">Перемещение по полю: </span>
     </>}
     {hasRoute ? <span>{position(from!)} → {position(to!)}</span> : null}

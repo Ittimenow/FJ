@@ -1,6 +1,7 @@
 "use client";
 
 import { CompactAssets, isStockAsset } from "./asset-portfolio";
+import { SandboxPanel } from "./sandbox-panel";
 import { Game202Panel } from "./game-202-panel";
 import { GameModeSettings } from "./game-mode-settings";
 import { RatRaceBoard, RatRaceMobileBoard as MobileBoard, RatRaceTabs, PlayerToken, cellTypes } from "./rat-race-layout";
@@ -15,6 +16,7 @@ import { useBoardMovement } from "./use-board-movement";
 import { useMobileGameHeader } from "./use-mobile-game-header";
 import { DiceAction, DiceFace } from "./dice-action";
 import { GameActionHistory } from "./game-action-history";
+import { CashChangeVisualization } from "./cash-change-visualization";
 import { JournalCard, MoneyBoldText } from "./journal-card";
 import { ChoicePanel, DecisionPanel, FundingProgress, MarketSalePanel, PurchasePanel, StockSalePanel } from "./game-decision-panels";
 import { TurnMovement } from "./turn-movement";
@@ -90,11 +92,9 @@ import {
 import { RoomInviteActions } from "@/components/game/room-invite-actions";
 import { LobbySettings } from "@/components/game/lobby-settings";
 import {
-  cashChangeExpression,
   compactPlayerActionDetails,
   eventCashChange,
-  eventReasonLabel,
-  type CashChange
+  eventReasonLabel
 } from "@/components/game/game-event-result";
 import { gameEndPresentation } from "@/components/game/game-end-result";
 import {
@@ -204,6 +204,10 @@ export function GameRoom({
   );
   const initialPreferredFigurine = initialMe?.user?.figurine;
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [sandboxOpen, setSandboxOpen] = useState(false);
+  const [sandboxPlayerId, setSandboxPlayerId] = useState(initialMe?.id ?? initialSnapshot.players[0]?.id ?? "");
+  const sandboxActionPending = useRef(false);
+  const [sandboxBusy, setSandboxBusy] = useState(false);
   const [connection, setConnection] = useState<ConnectionDiagnostics>(
     initialConnectionDiagnostics
   );
@@ -413,7 +417,7 @@ export function GameRoom({
     (player) => player.id === snapshot.game.currentPlayerId
   );
   const gamePlayers = snapshot.players.filter((player) => player.role === "PLAYER" && player.status === "JOINED");
-  const me = gamePlayers.find((player) => player.userId === currentUserId);
+  const me = gamePlayers.find((player) => snapshot.sandbox ? player.id === sandboxPlayerId : player.userId === currentUserId);
   useEffect(() => {
     if (initialSnapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED") && !snapshot.players.some((player) => player.userId === currentUserId && player.status === "JOINED")) {
       router.replace("/dashboard");
@@ -486,7 +490,7 @@ export function GameRoom({
   const selectedPlayer = me ?? gamePlayers[0];
   const canRoll =
     snapshot.game.status === "IN_PROGRESS" &&
-    currentPlayer?.userId === currentUserId &&
+    currentPlayer?.id === me?.id && !sandboxBusy &&
     me?.financialState?.bankruptcyStatus !== "LIQUIDATING";
   const isAdmin = currentUserRole === "ADMIN";
   const isSolo = snapshot.game.mode === "SOLO";
@@ -529,7 +533,7 @@ export function GameRoom({
     ownPendingAction?.type === "market_sale" ? ownPendingAction : null;
   const isMyTurn =
     snapshot.game.status === "IN_PROGRESS" &&
-    currentPlayer?.userId === currentUserId;
+    currentPlayer?.id === me?.id;
   const canAnswerCharity =
     isMyTurn && Boolean(charityChoice);
   const canAnswerDoodadPayment =
@@ -684,9 +688,10 @@ export function GameRoom({
       hostDisplayView: canManage && !isSolo && snapshot.game.gameType !== "202" ? gameRoomView : null,
       viewportMode,
       gameType: snapshot.game.gameType ?? "101",
-      mobileHeaderHidden,
+      mobileHeaderHidden: snapshot.sandbox ? false : mobileHeaderHidden,
       trackView: snapshot.game.rulesVersion === 2 && snapshot.game.status !== "WAITING" && hasFastTrackPlayers ? (showFastTrack ? "FAST_TRACK" : "RAT_RACE") : null,
       onTrackChange: setTrackView,
+      onOpenSandbox: snapshot.sandbox ? () => setSandboxOpen(true) : undefined,
       onCheckConnection: () => void refreshConnection()
     });
   }, [
@@ -732,7 +737,7 @@ export function GameRoom({
   }, [currentStockSaleResetKey]);
 
   useEffect(() => {
-    if (snapshot.game.status === "ENDED" && !stayOnEndedGame && snapshot.game.gameType !== "202") {
+    if (snapshot.game.status === "ENDED" && !snapshot.sandbox && !stayOnEndedGame && snapshot.game.gameType !== "202") {
       router.replace(`/games/${snapshot.game.id}/results` as Route);
     }
   }, [router, snapshot.game.id, snapshot.game.status, stayOnEndedGame]);
@@ -917,7 +922,25 @@ export function GameRoom({
     }
   }
 
+  async function requestSandboxAction(action: string, payload: Record<string, unknown>): Promise<GameActionResult> {
+    if (sandboxActionPending.current) throw new Error("Дождитесь завершения текущего действия");
+    sandboxActionPending.current = true;setSandboxBusy(true);
+    try {
+      const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/sandbox/action`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ run: snapshot.sandbox!.run, playerId: me?.id, action, payload })
+      });
+      const result = await response.json() as GameActionResult;
+      if (!response.ok) throw new Error(result.message ?? "Не удалось выполнить действие");
+      return result;
+    } finally { sandboxActionPending.current = false;setSandboxBusy(false); }
+  }
+
   function emit(event: string, payload: Record<string, unknown>) {
+    if (snapshot.sandbox && event !== "chat:send" && !event.startsWith("game:")) {
+      void requestSandboxAction(event, payload).then(applyActionResult).catch(cause => setError(gameErrorMessage(cause, "Не удалось выполнить действие")));
+      return;
+    }
     setError(null);
     socketRef.current?.emit(event, {
       gameId: snapshot.game.id,
@@ -926,6 +949,7 @@ export function GameRoom({
   }
 
   function emitWithAck(event: string, payload: Record<string, unknown>) {
+    if (snapshot.sandbox && !event.startsWith("game:")) return requestSandboxAction(event, payload);
     return new Promise<GameActionResult>((resolve, reject) => {
       const socket = socketRef.current;
       if (!socket?.connected) {
@@ -1025,6 +1049,11 @@ export function GameRoom({
     setFastBusy(true);
     setError(null);
     try {
+      if (snapshot.sandbox) {
+        applyActionResult(await requestSandboxAction(path, body));
+        if (path === "fast-track/enter") setTrackView("FAST_TRACK");
+        return true;
+      }
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${path}`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body)
       });
@@ -1039,7 +1068,7 @@ export function GameRoom({
 
   async function rollDice() {
     if (rollingDice) return;
-    if (!socketRef.current?.connected) {
+    if (!snapshot.sandbox && !socketRef.current?.connected) {
       setError("Соединение с игрой восстанавливается. Дождитесь подключения и повторите бросок.");
       return;
     }
@@ -1388,6 +1417,7 @@ export function GameRoom({
 
   const renderTurnFeed = (showHeader = true, action?: ReactNode) => (
     <GameTurnFeed
+      key={`${snapshot.game.id}:${snapshot.sandbox?.run ?? 0}`}
       gameId={snapshot.game.id}
       token={token}
       events={snapshot.events}
@@ -1400,6 +1430,7 @@ export function GameRoom({
       turnPlayerId={snapshot.game.status === "IN_PROGRESS" || snapshot.game.status === "PAUSED" ? snapshot.game.currentPlayerId : null}
       turnKey={`${snapshot.game.currentRound}:${snapshot.game.currentTurnIndex}`}
       currentAction={enterFastTrackAction || (showFastTrack ? action : pendingAction || stockSaleOffer ? action : null)}
+      {...(!showFastTrack && !enterFastTrackAction && action && latestDealDecisionCard ? {currentActionEventId: latestDealDecisionCard.event.id} : {})}
     />
   );
 
@@ -1426,8 +1457,10 @@ export function GameRoom({
       ) : null}
   </>;
 
+  const sandboxPanel = snapshot.sandbox && sandboxOpen ? <SandboxPanel snapshot={snapshot} token={token} playerId={sandboxPlayerId} onPlayerChange={setSandboxPlayerId} onSnapshot={next => { setTrackView(null);setSnapshot(current => acceptGameSnapshot(current, next)); }} onClose={() => setSandboxOpen(false)} /> : null;
+
   if (snapshot.game.gameType === "202" && snapshot.game202 && snapshot.game.status !== "WAITING") {
-    return <Game202Panel snapshot={snapshot} token={token} currentUserId={currentUserId} showFastTrack={showFastTrack} onTrackChange={setTrackView} onSnapshot={next => setSnapshot(current => acceptGameSnapshot(current, next))} />;
+    return <>{sandboxPanel}<Game202Panel controlledPlayerId={snapshot.sandbox ? sandboxPlayerId : undefined} snapshot={snapshot} token={token} currentUserId={currentUserId} showFastTrack={showFastTrack} onTrackChange={setTrackView} onSnapshot={next => setSnapshot(current => acceptGameSnapshot(current, next))} /></>;
   }
 
   return (
@@ -1443,6 +1476,7 @@ export function GameRoom({
           : null
       )}
     >
+      {sandboxPanel}
       {snapshot.game.status === "WAITING" ? <GameModeSettings snapshot={snapshot} token={token} canManage={canManage} isAdmin={isAdmin} disabled={lobbyBusy || settingsPending} onSaved={value => setSnapshot(current => acceptGameSnapshot(current, value))} onPendingChange={setModeSetupPending} /> : null}
       {snapshot.game.status !== "WAITING" || setupReady ? <>
       {snapshot.game.status === "WAITING" ? canManage && !isSolo ? (
@@ -1551,6 +1585,7 @@ export function GameRoom({
 
       {showFastTrack ? <FastTrackPanel snapshot={snapshot} player={me} onRoll={rollDice} onSkip={skipTurn} rolling={rollingDice} phase={turnAnimationPhase} diceValues={diceFaces} diceCount={activeDiceCount} onDiceCount={setFastDiceCount} onDecision={(buy, decisionId) => void fastAction("fast-track/decision", { buy, decisionId })} busy={fastBusy} turnTabRequest={turnTabRequest}>{(action) => renderTurnFeed(false, action)}</FastTrackPanel> : gameRoomView === "journey" && snapshot.game.status !== "WAITING" ? (
         <GameRoomVariantTwo
+          viewerPlayerId={snapshot.sandbox ? sandboxPlayerId : undefined}
           snapshot={boardSnapshot}
           movingPlayerId={movement.movingPlayerId}
           currentUserId={currentUserId}
@@ -2786,14 +2821,15 @@ function ActionsPanel({
         </DecisionPanel>
       ) : null}
 
-    {latestCard?<PurchasePanel
+    {latestCard?<div className="space-y-3"><JournalCardDraw event={latestCard.event}/><PurchasePanel
       card={{id:String(latestCard.cardId),title:latestCard.title,bodyText:latestCard.bodyText,isStock:latestCard.isStock,price:latestCard.priceCents,downPayment:latestCard.downPaymentCents,cashflow:latestCard.cashflowCents}}
       available={currentCashCents} quantity={dealQuantity} onQuantityChange={setDealQuantity}
       onBuy={onBuyLatest} onDecline={onDeclineLatest} onOpenBank={onOpenBank} canTakeLoan={canTakeLoan}
       {...(latestCard.isAuctionEligible?{onOffer:onStartAuction}:{})}
       submitting={decisionSubmission==="deal_buy"?"buy":decisionSubmission==="deal_decline"?"decline":decisionSubmission==="deal_auction_start"?"offer":null}
       waitingNames={waitingStockSellerNames} embedded={embedded}
-    />:null}
+      showCardText={false}
+    /></div>:null}
   </>;
   const hasAction=canChooseDeal||stockSaleOffer||marketSaleOffer||charityChoice||doodadPaymentChoice||latestCard||auctionPanel;
   if(embedded)return <section className="grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-3">{renderHistory(hasAction?content:null)}</section>;
@@ -2802,7 +2838,7 @@ function ActionsPanel({
 
 function GameTurnFeed({
   gameId, token, events, players, currentGamePlayerId, gameStatus,
-  onSendBabyGift, showHeader, fastTrackOnly, currentAction, turnPlayerId, turnKey
+  onSendBabyGift, showHeader, fastTrackOnly, currentAction, currentActionEventId, turnPlayerId, turnKey
 }: {
   gameId: string;
   token: string;
@@ -2814,6 +2850,7 @@ function GameTurnFeed({
   showHeader: boolean;
   fastTrackOnly: boolean;
   currentAction?: ReactNode;
+  currentActionEventId?: string;
   turnPlayerId: string | null;
   turnKey: string;
 }) {
@@ -2829,6 +2866,7 @@ function GameTurnFeed({
     currentTurnPlayerId={turnPlayerId}
     currentTurnKey={turnKey}
     currentAction={currentAction}
+    {...(currentActionEventId ? {currentActionEventId} : {})}
     loadEarlier={async () => {
       const response = await fetch(`${publicApiBaseUrl()}/api/games/${gameId}/replay`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Не удалось загрузить историю партии");
@@ -3179,7 +3217,7 @@ function GameEventHeadline({ event, pairedRoll }: { event: GameEvent; pairedRoll
   const EventIcon = eventTitleIcons[event.type as keyof typeof eventTitleIcons];
   return (
     <span className="inline-flex items-center gap-2">
-      {EventIcon ? <EventIcon size={16} className="shrink-0 text-journey" aria-hidden="true" /> : null}
+      {EventIcon ? <EventIcon size={16} className="shrink-0 text-journey" data-inline-action-icon aria-hidden="true" /> : null}
       <span>{eventTitle(event.type)}</span>
     </span>
   );
@@ -3213,31 +3251,6 @@ function compactEventDetails(event: GameEvent) {
   ];
   return details.filter(
     (detail) => !redundantCashPrefixes.some((prefix) => detail.startsWith(prefix))
-  );
-}
-
-function CashChangeVisualization({ change }: { change: CashChange }) {
-  const positive = change.deltaCents >= 0;
-  const expression = cashChangeExpression(change);
-
-  return (
-    <div className="mt-1.5 inline-flex max-w-full min-w-0 flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]">
-      <Banknote size={16} className="shrink-0 text-success" aria-hidden="true" />
-      {expression.kind === "equation" ? (
-        <>
-          <strong className="tabular-nums">{expression.before}</strong>
-          <span className={positive ? "font-semibold text-success" : "font-semibold text-red-700"}>{expression.operator}</span>
-          <strong className={`tabular-nums ${positive ? "text-success" : "text-red-700"}`}>{expression.effect}</strong>
-          <span className="sr-only">равно</span>
-          <span className="text-neutral-500" aria-hidden="true">→</span>
-          <strong className="font-semibold tabular-nums text-ink">{expression.after}</strong>
-        </>
-      ) : (
-        <strong className={positive ? "text-success" : "text-red-700"}>
-          {expression.value}
-        </strong>
-      )}
-    </div>
   );
 }
 
@@ -4080,6 +4093,7 @@ function latestDealCard(
         : dealDownPaymentAmount(meta, priceCents);
 
   return {
+    event,
     cardId: Number(event.payload.id),
     title: localizeGameText(title),
     bodyText: localizeGameText(bodyText),

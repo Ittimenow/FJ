@@ -46,6 +46,7 @@ import type { GamePlayer, GameSnapshot } from "@/lib/types";
 export type GameRoomView = "classic" | "journey";
 
 type VariantTwoProps = {
+  viewerPlayerId?: string | undefined;
   snapshot: GameSnapshot;
   currentUserId: string;
   canRoll: boolean;
@@ -57,6 +58,7 @@ type VariantTwoProps = {
 type CompactSection = "board" | "finance" | "actions";
 
 export function GameRoomVariantTwo({
+  viewerPlayerId,
   snapshot,
   currentUserId,
   canRoll,
@@ -67,7 +69,7 @@ export function GameRoomVariantTwo({
   const players = snapshot.players.filter(
     (player) => player.role === "PLAYER" && player.status === "JOINED"
   );
-  const me = players.find((player) => player.userId === currentUserId);
+  const me = players.find((player) => viewerPlayerId ? player.id === viewerPlayerId : player.userId === currentUserId);
   const currentPlayer = players.find((player) => player.id === snapshot.game.currentPlayerId);
   const initialSelectedId = me?.id ?? currentPlayer?.id ?? players[0]?.id ?? null;
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(initialSelectedId);

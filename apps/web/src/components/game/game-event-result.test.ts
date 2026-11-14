@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { money } from "../../lib/format";
+import { money202 } from "./financial-presentation";
 import type { GameEvent } from "../../lib/types";
 import {
   cashChangeExpression,
@@ -145,4 +146,18 @@ test("убирает повтор карточки у отказа и оплач
 test("понятно объясняет ручной и автоматический пропуск хода", () => {
   assert.equal(eventReasonLabel("player_choice"), "решение игрока");
   assert.equal(eventReasonLabel("downsized"), "потеря работы");
+});
+
+test("202 uses cents and recorded balances without changing 101 money units", () => {
+  const change = eventCashChange(gameEvent("game202:action", {beforeCashCents:40000,afterCashCents:209000,cashChangeCents:169000}))!;
+  assert.deepEqual(cashChangeExpression(change,money202),{kind:"equation",before:money202(40000),operator:"+",effect:money202(169000),after:money202(209000)});
+  const fractional = eventCashChange(gameEvent("game202:action", {beforeCashCents:10001,afterCashCents:-1234,cashChangeCents:-11235}))!;
+  assert.deepEqual(cashChangeExpression(fractional,money202),{kind:"equation",before:money202(10001),operator:"−",effect:money202(11235),after:money202(-1234)});
+});
+
+test("202 legacy deltas stay readable without invented balances", () => {
+  const change=eventCashChange(gameEvent("game202:action",{cashChangeCents:-10000}))!;
+  assert.deepEqual(change,{beforeCents:null,afterCents:null,deltaCents:-10000});
+  assert.deepEqual(cashChangeExpression(change,money202),{kind:"delta",value:`−${money202(10000)}`});
+  assert.equal(eventCashChange(gameEvent("game202:action",{text:"День зарплаты"})),null);
 });

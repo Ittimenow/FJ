@@ -90,7 +90,7 @@ test("replay cannot disclose auction amounts from older saved snapshots", async 
   const state = auctionState();
   const snapshots = [{ game202: public202(state) }, { game: { game202: public202(state) } }];
   const events = snapshots.map((stateSnapshot, index) => ({ id: `saved-${index}`, stateSnapshot }));
-  const service = new GamesService({ gameEvent: { findMany: async () => events } } as never);
+  const service = new GamesService({ game: { findUniqueOrThrow: async () => ({ isTest: false, settings: {} }) }, gameEvent: { findMany: async () => events } } as never);
   Object.assign(service, { ensureGameAccess: async () => undefined });
   const replay = await service.replay("room", "viewer");
   assert.equal(replay.events.length, 2);

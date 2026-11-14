@@ -71,14 +71,16 @@ export function Game202Offers({ snapshot, player, task, open, onClose, canOperat
       const cost = offerPayment202(offer, player.id) ?? 0;
       const affordable = player.cash >= cost;
       const title = offer.kind === "joint" ? "Совместная покупка" : offer.kind === "opportunity" ? "Предложение возможности" : offer.kind === "right" ? "Опцион недвижимости" : state.assets.find(asset => asset.id === offer.assetId)?.name ?? "Предложение актива";
-      return <OfferPanel key={offer.id} title={title} description={`${name(offer.from)} → ${name(offer.to)}`}>
+      const waitingIds=offer.kind==="joint"?Object.keys(offer.shares??{}).filter(id=>!offer.accepted.includes(id)):[offer.to];
+      const panel = <OfferPanel title={title} description={`${name(offer.from)} → ${name(offer.to)}`}>
         {sender ? <OfferResponse title={<span className="flex items-center gap-2"><GamePlayerMark player={sender} size="sm"/>{name(offer.from)}</span>}
-          description={awaiting ? "Ожидает вашего решения" : "Ожидаем решения участников"}/> : null}
+          description={awaiting ? "Ожидает вашего решения" : `Ожидаем: ${waitingIds.map(name).join(", ")}`}/> : null}
         <div className="space-y-1.5 text-sm text-neutral-700">
           <p>{offer.kind === "joint" ? "Общий взнос" : "Платёж продавцу"}: <strong>{money202(offer.price)}</strong></p>
           {offer.share ? <p>Доля объекта: <strong>{offer.share / 100}%</strong></p> : null}
           {offer.kind === "joint" ? <><p>Ваша доля: <strong>{(offer.shares?.[player.id] ?? 0) / 100}%</strong></p><p>Ваш взнос: <strong>{money202(cost)}</strong></p></> : null}
-          {!awaiting ? <p role="status">{offer.from === player.id ? "Ожидаем решения участников." : "Ваш ответ принят. Ожидаем остальных участников."}</p> : null}
+          {awaiting ? <p>Наличные после принятия: <strong>{money202(player.cash-cost)}</strong></p> : null}
+          {!awaiting && offer.from !== player.id ? <p role="status">Ваш ответ принят.</p> : null}
         </div>
         {awaiting && !affordable ? <p className="text-xs text-red-700">Для принятия предложения не хватает {money202(cost - player.cash)}.</p> : null}
         <DecisionActions actions={[
@@ -88,6 +90,7 @@ export function Game202Offers({ snapshot, player, task, open, onClose, canOperat
             busy: submission?.type === "reject" && submission.offerId === offer.id, busyLabel: "Отправляем…" }
         ]}/>
       </OfferPanel>;
+      return <div key={offer.id}>{panel}</div>;
     })}
     {open && selectedKind ? <div ref={formRef}><OfferPanel title="Предложить игрокам" description="Выберите участника и условия предложения.">
       <form className="space-y-4" onSubmit={event => { event.preventDefault(); void send(); }}>
@@ -108,7 +111,7 @@ export function Game202Offers({ snapshot, player, task, open, onClose, canOperat
         </label> : <p className="text-xs leading-5 text-neutral-600">Взнос и доход распределяются по долям. Покупка выполняется после согласия всех участников.</p>}
         <DecisionActions actions={[
           { label: "Предложить условия", onClick: () => void send(), disabled: !canOperate || !valid, busy: submission?.type === "offer", busyLabel: "Отправляем…" },
-          { label: "Отменить", onClick: onClose, disabled: submission?.type === "offer", variant: "secondary" }
+          { label: "К решению по карточке", onClick: onClose, disabled: submission?.type === "offer", variant: "secondary" }
         ]}/>
       </form>
     </OfferPanel></div> : null}

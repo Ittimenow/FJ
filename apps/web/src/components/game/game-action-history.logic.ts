@@ -4,7 +4,7 @@ import { game202TurnContext, gamePlayerForEvent, gameTurns, playerIdForTurn } fr
 
 const preparationEvents = new Set([
   "player:joined", "player:added", "player:removed", "player:role_changed",
-  "player:figurine_selected", "player:dream_chosen"
+  "player:figurine_selected", "player:dream_chosen", "sandbox:prepared"
 ]);
 
 export function mergeActionEvents(current: GameEvent[], incoming: GameEvent[]) {
@@ -66,10 +66,10 @@ export function playerActionTurns(events: GameEvent[], players: GamePlayer[], on
       player,
       complete: turn.complete,
       sequence: turn.events[0]?.sequence ?? 0,
-      events: turn.turnKey
-        ? visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId)
-        : visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId).reverse(),
-      otherActions
+      events: visible.filter((event) => gamePlayerForEvent(event, players)?.id === ownerId).reverse(),
+      otherActions: turn.turnKey
+        ? otherActions.map(group => ({ ...group, events: [...group.events].reverse() }))
+        : otherActions
     }];
   }).sort((a, b) => b.sequence - a.sequence);
 }

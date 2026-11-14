@@ -72,7 +72,9 @@ export function eventCashChange(event: GameEvent): CashChange | null {
   }
 
   let delta: number | null = null;
-  if (event.type === "loan:take") {
+  if (event.type === "game202:action") {
+    delta = optionalPayloadNumber(event.payload, "cashChangeCents");
+  } else if (event.type === "loan:take") {
     delta = optionalPayloadNumber(event.payload, "amountCents");
   } else if (event.type === "card:cash_delta") {
     delta = optionalPayloadNumber(event.payload, "amountCents");
@@ -97,21 +99,21 @@ export function eventCashChange(event: GameEvent): CashChange | null {
     : { beforeCents: null, afterCents: null, deltaCents: delta };
 }
 
-export function cashChangeExpression(change: CashChange): CashChangeExpression {
+export function cashChangeExpression(change: CashChange, formatMoney: (value:number)=>string = money): CashChangeExpression {
   const positive = change.deltaCents >= 0;
   if (change.beforeCents === null || change.afterCents === null) {
     return {
       kind: "delta",
-      value: `${positive ? "+" : "−"}${money(Math.abs(change.deltaCents))}`
+      value: `${positive ? "+" : "−"}${formatMoney(Math.abs(change.deltaCents))}`
     };
   }
 
   return {
     kind: "equation",
-    before: money(change.beforeCents),
-    after: money(change.afterCents),
+    before: formatMoney(change.beforeCents),
+    after: formatMoney(change.afterCents),
     operator: positive ? "+" : "−",
-    effect: money(Math.abs(change.deltaCents))
+    effect: formatMoney(Math.abs(change.deltaCents))
   };
 }
 

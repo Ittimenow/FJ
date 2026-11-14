@@ -1,3 +1,4 @@
+import { assert202CashHistory } from "./game-202-cash-history.assert";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -9,7 +10,7 @@ function fresh(){return newGame202(profiles,random);}
 function asset(s:State202,units=2,acres=0,owner="a"):Asset202 {
   const a:Asset202={id:`asset-${++s.serial}`,name:"Недвижимость",source:"test",kind:"property",owners:{[owner]:10000},cost:10000000,mortgage:6000000,down:4000000,income:40000,units,acres,house:units===1,lockedUntil:{}};s.assets.push(a);return a;
 }
-function act(s:State202,actor:string,command:Omit<Command202,"revision">){return command202(s,actor,{revision:s.revision,...command},random);}
+function act(s:State202,actor:string,command:Omit<Command202,"revision">){const next=command202(s,actor,{revision:s.revision,...command},random);assert202CashHistory(s,next);return next;}
 function decide(s:State202,choice:string,extra:Partial<Command202>={}){const t=s.queue[0]!;return act(s,t.playerId,{type:"decide",taskId:t.id,choice,...extra});}
 function open(s:State202,deck:Deck202,id:number|string){
   const slug=slug202(deck,id);s.decks[deck]=[slug];
@@ -18,6 +19,41 @@ function open(s:State202,deck:Deck202,id:number|string){
   s.players[0]!.position=0;s.queue=[{id:"roll",playerId:"a",kind:"roll"}];return command202(s,"a",{type:"roll",taskId:"roll",revision:s.revision,quantity:1},()=>0);
 }
 const cards=JSON.parse(readFileSync("../../dist/recognized_202_cards_ru.json","utf8")) as Array<{slug:string;isActive:boolean;meta:Array<{metaKey:string;metaValue:string}>}>;
+test("202: keeping a mentor card records one opening and preserves the purchase",()=>{
+  let s=fresh();s.players[0]!.mentorUntil=4;
+  s=open(s,"capital",4);
+  assert.equal(s.queue[0]!.kind,"mentor");
+  s=decide(s,"keep");
+  assert.equal(s.queue[0]!.kind,"deal");
+  assert.equal(s.log.filter(line=>line.effectType==="card_opened"&&line.slug==="set_202_capital_04").length,1);
+  s=decide(s,"buy");
+  assert.ok(s.assets.some(a=>a.source==="set_202_capital_04"));
+});
+test("202: automatic expense records the actual cash effect once",()=>{
+  const before=fresh();const cash=before.players[0]!.cash;
+  const s=open(before,"doodad",1);
+  const effects=s.log.filter(line=>line.effectType==="financial_result"&&line.slug==="set_202_doodad_01");
+  assert.equal(effects.length,1);
+  assert.equal(effects[0]!.cashChangeCents,-10000);
+  assert.equal(effects[0]!.cashflowChangeCents,0);
+  assert.equal(s.players[0]!.cash,cash-10000);
+  assert.equal(effects[0]!.turnKey,"a:1");
+});
+test("202: purchase and the following market have separate financial results",()=>{
+  let s=fresh();s.assets=[];s=open(s,"capital",4);
+  s.after="market";s.decks.market=["set_202_market_42"];
+  s=decide(s,"buy");
+  const effects=s.log.filter(line=>line.effectType==="financial_result"&&line.playerId==="a");
+  assert.deepEqual(effects.map(line=>[line.slug,line.cashChangeCents,line.cashflowChangeCents]),[
+    ["set_202_capital_04",-600000,2000],["set_202_market_42",0,3000]
+  ]);
+});
+test("202: an automatic market card with no affected assets explains the empty result",()=>{
+  const before=fresh();before.assets=[];
+  const s=open(before,"market",42);
+  assert.ok(s.log.some(line=>line.slug==="set_202_market_42"&&line.text==="Карточка не потребовала действий и не изменила финансы участников"));
+  assert.equal(s.log.some(line=>line.slug==="set_202_market_42"&&line.effectType==="financial_result"),false);
+});
 test("202: all physical cards have active typed rules identical to the import",()=>{
   assert.equal(cards.length,138);assert.equal(Object.keys(rules202).length,138);
   for(const card of cards){assert.equal(card.isActive,true,card.slug);assert.deepEqual(JSON.parse(card.meta.find(m=>m.metaKey==="game202_rule")!.metaValue),rules202[card.slug]);}
@@ -123,7 +159,7 @@ test("202: negative cashflow alone does not cause bankruptcy; snapshot round-tri
 test("202: deterministic autonomous game reaches full victory without hidden-deck decisions",()=>{
   let seed=2939485;const rng=(max:number)=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%max;};
   let s=newGame202(profiles.map(p=>({...p,savings:200000})),rng);const bots={a:"expert_v1",b:"balanced_v1",c:"beginner_v1"};
-  let steps=0;for(;steps<15000&&!s.winner;steps++){const action=botCommand202(public202(s),bots);assert.ok(action,`No decision at ${JSON.stringify(s.queue[0])}`);try{s=command202(s,action.playerId,action.command,rng);}catch(error){throw new Error(`Step ${steps}: ${JSON.stringify(action)}: ${String(error)}`);}}
+  let steps=0;for(;steps<15000&&!s.winner;steps++){const action=botCommand202(public202(s),bots);assert.ok(action,`No decision at ${JSON.stringify(s.queue[0])}`);try{const before=s;s=command202(s,action.playerId,action.command,rng);assert202CashHistory(before,s);}catch(error){throw new Error(`Step ${steps}: ${JSON.stringify(action)}: ${String(error)}`);}}
   assert.ok(s.winner,`No full victory after ${steps} decisions`);assert.equal(s.queue.length,0);
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { canEscape202, fastTrackCells, finances202, type Command202, type Task202 } from "@cashflow/shared";
+import { canEscape202, fastTrackCells, finances202, type Command202 } from "@cashflow/shared";
 import { Button } from "@/components/ui/button";
 import { RatRaceBoard, RatRaceMobileBoard, RatRaceTabs } from "./rat-race-layout";
 import { MobileTurnDialog } from "./mobile-turn-dialog";
@@ -19,19 +19,19 @@ import { publicApiBaseUrl } from "@/lib/api";
 import type { GameSnapshot } from "@/lib/types";
 
 const cash = (cents:number) => new Intl.NumberFormat("ru-RU",{style:"currency",currency:"USD",maximumFractionDigits:cents%100?2:0}).format(cents/100);
-const taskNames:Record<Task202["kind"],string>={roll:"Ваш ход",choose:"Выберите направление сделки",deal:"Инвестиционная возможность",quote:"Открыты торги",sale:"Предложение покупателя",exchange:"Обмен недвижимости",right:"Приоритет на недвижимость",insurance:"Страхование недвижимости",contamination:"Очистка участка",university:"Образование ребёнка",charity:"Благотворительность",auction:"Благотворительный аукцион",debt:"Покройте обязательный платёж",escape:"Доступен большой круг",fast:"Возможность большого круга",mentor:"Совет наставника"};
 
 /** Extension of the existing game room: warm surfaces, chosen figurines and explicit financial decisions. */
-export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTrack,onTrackChange}: {
+export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTrack,onTrackChange,controlledPlayerId}: {
   snapshot:GameSnapshot;
   token:string;
   currentUserId:string;
+  controlledPlayerId?:string|undefined;
   onSnapshot:(next:GameSnapshot)=>void;
   showFastTrack:boolean;
   onTrackChange:(track:"RAT_RACE"|"FAST_TRACK")=>void;
 }) {
   const state=snapshot.game202!;
-  const me=snapshot.players.find(p=>p.userId===currentUserId&&p.role==="PLAYER"&&p.status==="JOINED");
+  const me=snapshot.players.find(p=>(snapshot.sandbox&&controlledPlayerId?p.id===controlledPlayerId:p.userId===currentUserId)&&p.role==="PLAYER"&&p.status==="JOINED");
   const mine=state.players.find(p=>p.id===me?.id);
   const selectedPlayer=mine??state.players[state.current]??state.players[0]!;
   const track=showFastTrack?"FAST_TRACK":"RAT_RACE";
@@ -43,7 +43,7 @@ export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTr
   useEffect(()=>{
     if(tabRequest.tab!=="turn"||tabRequest.sequence===0)return;
     const frame=requestAnimationFrame(()=>{
-      const decision=Array.from(document.querySelectorAll<HTMLElement>('.game-room--202 [aria-label="Текущее решение"]'))
+      const decision=Array.from(document.querySelectorAll<HTMLElement>('.game-room--202 [aria-label="Действия по текущей карточке"]'))
         .find(element=>element.getClientRects().length>0);
       decision?.scrollIntoView({block:"start",behavior:"instant"});
     });
@@ -64,7 +64,6 @@ export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTr
   const person=(id:string)=>snapshot.players.find(p=>p.id===id);
   const name=(id:string)=>gamePlayerName(person(id));
   const card=t?.slug?snapshot.cards202?.find(c=>c.slug===t.slug):null;
-  const title=state.winner?`Победитель: ${name(state.winner)}`:card?.title??(t?taskNames[t.kind]:"Партия завершена");
   useEffect(()=>{setOffersOpen(false);setDice(mine?.track==="FAST_TRACK"?2:1);setError(null);},[t?.id,mine?.track]);
   const current=state.players[state.current]!;
   const activeName=t?.kind==="auction"?"Ожидаем ставки участников":name(t?.playerId??current.id);
@@ -72,7 +71,7 @@ export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTr
   const request=async(path:string,body:unknown)=>{
     if(busy)return false;setBusy(true);setError(null);
     try {
-      const response=await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${path}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
+      const response=await fetch(`${publicApiBaseUrl()}/api/games/${snapshot.game.id}/${snapshot.sandbox?"sandbox/action":path}`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify(snapshot.sandbox?{run:snapshot.sandbox.run,playerId:me?.id,action:path,payload:body}:body),signal:AbortSignal.timeout(20000)});
       const result=await response.json();if(!response.ok)throw new Error(typeof result.message==="string"?result.message:"Не удалось выполнить действие");
       if(result.snapshot)onSnapshot(result.snapshot);else if(result.game)onSnapshot(result);
       return true;
@@ -93,16 +92,13 @@ export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTr
   const availableOfferKinds=offerKinds202(state,mine,t);
   const visibleOffers=state.offers.filter(offer=>mine&&(offer.from===mine.id||offer.to===mine.id||offer.shares?.[mine.id]));
   const incomingOffer=visibleOffers.some(offer=>mine&&(offer.to===mine.id||offer.shares?.[mine.id])&&!offer.accepted.includes(mine.id));
+  const stageName=t?.kind==="choose"?"Выбор колоды":state.stage==="deal"?"Инвестиционная возможность":state.stage==="market"?"Рынок":t?.kind==="debt"?"Обязательный платёж":"Событие хода";
+  const responseStatus=t?.kind==="auction"?`Аукцион: ответили ${Object.keys(t.bids??{}).length} из ${t.candidates?.length??0}`:incomingOffer?"Вам поступило предложение":acting?"Ваше решение":`Решение ${activeName}`;
 
   const decision = <section className="min-w-0" aria-label="Решение по карточке">
-    <div className="mb-3 flex items-center gap-3">
-      {person(t?.playerId??current.id)?<GamePlayerMark player={person(t?.playerId??current.id)!} active/>:null}
-      <div>
-        {!card?<h2 className="text-xl font-extrabold">{title}</h2>:null}
-        <p className="text-sm text-muted">{acting?"Ваше решение":activeName}</p>
-      </div>
+    <div hidden={offersOpen}>
+      {mine&&t&&(acting||t.kind==="auction"&&mine.track==="RAT_RACE")?<Game202Decisions key={t.id} snapshot={snapshot} player={mine} task={t} disabled={!enabled} submission={submission} onCommand={command} onOpenBank={showBank} {...(availableOfferKinds.length?{onOffer:()=>setOffersOpen(true)}:{})}/>:null}
     </div>
-    {mine&&t&&(acting||t.kind==="auction"&&mine.track==="RAT_RACE")?<Game202Decisions key={t.id} snapshot={snapshot} player={mine} task={t} disabled={!enabled} submission={submission} onCommand={command} onOpenBank={showBank} {...(availableOfferKinds.length?{onOffer:()=>setOffersOpen(true)}:{})}/>:null}
     {!acting&&t&&t.kind!=="auction"?<p className="text-sm leading-6">Ожидаем решение участника. Финансовый отчёт доступен во вкладке «Игрок».</p>:null}
   </section>;
   const portfolio = <Game202Assets snapshot={snapshot} playerId={selectedPlayer.id}/>;
@@ -117,20 +113,24 @@ export function Game202Panel({snapshot,token,currentUserId,onSnapshot,showFastTr
     const loan=mine?.loans.find(item=>item.id===id);
     if(loan)void command({type:"repay",assetId:loan.id,amount:loan.balance});
   }}/>;
-  const decisionContents=<div className="space-y-4">
+  const decisionContents=<div className="space-y-4" aria-label="Действия по текущей карточке">
     {error&&!bankOpen?<p role="alert" className="text-sm font-bold text-red-700">{error}</p>:null}
     {t&&t.kind!=="roll"?decision:null}
     {mine?<Game202Offers key={t?.id??"offers"} snapshot={snapshot} player={mine} task={t} open={offersOpen} onClose={()=>setOffersOpen(false)} canOperate={canOperate} submission={submission} onCommand={command}/>:null}
   </div>;
-  const currentAction=card?<div data-card-slug={card.slug}>
-    <JournalCard {...game202CardContent(card,t?.rule)}/>
-    <div className="mt-3">{decisionContents}</div>
-  </div>:decisionContents;
+  const currentAction=<div className="space-y-3">
+    <div className="flex items-center gap-2" role="status" aria-label="Этап хода">
+      {person(t?.playerId??current.id)?<GamePlayerMark player={person(t?.playerId??current.id)!} size="sm"/>:null}
+      <p className="min-w-0 text-sm leading-6">Ход {name(current.id)} · <strong>{stageName}</strong> · {responseStatus}</p>
+    </div>
+    {card?<div data-card-slug={card.slug}><JournalCard {...game202CardContent(card,t?.rule)}/></div>:null}
+    {decisionContents}
+  </div>;
   const turn=<>
     {state.winner?<p role="status" className="my-3 rounded-xl bg-success/10 p-3 font-bold">Победитель: {name(state.winner)}</p>:null}
-    <Game202History snapshot={snapshot} token={token} viewerPlayerId={me?.id??null} currentActionPlayerId={acting||incomingOffer?mine?.id??null:t?.playerId??current.id} currentAction={t&&t.kind!=="roll"||visibleOffers.length?currentAction:null} {...(card?{currentCardSlug:card.slug}:{})}/>
+    <Game202History key={snapshot.sandbox?.run} snapshot={snapshot} token={token} viewerPlayerId={me?.id??null} currentActionPlayerId={acting||incomingOffer?mine?.id??null:t?.playerId??current.id} currentAction={t&&t.kind!=="roll"||visibleOffers.length?currentAction:null} {...(card?{currentCardSlug:card.slug}:{})}/>
   </>;
-  const history=<Game202History snapshot={snapshot} token={token} viewerPlayerId={me?.id??null} {...(card?{currentCardSlug:card.slug}:{})}/>;
+  const history=<Game202History key={snapshot.sandbox?.run} snapshot={snapshot} token={token} viewerPlayerId={me?.id??null} {...(card?{currentCardSlug:card.slug}:{})}/>;
   const canChooseDice=Boolean(mine&&(mine.track==="FAST_TRACK"?mine.fastCharity:mine.permanentCharity||mine.charityUntil>=mine.turns));
   const availableLoan=mine?loanLimit202(state,mine,finances202(state,mine).cashflow):0;
   const obligation=state.queue.find(task=>task.kind==="debt"&&task.playerId===mine?.id);

@@ -1,4 +1,4 @@
-import { botCommand202, public202, type State202 } from "@cashflow/shared";
+import { botCommand202, public202, isSandboxGame, type State202 } from "@cashflow/shared";
 import { fastTrackCells, fastTrackPrice, readFastTrackWorld, canEscapeRatRace } from "@cashflow/shared";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
@@ -196,6 +196,7 @@ export class GamesBotService implements OnModuleInit {
       for (let step = 0; step < maximumStepsPerRun; step += 1) {
         if (!(await this.renewLease(gameId, leaseToken))) return;
         const game = await this.loadGame(gameId);
+        if (game && isSandboxGame(game)) return;
         if (game?.gameType === "ADVANCED_202") {
           if (game.status !== GameStatus.IN_PROGRESS || !game.game202State) return;
           const decision = botCommand202(public202(game.game202State as unknown as State202), Object.fromEntries(game.players.filter(p => p.controller === PlayerController.BOT).map(p => [p.id, p.botStrategy ?? "balanced_v1"])));

@@ -53,15 +53,20 @@ export interface Log202 extends Partial<TurnContext202> {
   from?:number;
   to?:number;
   cell?:{index:number;type:string;label:string};
-  effectType?:"card_opened"|"dice";
+  effectType?:"card_opened"|"dice"|"financial_result"|"paycheck"|"expense";
+  beforeCashCents?:number;
+  afterCashCents?:number;
+  cashChangeCents?:number;
+  cashflowChangeCents?:number;
 }
 export interface State202 {
   version:1; revision:number; serial:number; current:number; round:number; players:Player202[]; assets:Asset202[];
   decks:Record<Deck202,string[]>; queue:Task202[]; after:"market"|"end"; stage:"roll"|"deal"|"market"|"other";
   offers:Offer202[]; world:FastTrackWorld; winner:string|null; shortGame:boolean;
   log:Log202[];
+  testControls?: { cards: Record<string, string[]>; dice: Record<string, number[]> };
 }
-export type Public202 = Omit<State202,"decks">;
+export type Public202 = Omit<State202,"decks"|"testControls">;
 export interface InitialPlayer202 { id:string; salary:number; passive:number; expenses:number; savings:number; childCost:number; dream:number; loans:Array<Omit<Loan202,"id">> }
 export type Command202 = {
   revision:number; type:"roll"|"choose"|"decide"|"loan"|"repay"|"bankruptcy"|"offer"|"accept"|"reject";
@@ -112,6 +117,22 @@ export function finances202(s:Pick<State202,"assets">,p:Player202) {
   return {passive,expenses,income:p.salary+passive,cashflow:p.salary+passive-expenses};
 }
 export function canEscape202(s:Pick<State202,"assets">,p:Player202) { const f=finances202(s,p); return p.track==="RAT_RACE"&&f.passive>=2*f.expenses&&!p.loans.some(l=>l.bank&&l.balance>0)&&p.cash>=0; }
+function financialSnapshot(s:State202) {
+  return s.players.map(p=>({id:p.id,cash:p.cash,cashflow:finances202(s,p).cashflow}));
+}
+function financialResults(s:State202,before:ReturnType<typeof financialSnapshot>,slug?:string) {
+  for(const previous of before) {
+    const p=player(s,previous.id);
+    const cashChangeCents=p.cash-previous.cash,cashflowChangeCents=finances202(s,p).cashflow-previous.cashflow;
+    if(cashChangeCents||cashflowChangeCents)event(s,p.id,"Финансовый результат",slug,{
+      effectType:"financial_result",beforeCashCents:previous.cash,afterCashCents:p.cash,cashChangeCents,cashflowChangeCents
+    });
+  }
+}
+/** Capture each automatic cash movement before a later card or turn changes the balance again. */
+function cashEvent(s:State202,p:Player202,beforeCashCents:number,text:string,effectType:"paycheck"|"expense") {
+  event(s,p.id,text,undefined,{effectType,beforeCashCents,afterCashCents:p.cash,cashChangeCents:p.cash-beforeCashCents});
+}
 function createProperty(s:State202,p:string,r:Property202,source:string) {
   const a:Asset202={id:id(s),name:r.acres?`Земля, ${r.acres} акров`:r.house?"Дом 2/1":`Дом на ${r.units} квартир`,source,kind:"property",owners:{[p]:10000},cost:money(r.cost),mortgage:money(r.mortgage),down:money(r.down),income:money(r.income),units:r.units,acres:r.acres,house:r.house,lockedUntil:{}};
   s.assets.push(a);return a;
@@ -151,6 +172,13 @@ function finishTurn(s:State202) {
 }
 function draw(s:State202,deck:Deck202,random:Random202) {
   if(!s.decks[deck].length)s.decks[deck]=shuffle(decks202[deck],random).slice(0,deck==="market"?25:undefined);
+  const scheduled=s.testControls?.cards[current(s).id];
+  const next=scheduled?.findIndex(slug=>decks202[deck].includes(slug))??-1;
+  if(scheduled&&next>=0) {
+    const slug=scheduled.splice(next,1)[0]!;
+    s.decks[deck]=s.decks[deck].filter(item=>item!==slug);
+    return slug;
+  }
   return s.decks[deck].shift()!;
 }
 function nextNeighbor(s:State202,p:string) {
@@ -181,6 +209,7 @@ function quoteEvent(s:State202,slug:string,r:Extract<Rule202,{kind:"quote"}>,own
   for(const symbol of r.symbols) {
     for(const p of s.players.filter(p=>p.track==="RAT_RACE")) {
       if(r.split){
+        if([...p.stocks,...p.shorts,...p.options].some(a=>a.symbol===symbol))event(s,p.id,`Количество акций и позиций ${symbol} удвоено`,slug);
         for(const a of [...p.stocks,...p.shorts,...p.options].filter(a=>a.symbol===symbol))a.quantity*=2;
         // Aggregate entry proceeds, premium and strike obligation stay constant.
       }
@@ -191,6 +220,7 @@ function quoteEvent(s:State202,slug:string,r:Extract<Rule202,{kind:"quote"}>,own
       }
       p.shorts=p.shorts.filter(a=>a.symbol!==symbol);
       if(r.bankrupt){
+        if([...p.stocks,...p.options,...p.shorts].some(a=>a.symbol===symbol))event(s,p.id,`Банкротство ${symbol}: прежние акции списаны, опционы и короткие позиции рассчитаны`,slug);
         p.stocks=p.stocks.filter(a=>a.symbol!==symbol);
         for(const option of p.options.filter(o=>o.symbol===symbol&&o.side==="put"))p.cash+=option.strikeTotal;
         p.options=p.options.filter(o=>o.symbol!==symbol);
@@ -222,19 +252,21 @@ function propertyOpportunity(s:State202,slug:string,p:string,r:Rule202) {
   for(const holder of [...rights].reverse()) resume=task(s,holder.p.id,"right",{slug,rule:r,rightId:holder.right.id,resume});
   s.queue.push(resume);
 }
-function reveal(s:State202,slug:string,owner:string,random:Random202,bypassMentor=false) {
+function reveal(s:State202,slug:string,owner:string,random:Random202,bypassMentor=false,alreadyOpened=false) {
   const r=rules202[slug];check(r,"Правило карточки не найдено");const p=player(s,owner);
-  event(s,p.id,"Открыта карточка",slug,{effectType:"card_opened"});
+  if(!alreadyOpened)event(s,p.id,"Открыта карточка",slug,{effectType:"card_opened"});
   const propertyWithRights=["property","market_property","exchange"].includes(r.kind)&&s.players.some(holder=>holder.track==="RAT_RACE"&&holder.rights.length>0);
   if(!bypassMentor&&p.id===current(s).id&&p.mentorUntil>=p.turns&&p.mentorUsed!==p.turns&&!propertyWithRights) {
     s.queue.push(task(s,p.id,"mentor",{slug,rule:r}));return;
   }
+  const before=financialSnapshot(s);
+  const lastEffect=s.log.at(-1);
   switch(r.kind){
     case "quote":quoteEvent(s,slug,r,owner);break;
     case "property":case "market_property":case "exchange":propertyOpportunity(s,slug,owner,r);break;
     case "right":case "option":case "d2y":case "investment":s.queue.push(task(s,owner,"deal",{slug,rule:r}));break;
     case "expense":{
-      if(r.children&&!p.children||r.threshold!==undefined&&finances202(s,p).passive<=money(r.threshold))break;
+      if(r.children&&!p.children||r.threshold!==undefined&&finances202(s,p).passive<=money(r.threshold)) {event(s,p.id,"Карточка вас не затронула: условие не выполнено",slug);break;}
       if(r.university){s.queue.push(task(s,p.id,"university",{slug,rule:r}));break;}
       p.cash-=money(r.cash)*(r.perChild?p.children:1);p.baseExpenses+=money(r.monthly);
       if(r.loan)p.loans.push({id:id(s),name:"Кредит по карточке расходов",balance:money(r.loan[0]),payment:money(r.loan[1]),bank:false});
@@ -253,14 +285,16 @@ function reveal(s:State202,slug:string,owner:string,random:Random202,bypassMento
         if(r.amount<0&&a.income<0)saleTask(s,owners(a)[0]!,slug,a,r);
       }break;
     }
-    case "wedding":if(p.children){p.children--;p.cash-=money(r.cost);const childLoan=p.loans.find(l=>l.child);if(childLoan)childLoan.payment=0;debt(s,p,true,"Свадьба ребёнка");}break;
+    case "wedding":if(p.children){p.children--;p.cash-=money(r.cost);const childLoan=p.loans.find(l=>l.child);if(childLoan)childLoan.payment=0;debt(s,p,true,"Свадьба ребёнка");event(s,p.id,"Один ребёнок покинул семью",slug);}else event(s,p.id,"Карточка вас не затронула: детей нет",slug);break;
     case "auction":s.queue.push(task(s,owner,"auction",{slug,candidates:[p,...nextNeighbor(s,owner)].map(p=>p.id),bids:{}}));break;
-    case "airport":{const a=highest(s,owner);if(a){distribute(s,a,a.down);removeAsset(s,a);}break;}
-    case "disaster":{const a=highest(s,owner);if(a){a.income=0;for(const ownerId of owners(a)){const o=player(s,ownerId);a.lockedUntil[ownerId]=o.laps+1;if(o.insurance)o.cash+=portion(a,o.id,a.down);}}break;}
-    case "insurance":if(!p.insurance)s.queue.push(task(s,owner,"insurance",{slug}));break;
+    case "airport":{const a=highest(s,owner);if(a){distribute(s,a,a.down);event(s,p.id,`Объект «${a.name}» изъят, первоначальный взнос возвращён владельцам`,slug);removeAsset(s,a);}else event(s,p.id,"Карточка вас не затронула: недвижимости нет",slug);break;}
+    case "disaster":{const a=highest(s,owner);if(a){a.income=0;for(const ownerId of owners(a)){const o=player(s,ownerId);a.lockedUntil[ownerId]=o.laps+1;if(o.insurance)o.cash+=portion(a,o.id,a.down);event(s,o.id,`Объект «${a.name}»: поток обнулён, продажа запрещена до следующего круга`,slug);}}else event(s,p.id,"Карточка вас не затронула: недвижимости нет",slug);break;}
+    case "insurance":if(!p.insurance)s.queue.push(task(s,owner,"insurance",{slug}));else event(s,p.id,"Страховка уже оформлена",slug);break;
     case "contamination":{const target=[...nextNeighbor(s,owner),p].find(p=>highest(s,p.id));if(target){const a=highest(s,target.id)!;if(!target.insurance)s.queue.push(task(s,target.id,"contamination",{slug,assetId:a.id}));}break;}
-    case "mentor":p.mentorUntil=p.turns+3;break;
+    case "mentor":p.mentorUntil=p.turns+3;event(s,p.id,"Получена помощь наставника на три следующих своих хода",slug);break;
   }
+  financialResults(s,before,slug);
+  if(!s.queue.length&&s.log.at(-1)===lastEffect)event(s,p.id,"Карточка не потребовала действий и не изменила финансы участников",slug);
 }
 function enterFast(s:State202,p:Player202) {
   check(canEscape202(s,p),"Для выхода нужен пассивный доход не меньше двойных расходов и погашенные банковские кредиты");
@@ -307,7 +341,10 @@ function fastBuy(s:State202,p:Player202,index:number,random:Random202) {
 function roll(s:State202,p:Player202,count:number,random:Random202) {
   const charity=p.permanentCharity||p.charityUntil>=p.turns;
   check(p.track==="FAST_TRACK"?(p.fastCharity?count>=1&&count<=3:count===2):(charity?count>=1&&count<=3:count===1),"Недопустимое число кубиков");
-  const dice=Array.from({length:count},()=>integer(random(6),0,5)+1), steps=dice.reduce((n,d)=>n+d,0);
+  const forced=s.testControls?.dice[p.id];
+  if(forced?.length)check(forced.length===count,"В песочнице задано другое количество кубиков. Измените бросок или настройку сценария");
+  const dice=forced?.length?forced.map(value=>integer(value,1,6)):Array.from({length:count},()=>integer(random(6),0,5)+1), steps=dice.reduce((n,d)=>n+d,0);
+  if(s.testControls)delete s.testControls.dice[p.id];
   const from=p.track==="FAST_TRACK"?p.fastPosition:p.position;
   const route=p.track==="FAST_TRACK"?fastTrackRoute(from,steps):null;
   const destination=route?route.at(-1)!:ratRaceBoard[(from+steps)%ratRaceBoard.length]!;
@@ -317,18 +354,26 @@ function roll(s:State202,p:Player202,count:number,random:Random202) {
   });
   if(p.track==="FAST_TRACK") {
     const cell=route!.at(-1)!;p.fastPosition=cell.index;
-    for(const crossed of route!)if(crossed.rule.kind==="cashflow")p.cash+=p.fastIncome;
+    for(const crossed of route!)if(crossed.rule.kind==="cashflow") {
+      const before=p.cash;p.cash+=p.fastIncome;cashEvent(s,p,before,"День денежного потока","paycheck");
+    }
     if(cell.rule.kind==="dream"&&s.players.some(o=>o.id!==p.id&&o.dream===cell.index)) {
       s.world.influence[cell.index]??=[];if(!s.world.influence[cell.index]!.includes(p.id))s.world.influence[cell.index]!.push(p.id);
     }
-    if(cell.rule.kind==="half_cash")p.cash-=Math.floor(p.cash/2);
-    else if(cell.rule.kind==="lose_cash")p.cash=0;
+    if(cell.rule.kind==="half_cash") {
+      const before=p.cash;p.cash-=Math.floor(p.cash/2);cashEvent(s,p,before,cell.label,"expense");
+    }
+    else if(cell.rule.kind==="lose_cash") {
+      const before=p.cash;p.cash=0;cashEvent(s,p,before,cell.label,"expense");
+    }
     else if(["business","chance_business","ipo","dream","charity"].includes(cell.rule.kind)&&s.world.owners[cell.index]!==p.id&&!(cell.rule.kind==="ipo"&&s.world.owners[cell.index])&&!(cell.rule.kind==="charity"&&p.fastCharity))s.queue.push(task(s,p.id,"fast",{cell:cell.index}));
     return;
   }
   for(let i=0;i<steps;i++) {
     p.position=(p.position+1)%ratRaceBoard.length;if(p.position===0)p.laps++;
-    if(ratRaceBoard[p.position]!.type==="paycheck") {p.cash+=finances202(s,p).cashflow;event(s,p.id,"День зарплаты");}
+    if(ratRaceBoard[p.position]!.type==="paycheck") {
+      const before=p.cash;p.cash+=finances202(s,p).cashflow;cashEvent(s,p,before,"День зарплаты","paycheck");
+    }
   }
   const cell=ratRaceBoard[p.position]!;
   s.stage="other";s.after="end";
@@ -336,7 +381,10 @@ function roll(s:State202,p:Player202,count:number,random:Random202) {
   else if(cell.type==="doodad")reveal(s,draw(s,"doodad",random),p.id,random);
   else if(cell.type==="charity")s.queue.push(task(s,p.id,"charity"));
   else if(cell.type==="baby"&&p.children<3)p.children++;
-  else if(cell.type==="downsized"){p.cash-=finances202(s,p).expenses;p.skip=2;debt(s,p,true,"Увольнение");}
+  else if(cell.type==="downsized") {
+    const before=p.cash;p.cash-=finances202(s,p).expenses;p.skip=2;debt(s,p,true,"Увольнение");
+    cashEvent(s,p,before,"Увольнение","expense");
+  }
   debt(s,p,true,"Обязательные платежи");
 }
 function buyDeal(s:State202,p:Player202,t:Task202,quantity:number) {
@@ -533,7 +581,7 @@ function decide(s:State202,p:Player202,t:Task202,c:Command202,random:Random202) 
     case "mentor":
       check(c.choice==="redraw"||c.choice==="keep"&&!t.mandatory,"Оставьте карточку или вытяните следующую");s.queue.shift();
       if(c.choice==="redraw"){p.mentorUsed=p.turns;const deck=(Object.keys(decks202) as Deck202[]).find(deck=>t.slug!.startsWith(`set_202_${deck}_`))!;reveal(s,draw(s,deck,random),p.id,random,true);}
-      else reveal(s,t.slug!,p.id,random,true);break;
+      else reveal(s,t.slug!,p.id,random,true,true);break;
   }
   s.offers=s.offers.filter(o=>!o.taskId||s.queue.some(t=>t.id===o.taskId));
 }
@@ -558,6 +606,16 @@ function commandText202(c:Command202,t:Task202|undefined) {
   if(t?.kind==="charity")return "Принята благотворительность";
   if(t?.kind==="contamination")return "Оплачена очистка участка";
   if(t?.kind==="debt")return "Обязательный платёж покрыт";
+  if(t?.kind==="deal") {
+    const rule=t.rule,kind=rule?.kind;
+    if(kind==="property"||kind==="market_property")return "Куплена недвижимость";
+    if(rule?.kind==="option")return `Куплен опцион ${rule.symbol}`;
+    if(kind==="right")return "Куплен приоритет на недвижимость";
+    if(kind==="d2y")return "Приобретён уровень D2Y";
+    if(kind==="exchange")return "Предложен обмен недвижимости";
+    if(kind==="investment")return "Приобретена инвестиция";
+  }
+  if(t?.kind==="fast")return "Куплена возможность большого круга";
   return "Принята инвестиционная возможность";
 }
 
@@ -584,6 +642,7 @@ export function command202(input:State202,actor:string,c:Command202,random:Rando
   check(input.version===1,"Неизвестная версия состояния 202");check(!input.winner,"Партия завершена");
   integer(c.revision,0);check(c.revision===input.revision,"Состояние изменилось. Обновите партию");
   const s:State202=structuredClone(input);const p=player(s,actor);s.revision++;
+  const beforeFinances=financialSnapshot(s);
   if(c.type==="loan") {
     check(p.track==="RAT_RACE","Кредит доступен на малом круге");
     const amount=integer(c.amount,1,money(100000000));check(amount%money(1000)===0,"Кредит кратен 1000");
@@ -607,6 +666,11 @@ export function command202(input:State202,actor:string,c:Command202,random:Rando
     else if(c.type==="choose") {check(t.kind==="choose"&&(c.choice==="capital"||c.choice==="cashflow"),"Выберите колоду");s.queue.shift();reveal(s,draw(s,c.choice,random),p.id,random);}
     else {check(c.type==="decide","Неизвестная команда");decide(s,p,t,c,random);}
   }
+  // Drawing a card records its own automatic effects; advancing to the market does so separately.
+  const revealsCard=c.type==="roll"||c.type==="choose"||c.type==="decide"&&(
+    input.queue[0]?.kind==="mentor"||input.queue[0]?.kind==="escape"&&(c.choice==="pass"||c.choice==="no")
+  );
+  if(!revealsCard)financialResults(s,beforeFinances,c.type==="decide"?input.queue[0]?.slug:undefined);
   event(s,p.id,commandText202(c,input.queue[0]),undefined,commandLog202(input,c));
   advance(s,random);validateState202(s);return s;
 }
@@ -614,4 +678,42 @@ export function validateState202(s:State202) {
   for(const p of s.players)for(const value of [p.cash,p.salary,p.baseExpenses,p.fastIncome,...p.stocks.flatMap(a=>[a.cost,a.quantity]),...p.shorts.flatMap(a=>[a.cost,a.quantity]),...p.options.flatMap(a=>[a.cost,a.quantity,a.strikeTotal])])check(Number.isSafeInteger(value),"Денежное значение вышло за допустимые пределы");
   for(const a of s.assets){check(Object.values(a.owners).every(v=>Number.isInteger(v)&&v>=0)&&Object.values(a.owners).reduce((n,v)=>n+v,0)<=10000,"Нарушены доли собственности");}
 }
-export function public202(s:State202):Public202 { const {decks,...view}=structuredClone(s);return view; }
+export function public202(s:State202):Public202 { const {decks,testControls,...view}=structuredClone(s);return view; }
+
+/** Server-authorized scenario setup. Acquired instruments use the normal purchase rules. */
+export function prepareSandbox202(input:State202, setup:{
+  track:"RAT_RACE"|"FAST_TRACK"; firstPlayerId:string;
+  players:Array<{playerId:string;cash:number;position:number;fastIncome:number;assets:Array<{slug:string;quantity:number}>;nextCards:string[];dice:number[]}>;
+}):State202 {
+  const s=structuredClone(input);
+  s.assets=[];s.offers=[];s.queue=[];s.winner=null;s.log=[];
+  s.testControls={cards:{},dice:{}};
+  s.current=s.players.findIndex(p=>p.id===setup.firstPlayerId);
+  check(s.current>=0,"Первый игрок не найден");
+  for(const config of setup.players) {
+    const p=player(s,config.playerId);
+    p.stocks=[];p.options=[];p.shorts=[];p.rights=[];p.d2y=[];
+    p.turns=0;
+    p.cash=money(10_000_000_000);
+    p.track=setup.track;p.position=setup.track==="RAT_RACE"?integer(config.position,-1,23):-1;p.fastPosition=Math.max(0,config.position);
+    if(setup.track==="FAST_TRACK") {p.position=-1;p.fastPosition=integer(config.position,0,47);}
+    p.fastIncome=p.initialFastIncome=money(integer(config.fastIncome,1,1_000_000));
+    for(const holding of config.assets) {
+      const rule=rules202[holding.slug];check(rule,"Карточка актива не найдена");
+      const quantity=integer(holding.quantity,1,1_000_000);
+      if(rule.kind==="quote") {
+        check(rule.price>0&&rule.symbols.length===1,"Эта карточка не задаёт начальный актив");
+        p.stocks.push({id:id(s),symbol:rule.symbols[0]!,quantity,cost:money(rule.price)*quantity});
+      } else {
+        if(!["option","investment"].includes(rule.kind))check(quantity===1,"Для этой карточки укажите количество 1");
+        buyDeal(s,p,task(s,p.id,"deal",{slug:holding.slug,rule}),quantity);
+      }
+    }
+    p.cash=money(integer(config.cash,0,10_000_000));
+    check(config.nextCards.every(slug=>Boolean(rules202[slug])),"Карточка следующего хода не найдена");
+    s.testControls.cards[p.id]=[...config.nextCards];
+    s.testControls.dice[p.id]=config.dice.map(value=>integer(value,1,6));
+  }
+  s.log=[];beginTurn(s);
+  validateState202(s);return s;
+}

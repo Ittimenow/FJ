@@ -31,6 +31,7 @@ import { SearchGameUsersDto } from "./dto/search-game-users.dto";
 import { UpdateHostParticipationDto } from "./dto/update-host-participation.dto";
 import { GamesRealtimeService } from "./games-realtime.service";
 import { GamesService } from "./games.service";
+import { CreateSandboxDto, SandboxActionDto, SandboxScenarioDto } from "./dto/sandbox.dto";
 
 @Controller("game-invites")
 export class GameInvitesController {
@@ -74,6 +75,42 @@ export class GamesController {
   @Get("card-sets")
   listPlayableCardSets(@Query() query: PlayableCardSetsQueryDto) {
     return this.games.listPlayableCardSets(query.gameType);
+  }
+
+  @Get("sandbox/access")
+  sandboxAccess(@CurrentUser() user: AuthenticatedUser) {
+    return this.games.sandboxAvailability(user.userId);
+  }
+
+  @Post("sandbox")
+  createSandbox(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateSandboxDto) {
+    return this.games.createSandbox(user.userId, dto);
+  }
+
+  @Get(":id/sandbox/cards")
+  sandboxCards(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.games.sandboxCatalog(id, user.userId);
+  }
+
+  @Post(":id/sandbox/scenario")
+  async sandboxScenario(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: SandboxScenarioDto) {
+    const result = await this.games.applySandboxScenario(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/sandbox/reset")
+  async sandboxReset(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.resetSandbox(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/sandbox/action")
+  async sandboxAction(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: SandboxActionDto) {
+    const result = await this.games.sandboxAction(id, user.userId, dto);
+    this.realtime.broadcastAction(id, result);
+    return result;
   }
 
   @Post(":id/202/command")

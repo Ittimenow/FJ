@@ -42,6 +42,10 @@ import {
   figurines
 } from "@cashflow/shared";
 import { randomInt, randomUUID } from "node:crypto";
+import { isSandboxGame, prepareSandbox202, type SandboxScenario, type SandboxView, type SandboxCard } from "@cashflow/shared";
+import { canUseSandbox } from "./sandbox-access";
+import { CreateSandboxDto, SandboxActionDto, SandboxScenarioDto } from "./dto/sandbox.dto";
+import { executeSandboxAction } from "./sandbox-actions";
 import { chooseBotDream, type BotLevel } from "./bot-strategy";
 import { cents, toSerializable } from "../common/json";
 import { PrismaService } from "../prisma/prisma.service";
@@ -209,6 +213,7 @@ type GamePendingAction =
     };
 
 interface GameSettings {
+  sandbox?: SandboxView & { version: 1; startSequence: number; initialDecks?: Partial<Record<CardType, CardDeckState>> | undefined };
   pendingAction?: GamePendingAction | null;
   timeLimitMinutes?: number | null;
   periodCount?: number;
@@ -328,6 +333,151 @@ export function createBotPlayers(names: string[], occupiedFigurines = new Set<st
 @Injectable()
 export class GamesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async sandboxAvailability(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, status: true, email: true } });
+    return { allowed: canUseSandbox(user) };
+  }
+
+  private async requireSandboxAdmin(userId: string) {
+    if (!(await this.sandboxAvailability(userId)).allowed) throw new ForbiddenException("Песочница доступна только назначенному администратору");
+  }
+
+  private async requireSandboxOwner(gameId: string, userId: string) {
+    await this.requireSandboxAdmin(userId);
+    const game = await this.prisma.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: { orderBy: { seat: "asc" } } } });
+    if (!isSandboxGame(game) || game.createdById !== userId) throw new ForbiddenException("Это не ваша тестовая песочница");
+    return game;
+  }
+
+  async createSandbox(userId: string, dto: CreateSandboxDto) {
+    await this.requireSandboxAdmin(userId);
+    const created = await this.createSoloGame(userId, { ...dto, botCount: 1, testing: true, title: `Песочница ${dto.gameType}` }, "Второй игрок");
+    const game = await this.prisma.game.findUniqueOrThrow({ where: { id: created.game.id }, include: { players: { orderBy: { seat: "asc" } } } });
+    const scenario: SandboxScenario = {
+      track: "RAT_RACE", firstPlayerId: game.players[0]!.id,
+      players: game.players.map(player => ({ playerId: player.id, cash: 10_000, position: -1, fastIncome: 100_000, assets: [], fastAssets: [], nextCards: [], dice: [] }))
+    };
+    const settings = this.normalizedSettings(game.settings);
+    await this.prisma.$transaction(async tx => {
+      await tx.game.update({ where: { id: game.id }, data: { settings: { ...settings, sandbox: { version: 1, scenario, run: 0, startSequence: 0, nextCards: {}, dice: {}, initialDecks: settings.cardDecks } } as unknown as Prisma.InputJsonValue } });
+      const taken = new Set(game.players.map(p => p.figurine).filter(Boolean));
+      for (const player of game.players) {
+        const figurine = player.figurine ?? figurines.find(f => !taken.has(f.id))!.id;
+        taken.add(figurine);
+        await tx.gamePlayer.update({ where: { id: player.id }, data: { figurine, isReady: true, dreamCellIndex: player.dreamCellIndex ?? fastTrackCells.find(c => c.rule.kind === "dream")!.index } });
+      }
+    });
+    await this.startGame(game.id, userId);
+    return (await this.applySandboxScenario(game.id, userId, scenario)).snapshot;
+  }
+
+  async sandboxCatalog(gameId: string, userId: string): Promise<SandboxCard[]> {
+    const game = await this.requireSandboxOwner(gameId, userId);
+    const cards = await this.prisma.card.findMany({ where: { cardSetId: game.cardSetId, isActive: true }, include: { meta: true, effects: true, conditions: true }, orderBy: [{ cardType: "asc" }, { id: "asc" }] });
+    return cards.map(card => {
+      const rule = game.gameType === GameType.ADVANCED_202 ? rules202[card.slug] : undefined;
+      const stock = rule?.kind === "quote" || this.isStockDeal(card, this.metaMap(card.meta));
+      const canOwn = rule ? ["property", "market_property", "right", "option", "d2y", "investment"].includes(rule.kind)
+        || rule.kind === "quote" && rule.price > 0 && rule.symbols.length === 1
+        : [CardType.SMALL_DEAL, CardType.BIG_DEAL].includes(card.cardType as "SMALL_DEAL" | "BIG_DEAL") && !this.hasAutomaticCardEffects(card) && !this.networkMarketingCard(card);
+      const typeLabel = rule ? card.slug.includes("_capital_") ? "Прирост капитала" : card.slug.includes("_cashflow_") ? "Денежный поток" : cardTypeLabel(card.cardType) : cardTypeLabel(card.cardType);
+      return { id: card.id, slug: card.slug, title: card.title, bodyText: card.bodyText, cardType: card.cardType, typeLabel, canOwn, quantityStep: rule?.kind === "option" ? 100 : 1, quantityMax: rule?.kind === "option" ? 5000 : stock || rule?.kind === "investment" && rule.repeat ? 1_000_000 : 1 };
+    });
+  }
+
+  async applySandboxScenario(gameId: string, userId: string, scenario: SandboxScenarioDto) {
+    await this.requireSandboxOwner(gameId, userId);
+    const emitted: PendingEvent[] = [];
+    const catalog = await this.sandboxCatalog(gameId, userId);
+    await this.prisma.$transaction(async tx => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: { include: { profession: true }, orderBy: { seat: "asc" } } } });
+      const settings = this.normalizedSettings(game.settings);
+      const previous = settings.sandbox!;
+      const ids = game.players.map(p => p.id);
+      if (scenario.players.length !== 2 || new Set(scenario.players.map(p => p.playerId)).size !== 2 || scenario.players.some(p => !ids.includes(p.playerId)) || !ids.includes(scenario.firstPlayerId)) throw new BadRequestException("Сценарий должен содержать обоих участников этой партии");
+      for (const setup of scenario.players) {
+        if (setup.position > (scenario.track === "FAST_TRACK" ? 47 : 23) || scenario.track === "FAST_TRACK" && setup.position < 0) throw new BadRequestException("Позиция не принадлежит выбранному кругу");
+        if (setup.nextCards.some(id => !catalog.some(card => card.id === id))) throw new BadRequestException("Выберите карточки из набора этой партии");
+        for (const asset of setup.assets) {
+          const card = catalog.find(card => card.id === asset.cardId);
+          if (!card?.canOwn || asset.quantity > card.quantityMax || asset.quantity % card.quantityStep) throw new BadRequestException("Карточка или количество не подходит для начального актива");
+        }
+      }
+      let world = readFastTrackWorld({});
+      const inputs: InitialPlayer202[] = [];
+      for (const player of game.players) {
+        const setup = scenario.players.find(p => p.playerId === player.id)!;
+        if (!player.profession) throw new BadRequestException("Профессия участника не найдена");
+        await this.createInitialFinancialState(tx, player.id, player.profession);
+        await tx.gamePlayer.update({ where: { id: player.id }, data: { status: GamePlayerStatus.JOINED, position: scenario.track === "RAT_RACE" ? setup.position : -1, fastTrackPosition: Math.max(0, setup.position), track: scenario.track, lastTurnAt: null } });
+        const f = await tx.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: player.id } });
+        const loans = await tx.playerLiability.findMany({ where: { gamePlayerId: player.id } });
+        inputs.push({ id: player.id, dream: player.dreamCellIndex!, salary: Number(f.salaryCents), passive: Number(f.basePassiveIncomeCents), expenses: Number(f.baseExpensesCents), savings: 0, childCost: Number(f.perChildCostCents), loans: loans.map(l => ({ name: l.name, balance: Number(l.balanceCents), payment: Number(l.paymentCents), bank: l.type === "bank_loan" })) });
+        let fastIncome = setup.fastIncome;
+        for (const index of setup.fastAssets) {
+          const cell = fastTrackCells[index];
+          if (!cell || !["business", "chance_business", "ipo"].includes(cell.rule.kind) || world.owners[index]) throw new BadRequestException("Выберите свободный актив большого круга");
+          const purchase = settleFastTrackPurchase({ cell, playerId: player.id, dreamCellIndex: player.dreamCellIndex, cash: 1_000_000_000, income: fastIncome, initialIncome: setup.fastIncome, charity: false, world, die: 6 });
+          world = purchase.world;fastIncome = purchase.income;
+        }
+        await tx.playerFinancialState.update({ where: { gamePlayerId: player.id }, data: { cashCents: BigInt(setup.cash), fastTrackStartIncomeCents: BigInt(setup.fastIncome), fastTrackIncomeCents: BigInt(fastIncome), ...(scenario.track === "FAST_TRACK" ? { escapedRatRaceAt: new Date() } : {}) } });
+        if (game.gameType === GameType.CLASSIC_101) {
+          for (const asset of setup.assets) {
+            const card = await tx.card.findUniqueOrThrow({ where: { id: asset.cardId }, include: { meta: true, effects: true } });
+            const meta = this.metaMap(card.meta);
+            const stock = this.isStockDeal(card, meta);
+            const unitPrice = this.dealUnitPriceCents(card, meta, stock);
+            const cashEffect = this.buyableCardActionAmount(card.effects, cardActionTypes.cashAdjust);
+            const down = cashEffect !== null ? BigInt(Math.abs(cents(cashEffect))) : stock ? unitPrice : BigInt(dealDownPaymentAmount(meta, Number(unitPrice)));
+            const flow = this.buyableCardActionAmount(card.effects, cardActionTypes.cashflowAdjust) ?? BigInt(Math.round(Number(meta.cashflow_monthly ?? "0")));
+            const quantity = BigInt(asset.quantity);
+            await tx.playerAsset.create({ data: { gamePlayerId: player.id, sourceCardId: card.id, type: card.category ?? card.cardType.toLowerCase(), name: card.category?.toLowerCase() === "business" ? card.title : realEstateAssetName({ name: card.title, sourceCard: card }), symbol: (stock ? this.stockSymbol(card, meta) : meta.symbol) ?? null, quantity: asset.quantity, units: asset.quantity, costBasisCents: unitPrice * quantity, marketValueCents: unitPrice * quantity, downPaymentCents: down * quantity, cashflowCents: flow * quantity } });
+          }
+          await this.recalculatePlayer(tx, player.id, emitted);
+        }
+      }
+      let state202: State202 | undefined;
+      if (game.gameType === GameType.ADVANCED_202) {
+        try {
+          state202 = prepareSandbox202(newGame202(inputs, max => max - 1), { ...scenario, players: scenario.players.map(p => ({ ...p, assets: p.assets.map(a => ({ slug: catalog.find(c => c.id === a.cardId)!.slug, quantity: a.quantity })), nextCards: p.nextCards.map(id => catalog.find(c => c.id === id)!.slug) })) });
+        } catch (error) { throw new BadRequestException((error as Error).message); }
+        state202.revision = ((game.game202State as unknown as State202 | null)?.revision ?? 0) + 1;
+        state202.world = world;
+        for (const p of state202.players) {
+          const f = await tx.playerFinancialState.findUniqueOrThrow({ where: { gamePlayerId: p.id } });
+          p.fastIncome = Number(f.fastTrackIncomeCents) * 100;
+        }
+        await this.project202(tx, state202);
+      }
+      const latest = await tx.gameEvent.findFirst({ where: { gameId }, orderBy: { sequence: "desc" }, select: { sequence: true } });
+      const sandbox: NonNullable<GameSettings["sandbox"]> = { version: 1, scenario, run: previous.run + 1, startSequence: (latest?.sequence ?? 0) + 1, initialDecks: previous.initialDecks, nextCards: Object.fromEntries(scenario.players.map(p => [p.playerId, [...p.nextCards]])), dice: Object.fromEntries(scenario.players.map(p => [p.playerId, [...p.dice]])) };
+      await tx.game.update({ where: { id: gameId }, data: {
+        status: GameStatus.IN_PROGRESS, endedAt: null, currentRound: 1, currentTurnIndex: ids.indexOf(scenario.firstPlayerId), fastTrackWorld: world as unknown as Prisma.InputJsonValue,
+        ...(state202 ? { game202State: state202 as unknown as Prisma.InputJsonValue } : {}),
+        settings: { ...settings, sandbox, pendingAction: null, cardDecks: previous.initialDecks, timeLimitMinutes: null, periodDeadlineAt: null, remainingPeriodSeconds: null, pausedAt: null, pauseReason: null } as unknown as Prisma.InputJsonValue
+      } });
+      emitted.push({ type: "sandbox:prepared", payload: { run: sandbox.run, message: "Тестовая ситуация подготовлена" } });
+      if (state202) for (const line of state202.log) { const { playerId, ...payload } = line; emitted.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, revision: state202.revision, gameType: "202" } }); }
+      await this.appendEvents(tx, gameId, userId, emitted);
+    }, { timeout: 30_000 });
+    return this.actionResult(gameId, emitted);
+  }
+
+  async resetSandbox(gameId: string, userId: string) {
+    const game = await this.requireSandboxOwner(gameId, userId);
+    return this.applySandboxScenario(gameId, userId, this.normalizedSettings(game.settings).sandbox!.scenario);
+  }
+
+  async sandboxAction(gameId: string, userId: string, dto: SandboxActionDto) {
+    const game = await this.requireSandboxOwner(gameId, userId);
+    if (dto.run !== this.normalizedSettings(game.settings).sandbox!.run) throw new ConflictException("Сценарий уже перезапущен. Обновите состояние партии");
+    const player = game.players.find(p => p.id === dto.playerId && p.role === GameRole.PLAYER && p.status === GamePlayerStatus.JOINED);
+    if (!player) throw new ForbiddenException("Участник не найден в этой песочнице");
+    const actorId = player.controller === PlayerController.BOT ? this.botActorId(player.id) : userId;
+    return executeSandboxAction(this, gameId, actorId, dto);
+  }
 
   botActorId(gamePlayerId: string) {
     return `${botActorPrefix}${gamePlayerId}`;
@@ -465,7 +615,7 @@ export class GamesService {
     };
   }
 
-  async createSoloGame(userId: string, dto: CreateSoloGameDto) {
+  async createSoloGame(userId: string, dto: CreateSoloGameDto, controlledParticipantName?: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { status: true, figurine: true, role: true }
@@ -486,7 +636,7 @@ export class GamesService {
     if (user.figurine && isFigurineId(user.figurine)) {
       occupiedFigurines.add(user.figurine);
     }
-    const botPlayers = createBotPlayers(await this.drawBotNames(this.prisma, botCount), occupiedFigurines, dto.botLevels).map((player, index) => ({
+    const botPlayers = createBotPlayers(controlledParticipantName ? [controlledParticipantName] : await this.drawBotNames(this.prisma, botCount), occupiedFigurines, dto.botLevels).map((player, index) => ({
       ...player,
       botStrategy: dto.botLevels?.[index] ?? player.botStrategy,
       seat: index + 2,
@@ -673,7 +823,7 @@ export class GamesService {
 
   private async rollFastTrack(
     tx: Tx,
-    game: { id: string; currentRound: number; currentTurnIndex: number; settings: Prisma.JsonValue; fastTrackWorld: Prisma.JsonValue; players: Array<{ id: string; dreamCellIndex: number | null }> },
+    game: { id: string; isTest?: boolean; currentRound: number; currentTurnIndex: number; settings: Prisma.JsonValue; fastTrackWorld: Prisma.JsonValue; players: Array<{ id: string; dreamCellIndex: number | null }> },
     player: { id: string; fastTrackPosition: number; dreamCellIndex: number | null; financialState: NonNullable<Prisma.PlayerFinancialStateGetPayload<{}>> | null },
     activeIndex: number, requestedCount: number | undefined, events: PendingEvent[]
   ) {
@@ -681,7 +831,7 @@ export class GamesService {
     let count: number;
     try { count = fastTrackDiceCount(state.fastTrackCharity, requestedCount); }
     catch (error) { throw new BadRequestException((error as Error).message); }
-    const diceValues = Array.from({ length: count }, () => rollDie());
+    const diceValues = await this.rollValues(tx, game, player.id, count);
     const steps = diceValues.reduce((sum, value) => sum + value, 0);
     const route = fastTrackRoute(player.fastTrackPosition, steps);
     const cell = route[route.length - 1]!;
@@ -1389,7 +1539,7 @@ export class GamesService {
           }
         });
         await this.createInitialFinancialState(tx, player.id, profession);
-        if (game.isTest) {
+        if (game.isTest && !isSandboxGame(game)) {
           const options = game.settings as Record<string, number>;
           await this.initializeFastTrack(tx, player.id, options.testIncomeCents ?? 100_000, emittedEvents, options.testCashCents ?? 500_000);
         }
@@ -1405,7 +1555,7 @@ export class GamesService {
           inputs.push({ id: row.id, dream: row.dreamCellIndex!, salary: Number(f.salaryCents), passive: Number(f.basePassiveIncomeCents), expenses: Number(f.baseExpensesCents), savings: Number(row.profession?.savingsCents ?? 0), childCost: Number(f.perChildCostCents), loans: row.liabilities.map(l => ({ name: l.name, balance: Number(l.balanceCents), payment: Number(l.paymentCents), bank: l.type === "bank_loan" })) });
         }
         state202 = newGame202(inputs, max => randomInt(max));
-        if (game.isTest) {
+        if (game.isTest && !isSandboxGame(game)) {
           const options = game.settings as Record<string, number>;
           for (const p of state202.players) { p.track = "FAST_TRACK"; p.cash = (options.testCashCents ?? 500_000) * 100; p.fastIncome = p.initialFastIncome = (options.testIncomeCents ?? 100_000) * 100; }
         }
@@ -1439,7 +1589,7 @@ export class GamesService {
       if (state202) {
         for (const line of state202.log) {
           const { playerId, ...payload } = line;
-          emittedEvents.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, ...(game.isTest && payload.turnKey ? { track: "FAST_TRACK" } : {}), gameType: "202" } });
+          emittedEvents.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, ...(game.isTest && !isSandboxGame(game) && payload.turnKey ? { track: "FAST_TRACK" } : {}), gameType: "202" } });
         }
       }
       if (timeline.timeLimitMinutes !== null) {
@@ -1505,7 +1655,7 @@ export class GamesService {
     const paused = await this.prisma.$transaction(async (tx) => {
       const game = await tx.game.findUnique({ where: { id: gameId } });
       if (
-        !game ||
+        !game || isSandboxGame(game) ||
         game.mode !== GameMode.SOLO ||
         game.status !== GameStatus.IN_PROGRESS
       ) {
@@ -1845,7 +1995,7 @@ export class GamesService {
       }
 
       const charityDiceActive = currentPlayer.financialState.charityTurns > 0;
-      const diceValues = charityDiceActive ? [rollDie(), rollDie()] : [rollDie()];
+      const diceValues = await this.rollValues(tx, game, currentPlayer.id, charityDiceActive ? 2 : 1);
       const dice = diceValues.reduce((sum, value) => sum + value, 0);
       const move = moveOnCircularTrack(currentPlayer.position, dice);
       const cell = ratRaceBoard[move.to];
@@ -2109,7 +2259,8 @@ export class GamesService {
         tx,
         gameId,
         game.settings,
-        dto.cardType
+        dto.cardType,
+        player.id
       );
       const { card } = draw;
       const gameSettings = draw.settings;
@@ -3958,8 +4109,10 @@ export class GamesService {
 
   async replay(gameId: string, userId: string) {
     await this.ensureGameAccess(gameId, userId);
+    const game = await this.prisma.game.findUniqueOrThrow({ where: { id: gameId }, select: { isTest: true, settings: true } });
+    const startSequence = isSandboxGame(game) ? this.normalizedSettings(game.settings).sandbox!.startSequence : undefined;
     const events = await this.prisma.gameEvent.findMany({
-      where: { gameId },
+      where: { gameId, ...(startSequence !== undefined ? { sequence: { gte: startSequence } } : {}) },
       orderBy: { sequence: "asc" },
       include: {
         actor: { select: { id: true, displayName: true } },
@@ -4118,7 +4271,8 @@ export class GamesService {
         tx,
         gameId,
         currentSettings,
-        cardType
+        cardType,
+        gamePlayerId
       );
       const { card } = draw;
       currentSettings = draw.settings;
@@ -5747,15 +5901,27 @@ export class GamesService {
     });
   }
 
+  private async rollValues(tx: Tx, game: { id: string; isTest?: boolean; settings: Prisma.JsonValue }, playerId: string, count: number) {
+    const settings = this.normalizedSettings(game.settings);
+    const forced = isSandboxGame(game) ? settings.sandbox?.dice[playerId] : undefined;
+    if (!forced?.length) return Array.from({ length: count }, () => rollDie());
+    if (forced.length !== count) throw new BadRequestException("В сценарии задано другое количество кубиков. Измените бросок или настройку сценария");
+    delete settings.sandbox!.dice[playerId];
+    game.settings = settings as unknown as Prisma.JsonValue;
+    await tx.game.update({ where: { id: game.id }, data: { settings: game.settings as Prisma.InputJsonValue } });
+    return forced;
+  }
+
   private async drawCardFromDeck(
     tx: Tx,
     gameId: string,
     settings: Prisma.JsonValue,
-    cardType: CardType
+    cardType: CardType,
+    playerId?: string
   ): Promise<CardDeckDrawResult> {
     const game = await tx.game.findUniqueOrThrow({
       where: { id: gameId },
-      select: { cardSetId: true }
+      select: { cardSetId: true, isTest: true }
     });
     const baseSettings = this.normalizedSettings(settings);
     const cardDecks = baseSettings.cardDecks
@@ -5772,6 +5938,15 @@ export class GamesService {
       }
     }
     let deck = this.normalizedDeck(cardDecks[cardType]);
+    if (game.isTest && baseSettings.sandbox && playerId) {
+      const planned = baseSettings.sandbox.nextCards[playerId] ?? [];
+      const candidates = await tx.card.findMany({ where: { id: { in: planned }, cardSetId: game.cardSetId, cardType, isActive: true }, select: { id: true } });
+      const index = planned.findIndex(id => candidates.some(card => card.id === id));
+      if (index >= 0) {
+        const [forcedId] = planned.splice(index, 1);
+        deck = { ...deck, drawPile: [forcedId!, ...deck.drawPile.filter(id => id !== forcedId)], discardPile: deck.discardPile.filter(id => id !== forcedId) };
+      }
+    }
     if (deck.drawPile.length === 0 && deck.discardPile.length > 0) {
       deck = {
         drawPile: this.shuffled(deck.discardPile),
@@ -6494,6 +6669,11 @@ export class GamesService {
   }
 
   private async ensureGameAccess(gameId: string, userId: string) {
+    const room = await this.prisma.game.findUnique({ where: { id: gameId }, select: { isTest: true, settings: true, createdById: true } });
+    if (room && isSandboxGame(room)) {
+      await this.requireSandboxAdmin(userId);
+      if (room.createdById !== userId) throw new ForbiddenException("Это не ваша тестовая песочница");
+    }
     const player = await this.prisma.gamePlayer.findFirst({
       where: {
         gameId,
@@ -6514,6 +6694,10 @@ export class GamesService {
       include: { players: true }
     });
     if (!game) throw new NotFoundException("Игра не найдена");
+    if (isSandboxGame(game)) {
+      await this.requireSandboxAdmin(userId);
+      if (game.createdById !== userId) throw new ForbiddenException("Это не ваша тестовая песочница");
+    }
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, status: true }
@@ -6880,6 +7064,10 @@ export class GamesService {
         fastTrackWorld: readFastTrackWorld(game.fastTrackWorld),
         pendingAction: game.gameType === "ADVANCED_202" ? null : this.publicPendingAction(this.pendingAction(game.settings))
       },
+      sandbox: isSandboxGame(game) ? (() => {
+        const { scenario, run, nextCards, dice } = this.normalizedSettings(game.settings).sandbox!;
+        return { scenario, run, nextCards, dice };
+      })() : undefined,
       game202: game.game202State ? sealedPublic202(game.game202State as unknown as State202) : null,
       cards202: game.gameType === "ADVANCED_202" ? await this.prisma.card.findMany({ where: { cardSetId: game.cardSetId }, select: { slug: true, title: true, bodyText: true } }) : undefined,
       board: ratRaceBoard,
@@ -6889,7 +7077,7 @@ export class GamesService {
         figurine: player.figurine && isFigurineId(player.figurine) ? player.figurine : selectedFigurines.get(player.id) ?? null,
         assets: player.assets.map((asset) => ({ ...asset, name: realEstateAssetName(asset) }))
       })),
-      events: [...game.events].reverse().map(event => ({ ...event, stateSnapshot: sealedSavedSnapshot202(event.stateSnapshot) })),
+      events: [...game.events].filter(event => !isSandboxGame(game) || event.sequence >= this.normalizedSettings(game.settings).sandbox!.startSequence).reverse().map(event => ({ ...event, stateSnapshot: sealedSavedSnapshot202(event.stateSnapshot) })),
       chatMessages: [
         ...game.chatMessages,
         ...gameChatNotices(game, noticeEvents.reverse(), game.players, game.gameType !== "ADVANCED_202" && game.rulesVersion === 2 && game.status === GameStatus.IN_PROGRESS

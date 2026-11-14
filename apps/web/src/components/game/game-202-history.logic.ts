@@ -67,6 +67,52 @@ export function currentCardOpening202(events: GameEvent[], slug: string | undefi
     .sort((left, right) => right.sequence - left.sequence)[0];
 }
 
+const emptyHistoryText = new Set(["Начало хода", "Решение по открытой карточке"]);
+
+/** Join a command only to its recorded results and explanation, never another actor or revision. */
+export function prepare202History(events: GameEvent[]) {
+  const compact = compact202History(events);
+  const ordered = [...compact].sort((a,b)=>a.sequence-b.sequence);
+  const consumed = new Set<string>();
+  const replacements = new Map<string, GameEvent>();
+  for (const command of ordered.filter(event => event.payload.kind === "command")) {
+    const key = rollGroup202(command);
+    if (!key) continue;
+    const related = ordered.filter(event => event.id !== command.id && rollGroup202(event) === key);
+    const results = related.filter(event => event.payload.effectType === "financial_result"
+      && event.sequence < command.sequence && event.payload.slug === command.payload.slug);
+    const explanation = related.find(event => event.payload.kind === "bot" && !emptyHistoryText.has(String(event.payload.text)));
+    results.forEach(event => consumed.add(event.id));
+    related.filter(event => event.payload.kind === "bot").forEach(event => consumed.add(event.id));
+    // These effect labels repeat the successful command; its amounts are retained below.
+    for (const event of related) {
+      if (event.sequence >= command.sequence || event.payload.kind !== "effect") continue;
+      if (event.payload.text === "Приобретён актив" && command.payload.choice === "buy" && event.payload.slug === command.payload.slug
+        || event.payload.text === "Погашен кредит" && command.payload.commandType === "repay"
+        || typeof event.payload.text === "string" && event.payload.text.startsWith("Получен кредит ") && command.payload.commandType === "loan") consumed.add(event.id);
+    }
+    const totals = results.reduce((sum,event) => ({
+      cashChangeCents: sum.cashChangeCents + (finiteNumber(event.payload.cashChangeCents) ? event.payload.cashChangeCents : 0),
+      cashflowChangeCents: sum.cashflowChangeCents + (finiteNumber(event.payload.cashflowChangeCents) ? event.payload.cashflowChangeCents : 0)
+    }), {cashChangeCents:0,cashflowChangeCents:0});
+    const cashResults = results.filter(event => event.payload.cashChangeCents !== 0);
+    const first = cashResults[0]?.payload, last = cashResults.at(-1)?.payload;
+    const continuous = cashResults.length > 0 && cashResults.every((event,index) => {
+      const {beforeCashCents,afterCashCents,cashChangeCents} = event.payload;
+      return finiteNumber(beforeCashCents) && finiteNumber(afterCashCents)
+        && afterCashCents-beforeCashCents === cashChangeCents
+        && (index === 0 || cashResults[index-1]!.payload.afterCashCents === beforeCashCents);
+    });
+    replacements.set(command.id, {...command, payload: {...command.payload,
+      ...(results.length ? totals : {}),
+      ...(continuous ? {beforeCashCents:first!.beforeCashCents,afterCashCents:last!.afterCashCents} : {}),
+      ...(explanation ? { explanation: explanation.payload.text } : {})
+    }});
+  }
+  return compact.filter(event => !consumed.has(event.id) && !emptyHistoryText.has(String(event.payload.text)))
+    .map(event => replacements.get(event.id) ?? event);
+}
+
 /** Older games kept their starting portfolios only in JSON. Reconcile occurrences, not just unique text. */
 export function legacy202HistoryEvents(events: GameEvent[], log: Log202[], players: GamePlayer[], gameId: string) {
   const persisted = events.filter(event => event.type === "game202:action" && !game202TurnContext(event) && event.payload.kind !== "setup")

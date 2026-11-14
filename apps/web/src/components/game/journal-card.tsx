@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { localizeGameText } from "@/lib/game-labels";
+import { uniqueJournalCardText } from "./journal-card.logic";
 
 /** Each mode supplies its own labels and already formatted amounts. */
 export type JournalCardContent = {
@@ -90,6 +91,10 @@ export function JournalCard({
   children
 }: JournalCardContent & { children?: ReactNode }) {
   const appearance = journalCardAppearances[cardType] ?? defaultJournalCardAppearance;
+  const content = uniqueJournalCardText({title, bodyText: bodyText ?? null, financialDetails, effectDetails});
+  bodyText = content.bodyText;
+  financialDetails = content.financialDetails;
+  effectDetails = content.effectDetails;
   return (
     <div
       data-journal-card={cardType}

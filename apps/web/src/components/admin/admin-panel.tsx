@@ -29,6 +29,7 @@ import { AdminMonitoringPanel } from "@/components/admin/admin-monitoring-panel"
 import { AdminPublicationsPanel } from "@/components/admin/admin-publications-panel";
 import { AdminUsersPanel } from "@/components/admin/admin-users-panel";
 import { CreateGameForm } from "@/components/game/create-game-form";
+import { CreateSandboxForm } from "@/components/game/create-sandbox-form";
 import { JoinGameForm } from "@/components/game/join-game-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -155,6 +156,7 @@ export function AdminPanel({
         </aside>
 
         <main className="min-w-0">
+        {section === "dashboard" || section === "games" ? <CreateSandboxForm token={token} /> : null}
         {section === "dashboard" ? (
           <AdminDashboard portalStats={portalStats} games={games} token={token} />
         ) : null}

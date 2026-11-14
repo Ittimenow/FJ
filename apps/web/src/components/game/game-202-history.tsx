@@ -9,14 +9,23 @@ import { GameActionHistory } from "./game-action-history";
 import { mergeActionEvents } from "./game-action-history.logic";
 import { game202TurnContext } from "./game-journal";
 import { GamePlayerMark } from "./game-player-mark";
-import { compact202History, currentCardOpening202, isCardOpening202, legacy202HistoryEvents, recordedMovement202 } from "./game-202-history.logic";
+import { prepare202History, currentCardOpening202, isCardOpening202, legacy202HistoryEvents, recordedMovement202 } from "./game-202-history.logic";
 import { JournalCard } from "./journal-card";
 import { game202CardContent } from "./game-202-card-model";
 import { TurnMovement } from "./turn-movement";
+import { CashChangeVisualization } from "./cash-change-visualization";
+import { eventCashChange } from "./game-event-result";
+import { money202 } from "./financial-presentation";
 
-const money202 = (value: number) => new Intl.NumberFormat("ru-RU", {
-  style: "currency", currency: "USD", maximumFractionDigits: value % 100 ? 2 : 0
-}).format(value / 100);
+function financialResult(event: GameEvent) {
+  const cash = eventCashChange(event), flow = event.payload.cashflowChangeCents;
+  const hasFlow = typeof flow === "number" && Number.isFinite(flow) && flow !== 0;
+  if (!cash?.deltaCents && !hasFlow) return null;
+  return <div>
+    {cash ? <CashChangeVisualization change={cash} formatMoney={money202}/> : null}
+    {hasFlow ? <p className="m-0 text-sm leading-6 font-medium">Денежный поток {flow>0?"+":""}{money202(flow)}/мес.</p> : null}
+  </div>;
+}
 
 /** The same turn cards as 101, backed by explicit 202 turn metadata and the durable replay archive. */
 export function Game202History({ snapshot, token, viewerPlayerId, currentAction, currentCardSlug, currentActionPlayerId }: {
@@ -44,7 +53,7 @@ export function Game202History({ snapshot, token, viewerPlayerId, currentAction,
   const editionEvents = history.filter(event => event.type === "game202:action");
   const groupedEvents = editionEvents.filter(event => game202TurnContext(event));
   const preparation = editionEvents.filter(event => event.payload.kind === "setup");
-  const legacy = compact202History(legacy202HistoryEvents(editionEvents, state.log, snapshot.players, snapshot.game.id));
+  const legacy = prepare202History(legacy202HistoryEvents(editionEvents, state.log, snapshot.players, snapshot.game.id));
   const currentOpening = currentCardOpening202(editionEvents, currentCardSlug, currentTurnKey);
 
   async function loadEarlier() {
@@ -57,7 +66,7 @@ export function Game202History({ snapshot, token, viewerPlayerId, currentAction,
     return data.events.filter(event => game202TurnContext(event));
   }
 
-  const action = (event: GameEvent) => {
+  const action = (event: GameEvent): ReactNode => {
     const movement = recordedMovement202(event);
     if (movement) return <TurnMovement {...movement}/>;
     if (event.payload.commandType === "roll") return <span title="Результат броска отсутствует в этой сохранённой записи"><TurnMovement diceValues={[]}/></span>;
@@ -65,12 +74,20 @@ export function Game202History({ snapshot, token, viewerPlayerId, currentAction,
       ? snapshot.cards202?.find(item => item.slug === event.payload.slug)
       : null;
     const text = typeof event.payload.text === "string" ? event.payload.text : "Действие игрока";
-    if (card && isCardOpening202(event)) return <div data-card-slug={card.slug}><JournalCard {...game202CardContent(card)}/></div>;
+    if (card && isCardOpening202(event)) {
+      return <div data-card-slug={card.slug}><JournalCard {...game202CardContent(card)}/></div>;
+    }
+    const result = financialResult(event);
+    if(event.payload.effectType==="financial_result")return result;
+    const hasCardInTurn = card && game202TurnContext(event) && editionEvents.some(opening => isCardOpening202(opening)
+      && opening.payload.slug === card.slug && opening.payload.turnKey === event.payload.turnKey);
     return <div className="min-w-0 text-sm leading-6">
-      <p className="m-0">{text}{card ? ` — ${card.title}` : ""}</p>
+      <p className="m-0">{text}{card && !hasCardInTurn ? ` — ${card.title}` : ""}</p>
+      {result}
+      {typeof event.payload.explanation === "string" ? <p className="m-0 text-xs text-muted">{event.payload.explanation}</p> : null}
       {event.payload.kind === "command" && typeof event.payload.quantity === "number" && event.payload.commandType !== "roll"
         ? <p className="m-0 text-xs text-muted">Количество: {event.payload.quantity}</p> : null}
-      {event.payload.kind === "command" && event.payload.taskKind !== "auction" && typeof event.payload.amountCents === "number"
+      {event.payload.kind === "command" && event.payload.taskKind !== "auction" && typeof event.payload.amountCents === "number" && !result
         ? <p className="m-0 text-xs text-muted">Сумма: {money202(event.payload.amountCents)}</p> : null}
     </div>;
   };
@@ -96,8 +113,7 @@ export function Game202History({ snapshot, token, viewerPlayerId, currentAction,
       {...(currentTurnKey ? { currentTurnKey } : {})}
       currentAction={currentAction}
       {...(currentActionPlayerId ? {currentActionPlayerId} : {})}
-      prepareEvents={compact202History}
-      chronologicalActions
+      prepareEvents={prepare202History}
       {...(currentOpening ? { currentActionEventId: currentOpening.id } : {})}
       gameStatus={snapshot.game.status}
       hasEarlierEvents={snapshot.events.length >= 80}

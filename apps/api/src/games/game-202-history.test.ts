@@ -1,3 +1,4 @@
+import { assert202CashHistory } from "./game-202-cash-history.assert";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { command202, fastTrackCells, fastTrackRoute, newGame202, ratRaceBoard, type Command202, type State202 } from "@cashflow/shared";
@@ -11,7 +12,9 @@ function fresh(count = 3) {
   })), random);
 }
 function act(state: State202, actor: string, command: Omit<Command202, "revision">) {
-  return command202(state, actor, { ...command, revision: state.revision }, random);
+  const next=command202(state, actor, { ...command, revision: state.revision }, random);
+  assert202CashHistory(state,next);
+  return next;
 }
 
 test("202 history separates preparation and establishes a stable first-turn identity", () => {
@@ -28,6 +31,7 @@ test("202 history separates preparation and establishes a stable first-turn iden
 test("202 roll records an exact route from start in the same event as the dice", () => {
   const initial=fresh();
   const state=command202(initial,"a",{revision:initial.revision,type:"roll",taskId:initial.queue[0]!.id,quantity:1},()=>1);
+  assert202CashHistory(initial,state);
   const movement=state.log.find(line=>line.effectType==="dice")!;
   assert.deepEqual({from:movement.from,to:movement.to,dice:movement.dice,values:movement.diceValues,cell:movement.cell},
     {from:-1,to:1,dice:2,values:[2],cell:{index:1,type:"doodad",label:"Всякая всячина"}});
@@ -43,6 +47,7 @@ test("202 multi-dice movement keeps wraparound and every crossed payday", () => 
   initial.players[0]!.position=20;
   initial.players[0]!.permanentCharity=true;
   const state=command202(initial,"a",{revision:initial.revision,type:"roll",taskId:initial.queue[0]!.id,quantity:3},()=>5);
+  assert202CashHistory(initial,state);
   const movement=state.log.find(line=>line.effectType==="dice")!;
   assert.deepEqual([movement.from,movement.to,movement.dice,movement.diceValues],[20,14,18,[6,6,6]]);
   assert.deepEqual(movement.cell,ratRaceBoard[14]);
@@ -56,6 +61,7 @@ test("202 large-track movement records the route actually followed by the engine
   initial.players[0]!.fastPosition=-1;
   const state=command202(initial,"a",{revision:initial.revision,type:"roll",taskId:initial.queue[0]!.id,quantity:2},()=>0);
   const destination=fastTrackRoute(-1,2).at(-1)!;
+  assert202CashHistory(initial,state);
   const movement=state.log.find(line=>line.effectType==="dice")!;
   assert.deepEqual([movement.from,movement.to,movement.dice,movement.diceValues],[-1,destination.index,2,[1,1]]);
   assert.deepEqual(movement.cell,{index:destination.index,type:destination.type,label:destination.label});
@@ -166,8 +172,9 @@ test("202 API preserves turn metadata and command records in the durable event s
   assert.ok(rows.every(event => event.payload.gameType === "202"));
 });
 
-test("202 API persists exact movement fields instead of reconstructing positions from the current snapshot", async () => {
+test("202 API persists exact movement and cash balances instead of reconstructing history", async () => {
   const state=fresh();
+  state.players[0]!.position=4;
   const emitted:Array<{type:string;payload:Record<string,unknown>}>=[];
   const tx={
     $queryRaw:async()=>[],
@@ -184,9 +191,36 @@ test("202 API persists exact movement fields instead of reconstructing positions
   });
   await service.act202("room","owner",{revision:state.revision,type:"roll",taskId:state.queue[0]!.id,quantity:1});
   const move=emitted.find(event=>event.payload.effectType==="dice")!.payload;
-  assert.equal(move.from,-1);
-  assert.equal(move.to,Number(move.dice)-1);
+  assert.equal(move.from,4);
+  assert.equal(move.to,Number(move.dice)+4);
   assert.deepEqual(move.diceValues,[move.dice]);
   assert.deepEqual(move.cell,ratRaceBoard[Number(move.to)]);
   assert.equal(move.turnKey,"a:1");
+  const cash=emitted.find(event=>event.payload.effectType==="paycheck")!.payload;
+  assert.equal(cash.beforeCashCents,state.players[0]!.cash);
+  assert.equal(Number(cash.afterCashCents)-Number(cash.beforeCashCents),cash.cashChangeCents);
+});
+
+test("202 a roll keeps each payday and the following unemployment expense separate",()=>{
+  const before=fresh();before.assets=[];
+  const p=before.players[0]!;p.position=1;p.permanentCharity=true;p.cash=40000;p.salary=0;p.basePassive=0;p.baseExpenses=100000;
+  const after=command202(before,"a",{revision:before.revision,type:"roll",taskId:before.queue[0]!.id,quantity:3},()=>5);
+  assert202CashHistory(before,after);
+  const cash=after.log.filter(row=>row.revision===after.revision&&row.cashChangeCents!==undefined);
+  assert.deepEqual(cash.map(row=>[row.text,row.beforeCashCents,row.cashChangeCents,row.afterCashCents]),[
+    ["День зарплаты",40000,-100000,-60000],["День зарплаты",-60000,-100000,-160000],["Увольнение",-160000,-100000,-260000]
+  ]);
+});
+
+test("202 fast-track cash losses preserve exact balances including odd cents",()=>{
+  for(const kind of ["half_cash","lose_cash"]){
+    const before=fresh();const p=before.players[0]!;p.track="FAST_TRACK";p.cash=10001;p.fastIncome=0;
+    const target=fastTrackCells.find(cell=>cell.rule.kind===kind)!;
+    p.fastPosition=fastTrackCells.find(cell=>fastTrackRoute(cell.index,2).at(-1)!.index===target.index)!.index;
+    const after=command202(before,"a",{revision:before.revision,type:"roll",taskId:before.queue[0]!.id,quantity:2},()=>0);
+    assert202CashHistory(before,after);
+    const expense=after.log.find(row=>row.effectType==="expense")!;
+    assert.equal(expense.beforeCashCents,10001);
+    assert.equal(expense.afterCashCents,kind==="half_cash"?5001:0);
+  }
 });

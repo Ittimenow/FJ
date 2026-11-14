@@ -2,6 +2,7 @@
 
 import {
   Bot,
+  FlaskConical,
   Bell,
   CircleDot,
   Circle,
@@ -68,6 +69,7 @@ export interface GameRoomHeaderState {
   trackView: "RAT_RACE" | "FAST_TRACK" | null;
   onTrackChange: (track: "RAT_RACE" | "FAST_TRACK") => void;
   onCheckConnection: () => void;
+  onOpenSandbox?: (() => void) | undefined;
 }
 
 const GameRoomHeaderContext = createContext<{
@@ -152,6 +154,7 @@ export function GameRoomHeaderSlot({ profile }: { profile?: ReactNode }) {
             </div>
           </div> : null}
           <div className="hidden xl:block"><HostShortcuts state={state} /></div>
+          {state.onOpenSandbox ? <button type="button" onClick={state.onOpenSandbox} aria-label="Открыть песочницу" title="Песочница" className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-card text-journey hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-action/25 xl:w-auto xl:px-3"><FlaskConical size={19} aria-hidden="true" /><span className="hidden font-extrabold xl:inline">Песочница</span></button> : null}
           {!state.isSolo && state.remainingSeconds !== null ? (
             <span
               className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-card px-2.5 py-2 font-extrabold tabular-nums text-ink xl:inline-flex"

@@ -34,17 +34,17 @@ test('202 replay pages merge by explicit turn identity even when the turn start 
   const after=playerActionTurns(mergeActionEvents(recent,earlier),players,null,false,'boris');
   assert.equal(before[0]?.id,after[0]?.id);
   assert.equal(after[0]?.player.id,'anna');
-  assert.deepEqual(after[0]?.events.map(item=>item.sequence),[82,92]);
+  assert.deepEqual(after[0]?.events.map(item=>item.sequence),[92,82]);
   assert.deepEqual(after[0]?.otherActions[0]?.events.map(item=>item.sequence),[91]);
 });
 
-test('202 owner actions are oldest first and each other participant gets one ordered group below', () => {
+test('202 owner actions are newest first and each other participant gets one ordered group below', () => {
   const people=[...players,{id:'vera',userId:'u3'}] as GamePlayer[];
   const row=(sequence:number,id:string)=>event(sequence,'game202:action',id,{turnKey:'anna:4',turnOwnerGamePlayerId:'anna',kind:'command',revision:sequence});
   const input=[row(7,'anna'),row(6,'boris'),row(5,'vera'),row(4,'anna'),row(3,'boris'),row(2,'anna'),row(1,'anna')];
   const turn=playerActionTurns(input,people)[0]!;
-  assert.deepEqual(turn.events.map(item=>item.sequence),[1,2,4,7]);
-  assert.deepEqual(turn.otherActions.map(group=>[group.player.id,group.events.map(item=>item.sequence)]),[['boris',[3,6]],['vera',[5]]]);
+  assert.deepEqual(turn.events.map(item=>item.sequence),[7,4,2,1]);
+  assert.deepEqual(turn.otherActions.map(group=>[group.player.id,group.events.map(item=>item.sequence)]),[['boris',[6,3]],['vera',[5]]]);
   assert.deepEqual(input.map(item=>item.sequence),[7,6,5,4,3,2,1]);
 });
 
