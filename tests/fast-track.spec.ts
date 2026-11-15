@@ -1079,12 +1079,31 @@ for (const track of ['small', 'large']) {
       await expect(card.locator('.game-turn-other-action [data-player-id="boris"]')).toHaveAttribute('data-figurine', 'cat-in-box');
       await expect(card.locator('.game-turn-other-action').first()).toContainText('1 000');
       await expect(card.locator('.game-turn-other-action').last()).toContainText('Квартира 2/1');
-      const dots = await card.locator('.game-turn-event').evaluateAll(elements => elements.map(element => ({ content: getComputedStyle(element, '::before').content, left: element.getBoundingClientRect().left + parseFloat(getComputedStyle(element, '::before').left) })));
-      expect(dots.every(dot => dot.content === '""' && dot.left > (0))).toBe(true);
-      expect(new Set(dots.map(dot => dot.left)).size).toBe(1);
-      expect(dots[0]!.left).toBeGreaterThanOrEqual((await card.boundingBox())!.x);
+      const markers = card.locator('.game-turn-event > .game-turn-marker');
+      await expect(markers).toHaveCount(4);
+      expect(await markers.evaluateAll(elements => elements.map(element => element.getAttribute('data-action-icon')))).toEqual(['decision', 'dice', 'bank', 'sale']);
+      for (const marker of await markers.all()) {
+        await expect(marker).toBeVisible();
+        await expect(marker.locator('svg')).toHaveCount(1);
+        await expect(marker.locator('svg')).toBeVisible();
+      }
+      const bounds = await markers.evaluateAll(elements => elements.map(element => {
+        const { left, right, top, bottom, width, height } = element.getBoundingClientRect();
+        return { left, right, top, bottom, width, height };
+      }));
+      const cardBounds = (await card.boundingBox())!;
+      expect(Math.max(...bounds.map(marker => marker.left)) - Math.min(...bounds.map(marker => marker.left))).toBeLessThanOrEqual(1);
+      for (const marker of bounds) {
+        expect(marker.width).toBeGreaterThan(0);
+        expect(marker.height).toBeGreaterThan(0);
+        expect(marker.left).toBeGreaterThanOrEqual(cardBounds.x);
+        expect(marker.right).toBeLessThanOrEqual(cardBounds.x + cardBounds.width);
+        expect(marker.top).toBeGreaterThanOrEqual(cardBounds.y);
+        expect(marker.bottom).toBeLessThanOrEqual(cardBounds.y + cardBounds.height);
+      }
+      expect(await card.locator('.game-turn-event').evaluateAll(elements => elements.map(element => getComputedStyle(element, '::before').content))).toEqual(['none', 'none', 'none', 'none']);
       expect(await card.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
-      await page.screenshot({ path: join(output, `turn-layout-${track}-${width}-decision.png`), fullPage: true });
+      await test.info().attach('turn-timeline', { body: await page.screenshot({ path: test.info().outputPath('turn-timeline.png'), fullPage: true }), contentType: 'image/png' });
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     });
   }
