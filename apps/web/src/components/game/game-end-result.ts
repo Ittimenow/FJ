@@ -57,7 +57,7 @@ export function gameEndPresentation({
     };
   }
 
-  if (reason === "all_players_bankrupt") {
+  if (reason === "all_players_bankrupt" || reason === "all_players_departed") {
     return {
       icon: "circle-off",
       tone: "danger",

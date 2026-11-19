@@ -17,7 +17,7 @@ export function GameRoomFixture({ snapshot }: { snapshot: GameSnapshot }) {
       mode: 'SOLO',
       createdById: 'admin',
       status: params.get('status') === 'WAITING' ? 'WAITING' : 'IN_PROGRESS',
-      gameType: '101',
+      gameType: params.get('mode') === '202' ? '202' : '101',
       gameTypeSelected: true,
       cardSet: { id: 'fixture-101', name: 'Тестовый 101' },
       maxPlayers: 6,
@@ -69,6 +69,6 @@ export function GameRoomFixture({ snapshot }: { snapshot: GameSnapshot }) {
     };
   }, [initialSnapshot]);
   return <SessionProvider session={null}><GameRoomHeaderProvider><AppShell userName="Анна" gameViewportMode={initialSnapshot.game.status === 'WAITING' ? null : initialSnapshot.players[0]!.user!.gameRoomView}>
-    <GameRoom key={version} initialSnapshot={restored} token="fixture" currentUserId={new URLSearchParams(location.search).get("viewer") ?? "admin"} currentUserRole="ADMIN" gameRoomView={initialSnapshot.players[0]!.user!.gameRoomView ?? 'classic'} timeZone={null} />
+    <GameRoom key={version} initialSnapshot={restored} token="fixture" currentUserId={new URLSearchParams(location.search).get("viewer") ?? "admin"} currentUserRole={new URLSearchParams(location.search).get("ordinary") ? "USER" : "ADMIN"} gameRoomView={initialSnapshot.players[0]!.user!.gameRoomView ?? 'classic'} timeZone={null} />
   </AppShell></GameRoomHeaderProvider></SessionProvider>;
 }

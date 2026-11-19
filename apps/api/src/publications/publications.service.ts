@@ -600,7 +600,7 @@ function buildFacts(game: {
   const startingById = new Map(startingRows.map((row) => [String(record(row)?.id ?? ""), record(record(row)?.financialState)]));
   const endEvent = [...game.events].reverse().find((event) => event.type === "game:ended");
   const endPayload = record(endEvent?.payload);
-  const players: SummaryPlayerFacts[] = game.players.map((player) => {
+  const players: SummaryPlayerFacts[] = game.players.filter(player => player.financialState || !["LEFT", "KICKED"].includes(player.status)).map((player) => {
     const start = startingById.get(player.id);
     const finalCashflowCents = Number((player.track === "FAST_TRACK" ? player.financialState?.fastTrackIncomeCents : player.financialState?.monthlyCashflowCents) ?? 0);
     const finalPassiveIncomeCents = Number((player.track === "FAST_TRACK" ? player.financialState?.fastTrackIncomeCents : player.financialState?.passiveIncomeCents) ?? 0);

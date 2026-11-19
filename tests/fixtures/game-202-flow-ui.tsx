@@ -38,6 +38,10 @@ function initial() {
   }
   if(scenario==='incoming')state.offers=[{id:'joint',kind:'joint',from:'anna',to:'boris',price:600000,taskId:'property',shares:{anna:6000,boris:4000},accepted:['anna'],turn:1}];
   if(state.queue[0]?.slug)state.log.push({revision:0,playerId:'anna',kind:'effect',effectType:'card_opened',text:'Открыта карточка',slug:state.queue[0].slug,turnKey:'anna:1',turnOwnerGamePlayerId:'anna',turnNumber:1,round:1,track:'RAT_RACE'});
+  if(query.has('allFast')) {
+    for(const p of state.players){p.track='FAST_TRACK';p.fastIncome=p.initialFastIncome=10000000;}
+    state.queue=[{id:'roll',kind:'roll',playerId:'anna'}];state.stage='roll';state.after='end';
+  }
   return state;
 }
 
@@ -81,6 +85,7 @@ function App() {
           return new Response(JSON.stringify({snapshot:snapshot(next)}),{status:200});
         }catch(error){return new Response(JSON.stringify({message:(error as Error).message}),{status:400});}
       }
+      if(url.endsWith('/leave')||url.endsWith('/expel'))return original(input,init);
       if(url.includes('/api/games/flow-fixture'))return new Response(JSON.stringify(snapshot(state)));
       if(url.includes('/api/auth/session'))return new Response('{}');
       return new Response('[]');
@@ -88,7 +93,7 @@ function App() {
     document.documentElement.dataset.fixtureReady='true';
     return ()=>{window.fetch=original;};
   },[state]);
-  if(query.get('mode')==='101')return <GameRoomFixture snapshot={view}/>;
+  if(query.get('mode')==='101'||query.has('departure'))return <GameRoomFixture snapshot={view}/>;
   return <SessionProvider session={null}><GameRoomHeaderProvider><AppShell userName="Анна" gameViewportMode="classic">
     <div className="game-room game-room--classic-active game-room--202"><Game202Panel snapshot={view} token="fixture" currentUserId={viewer} onSnapshot={setView} showFastTrack={false} onTrackChange={()=>{}}/></div>
   </AppShell></GameRoomHeaderProvider></SessionProvider>;

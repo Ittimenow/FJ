@@ -60,3 +60,12 @@ test("summary reads as a short story instead of a duplicate statistics block", (
   assert.doesNotMatch(summary.body, /3 игрока · 22 раунда/);
   assert.ok(summary.body.length <= 1024);
 });
+
+test("summary distinguishes voluntary exits and expulsions without awarding a victory", () => {
+  const player = { name: "Анна", mention: "Анна", profession: null, figurine: null, finalCashCents: 0, finalCashflowCents: 0, finalPassiveIncomeCents: 0, cashflowDeltaCents: 0, passiveIncomeDeltaCents: 0, assetsCount: 0, track: "RAT_RACE" };
+  const summary = composeGameSummary({ gameId: "game", title: "Тест", endedAt: "2026-11-19", durationMinutes: 10, rounds: 3, endReason: "all_players_departed", winnerGamePlayerId: null, players: [{ ...player, id: "a", status: "LEFT" }, { ...player, id: "b", name: "Борис", mention: "Борис", status: "KICKED" }], highlights: [], awards: [] });
+  assert.match(summary.body, /Анна: добровольно завершил участие досрочно/);
+  assert.match(summary.body, /Борис: удалён из партии ведущим или администратором/);
+  assert.match(summary.body, /победителя нет/);
+  assert.doesNotMatch(summary.body, /банкрот/);
+});

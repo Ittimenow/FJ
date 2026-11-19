@@ -165,6 +165,20 @@ export class GamesController {
     return result;
   }
 
+  @Post(":id/leave")
+  async leave(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    const result = await this.games.departPlayer(id, user.userId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
+  @Post(":id/players/:playerId/expel")
+  async expel(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Param("playerId") playerId: string) {
+    const result = await this.games.departPlayer(id, user.userId, playerId);
+    this.realtime.broadcastAction(id, result);
+    return result;
+  }
+
   @Post(":id/start")
   async start(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     const result = await this.games.startGame(id, user.userId);

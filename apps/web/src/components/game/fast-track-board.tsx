@@ -1,5 +1,7 @@
 "use client";
 
+import { PlayerDepartureButton } from "./player-departure";
+
 import { fastTrackCells, fastTrackOwner, fastTrackPrice, readFastTrackWorld, type FastTrackCell } from "@cashflow/shared";
 import { BriefcaseBusiness, Dices, UserRound } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -202,6 +204,7 @@ function PlayerOverview({ snapshot, player, mobile }: { snapshot: GameSnapshot; 
       <div className="player-goal-row"><span>Благотворительность</span><strong>{state?.fastTrackCharity ? "Активна · 1–3 кубика" : "Не оплачена · 2 кубика"}</strong></div>
     </div> : <PlayerAssets snapshot={snapshot} player={player} />}
     <section className="player-income-progress" aria-label="Ваш доход к победе"><FastTrackResult player={player} showDream={false} /></section>
+    <PlayerDepartureButton player={player} />
     <OtherPlayersList className="mt-4 border-t border-line/70 pt-4" players={snapshot.players.filter((other) => other.role === "PLAYER" && other.id !== player.id)} currentPlayerId={snapshot.game.currentPlayerId} />
   </section>;
 }

@@ -51,6 +51,12 @@ export function GameResultsPage({ results, viewerId }: { results: GameResultsRes
           </div>
         ) : null}
 
+        {results.players.some(player => Boolean(player.financialState) && (player.status === "LEFT" || player.status === "KICKED")) ? <section className="mt-5 rounded-2xl bg-white p-5 shadow-panel" aria-label="Выбывшие участники">
+          <h2 className="text-lg font-bold">Досрочно завершили участие</h2>
+          <ul className="mt-3 space-y-3">{results.players.filter(player => Boolean(player.financialState) && (player.status === "LEFT" || player.status === "KICKED")).map(player => <li key={player.id} className="flex items-center gap-3">
+            <GamePlayerMark player={player} size="sm" /><div className="min-w-0 break-words"><strong>{gamePlayerName(player)}</strong><p className="text-sm text-muted">{player.status === "LEFT" ? "Добровольный выход" : "Удалён ведущим или администратором"} · показатели зафиксированы на момент выбытия</p></div>
+          </li>)}</ul>
+        </section> : null}
         {view === "mine" && canViewMine && viewer && viewerResult ? (
           <div className="mt-5 space-y-5">
             <PlayerHeading title="Ваши результаты" player={viewer} description="Ваш путь в завершённой партии" />

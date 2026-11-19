@@ -52,11 +52,17 @@ export function composeGameSummary(facts: GameSummaryFacts) {
     ? facts.endReason === "dream" ? `${winner.mention} покупает выбранную перед стартом мечту и побеждает.`
       : facts.endReason === "fast_track_income" ? `${winner.mention} увеличивает доход на большом круге как минимум на $50 000 и побеждает.`
       : `${winner.mention} выходит на уровень финансовой свободы раньше остальных: пассивный доход к финалу составил ${money(winner.finalPassiveIncomeCents)} в месяц.`
+    : facts.endReason === "all_players_departed"
+      ? "Все участники выбыли из партии; победителя нет."
     : facts.endReason === "time_limit"
       ? "Время партии завершилось, и результат зафиксирован на достигнутых позициях."
       : facts.endReason === "all_players_bankrupt"
-        ? "Финал оказался непростым: финансовые испытания остановили всех участников."
+        ? facts.players.some(player => player.status === "LEFT" || player.status === "KICKED")
+          ? "После досрочного выбытия части участников оставшиеся игроки выбыли из-за банкротства."
+          : "Финал оказался непростым: финансовые испытания остановили всех участников."
         : "Финальный результат сложился из решений, сделок и поворотных событий партии.";
+  const departures = facts.players.filter(player => player.status === "LEFT" || player.status === "KICKED")
+    .map(player => `• ${player.mention}: ${player.status === "LEFT" ? "добровольно завершил участие досрочно" : "удалён из партии ведущим или администратором"}.`);
   const highlights = facts.highlights.slice(0, 3).map((highlight) => `• ${highlight.text}`);
   const awards = facts.awards.slice(0, 3).map((award) => `• ${award.text}`);
   const roster = naturalList(facts.players.map((player) => player.mention));
@@ -67,6 +73,7 @@ export function composeGameSummary(facts: GameSummaryFacts) {
       `🎲 Итоги игры «${facts.title}»`,
       "",
       `${progress} ${outcome}`,
+      ...(departures.length ? ["", "Досрочное завершение участия:", ...departures] : []),
       ...(awards.length ? ["", "Награды партии:", ...awards] : []),
       ...(highlights.length ? ["", "Главные повороты:", ...highlights] : []),
       "",

@@ -674,6 +674,55 @@ export function command202(input:State202,actor:string,c:Command202,random:Rando
   event(s,p.id,commandText202(c,input.queue[0]),undefined,commandLog202(input,c));
   advance(s,random);validateState202(s);return s;
 }
+/** Server-authorized departure; historical financial projections remain in the database. */
+export function removePlayer202(input:State202, playerId:string, random:Random202, reason:"voluntary"|"removed"="voluntary"):State202 {
+  const s=structuredClone(input);
+  const index=s.players.findIndex(p=>p.id===playerId);
+  check(index>=0,"Игрок уже выбыл");
+  const wasCurrent=index===s.current;
+  s.revision++;
+  event(s,playerId,reason==="voluntary"?"Игрок добровольно завершил участие":"Игрок удалён ведущим или администратором");
+  s.players.splice(index,1);
+  s.offers=s.offers.filter(o=>o.from!==playerId&&o.to!==playerId&&!o.shares?.[playerId]);
+  for(const a of s.assets) { delete a.owners[playerId]; delete a.lockedUntil[playerId]; }
+  s.assets=s.assets.filter(a=>owners(a).length>0);
+  for(const [cell,owner] of Object.entries(s.world.owners))if(owner===playerId)delete s.world.owners[Number(cell)];
+  for(const cell of Object.keys(s.world.influence))s.world.influence[cell]=s.world.influence[cell]!.filter(id=>id!==playerId);
+  const clean=(t:Task202):Task202|undefined=>{
+    if(t.resume) { const resume=clean(t.resume); if(resume)t.resume=resume;else delete t.resume; }
+    if(t.playerId===playerId) {
+      if(t.kind==="right")return t.resume;
+      if((t.kind==="sale"||t.kind==="exchange")&&t.assetId) {
+        const a=s.assets.find(a=>a.id===t.assetId);
+        const next=a&&owners(a).find(id=>!t.approved?.includes(id));
+        if(next)t.playerId=next;else return undefined;
+      } else return undefined;
+    }
+    if(t.assetId&&!s.assets.some(a=>a.id===t.assetId)&&(t.kind==="sale"||t.kind==="exchange"))return undefined;
+    if(t.candidates)t.candidates=t.candidates.filter(id=>id!==playerId);
+    if(t.bids)delete t.bids[playerId];
+    if(t.holderIds)t.holderIds=t.holderIds.filter(id=>id!==playerId);
+    if(t.kind==="right"&&!t.resume)return undefined;
+    return t;
+  };
+  s.queue=s.queue.flatMap(t=>{const next=clean(t);return next?[next]:[];});
+  if(!s.players.length){s.current=0;s.queue=[];s.offers=[];return s;}
+  if(index<s.current)s.current--;
+  if(s.current>=s.players.length){s.current=0;s.round++;}
+  if(wasCurrent){s.queue=[];s.offers=[];beginTurn(s);}
+  else {
+    const auction=s.queue[0];
+    if(auction?.kind==="auction"&&auction.candidates?.every(id=>auction.bids?.[id]!==undefined)) {
+      // Resolve with the remaining sealed bids using the normal auction reducer.
+      const last=auction.candidates.at(-1);
+      if(last){const bid=auction.bids![last]!;delete auction.bids![last];decide(s,player(s,last),auction,{revision:s.revision,type:"decide",choice:bid>0?"bid":"pass",amount:bid},random);}
+      else s.queue.shift();
+    }
+    advance(s,random);
+  }
+  validateState202(s);return s;
+}
+
 export function validateState202(s:State202) {
   for(const p of s.players)for(const value of [p.cash,p.salary,p.baseExpenses,p.fastIncome,...p.stocks.flatMap(a=>[a.cost,a.quantity]),...p.shorts.flatMap(a=>[a.cost,a.quantity]),...p.options.flatMap(a=>[a.cost,a.quantity,a.strikeTotal])])check(Number.isSafeInteger(value),"Денежное значение вышло за допустимые пределы");
   for(const a of s.assets){check(Object.values(a.owners).every(v=>Number.isInteger(v)&&v>=0)&&Object.values(a.owners).reduce((n,v)=>n+v,0)<=10000,"Нарушены доли собственности");}

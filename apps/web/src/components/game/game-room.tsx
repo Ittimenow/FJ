@@ -2,6 +2,7 @@
 
 import { CompactAssets, isStockAsset } from "./asset-portfolio";
 import { SandboxPanel } from "./sandbox-panel";
+import { PlayerDepartureProvider } from "./player-departure";
 import { Game202Panel } from "./game-202-panel";
 import { GameModeSettings } from "./game-mode-settings";
 import { RatRaceBoard, RatRaceMobileBoard as MobileBoard, RatRaceTabs, PlayerToken, cellTypes } from "./rat-race-layout";
@@ -1421,7 +1422,7 @@ export function GameRoom({
       gameId={snapshot.game.id}
       token={token}
       events={snapshot.events}
-      players={gamePlayers}
+      players={snapshot.players.filter(player => player.role === "PLAYER")}
       currentGamePlayerId={me?.id ?? null}
       gameStatus={snapshot.game.status}
       onSendBabyGift={sendBabyGift}
@@ -1459,12 +1460,16 @@ export function GameRoom({
 
   const sandboxPanel = snapshot.sandbox && sandboxOpen ? <SandboxPanel snapshot={snapshot} token={token} playerId={sandboxPlayerId} onPlayerChange={setSandboxPlayerId} onSnapshot={next => { setTrackView(null);setSnapshot(current => acceptGameSnapshot(current, next)); }} onClose={() => setSandboxOpen(false)} /> : null;
 
+  const departureProps = { snapshot, token, currentUserId, canManage, onSnapshot: (next: GameSnapshot) => setSnapshot(current => acceptGameSnapshot(current, next)) };
+  if (snapshot.game.gameType === "202" && snapshot.game202 && !snapshot.game202.players.length) {
+    return <section className="rounded-2xl bg-white p-6"><h1 className="text-xl font-bold">Все игроки выбыли</h1><p className="mt-3">Партия завершилась без победителя.</p><a className="mt-4 inline-block text-journey underline" href={`/games/${snapshot.game.id}/results`}>Результаты игры</a></section>;
+  }
   if (snapshot.game.gameType === "202" && snapshot.game202 && snapshot.game.status !== "WAITING") {
-    return <>{sandboxPanel}<Game202Panel controlledPlayerId={snapshot.sandbox ? sandboxPlayerId : undefined} snapshot={snapshot} token={token} currentUserId={currentUserId} showFastTrack={showFastTrack} onTrackChange={setTrackView} onSnapshot={next => setSnapshot(current => acceptGameSnapshot(current, next))} /></>;
+    return <PlayerDepartureProvider {...departureProps}>{sandboxPanel}<Game202Panel controlledPlayerId={snapshot.sandbox ? sandboxPlayerId : undefined} snapshot={snapshot} token={token} currentUserId={currentUserId} showFastTrack={showFastTrack} onTrackChange={setTrackView} onSnapshot={next => setSnapshot(current => acceptGameSnapshot(current, next))} /></PlayerDepartureProvider>;
   }
 
   return (
-    <div
+    <PlayerDepartureProvider {...departureProps}><div
       className={cn(
         "game-room grid w-full min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5",
         showFastTrack ? "game-room--fast-track-active" : null,
@@ -1802,7 +1807,7 @@ export function GameRoom({
         </>
       )}
       </> : null}
-    </div>
+    </div></PlayerDepartureProvider>
   );
 }
 
@@ -2919,6 +2924,7 @@ function BabyJournalEvent({
   const currentCashCents = currentGamePlayer?.financialState?.cashCents ?? 0;
   const showAction =
     isActiveParticipant &&
+    recipient?.status === "JOINED" &&
     !isRecipient &&
     !alreadyGifted &&
     windowOpen &&
@@ -3299,6 +3305,8 @@ const eventTitles: Record<string, string> = {
   "game:deleted": "Игра удалена",
   "game:ended": "Игра завершена",
   "bot:decision": "Решение бота",
+  "player:departed": "Игрок добровольно завершил участие",
+  "player:expelled": "Игрок удалён ведущим или администратором",
   "player:joined": "Игрок вошел в комнату",
   "player:added": "Игрок добавлен ведущим",
   "player:removed": "Участник удалён из лобби",

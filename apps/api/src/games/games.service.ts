@@ -1,4 +1,4 @@
-import { newGame202, command202, public202, finances202, rules202, turnContext202, type State202, type Public202, type Task202, type InitialPlayer202, type Command202 } from "@cashflow/shared";
+import { removePlayer202, newGame202, command202, public202, finances202, rules202, turnContext202, type State202, type Public202, type Task202, type InitialPlayer202, type Command202 } from "@cashflow/shared";
 import { fastTrackCells, fastTrackRoute, fastTrackDiceCount, fastTrackExpense, fastTrackOwner, fastTrackPrice, isDreamCell, readFastTrackWorld, settleFastTrackPurchase } from "@cashflow/shared";
 import { TestGameOptionsDto, RollDiceDto, FastTrackDecisionDto } from "./dto/fast-track.dto";
 import {
@@ -974,7 +974,7 @@ export class GamesService {
       status: { not: GameStatus.CANCELLED }
     };
     if (!canSeeAll) {
-      mineWhere.OR = [{ createdById: userId }, { players: { some: { userId, status: GamePlayerStatus.JOINED } } }];
+      mineWhere.OR = [{ createdById: userId }, { players: { some: { userId, OR: [{ status: GamePlayerStatus.JOINED }, { financialState: { isNot: null }, status: { in: [GamePlayerStatus.LEFT, GamePlayerStatus.KICKED, GamePlayerStatus.BANKRUPT] } }] } } }];
     }
 
     const [mine, open] = await Promise.all([
@@ -1460,6 +1460,65 @@ export class GamesService {
     return this.actionResult(gameId, [{ type: realtimeEvents.stateUpdate, payload: {} }]);
   }
 
+  async departPlayer(gameId: string, actorUserId: string, targetId?: string) {
+    if (targetId) await this.ensureCanManageGame(gameId, actorUserId);
+    else await this.ensureGameAccess(gameId, actorUserId);
+    const events: PendingEvent[] = [];
+    await this.prisma.$transaction(async tx => {
+      await this.lockGame(tx, gameId);
+      const game = await tx.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: { orderBy: { seat: "asc" } } } });
+      if (game.status !== GameStatus.IN_PROGRESS && game.status !== GameStatus.PAUSED) throw new BadRequestException("Выход доступен только в начатой партии");
+      const active = game.players.filter(p => p.role === GameRole.PLAYER && p.status === GamePlayerStatus.JOINED);
+      const leaving = active.find(p => targetId ? p.id === targetId : p.userId === actorUserId && p.controller === PlayerController.HUMAN);
+      if (!leaving) throw new BadRequestException("Игрок уже выбыл или не участвует в партии");
+      const kicked = Boolean(targetId);
+      await tx.gamePlayer.update({ where: { id: leaving.id }, data: { status: kicked ? GamePlayerStatus.KICKED : GamePlayerStatus.LEFT, leftAt: new Date() } });
+      events.push({ type: kicked ? "player:expelled" : "player:departed", gamePlayerId: leaving.id, payload: { reason: kicked ? "removed_by_manager" : "voluntary", displayName: leaving.guestName } });
+      const remaining = active.filter(p => p.id !== leaving.id);
+      if (game.gameType === GameType.ADVANCED_202) {
+        const state = removePlayer202(game.game202State as unknown as State202, leaving.id, max => randomInt(max), kicked ? "removed" : "voluntary");
+        await this.project202(tx, state);
+        await tx.game.update({ where: { id: gameId }, data: { game202State: state as unknown as Prisma.InputJsonValue, fastTrackWorld: state.world as unknown as Prisma.InputJsonValue, currentTurnIndex: state.current, currentRound: state.round } });
+        for (const line of state.log.filter(line => line.revision === state.revision)) {
+          const { playerId, ...payload } = line;
+          events.push({ type: "game202:action", gamePlayerId: playerId, payload: { ...payload, gameType: "202" } });
+        }
+      } else {
+        const oldIndex = game.currentTurnIndex % active.length;
+        const removedIndex = active.findIndex(p => p.id === leaving.id);
+        const ownsTurn = removedIndex === oldIndex;
+        let nextIndex = oldIndex - (removedIndex < oldIndex ? 1 : 0);
+        let round = game.currentRound;
+        let pending = this.pendingAction(game.settings);
+        if (ownsTurn) pending = null;
+        else if (pending?.type === "market_sale") {
+          const offers = pending.remainingOffers.filter(o => o.gamePlayerId !== leaving.id);
+          if (pending.gamePlayerId === leaving.id) {
+            pending = offers.length ? this.marketPendingAction({ id: pending.cardId, title: pending.title }, offers, pending.offerNumber + 1) : null;
+            if (!pending) nextIndex++;
+          } else pending = { ...pending, remainingOffers: offers };
+        } else if (pending?.type === "deal_auction") {
+          pending = { ...pending, bidderGamePlayerIds: pending.bidderGamePlayerIds.filter(id => id !== leaving.id), responses: pending.responses.filter(r => r.gamePlayerId !== leaving.id) };
+          if (!pending.bidderGamePlayerIds.length) pending = { type: "deal_card_drawn", gamePlayerId: pending.gamePlayerId, cardId: pending.cardId, cardType: pending.cardType, auctionAttempted: true };
+        } else if (pending?.type === "stock_sale_window") {
+          pending = { ...pending, sellerGamePlayerIds: pending.sellerGamePlayerIds.filter(id => id !== leaving.id), resolvedGamePlayerIds: pending.resolvedGamePlayerIds.filter(id => id !== leaving.id) };
+        } else if (pending?.gamePlayerId === leaving.id) pending = null;
+        if (remaining.length && nextIndex >= remaining.length) { nextIndex = 0; round++; }
+        const world = readFastTrackWorld(game.fastTrackWorld);
+        for (const [cell, owner] of Object.entries(world.owners)) if (owner === leaving.id) delete world.owners[cell];
+        for (const cell of Object.keys(world.influence)) world.influence[cell] = world.influence[cell]!.filter(id => id !== leaving.id);
+        await tx.game.update({ where: { id: gameId }, data: { currentTurnIndex: remaining.length ? nextIndex : 0, currentRound: round, settings: this.settingsWithPending(game.settings, pending), fastTrackWorld: world as unknown as Prisma.InputJsonValue } });
+      }
+      if (!remaining.length) {
+        await tx.game.update({ where: { id: gameId }, data: { status: GameStatus.ENDED, endedAt: new Date(), currentTurnIndex: 0, settings: this.settingsWithPending(game.settings, null) } });
+        events.push({ type: realtimeEvents.gameEnded, payload: { reason: "all_players_departed" } });
+      }
+      events.push({ type: realtimeEvents.stateUpdate, payload: { reason: "player_departed" } });
+      await this.appendEvents(tx, gameId, actorUserId, events);
+    }, { timeout: 20_000 });
+    return this.actionResult(gameId, events);
+  }
+
   async startGame(gameId: string, userId: string) {
     await this.ensureCanManageGame(gameId, userId);
     const emittedEvents: PendingEvent[] = [];
@@ -1662,6 +1721,9 @@ export class GamesService {
         return false;
       }
 
+      // Once the human has explicitly left, the remaining bots keep playing.
+      const human = await tx.gamePlayer.findFirst({ where: { gameId, role: GameRole.PLAYER, controller: PlayerController.HUMAN, status: GamePlayerStatus.JOINED } });
+      if (!human) return false;
       const now = new Date();
       const timeline = gameTimeline(game.settings, game.startedAt);
       const update = await tx.game.updateMany({
@@ -3545,6 +3607,7 @@ export class GamesService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        await this.lockGame(tx, gameId);
         const sender = await this.requirePlayer(tx, gameId, userId, true);
         const birthEvent = await tx.gameEvent.findFirst({
           where: {
@@ -3592,6 +3655,8 @@ export class GamesService {
           throw new ConflictException("Вы уже поздравили этого игрока");
         }
 
+        const recipient = await tx.gamePlayer.findFirst({ where: { id: birthEvent.gamePlayerId, gameId, role: GameRole.PLAYER, status: GamePlayerStatus.JOINED } });
+        if (!recipient) throw new BadRequestException("Игрок уже завершил участие в партии");
         const [senderState, recipientState] = await Promise.all([
           tx.playerFinancialState.findUniqueOrThrow({
             where: { gamePlayerId: sender.id }
@@ -5342,7 +5407,7 @@ export class GamesService {
       where: {
         status: AssetStatus.ACTIVE,
         symbol: normalizedSymbol,
-        gamePlayer: { gameId, track: BoardTrack.RAT_RACE }
+        gamePlayer: { gameId, track: BoardTrack.RAT_RACE, status: GamePlayerStatus.JOINED }
       },
       select: {
         id: true,
@@ -6678,7 +6743,7 @@ export class GamesService {
       where: {
         gameId,
         userId,
-        status: { in: [GamePlayerStatus.JOINED, GamePlayerStatus.BANKRUPT] }
+        OR: [{ status: { in: [GamePlayerStatus.JOINED, GamePlayerStatus.BANKRUPT] } }, { status: { in: [GamePlayerStatus.LEFT, GamePlayerStatus.KICKED] }, financialState: { isNot: null } }]
       }
     });
     if (!player && (await this.canManageGame(gameId, userId))) {

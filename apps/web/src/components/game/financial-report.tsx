@@ -1,5 +1,7 @@
 "use client";
 
+import { PlayerDepartureButton } from "./player-departure";
+
 import { figurineImagePath, outstandingBankLoanBalanceCents } from "@cashflow/shared";
 import { Baby, CheckCircle2, Circle, Landmark } from "lucide-react";
 import type { ReactNode } from "react";
@@ -661,6 +663,7 @@ export function FinancialPlayerReport({player,players,currentPlayerId,canOpenBan
                 ))}
               </div>
             ) : null}
+            <PlayerDepartureButton player={player} />
             <OtherPlayersList
               className="mt-4 border-t border-line/70 pt-4"
               players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}
@@ -711,6 +714,7 @@ export function FinancialPlayerReport({player,players,currentPlayerId,canOpenBan
               presentation={presentation}
             />}
             <CashflowEquation state={state} presentation={presentation} />
+            <PlayerDepartureButton player={player} />
             <OtherPlayersList
               className="border-t border-line/70 pt-3"
               players={players.filter((otherPlayer) => otherPlayer.id !== player.id)}

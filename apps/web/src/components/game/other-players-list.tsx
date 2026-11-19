@@ -1,5 +1,7 @@
 "use client";
 
+import { PlayerDepartureButton } from "./player-departure";
+
 import { fastTrackCells, outstandingBankLoanBalanceCents } from "@cashflow/shared";
 import { Orbit } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +44,9 @@ export function OtherPlayersList({ players, currentPlayerId, className = "", pre
                 <span>{fastTrack ? `Денежный поток ${presentation.money(state.fastTrackIncomeCents ?? 0)}` : `Поток ${presentation.money(state.monthlyCashflowCents)}/мес`}</span>
               </> : null}
             </div>
+            {player.status === "LEFT" || player.status === "KICKED" ? <p className="mt-2 text-xs text-muted">{player.status === "LEFT" ? "Добровольно завершил участие" : "Удалён из партии"}</p> : null}
             {state ? fastTrack ? <FastTrackResult player={player} presentation={presentation} /> : <PlayerFreedomMini player={player} presentation={presentation} /> : null}
+            <PlayerDepartureButton player={player} />
           </li>;
         })}
       </ul>

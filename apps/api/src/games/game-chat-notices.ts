@@ -1,4 +1,6 @@
 export const gameChatNoticeTypes = [
+  "player:departed",
+  "player:expelled",
   "game:started",
   "game:paused",
   "game:resumed",
@@ -56,6 +58,12 @@ export function gameChatNotices(
     const period = typeof payload.currentPeriod === "number" ? ` ${payload.currentPeriod}` : "";
     let body: string;
     switch (event.type) {
+      case "player:departed":
+        body = `${playerName(event.gamePlayerId)} добровольно завершил участие в партии.`;
+        break;
+      case "player:expelled":
+        body = `${playerName(event.gamePlayerId)} удалён из партии ведущим или администратором.`;
+        break;
       case "game:started":
         body = "Партия началась.";
         break;

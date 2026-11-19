@@ -13,6 +13,7 @@ const birthEventId = "11111111-1111-4111-8111-111111111111";
 
 function serviceFixture(options: {
   duplicate?: boolean;
+  recipientLeft?: boolean;
   laterTurns?: number;
   senderCashCents?: bigint;
   birthRecipientId?: string;
@@ -42,8 +43,9 @@ function serviceFixture(options: {
   }));
 
   const transactionClient = {
+    $queryRaw: async () => [],
     gamePlayer: {
-      findFirst: async () => sender
+      findFirst: async ({ where }: { where: { id?: string } }) => where.id && options.recipientLeft ? null : sender
     },
     gameEvent: {
       findFirst: async () => ({
@@ -160,4 +162,12 @@ test("does not allow a player to congratulate themselves", async () => {
     }),
     BadRequestException
   );
+});
+
+
+test("does not change frozen balances after the recipient leaves", async () => {
+  const fixture = serviceFixture({ recipientLeft: true });
+  await assert.rejects(fixture.service.sendBabyGift("game-1", "sender-user", { birthEventId, amountCents: 100 }), /завершил участие/);
+  assert.equal(fixture.senderState.cashCents, 1000n);
+  assert.equal(fixture.recipientState.cashCents, 200n);
 });

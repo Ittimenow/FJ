@@ -291,7 +291,7 @@ export function PlayerToken({
 function cellPlayers(snapshot: GameSnapshot, cellIndex: number) {
   return snapshot.players.filter(
     (player) =>
-      player.role === "PLAYER" &&
+      player.role === "PLAYER" && player.status === "JOINED" &&
       player.track === "RAT_RACE" &&
       player.position === cellIndex
   );
