@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "changes:check": "node scripts/check-changes.mjs",
+    "verify": "npm run changes:check && npm run typecheck && npm test && npm run build",
     "predev:local": "node scripts/check-dev-ports.mjs FJ 3000:web 4000:api",
     "dev:local": "node scripts/dev-local.mjs",
     "predev:api": "node scripts/check-dev-ports.mjs FJ 4000:api",

@@ -1,29 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AssetStatus, BoardTrack } from "@prisma/client";
+import { AssetStatus, BoardTrack, GamePlayerStatus } from "@prisma/client";
 import { GamesService } from "./games.service";
 
-test("обратное дробление меняет все пакеты нужного тикера и не трогает другие акции", async () => {
+test("обратное дробление меняет пакеты нужного тикера только у активных игроков", async () => {
+  const playerStatuses: Record<string, GamePlayerStatus> = {
+    max: GamePlayerStatus.JOINED,
+    left: GamePlayerStatus.LEFT,
+    kicked: GamePlayerStatus.KICKED,
+    bankrupt: GamePlayerStatus.BANKRUPT
+  };
   const assets = [
     { id: "ok-10", gamePlayerId: "max", name: "Акции OK4U: $10", symbol: "OK4U", quantity: 300, units: 300 },
     { id: "ok-5", gamePlayerId: "max", name: "Акции OK4U: $5", symbol: "OK4U", quantity: 1000, units: 1000 },
     { id: "ok-1", gamePlayerId: "max", name: "Акции OK4U: $1", symbol: "OK4U", quantity: 20000, units: 20000 },
-    { id: "chip", gamePlayerId: "max", name: "Акции CHIP", symbol: "CHIP", quantity: 400, units: 400 }
+    { id: "chip", gamePlayerId: "max", name: "Акции CHIP", symbol: "CHIP", quantity: 400, units: 400 },
+    ...["left", "kicked", "bankrupt"].map(gamePlayerId => ({
+      id: `ok-${gamePlayerId}`, gamePlayerId, name: "Акции OK4U", symbol: "OK4U", quantity: 200, units: 200
+    }))
   ];
   const updates: Array<{ id: string; data: Record<string, unknown> }> = [];
   const tx = {
     playerAsset: {
       findMany: async ({ where, select }: {
-        where: { status: AssetStatus; symbol: string; gamePlayer: { gameId: string; track: BoardTrack } };
+        where: { status: AssetStatus; symbol: string; gamePlayer: { gameId: string; track: BoardTrack; status: GamePlayerStatus } };
         select: Record<string, boolean>;
       }) => {
         assert.deepEqual(where, {
           status: AssetStatus.ACTIVE,
           symbol: "OK4U",
-          gamePlayer: { gameId: "game", track: BoardTrack.RAT_RACE }
+          gamePlayer: { gameId: "game", track: BoardTrack.RAT_RACE, status: GamePlayerStatus.JOINED }
         });
         assert.equal(select.name, true);
-        return assets.filter((asset) => asset.symbol === where.symbol);
+        return assets.filter((asset) => asset.symbol === where.symbol
+          && playerStatuses[asset.gamePlayerId] === where.gamePlayer.status);
       },
       update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         updates.push({ id: where.id, data });
