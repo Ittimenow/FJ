@@ -46,13 +46,11 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npm run changes:check
       - run: npm run db:generate
       - run: npm run db:push
       - run: npm run db:verify
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: Verify final changes
+        run: npm run verify
 
   image:
     needs: build
